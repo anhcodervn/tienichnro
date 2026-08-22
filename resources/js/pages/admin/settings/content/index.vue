@@ -13,8 +13,8 @@ import type {
     ContentPageTabKey,
     ContentPageTitleKey,
 } from '@/types/setting.type';
-import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { uploadEditorImages } from '@/utils/editor-image-upload';
+import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import {
     BookOpenText,
     CircleHelp,
@@ -79,7 +79,7 @@ const pageDefinitions: PageDefinition[] = [
         key: 'faq_page',
         label: 'FAQ',
         subtitle: 'Câu hỏi thường gặp',
-        description: 'Cập nhật các câu hỏi thường gặp cho người dùng API mua proxy.',
+        description: 'Cập nhật các câu hỏi thường gặp cho người dùng dịch vụ nạp game.',
         slug: 'cau-hoi-thuong-gap',
         icon: CircleHelp,
         titleKey: 'faq_page_title',
@@ -107,7 +107,7 @@ const pageDefinitions: PageDefinition[] = [
         key: 'about_page',
         label: 'Giới thiệu',
         subtitle: 'Giới thiệu về hệ thống',
-        description: 'Trình bày thông tin tổng quan, năng lực và định vị sản phẩm giapproxy.vn.',
+        description: 'Trình bày thông tin tổng quan, năng lực và định vị sản phẩm napcarot.vn.',
         slug: 'gioi-thieu',
         icon: Info,
         titleKey: 'about_page_title',
@@ -459,7 +459,9 @@ onMounted(async () => {
         <Breadcrumb title="Cấu hình nội dung" description="Dashboard / Cấu hình nội dung" />
 
         <section class="space-y-5">
-            <div class="flex flex-col gap-4 rounded-[12px] border border-slate-200 bg-white px-5 py-5 shadow-sm xl:flex-row xl:items-start xl:justify-between">
+            <div
+                class="flex flex-col gap-4 rounded-[12px] border border-slate-200 bg-white px-5 py-5 shadow-sm xl:flex-row xl:items-start xl:justify-between"
+            >
                 <div class="max-w-3xl">
                     <p class="text-sm font-medium uppercase tracking-[0.14em] text-indigo-500">Dashboard</p>
                     <h1 class="mt-2 text-3xl font-bold tracking-tight text-slate-950 sm:text-4xl">Cấu hình nội dung</h1>
@@ -538,10 +540,7 @@ onMounted(async () => {
 
                         <div class="min-w-0 flex-1">
                             <p class="text-base font-semibold">{{ page.label }}</p>
-                            <p
-                                class="mt-1 truncate text-sm"
-                                :class="activeTab === page.key ? 'text-indigo-100' : 'text-slate-500'"
-                            >
+                            <p class="mt-1 truncate text-sm" :class="activeTab === page.key ? 'text-indigo-100' : 'text-slate-500'">
                                 {{ page.subtitle }}
                             </p>
                         </div>
@@ -550,7 +549,10 @@ onMounted(async () => {
                             <p class="text-xs font-medium" :class="activeTab === page.key ? 'text-indigo-100' : 'text-slate-400'">
                                 {{ page.blocks }} khối
                             </p>
-                            <p class="mt-1 text-xs font-semibold" :class="page.published ? 'text-emerald-200' : activeTab === page.key ? 'text-indigo-100' : 'text-slate-400'">
+                            <p
+                                class="mt-1 text-xs font-semibold"
+                                :class="page.published ? 'text-emerald-200' : activeTab === page.key ? 'text-indigo-100' : 'text-slate-400'"
+                            >
                                 {{ page.published ? 'Công khai' : 'Ẩn' }}
                             </p>
                         </div>
@@ -666,11 +668,7 @@ onMounted(async () => {
                                 <p class="text-xs uppercase tracking-[0.14em] text-slate-400">Trạng thái</p>
                                 <span
                                     class="mt-2 inline-flex rounded-full px-3 py-1 text-sm font-semibold"
-                                    :class="
-                                        isPublishedValue
-                                            ? 'bg-emerald-50 text-emerald-700'
-                                            : 'bg-slate-100 text-slate-600'
-                                    "
+                                    :class="isPublishedValue ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'"
                                 >
                                     {{ isPublishedValue ? 'Đang hiển thị' : 'Đang ẩn' }}
                                 </span>
@@ -689,11 +687,15 @@ onMounted(async () => {
                     <div class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
                         <h3 class="text-xl font-semibold text-slate-950">Gợi ý SEO</h3>
                         <div class="mt-5 flex items-center gap-4">
-                            <div class="flex h-20 w-20 items-center justify-center rounded-full border-4 border-indigo-500/20 text-lg font-bold text-indigo-600">
+                            <div
+                                class="flex h-20 w-20 items-center justify-center rounded-full border-4 border-indigo-500/20 text-lg font-bold text-indigo-600"
+                            >
                                 {{ seoScore }}/100
                             </div>
                             <div>
-                                <p class="text-xl font-semibold text-emerald-600">{{ seoScore >= 67 ? 'Tốt' : seoScore >= 34 ? 'Trung bình' : 'Cần cải thiện' }}</p>
+                                <p class="text-xl font-semibold text-emerald-600">
+                                    {{ seoScore >= 67 ? 'Tốt' : seoScore >= 34 ? 'Trung bình' : 'Cần cải thiện' }}
+                                </p>
                                 <p class="mt-1 text-sm leading-6 text-slate-500">Nội dung được đánh giá dựa trên metadata và nội dung chính.</p>
                             </div>
                         </div>

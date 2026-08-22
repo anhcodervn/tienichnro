@@ -2,6 +2,8 @@
 
 namespace App\Features\Client\Profile\Requests;
 
+use App\Models\User;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -9,22 +11,18 @@ class UpdateProfileRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user() !== null;
+        return $this->user() instanceof User;
     }
 
     /**
-     * @return array<string, array<int, mixed>>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
-        $userId = $this->user()?->id;
-
         return [
-            'full_name' => ['required', 'string', 'max:255'],
-            'email' => ['required', 'email:rfc', 'max:255', Rule::unique('users', 'email')->ignore($userId)],
-            'phone' => ['nullable', 'string', 'max:20'],
-            'avatar' => ['nullable', 'string', 'max:2048'],
-            'username' => ['required', 'string', 'max:32', 'regex:/^[a-z0-9]+$/', Rule::unique('users', 'username')->ignore($userId)],
+            'avatar' => ['nullable', 'url:http,https', 'max:2048'],
+            'full_name' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:30', Rule::unique('users', 'phone')->ignore($this->user()?->id)],
         ];
     }
 }

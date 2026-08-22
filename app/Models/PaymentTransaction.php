@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class PaymentTransaction extends Model
@@ -12,9 +12,11 @@ class PaymentTransaction extends Model
 
     protected $fillable = [
         'user_id',
+        'order_id',
         'bank_code',
         'account_number',
         'transaction_code',
+        'provider_transaction_id',
         'amount',
         'content',
         'raw_data',
@@ -32,5 +34,10 @@ class PaymentTransaction extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function order(): BelongsTo
+    {
+        return $this->belongsTo(Order::class);
     }
 }

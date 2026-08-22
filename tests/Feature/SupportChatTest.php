@@ -236,7 +236,7 @@ test('discord job is unique retries failures and blocks user mentions', function
     ]);
     config([
         'services.discord.channels.support' => 'https://discord.test/webhook',
-        'app.url' => 'https://dailyproxy.test',
+        'app.url' => 'https://napcarot.test',
     ]);
     Http::preventStrayRequests();
     Http::fake(['https://discord.test/webhook' => Http::response([], 204)]);
@@ -252,12 +252,13 @@ test('discord job is unique retries failures and blocks user mentions', function
     Http::assertSent(function (Request $request) use ($conversation): bool {
         return $request->url() === 'https://discord.test/webhook'
             && $request['allowed_mentions'] === ['parse' => []]
-            && $request['embeds'][0]['url'] === "https://dailyproxy.test/admin/support?conversation={$conversation->id}"
+            && $request['embeds'][0]['url'] === "https://napcarot.test/admin/support?conversation={$conversation->id}"
             && ! str_contains((string) $request['embeds'][0]['description'], '@everyone');
     });
 });
 
 test('replaying events or discord jobs never creates duplicate messages', function () {
+    Event::fake([SupportMessageCreated::class]);
     $user = User::factory()->create();
     $conversation = supportConversationFor($user);
     $message = SupportMessage::factory()->for($conversation, 'conversation')->create([

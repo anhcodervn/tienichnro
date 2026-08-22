@@ -6,7 +6,7 @@ use App\Jobs\SendSystemMailJob;
 
 class MailQueue
 {
-    public const DEFAULT_SUBJECT = 'Hệ thống Auto Cron';
+    public const DEFAULT_SUBJECT = 'Thông báo từ Nạp Carot';
 
     /**
      * @param  array<int, string>  $messageLines
@@ -22,12 +22,12 @@ class MailQueue
     ): void {
         SendSystemMailJob::dispatch(
             to: $to,
-            subjectText: self::DEFAULT_SUBJECT,
+            subjectText: $subjectText !== '' ? $subjectText : self::DEFAULT_SUBJECT,
             title: $title,
             messageLines: $messageLines,
             ctaText: $ctaText,
             ctaUrl: $ctaUrl,
             mailer: $mailer,
-        )->onQueue('mails')->afterCommit();
+        );
     }
 }

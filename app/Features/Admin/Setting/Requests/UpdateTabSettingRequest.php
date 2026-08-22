@@ -2,6 +2,7 @@
 
 namespace App\Features\Admin\Setting\Requests;
 
+use App\Rules\ValidHomepageNoticeContent;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -25,6 +26,11 @@ class UpdateTabSettingRequest extends FormRequest
                 'site_description' => ['nullable', 'string', 'max:2000'],
                 'site_active' => ['required', 'boolean'],
                 'allow_register' => ['required', 'boolean'],
+            ],
+            'homepage' => [
+                'home_notice_title' => ['required', 'string', 'max:255'],
+                'home_notice_content' => ['present', 'array', new ValidHomepageNoticeContent],
+                'home_notice_is_published' => ['required', 'boolean'],
             ],
             'branding' => [
                 'light_logo' => ['nullable', 'string', 'max:2048'],

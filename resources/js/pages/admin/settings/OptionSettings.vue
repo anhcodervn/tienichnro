@@ -6,7 +6,7 @@
             <div class="flex flex-col gap-3 border-b border-slate-200 px-4 py-4 md:flex-row md:items-start md:justify-between">
                 <div>
                     <h2 class="text-base font-semibold text-slate-900">Nội dung chung toàn website</h2>
-                    <p class="text-sm text-slate-500">Các văn bản này được dùng cho nhóm trang pháp lý và thông tin công khai của giapproxy.vn.</p>
+                    <p class="text-sm text-slate-500">Các văn bản này được dùng cho nhóm trang pháp lý và thông tin công khai của napcarot.vn.</p>
                 </div>
 
                 <button

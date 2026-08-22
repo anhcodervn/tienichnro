@@ -1,0 +1,272 @@
+<?php
+
+namespace App\Features\Admin\Topup\Services;
+
+use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
+use App\Features\Topup\Jobs\ProcessTopupOrder;
+use App\Features\Topup\Services\OrderStatusService;
+use App\Mail\Orders\OrderCompletedMail;
+use App\Mail\Orders\OrderFailedMail;
+use App\Mail\Orders\PaymentReceivedMail;
+use App\Models\AdminAuditLog;
+use App\Models\Game;
+use App\Models\GameServer;
+use App\Models\Order;
+use App\Models\TopupPackage;
+use App\Models\TopupProvider;
+use App\Models\User;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Mail;
+use Illuminate\Validation\ValidationException;
+
+class TopupAdminService
+{
+    public function __construct(private readonly OrderStatusService $orderStatusService) {}
+
+    /** @param array<string, mixed> $filters */
+    public function games(array $filters): LengthAwarePaginator
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+
+        return Game::query()->withCount(['servers', 'packages'])
+            ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $nested) use ($search): void {
+                $nested->where('name', 'like', "%{$search}%")
+                    ->orWhere('slug', 'like', "%{$search}%")
+                    ->orWhere('short_name', 'like', "%{$search}%");
+            }))
+            ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->paginate($this->perPageFromFilters($filters));
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function servers(array $filters): LengthAwarePaginator
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+
+        return GameServer::query()->with('game:id,name')
+            ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $nested) use ($search): void {
+                $nested->where('name', 'like', "%{$search}%")
+                    ->orWhere('code', 'like', "%{$search}%");
+            }))
+            ->when(filled($filters['game_id'] ?? null), fn (Builder $query) => $query->where('game_id', $filters['game_id']))
+            ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->paginate($this->perPageFromFilters($filters));
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function providers(array $filters): LengthAwarePaginator
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+
+        return TopupProvider::query()
+            ->withCount('packages')
+            ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $nested) use ($search): void {
+                $nested->where('name', 'like', "%{$search}%")
+                    ->orWhere('slug', 'like', "%{$search}%");
+            }))
+            ->orderBy('name')
+            ->orderBy('id')
+            ->paginate($this->perPageFromFilters($filters));
+    }
+
+    /** @param array<string, mixed> $filters */
+    public function packages(array $filters): LengthAwarePaginator
+    {
+        $search = trim((string) ($filters['search'] ?? ''));
+
+        return TopupPackage::query()->with(['game:id,name', 'server:id,name', 'provider:id,name,slug'])
+            ->when($search !== '', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
+            ->when(filled($filters['game_id'] ?? null), fn (Builder $query) => $query->where('game_id', $filters['game_id']))
+            ->when(filled($filters['game_server_id'] ?? null), fn (Builder $query) => $query->where('game_server_id', $filters['game_server_id']))
+            ->when(filled($filters['provider_id'] ?? null), fn (Builder $query) => $query->where('provider_id', $filters['provider_id']))
+            ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
+            ->when(isset($filters['min_price']), fn (Builder $query) => $query->where('price', '>=', $filters['min_price']))
+            ->when(isset($filters['max_price']), fn (Builder $query) => $query->where('price', '<=', $filters['max_price']))
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->paginate($this->perPageFromFilters($filters));
+    }
+
+    public function orders(Request $request): LengthAwarePaginator
+    {
+        return Order::query()->with(['game:id,name', 'server:id,name'])
+            ->when($request->filled('search'), function (Builder $query) use ($request): void {
+                $search = trim($request->string('search')->toString());
+                $query->where(fn (Builder $nested) => $nested->where('code', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
+            })
+            ->when($request->filled('payment_status'), fn (Builder $query) => $query->where('payment_status', $request->string('payment_status')))
+            ->when($request->filled('order_status'), fn (Builder $query) => $query->where('order_status', $request->string('order_status')))
+            ->latest()->paginate($this->perPage($request));
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function create(Model $model, array $payload, User $admin, Request $request): Model
+    {
+        $model->fill($payload)->save();
+        $this->audit($admin, 'created', $model, [], $this->auditSnapshot($model), $request);
+
+        return $model->refresh();
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function update(Model $model, array $payload, User $admin, Request $request): Model
+    {
+        $old = $this->auditSnapshot($model);
+        $model->fill($payload)->save();
+        $priceChanged = $model instanceof TopupPackage
+            && array_intersect(['provider_price', 'original_price', 'price'], array_keys($payload)) !== [];
+        $action = $model instanceof TopupProvider && array_key_exists('connection_config', $payload)
+            ? 'provider_connection_config_updated'
+            : ($priceChanged ? 'package_price_changed' : 'updated');
+        $new = $this->auditSnapshot($model);
+
+        if ($model instanceof TopupProvider && array_key_exists('connection_config', $payload)) {
+            $new['connection_config_changed'] = true;
+        }
+
+        $this->audit($admin, $action, $model, $old, $new, $request);
+
+        return $model->refresh();
+    }
+
+    public function disable(Model $model, User $admin, Request $request): Model
+    {
+        return $this->update($model, ['status' => 'inactive'], $admin, $request);
+    }
+
+    public function delete(Model $model, User $admin, Request $request): void
+    {
+        DB::transaction(function () use ($model, $admin, $request): void {
+            $old = $this->auditSnapshot($model);
+            $this->audit($admin, 'deleted', $model, $old, [], $request);
+            $model->delete();
+        }, 3);
+    }
+
+    public function deleteCatalogModel(Game|GameServer|TopupPackage $model, User $admin, Request $request): void
+    {
+        DB::transaction(function () use ($model, $admin, $request): void {
+            /** @var Game|GameServer|TopupPackage $lockedModel */
+            $lockedModel = $model->newQuery()->lockForUpdate()->findOrFail($model->getKey());
+            [$errorKey, $message, $blockingRelations] = match (true) {
+                $lockedModel instanceof Game => [
+                    'game',
+                    'Không thể xóa game khi còn máy chủ, gói nạp hoặc đơn hàng. Hãy xóa dữ liệu con trước hoặc chuyển game sang Tạm tắt.',
+                    ['servers', 'packages', 'orders'],
+                ],
+                $lockedModel instanceof GameServer => [
+                    'server',
+                    'Không thể xóa máy chủ khi còn gói nạp hoặc đơn hàng. Hãy xóa dữ liệu liên quan trước hoặc chuyển máy chủ sang Tạm tắt.',
+                    ['packages', 'orders'],
+                ],
+                default => [
+                    'package',
+                    'Không thể xóa gói nạp đã phát sinh đơn hàng. Hãy chuyển gói sang Tạm tắt để giữ lịch sử.',
+                    ['orders'],
+                ],
+            };
+
+            foreach ($blockingRelations as $relation) {
+                if ($lockedModel->{$relation}()->exists()) {
+                    throw ValidationException::withMessages([$errorKey => $message]);
+                }
+            }
+
+            $old = $this->auditSnapshot($lockedModel);
+            $this->audit($admin, 'deleted', $lockedModel, $old, [], $request);
+            $lockedModel->delete();
+        }, 3);
+    }
+
+    public function updateOrder(Order $order, string $action, ?string $reason, User $admin, Request $request): Order
+    {
+        $dispatchTopup = false;
+
+        $order = DB::transaction(function () use ($order, $action, $reason, $admin, $request, &$dispatchTopup): Order {
+            $order = Order::query()->lockForUpdate()->findOrFail($order->id);
+            $old = $order->getAttributes();
+
+            match ($action) {
+                'mark_paid' => $this->markPaid($order),
+                'process' => $this->orderStatusService->transition($order, OrderStatus::Processing),
+                'complete' => $this->orderStatusService->transition($order, OrderStatus::Completed),
+                'fail' => $this->orderStatusService->transition($order, OrderStatus::Failed, $reason),
+                'cancel' => $this->orderStatusService->transition($order, OrderStatus::Cancelled, $reason),
+            };
+
+            $dispatchTopup = in_array($action, ['mark_paid', 'process'], true);
+            $this->audit($admin, 'order_'.$action, $order, $old, $order->getAttributes(), $request);
+
+            return $order->refresh();
+        }, 3);
+
+        if ($action === 'mark_paid') {
+            Mail::to($order->email)->queue(new PaymentReceivedMail($order));
+        } elseif ($action === 'complete') {
+            Mail::to($order->email)->queue(new OrderCompletedMail($order));
+        } elseif ($action === 'fail') {
+            Mail::to($order->email)->queue(new OrderFailedMail($order));
+        }
+
+        if ($dispatchTopup) {
+            ProcessTopupOrder::dispatch($order->id)->afterCommit();
+        }
+
+        return $order;
+    }
+
+    private function markPaid(Order $order): void
+    {
+        if ($order->payment_status === PaymentStatus::Paid) {
+            return;
+        }
+
+        $order->forceFill(['payment_status' => PaymentStatus::Paid, 'paid_at' => now()])->save();
+    }
+
+    /** @param array<string, mixed> $old @param array<string, mixed> $new */
+    private function audit(User $admin, string $action, Model $subject, array $old, array $new, Request $request): void
+    {
+        AdminAuditLog::query()->create([
+            'admin_id' => $admin->id, 'action' => $action,
+            'subject_type' => $subject::class, 'subject_id' => $subject->getKey(),
+            'old_values' => $old, 'new_values' => $new,
+            'ip' => $request->ip(), 'user_agent' => $request->userAgent(),
+        ]);
+    }
+
+    /** @return array<string, mixed> */
+    private function auditSnapshot(Model $model): array
+    {
+        if ($model instanceof TopupProvider) {
+            return [
+                'id' => $model->getKey(),
+                'name' => $model->name,
+                'slug' => $model->slug,
+                'has_connection_config' => filled($model->getRawOriginal('connection_config')),
+            ];
+        }
+
+        return $model->getAttributes();
+    }
+
+    private function perPage(Request $request): int
+    {
+        return min(max($request->integer('per_page', 20), 1), 100);
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function perPageFromFilters(array $filters): int
+    {
+        return min(max((int) ($filters['per_page'] ?? 20), 1), 100);
+    }
+}

@@ -4,21 +4,23 @@ namespace App\Features\Admin\User\Actions;
 
 use App\Events\WalletBalanceChanged;
 use App\Exceptions\ApiException;
+use App\Models\AdminAuditLog;
 use App\Models\Notification;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 
 class AdjustUserWalletAction
 {
     /**
-     * @param  array{type:string,amount:numeric-string|int|float,note?:string}  $payload
+     * @param  array{type:string,amount:int,note?:string}  $payload
      * @return array<string, mixed>
      */
-    public function handle(User $user, array $payload, User $actor): array
+    public function handle(User $user, array $payload, User $actor, Request $request): array
     {
-        return DB::transaction(function () use ($user, $payload, $actor): array {
+        return DB::transaction(function () use ($user, $payload, $actor, $request): array {
             $wallet = Wallet::query()
                 ->where('user_id', $user->id)
                 ->where('type', Wallet::TYPE_MAIN)
@@ -36,9 +38,9 @@ class AdjustUserWalletAction
                 $wallet = Wallet::query()->whereKey($wallet->id)->lockForUpdate()->firstOrFail();
             }
 
-            $amount = (float) $payload['amount'];
+            $amount = (int) $payload['amount'];
             $signedAmount = $payload['type'] === 'subtract' ? -1 * $amount : $amount;
-            $balanceBefore = (float) $wallet->balance;
+            $balanceBefore = (int) $wallet->balance;
             $balanceAfter = $balanceBefore + $signedAmount;
 
             if ($balanceAfter < 0) {
@@ -73,7 +75,7 @@ class AdjustUserWalletAction
                     number_format($balanceAfter, 0, ',', '.'),
                     filled($payload['note'] ?? null) ? ' Nội dung: '.trim((string) $payload['note']) : '',
                 ),
-                'redirect_url' => '/wallet',
+                'redirect_url' => '/tai-khoan/so-du',
                 'type' => $isCredit ? 'success' : 'warning',
                 'is_read' => false,
             ]);
@@ -101,6 +103,21 @@ class AdjustUserWalletAction
                     'created_at' => $notification->created_at?->toDateTimeString(),
                 ],
             );
+
+            AdminAuditLog::query()->create([
+                'admin_id' => $actor->id,
+                'action' => 'wallet_adjusted',
+                'subject_type' => User::class,
+                'subject_id' => $user->id,
+                'old_values' => ['balance' => $balanceBefore],
+                'new_values' => [
+                    'balance' => $balanceAfter,
+                    'amount' => $signedAmount,
+                    'note' => $payload['note'] ?? null,
+                ],
+                'ip' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+            ]);
 
             return [
                 'wallet' => [

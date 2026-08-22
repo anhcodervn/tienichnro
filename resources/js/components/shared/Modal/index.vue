@@ -20,7 +20,7 @@
 
                         <button
                             type="button"
-                            class="proxy-focus absolute right-4 top-4 z-10 rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-900"
+                            class="ui-focus absolute right-4 top-4 z-10 rounded-xl border border-slate-200 bg-white p-2 text-slate-500 shadow-sm hover:bg-slate-50 hover:text-slate-900"
                             :class="iconClass"
                             title="Đóng"
                             aria-label="Đóng hộp thoại"

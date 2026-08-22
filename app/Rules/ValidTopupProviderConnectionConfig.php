@@ -1,0 +1,109 @@
+<?php
+
+namespace App\Rules;
+
+use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
+use Illuminate\Translation\PotentiallyTranslatedString;
+
+class ValidTopupProviderConnectionConfig implements ValidationRule
+{
+    private const MAX_BYTES = 16384;
+
+    private const MAX_DEPTH = 4;
+
+    private const MAX_ITEMS = 50;
+
+    /**
+     * Run the validation rule.
+     *
+     * @param  Closure(string, ?string=): PotentiallyTranslatedString  $fail
+     */
+    public function validate(string $attribute, mixed $value, Closure $fail): void
+    {
+        if (! is_array($value) || array_is_list($value)) {
+            $fail('Cấu hình kết nối phải là một JSON object.');
+
+            return;
+        }
+
+        $encoded = json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+
+        if (! is_string($encoded) || strlen($encoded) > self::MAX_BYTES) {
+            $fail('Cấu hình kết nối không được vượt quá 16 KB.');
+
+            return;
+        }
+
+        $items = 0;
+
+        if (! $this->hasValidValues($value, 1, $items)) {
+            $fail('Cấu hình chỉ hỗ trợ tối đa 4 cấp, 50 trường; tên trường phải an toàn và giá trị chuỗi không quá 4096 ký tự.');
+
+            return;
+        }
+
+        $baseUrl = $value['base_url'] ?? null;
+
+        if (is_string($baseUrl) && $baseUrl !== '' && ! $this->hasValidBaseUrl($baseUrl)) {
+            $fail('base_url phải là URL HTTP hoặc HTTPS hợp lệ và không được trỏ tới địa chỉ nội bộ.');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>  $values
+     */
+    private function hasValidValues(array $values, int $depth, int &$items): bool
+    {
+        if ($depth > self::MAX_DEPTH) {
+            return false;
+        }
+
+        foreach ($values as $key => $value) {
+            $items++;
+
+            if ($items > self::MAX_ITEMS
+                || ! is_string($key)
+                || $key === '__encrypted'
+                || preg_match('/\A[a-zA-Z][a-zA-Z0-9_.-]{0,99}\z/', $key) !== 1) {
+                return false;
+            }
+
+            if (is_array($value)) {
+                if (array_is_list($value) || ! $this->hasValidValues($value, $depth + 1, $items)) {
+                    return false;
+                }
+
+                continue;
+            }
+
+            if (! is_string($value) && ! is_int($value) && ! is_float($value) && ! is_bool($value) && $value !== null) {
+                return false;
+            }
+
+            if (is_string($value) && mb_strlen($value) > 4096) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    private function hasValidBaseUrl(string $baseUrl): bool
+    {
+        $parts = parse_url($baseUrl);
+        $scheme = is_array($parts) ? ($parts['scheme'] ?? null) : null;
+        $host = is_array($parts) ? ($parts['host'] ?? null) : null;
+
+        if (! is_string($host) || ! in_array($scheme, ['http', 'https'], true) || mb_strlen($baseUrl) > 500) {
+            return false;
+        }
+
+        if (strtolower($host) === 'localhost' || str_ends_with(strtolower($host), '.localhost')) {
+            return false;
+        }
+
+        return filter_var($host, FILTER_VALIDATE_IP) === false
+            || filter_var($host, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) !== false;
+    }
+}

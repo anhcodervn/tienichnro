@@ -5,6 +5,7 @@ namespace App\Features\Auth\Requests;
 use App\Exceptions\ApiException;
 use App\Models\User;
 use Closure;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Str;
@@ -36,7 +37,7 @@ class RegisterRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -121,6 +122,10 @@ class RegisterRequest extends FormRequest
 
     protected function failedValidation(Validator $validator): void
     {
+        if (! $this->expectsJson()) {
+            parent::failedValidation($validator);
+        }
+
         throw new ApiException($validator->errors()->first(), 422, [
             'errors' => $validator->errors()->toArray(),
         ]);

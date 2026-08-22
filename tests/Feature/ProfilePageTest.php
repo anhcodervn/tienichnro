@@ -1,0 +1,197 @@
+<?php
+
+use App\Jobs\SaveUserLogJob;
+use App\Models\User;
+use App\Models\UserLog;
+use App\Models\WalletTransaction;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Queue;
+use Laravel\Sanctum\PersonalAccessToken;
+
+test('profile tabs require authentication', function (string $routeName): void {
+    $this->get(route($routeName))->assertRedirect(route('login'));
+})->with([
+    'overview' => 'account.index',
+    'profile' => 'account.profile.edit',
+    'password' => 'account.profile.password',
+    'api key' => 'account.profile.api',
+    'user logs' => 'account.profile.logs',
+    'wallet history' => 'account.profile.wallet',
+]);
+
+test('authenticated user can navigate every profile tab', function (): void {
+    $user = User::factory()->create();
+
+    $expectedPages = [
+        'account.index' => 'Hồ sơ hiển thị',
+        'account.profile.edit' => 'Hồ sơ hiển thị',
+        'account.profile.password' => 'Đổi mật khẩu',
+        'account.profile.api' => 'Quản lý API key',
+        'account.profile.logs' => 'Lịch sử người dùng',
+        'account.profile.wallet' => 'Lịch sử dòng tiền',
+    ];
+
+    foreach ($expectedPages as $routeName => $heading) {
+        $this->actingAs($user)
+            ->get(route($routeName))
+            ->assertSuccessful()
+            ->assertSee($heading)
+            ->assertSee('Thông tin user')
+            ->assertSee('Đổi mật khẩu')
+            ->assertSee('API key')
+            ->assertSee('Lịch sử người dùng')
+            ->assertSee('Lịch sử dòng tiền');
+    }
+});
+
+test('user can update profile fields but not account identity', function (): void {
+    $user = User::factory()->create([
+        'username' => 'immutable-user',
+        'email' => 'immutable@example.com',
+    ]);
+    Queue::fake();
+
+    $this->actingAs($user)
+        ->patch(route('account.profile.update'), [
+            'avatar' => 'https://example.com/avatar.jpg',
+            'full_name' => 'Nguyễn Văn Mới',
+            'phone' => '0901234567',
+            'username' => 'forged-user',
+            'email' => 'forged@example.com',
+        ])
+        ->assertRedirect(route('account.profile.edit'))
+        ->assertSessionHas('success');
+
+    $user->refresh();
+
+    expect($user->avatar)->toBe('https://example.com/avatar.jpg')
+        ->and($user->full_name)->toBe('Nguyễn Văn Mới')
+        ->and($user->phone)->toBe('0901234567')
+        ->and($user->username)->toBe('immutable-user')
+        ->and($user->email)->toBe('immutable@example.com');
+
+    Queue::assertPushed(SaveUserLogJob::class, fn (SaveUserLogJob $job): bool => $job->action === 'profile_updated');
+});
+
+test('password change validates the current password and queues an audit log', function (): void {
+    $user = User::factory()->create(['password' => 'old-password']);
+    Queue::fake();
+
+    $this->actingAs($user)
+        ->from(route('account.profile.password'))
+        ->put(route('account.profile.password.update'), [
+            'current_password' => 'wrong-password',
+            'password' => 'new-secure-password',
+            'password_confirmation' => 'new-secure-password',
+        ])
+        ->assertRedirect(route('account.profile.password'))
+        ->assertSessionHasErrors('current_password');
+
+    $this->actingAs($user)
+        ->put(route('account.profile.password.update'), [
+            'current_password' => 'old-password',
+            'password' => 'new-secure-password',
+            'password_confirmation' => 'new-secure-password',
+        ])
+        ->assertRedirect(route('account.profile.password'))
+        ->assertSessionHas('success');
+
+    expect(Hash::check('new-secure-password', $user->refresh()->password))->toBeTrue();
+    Queue::assertPushed(SaveUserLogJob::class, fn (SaveUserLogJob $job): bool => $job->action === 'password_changed');
+});
+
+test('api key is shown once and stored as a sanctum hash', function (): void {
+    $user = User::factory()->create();
+    Queue::fake();
+    $plainTextToken = null;
+
+    $response = $this->actingAs($user)
+        ->post(route('account.profile.api.store'), ['name' => 'Desktop integration'])
+        ->assertRedirect(route('account.profile.api'))
+        ->assertSessionHas('success');
+
+    $response->assertSessionHas('new_api_token', function (string $token) use (&$plainTextToken): bool {
+        $plainTextToken = $token;
+
+        return str_contains($token, '|');
+    });
+
+    $storedToken = PersonalAccessToken::query()->sole();
+
+    expect($storedToken->name)->toBe('Desktop integration')
+        ->and($storedToken->token)->not->toContain((string) $plainTextToken);
+
+    $this->actingAs($user)
+        ->get(route('account.profile.api'))
+        ->assertSuccessful()
+        ->assertSee((string) $plainTextToken);
+
+    Queue::assertPushed(SaveUserLogJob::class, fn (SaveUserLogJob $job): bool => $job->action === 'api_token_created');
+});
+
+test('user can revoke only their own api key', function (): void {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+    $ownedToken = $user->createToken('Owned key')->accessToken;
+    $foreignToken = $otherUser->createToken('Foreign key')->accessToken;
+    Queue::fake();
+
+    $this->actingAs($user)
+        ->delete(route('account.profile.api.destroy', $ownedToken->id))
+        ->assertRedirect(route('account.profile.api'));
+
+    expect(PersonalAccessToken::query()->find($ownedToken->id))->toBeNull();
+
+    $this->actingAs($user)
+        ->delete(route('account.profile.api.destroy', $foreignToken->id))
+        ->assertNotFound();
+
+    expect(PersonalAccessToken::query()->find($foreignToken->id))->not->toBeNull();
+});
+
+test('activity and wallet tabs show only records owned by the signed in user', function (): void {
+    $user = User::factory()->create();
+    $otherUser = User::factory()->create();
+    UserLog::query()->create([
+        'user_id' => $user->id,
+        'action' => 'login',
+        'description' => 'OWN ACTIVITY',
+        'ip' => '127.0.0.1',
+    ]);
+    UserLog::query()->create([
+        'user_id' => $otherUser->id,
+        'action' => 'login',
+        'description' => 'FOREIGN ACTIVITY',
+        'ip' => '10.0.0.1',
+    ]);
+    WalletTransaction::query()->create([
+        'wallet_id' => $user->wallet()->firstOrFail()->id,
+        'type' => 'credit',
+        'amount' => 100000,
+        'balance_before' => 0,
+        'balance_after' => 100000,
+        'description' => 'OWN WALLET ENTRY',
+        'status' => 'success',
+    ]);
+    WalletTransaction::query()->create([
+        'wallet_id' => $otherUser->wallet()->firstOrFail()->id,
+        'type' => 'credit',
+        'amount' => 200000,
+        'balance_before' => 0,
+        'balance_after' => 200000,
+        'description' => 'FOREIGN WALLET ENTRY',
+        'status' => 'success',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('account.profile.logs'))
+        ->assertSuccessful()
+        ->assertSee('OWN ACTIVITY')
+        ->assertDontSee('FOREIGN ACTIVITY');
+
+    $this->actingAs($user)
+        ->get(route('account.profile.wallet'))
+        ->assertSuccessful()
+        ->assertSee('OWN WALLET ENTRY')
+        ->assertDontSee('FOREIGN WALLET ENTRY');
+});

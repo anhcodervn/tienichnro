@@ -3,8 +3,11 @@
 namespace App\Models;
 
 use App\Notifications\QueuedResetPasswordNotification;
+use App\Notifications\QueuedVerifyEmailNotification;
+use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Auth\Passwords\CanResetPassword as CanResetPasswordTrait;
 use Illuminate\Contracts\Auth\CanResetPassword;
+use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -16,9 +19,9 @@ use Illuminate\Support\Str;
 use Laravel\Sanctum\HasApiTokens;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
-class User extends Authenticatable implements CanResetPassword, JWTSubject
+class User extends Authenticatable implements CanResetPassword, JWTSubject, MustVerifyEmailContract
 {
-    use CanResetPasswordTrait, HasApiTokens, HasFactory, Notifiable, SoftDeletes;
+    use CanResetPasswordTrait, HasApiTokens, HasFactory, MustVerifyEmail, Notifiable, SoftDeletes;
 
     protected $fillable = [
         'name',
@@ -103,19 +106,9 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject
         return $this->hasMany(UserSession::class);
     }
 
-    public function apiKeys(): HasMany
-    {
-        return $this->hasMany(ApiKey::class);
-    }
-
     public function wallet(): HasOne
     {
         return $this->hasOne(Wallet::class)->where('type', Wallet::TYPE_MAIN);
-    }
-
-    public function bankAccounts(): HasMany
-    {
-        return $this->hasMany(BankAccount::class);
     }
 
     public function wallets(): HasMany
@@ -128,9 +121,14 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject
         return $this->hasMany(PaymentTransaction::class);
     }
 
-    public function apiLogs(): HasMany
+    public function orders(): HasMany
     {
-        return $this->hasMany(ApiLog::class);
+        return $this->hasMany(Order::class);
+    }
+
+    public function adminAuditLogs(): HasMany
+    {
+        return $this->hasMany(AdminAuditLog::class, 'admin_id');
     }
 
     public function notifications(): HasMany
@@ -156,26 +154,6 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject
     public function userLogs(): HasMany
     {
         return $this->hasMany(UserLog::class);
-    }
-
-    public function webhooks(): HasMany
-    {
-        return $this->hasMany(Webhook::class);
-    }
-
-    public function rechargeOrders(): HasMany
-    {
-        return $this->hasMany(RechargeOrder::class);
-    }
-
-    public function rechargeClientOrders(): HasMany
-    {
-        return $this->hasMany(RechargeClient::class);
-    }
-
-    public function couponLogs(): HasMany
-    {
-        return $this->hasMany(CouponLog::class);
     }
 
     public function getJWTIdentifier(): mixed
@@ -217,5 +195,10 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject
     public function sendPasswordResetNotification($token): void
     {
         $this->notify(new QueuedResetPasswordNotification((string) $token));
+    }
+
+    public function sendEmailVerificationNotification(): void
+    {
+        $this->notify(new QueuedVerifyEmailNotification);
     }
 }

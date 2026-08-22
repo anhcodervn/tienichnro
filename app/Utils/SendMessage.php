@@ -22,6 +22,7 @@ class SendMessage
         'sales' => 'sales',
         'provider' => 'provider',
         'feedback' => 'feedback',
+        'support' => 'support',
         'activity' => 'activity',
     ];
 
@@ -81,11 +82,29 @@ class SendMessage
         Http::connectTimeout(5)
             ->timeout(10)
             ->post($url, [
-                'username' => (string) config('services.discord.bot_name', 'DailyProxy Monitor'),
+                'username' => (string) config('services.discord.bot_name', 'Nạp Carot Monitor'),
                 'avatar_url' => (string) config('services.discord.bot_avatar_url', ''),
                 'content' => $message,
+                'allowed_mentions' => ['parse' => []],
             ])
             ->throw();
+    }
+
+    /**
+     * Send a report immediately and allow transport exceptions to bubble so a queue job can retry.
+     *
+     * @param  array<string, mixed>  $details
+     */
+    public static function sendReport(string $channel, string $title, array $details = []): void
+    {
+        if (! array_key_exists($channel, self::DISCORD_CHANNELS)) {
+            throw new InvalidArgumentException(sprintf('Unsupported Discord channel type [%s].', $channel));
+        }
+
+        self::sendDiscord(
+            self::formatDiscordReport(Str::upper($channel), $title, $details),
+            $channel,
+        );
     }
 
     /**

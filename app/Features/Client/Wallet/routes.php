@@ -10,6 +10,6 @@ Route::prefix('client/wallet')
     ->group(function (): void {
         Route::get('/', 'index')->name('index');
         Route::get('/deposit-requests', 'depositRequests')->name('deposit-requests.index');
-        Route::post('/deposit-requests', 'storeDepositRequest')->name('deposit-requests.store');
-        Route::post('/deposit-requests/{paymentTransaction}/confirm', 'confirmDepositRequest')->name('deposit-requests.confirm');
+        Route::post('/deposit-requests', 'storeDepositRequest')->middleware('throttle:6,1')->name('deposit-requests.store');
+        Route::post('/deposit-requests/{paymentTransaction}/confirm', 'confirmDepositRequest')->middleware('throttle:10,1')->name('deposit-requests.confirm');
     });

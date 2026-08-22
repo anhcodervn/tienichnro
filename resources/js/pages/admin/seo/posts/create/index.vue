@@ -20,26 +20,26 @@ const editingId = computed(() => {
 });
 
 const form = reactive<AdminSeoPostPayload>({
-    title: "Hướng dẫn tạo đơn proxy đầu tiên trên DailyProxy",
-    slug: "huong-dan-tao-task-proxy-dau-tien-tren-giapproxy",
+    title: "Hướng dẫn tạo đơn nạp game đầu tiên trên Nạp Carot",
+    slug: "huong-dan-nap-carot-teamobi",
     seo_category_id: null,
-    excerpt: "Bài viết hướng dẫn tạo đơn proxy, gửi payload và theo dõi kết quả trả về trong DailyProxy.",
+    excerpt: "Bài viết hướng dẫn tạo đơn nạp game, gửi payload và theo dõi kết quả trả về trong Nạp Carot.",
     content: [
         {
             type: "paragraph",
             children: [
                 {
-                    text: "Bài viết này hướng dẫn luồng tạo đơn proxy, chọn loại proxy, gửi payload và theo dõi kết quả trả về ngay trong dashboard.",
+                    text: "Bài viết này hướng dẫn luồng chọn game, server, gói nạp, thanh toán và theo dõi kết quả.",
                 },
             ],
         },
     ],
-    seo_title: "Hướng dẫn tạo đơn proxy đầu tiên | DailyProxy",
-    seo_description: "Từng bước tạo đơn proxy, tích hợp API, theo dõi task và nhận kết quả trong DailyProxy.",
-    canonical_url: "https://giapproxy.vn/blog/huong-dan-tao-task-proxy-dau-tien-tren-giapproxy",
+    seo_title: "Hướng dẫn tạo đơn nạp game đầu tiên | Nạp Carot",
+    seo_description: "Từng bước tạo đơn nạp game, tích hợp API, theo dõi task và nhận kết quả trong Nạp Carot.",
+    canonical_url: "https://napcarot.vn/tin-tuc/huong-dan-nap-carot-teamobi",
     robots: "index,follow",
-    focus_keyword: "api mua proxy",
-    cover_alt: "Minh họa quy trình tạo đơn proxy trên DailyProxy",
+    focus_keyword: "nạp game teamobi",
+    cover_alt: "Minh họa quy trình tạo đơn nạp game trên Nạp Carot",
     article_schema: true,
     breadcrumb_schema: true,
     status: "draft",

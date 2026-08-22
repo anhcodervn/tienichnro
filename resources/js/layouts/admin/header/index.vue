@@ -18,11 +18,11 @@ const searchKeyword = ref('');
 
 const notifications = [
     {
-        title: 'New proxy order created',
-        description: 'Review the latest proxy order and payment activity.',
+        title: 'New topup order created',
+        description: 'Review the latest topup order and payment activity.',
     },
     {
-        title: 'Proxy nearing expiry',
+        title: 'Topup order needs attention',
         description: 'Check renewal requests and provider status.',
     },
 ];
@@ -45,14 +45,14 @@ const userInitials = computed(() => {
             <div class="flex items-center gap-3">
                 <button
                     type="button"
-                    class="proxy-focus inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-blue-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 lg:hidden"
+                    class="ui-focus inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-blue-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 lg:hidden"
                     @click="$emit('openSidebar')"
                 >
                     <MenuIcon class="h-5 w-5" />
                 </button>
 
                 <div class="hidden xl:flex xl:flex-col">
-                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">Proxy operations</p>
+                    <p class="text-xs font-semibold uppercase tracking-[0.22em] text-blue-600">Topup operations</p>
                     <h2 class="mt-1 text-2xl font-black tracking-tight text-slate-950">{{ pageTitle }}</h2>
                 </div>
             </div>
@@ -72,7 +72,7 @@ const userInitials = computed(() => {
 
                 <Menu as="div" class="relative">
                     <MenuButton
-                        class="proxy-focus relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-blue-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50"
+                        class="ui-focus relative inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-slate-200 bg-white text-blue-700 shadow-sm transition hover:border-blue-200 hover:bg-blue-50"
                     >
                         <Bell class="h-5 w-5" />
                         <span class="absolute right-2.5 top-2.5 h-2.5 w-2.5 rounded-full bg-cyan-400 ring-2 ring-white" />
@@ -114,7 +114,7 @@ const userInitials = computed(() => {
 
                 <Menu as="div" class="relative">
                     <MenuButton
-                        class="proxy-focus inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white py-1.5 pl-2 pr-3 shadow-sm transition hover:border-blue-200 hover:bg-blue-50/60"
+                        class="ui-focus inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white py-1.5 pl-2 pr-3 shadow-sm transition hover:border-blue-200 hover:bg-blue-50/60"
                     >
                         <div
                             class="flex h-10 w-10 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 text-sm font-bold text-white"

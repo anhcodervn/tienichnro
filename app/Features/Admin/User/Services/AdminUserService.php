@@ -44,7 +44,10 @@ class AdminUserService
     {
         $user = User::query()
             ->with('wallet')
-            ->withCount('apiKeys')
+            ->withCount('orders')
+            ->withSum([
+                'orders as paid_orders_total' => fn (Builder $query) => $query->where('payment_status', 'paid'),
+            ], 'total_amount')
             ->findOrFail($user->id);
 
         $wallet = $user->wallet;
@@ -53,10 +56,9 @@ class AdminUserService
             'user' => $user,
             'wallet' => $wallet,
             'stats' => [
-                'total_spent' => $wallet instanceof Wallet ? (float) $wallet->total_spent : 0.0,
-                'proxy_task_count' => 0,
-                'api_key_count' => $user->api_keys_count,
-                'solved_task_count' => 0,
+                'total_spent' => (float) ($user->paid_orders_total ?? 0),
+                'order_count' => $user->orders_count,
+                'completed_order_count' => $user->orders()->where('order_status', 'completed')->count(),
             ],
             'latest_login' => [
                 'at' => $user->last_login_at?->toISOString(),

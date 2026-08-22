@@ -20,6 +20,7 @@ class AdminUserDetailResource extends JsonResource
             'name' => $user->name,
             'username' => $user->username,
             'email' => $user->email,
+            'email_verified_at' => $user->email_verified_at?->toISOString(),
             'phone' => $user->phone,
             'role' => $user->role,
             'status' => $user->status === 'banned' ? 'blocked' : $user->status,

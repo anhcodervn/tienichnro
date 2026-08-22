@@ -1,17 +1,18 @@
 import { useUserStore } from '@/stores/user.store';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import adminRouter from './modules/admin';
-import clientRouter from './modules/client';
 
-const routes: RouteRecordRaw[] = [adminRouter, clientRouter];
+const routes: RouteRecordRaw[] = [adminRouter];
 
 const routeTitles: Record<string, string> = {
     'admin.dashboard': 'Tổng quan quản trị',
-    'admin.analytics.index': 'Báo cáo vận hành',
     'admin.support.index': 'Tin nhắn hỗ trợ',
-    'admin.proxy-taxonomy.index': 'Chuyên mục proxy',
-    'admin.proxy-providers.index': 'Nhà cung cấp proxy',
-    'admin.proxy-products.index': 'Sản phẩm proxy',
+    'admin.topup.catalog': 'Danh mục nạp game',
+    'admin.topup.games': 'Danh sách game',
+    'admin.topup.servers': 'Danh sách máy chủ game',
+    'admin.topup.packages': 'Danh sách gói nạp game',
+    'admin.topup.providers': 'Nhà cung cấp nạp game',
+    'admin.topup.orders': 'Đơn nạp game',
     'admin.users.index': 'Quản lý người dùng',
     'admin.users.show': 'Chi tiết người dùng',
     'admin.users.wallet-transaction': 'Biến động ví người dùng',
@@ -35,17 +36,6 @@ const routeTitles: Record<string, string> = {
     'admin.recharge.config': 'Cấu hình nạp tiền',
     'admin.recharge.history': 'Lịch sử nạp tiền',
     'admin.error.404': 'Trang quản trị không tồn tại',
-    'client.home': 'Tổng quan',
-    'client.services': 'Mua proxy',
-    'client.proxy-orders': 'Quản lý proxy',
-    'client.wallet': 'Ví và nạp tiền',
-    'client.proxy-check': 'Check Proxy',
-    'client.proxy-country-check': 'Check quốc gia proxy',
-    'client.api-docs': 'Tài liệu API',
-    'client.profile': 'Hồ sơ tài khoản',
-    'client.contact': 'Liên hệ và góp ý',
-    'client.support': 'Hỗ trợ trực tiếp',
-    'client.error.404': 'Trang khách hàng không tồn tại',
 };
 
 const router = createRouter({

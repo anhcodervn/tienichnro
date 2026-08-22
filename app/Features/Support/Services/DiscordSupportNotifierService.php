@@ -28,7 +28,7 @@ class DiscordSupportNotifierService
             ->timeout(7)
             ->acceptJson()
             ->post($webhookUrl, [
-                'username' => (string) config('services.discord.bot_name', 'DailyProxy Monitor'),
+                'username' => (string) config('services.discord.bot_name', 'Nạp Carot Monitor'),
                 'avatar_url' => (string) config('services.discord.bot_avatar_url', ''),
                 'allowed_mentions' => ['parse' => []],
                 'embeds' => [[

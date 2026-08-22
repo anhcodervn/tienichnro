@@ -27,6 +27,11 @@ class SettingController extends Controller
                 'site_active' => true,
                 'allow_register' => false,
             ],
+            'homepage' => [
+                'home_notice_title' => 'Thông báo quan trọng',
+                'home_notice_content' => [],
+                'home_notice_is_published' => true,
+            ],
             'branding' => [
                 'light_logo' => '',
                 'dark_logo' => '',
@@ -163,6 +168,11 @@ class SettingController extends Controller
                 'site_active' => 'site_active',
                 'allow_register' => 'allow_register',
             ],
+            'homepage' => [
+                'home_notice_title' => 'home_notice_title',
+                'home_notice_content' => 'home_notice_content',
+                'home_notice_is_published' => 'home_notice_is_published',
+            ],
             'branding' => [
                 'light_logo' => 'light_logo',
                 'dark_logo' => 'dark_logo',
@@ -296,33 +306,29 @@ class SettingController extends Controller
         abort_if($tab === self::SYSTEM_TAB || $tab === 'options', 404);
         abort_if(! $this->tabExists($tab), 404);
 
-        $payload = [
-            ...$this->tabDefaults()[$tab],
-            ...$request->validated(),
-        ];
-
-        $this->writeTab($settingStore, $payload, $this->tabStorageMap()[$tab]);
+        $validated = $request->validated();
+        $storageMap = Arr::only($this->tabStorageMap()[$tab], array_keys($validated));
+        $this->writeTab($settingStore, $validated, $storageMap);
+        $settings = $this->readTab($settingStore, $this->tabDefaults()[$tab], $this->tabStorageMap()[$tab]);
 
         return response()->json([
             'status' => true,
             'message' => 'Cập nhật cấu hình thành công.',
             'data' => [
                 'tab' => $tab,
-                'settings' => $payload,
+                'settings' => $settings,
             ],
         ]);
     }
 
     public function updateSystem(UpdateSystemSettingRequest $request, SettingStore $settingStore): JsonResponse
     {
-        $payload = [
-            ...$this->defaultSystem(),
-            ...$request->validated(),
-        ];
+        $payload = $request->validated();
 
         foreach (['general', 'branding', 'contact', 'seo'] as $tab) {
             $tabPayload = Arr::only($payload, array_keys($this->tabDefaults()[$tab]));
-            $this->writeTab($settingStore, $tabPayload, $this->tabStorageMap()[$tab]);
+            $storageMap = Arr::only($this->tabStorageMap()[$tab], array_keys($tabPayload));
+            $this->writeTab($settingStore, $tabPayload, $storageMap);
         }
 
         return response()->json([

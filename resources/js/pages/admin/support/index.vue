@@ -410,7 +410,7 @@ onBeforeUnmount(() => {
                         </div>
                         <button
                             type="button"
-                            class="proxy-focus inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-700"
+                            class="ui-focus inline-flex min-h-11 items-center gap-2 rounded-[10px] bg-blue-600 px-3 text-xs font-semibold text-white transition hover:bg-blue-700"
                             @click="showNewConversation = true"
                         >
                             <MessageSquarePlus class="h-4 w-4" /> Tin mới
@@ -442,7 +442,7 @@ onBeforeUnmount(() => {
                             v-for="item in conversations"
                             :key="item.id"
                             type="button"
-                            class="proxy-focus mb-1 flex min-h-[76px] w-full items-start gap-3 rounded-[12px] p-3 text-left transition duration-200"
+                            class="ui-focus mb-1 flex min-h-[76px] w-full items-start gap-3 rounded-[12px] p-3 text-left transition duration-200"
                             :class="
                                 selectedConversation?.id === item.id
                                     ? 'bg-blue-600 text-white shadow-sm'
@@ -506,7 +506,7 @@ onBeforeUnmount(() => {
                     <div class="flex min-w-0 items-center gap-3">
                         <button
                             type="button"
-                            class="proxy-focus inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-slate-600 hover:bg-slate-100 lg:hidden"
+                            class="ui-focus inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] text-slate-600 hover:bg-slate-100 lg:hidden"
                             aria-label="Quay lại danh sách"
                             @click="backToList"
                         >
@@ -527,7 +527,7 @@ onBeforeUnmount(() => {
                         <span class="hidden sm:inline">{{ supportStore.connected ? 'Realtime' : 'Đang kết nối' }}</span>
                         <button
                             type="button"
-                            class="proxy-focus ml-2 inline-flex h-11 w-11 items-center justify-center rounded-[10px] text-slate-500 hover:bg-slate-100"
+                            class="ui-focus ml-2 inline-flex h-11 w-11 items-center justify-center rounded-[10px] text-slate-500 hover:bg-slate-100"
                             aria-label="Tải lại cuộc trò chuyện"
                             @click="openConversation(selectedConversation.id, false)"
                         >
@@ -544,7 +544,7 @@ onBeforeUnmount(() => {
                         <button
                             v-else-if="hasMore"
                             type="button"
-                            class="proxy-focus mx-auto mb-3 flex min-h-11 items-center rounded-[10px] px-3 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+                            class="ui-focus mx-auto mb-3 flex min-h-11 items-center rounded-[10px] px-3 text-xs font-semibold text-blue-700 hover:bg-blue-50"
                             @click="loadOlder"
                         >
                             Xem tin nhắn cũ hơn
@@ -601,7 +601,7 @@ onBeforeUnmount(() => {
                     <button
                         v-if="showNewMessageButton"
                         type="button"
-                        class="proxy-focus absolute bottom-3 left-1/2 inline-flex min-h-11 -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950 px-4 text-xs font-semibold text-white shadow-lg transition hover:bg-blue-700"
+                        class="ui-focus absolute bottom-3 left-1/2 inline-flex min-h-11 -translate-x-1/2 items-center gap-2 rounded-full bg-slate-950 px-4 text-xs font-semibold text-white shadow-lg transition hover:bg-blue-700"
                         @click="scrollToBottom()"
                     >
                         <ArrowDown class="h-4 w-4" /> Tin nhắn mới
@@ -625,7 +625,7 @@ onBeforeUnmount(() => {
                         />
                         <button
                             type="submit"
-                            class="proxy-focus inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-blue-600 text-white transition hover:bg-blue-700 disabled:opacity-50"
+                            class="ui-focus inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-blue-600 text-white transition hover:bg-blue-700 disabled:opacity-50"
                             :disabled="sending || messageText.trim() === ''"
                             aria-label="Gửi phản hồi"
                         >
@@ -651,7 +651,7 @@ onBeforeUnmount(() => {
                         </div>
                         <button
                             type="button"
-                            class="proxy-focus inline-flex h-11 w-11 items-center justify-center rounded-[10px] text-slate-500 hover:bg-slate-100"
+                            class="ui-focus inline-flex h-11 w-11 items-center justify-center rounded-[10px] text-slate-500 hover:bg-slate-100"
                             aria-label="Đóng"
                             @click="showNewConversation = false"
                         >

@@ -6,13 +6,13 @@ use App\Events\WalletDepositCredited;
 use App\Exceptions\ApiException;
 use App\Features\Recharge\Services\ApiBankVnPartnerService;
 use App\Features\Recharge\Services\RechargeConfigService;
+use App\Features\Reporting\Services\DiscordReportService;
 use App\Models\ConfigRecharge;
 use App\Models\Notification;
 use App\Models\PaymentTransaction;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
-use App\Utils\SendMessage;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -24,6 +24,7 @@ class WalletDepositService
     public function __construct(
         private readonly RechargeConfigService $rechargeConfigService,
         private readonly ApiBankVnPartnerService $apiBankVnPartnerService,
+        private readonly DiscordReportService $discordReportService,
     ) {}
 
     /**
@@ -124,6 +125,22 @@ class WalletDepositService
         );
 
         return $transactions;
+    }
+
+    public function latestPendingRequest(User $user): ?PaymentTransaction
+    {
+        return $user->paymentTransactions()
+            ->whereNull('order_id')
+            ->whereIn('status', ['pending', 'matched'])
+            ->latest('id')
+            ->first([
+                'id',
+                'user_id',
+                'transaction_code',
+                'amount',
+                'status',
+                'created_at',
+            ]);
     }
 
     public function syncTransactionStatus(PaymentTransaction $paymentTransaction): PaymentTransaction
@@ -385,13 +402,18 @@ class WalletDepositService
                 notification: $eventPayload['notification'],
             );
 
-            SendMessage::sendActivityReport('Người dùng nạp tiền thành công', [
-                'Mã giao dịch' => $eventPayload['transaction_code'],
-                'User ID' => $eventPayload['user_id'],
-                'Số tiền' => number_format((float) $eventPayload['amount'], 0, ',', '.').' đ',
-                'Số dư trước' => number_format((float) $eventPayload['balance_before'], 0, ',', '.').' đ',
-                'Số dư sau' => number_format((float) $eventPayload['balance'], 0, ',', '.').' đ',
-            ]);
+            $this->discordReportService->queue(
+                channel: 'activity',
+                title: 'Người dùng nạp tiền thành công',
+                details: [
+                    'Mã giao dịch' => $eventPayload['transaction_code'],
+                    'User ID' => $eventPayload['user_id'],
+                    'Số tiền' => number_format((float) $eventPayload['amount'], 0, ',', '.').' đ',
+                    'Số dư trước' => number_format((float) $eventPayload['balance_before'], 0, ',', '.').' đ',
+                    'Số dư sau' => number_format((float) $eventPayload['balance'], 0, ',', '.').' đ',
+                ],
+                dedupeKey: 'wallet-deposit:'.$eventPayload['payment_transaction_id'].':credited',
+            );
         }
 
         return $creditedTransaction;

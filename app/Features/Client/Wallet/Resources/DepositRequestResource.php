@@ -28,8 +28,8 @@ class DepositRequestResource extends JsonResource
             'code' => $this->transaction_code,
             'created_at' => $this->created_at?->toISOString(),
             'method' => [
-                'id' => (string) ($raw['method_id'] ?? 'bank_transfer'),
-                'name' => (string) ($raw['method_name'] ?? 'Chuyển khoản ngân hàng'),
+                'id' => 'bank_transfer',
+                'name' => 'Chuyển khoản ngân hàng',
             ],
             'amount' => (float) $this->amount,
             'bonus_amount' => (float) ($raw['bonus_amount'] ?? 0),

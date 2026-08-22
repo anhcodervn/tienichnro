@@ -141,7 +141,7 @@ class DiscordWebhookNotifier
             ->acceptJson()
             ->retry(1, 300, throw: false)
             ->post($url, [
-                'username' => (string) config('services.discord.bot_name', 'DailyProxy Monitor'),
+                'username' => (string) config('services.discord.bot_name', 'Nạp Carot Monitor'),
                 'avatar_url' => (string) config('services.discord.bot_avatar_url', ''),
                 'embeds' => [[
                     'title' => Arr::get($payload, 'title', 'Thông báo hệ thống'),

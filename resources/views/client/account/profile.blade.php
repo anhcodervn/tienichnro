@@ -1,0 +1,282 @@
+@extends('client.layouts.app')
+
+@section('title', 'Quản lý tài khoản')
+@section('robots', 'noindex,nofollow')
+
+@section('content')
+@php
+    $avatarUrl = old('avatar', $user->avatar);
+    $tabs = [
+        ['key' => 'profile', 'route' => 'account.index', 'icon' => 'bx-user-circle', 'title' => 'Thông tin user', 'description' => 'Hồ sơ và trạng thái tài khoản'],
+        ['key' => 'password', 'route' => 'account.profile.password', 'icon' => 'bx-key', 'title' => 'Đổi mật khẩu', 'description' => 'Bảo mật phiên đăng nhập'],
+        ['key' => 'api', 'route' => 'account.profile.api', 'icon' => 'bx-code-alt', 'title' => 'API key', 'description' => 'Khóa tích hợp cá nhân'],
+        ['key' => 'logs', 'route' => 'account.profile.logs', 'icon' => 'bx-history', 'title' => 'Lịch sử người dùng', 'description' => 'Nhật ký thao tác tài khoản'],
+        ['key' => 'wallet', 'route' => 'account.profile.wallet', 'icon' => 'bx-wallet-alt', 'title' => 'Lịch sử dòng tiền', 'description' => 'Biến động số dư ví'],
+    ];
+    $statusLabel = match ($user->status) {
+        'active' => 'Đang hoạt động',
+        'banned' => 'Đã khóa',
+        default => 'Tạm ngừng',
+    };
+@endphp
+
+<section class="client-container py-4 sm:py-6 lg:py-8">
+    <div class="client-card min-w-0 overflow-hidden">
+        <nav class="overflow-x-auto border-b border-slate-200 p-3 sm:p-4" aria-label="Chức năng tài khoản">
+            <div class="flex min-w-max gap-2 lg:grid lg:min-w-0 lg:grid-cols-5">
+                @foreach ($tabs as $tab)
+                    <a
+                        @class([
+                            'flex min-h-[4.5rem] w-[13.5rem] items-center gap-3 rounded-[5px] border p-3 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:w-auto',
+                            'border-slate-950 bg-slate-950 text-white shadow-sm' => $activeTab === $tab['key'],
+                            'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/50' => $activeTab !== $tab['key'],
+                        ])
+                        href="{{ route($tab['route']) }}"
+                        @if ($activeTab === $tab['key']) aria-current="page" @endif
+                    >
+                        <span @class(['grid h-10 w-10 shrink-0 place-items-center rounded-[5px] text-xl', 'bg-white/10 text-white' => $activeTab === $tab['key'], 'bg-slate-200/70 text-slate-500' => $activeTab !== $tab['key']])>
+                            <i class="bx {{ $tab['icon'] }}" aria-hidden="true"></i>
+                        </span>
+                        <span class="min-w-0">
+                            <strong class="block text-sm">{{ $tab['title'] }}</strong>
+                            <span @class(['mt-1 block text-xs leading-5', 'text-slate-300' => $activeTab === $tab['key'], 'text-slate-400' => $activeTab !== $tab['key']])>{{ $tab['description'] }}</span>
+                        </span>
+                    </a>
+                @endforeach
+            </div>
+        </nav>
+
+        <div class="min-w-0 p-3 sm:p-4">
+            @if ($activeTab === 'profile')
+                <div class="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
+                    <form class="min-w-0 rounded-[5px] border border-slate-200 bg-white p-4 sm:p-5" method="POST" action="{{ route('account.profile.update') }}">
+                        @csrf
+                        @method('PATCH')
+
+                        <div class="flex flex-col gap-4 rounded-[5px] bg-slate-50 p-4 sm:flex-row sm:items-center">
+                            <div class="relative h-20 w-20 shrink-0 overflow-hidden rounded-[5px] border border-slate-200 bg-white">
+                                @if ($avatarUrl)
+                                    <img class="h-full w-full object-cover" src="{{ $avatarUrl }}" alt="Ảnh đại diện của {{ $user->name }}">
+                                @else
+                                    <span class="grid h-full w-full place-items-center text-4xl text-slate-400"><i class="bx bx-user" aria-hidden="true"></i></span>
+                                @endif
+                            </div>
+                            <div class="min-w-0">
+                                <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Hồ sơ hiển thị</p>
+                                <h2 class="mt-1 truncate text-xl font-extrabold text-slate-950">{{ $user->name }}</h2>
+                                <p class="mt-1 truncate text-sm text-slate-500">{{ $user->email }}</p>
+                            </div>
+                        </div>
+
+                        <div class="mt-5 grid min-w-0 gap-4 sm:grid-cols-2">
+                            <label class="client-label">Avatar URL
+                                <input class="client-input" type="url" name="avatar" value="{{ old('avatar', $user->avatar) }}" placeholder="https://example.com/avatar.jpg" autocomplete="url">
+                                @error('avatar')<span class="text-xs font-medium text-rose-600">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="client-label">Họ tên
+                                <input class="client-input" name="full_name" value="{{ old('full_name', $user->full_name) }}" autocomplete="name">
+                                @error('full_name')<span class="text-xs font-medium text-rose-600">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="client-label">Email
+                                <input class="client-input bg-slate-100 text-slate-500" type="email" value="{{ $user->email }}" disabled>
+                            </label>
+                            <label class="client-label">Số điện thoại
+                                <input class="client-input" type="tel" name="phone" value="{{ old('phone', $user->phone) }}" inputmode="tel" autocomplete="tel">
+                                @error('phone')<span class="text-xs font-medium text-rose-600">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="client-label">Tên đăng nhập
+                                <input class="client-input bg-slate-100 text-slate-500" value="{{ $user->username }}" disabled>
+                            </label>
+                            <label class="client-label">User ID
+                                <input class="client-input bg-slate-100 text-slate-500" value="#{{ $user->id }}" disabled>
+                            </label>
+                        </div>
+
+                        <div class="mt-5 flex justify-end">
+                            <button class="client-button min-h-11 w-full justify-center sm:w-auto" type="submit"><i class="bx bx-save text-lg" aria-hidden="true"></i>Lưu thay đổi</button>
+                        </div>
+                    </form>
+
+                    <aside class="grid content-start gap-3">
+                        <section class="rounded-[5px] border border-slate-200 bg-white p-4">
+                            <h2 class="flex items-center gap-2 font-extrabold text-slate-950"><i class="bx bx-envelope text-lg text-emerald-600" aria-hidden="true"></i>Tổng quan xác thực</h2>
+                            <dl class="mt-4 grid gap-2 text-sm">
+                                <div class="flex items-center justify-between gap-3 rounded-[5px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">User ID</dt><dd class="font-extrabold">#{{ $user->id }}</dd></div>
+                                <div class="flex items-center justify-between gap-3 rounded-[5px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Trạng thái</dt><dd class="font-extrabold">{{ $statusLabel }}</dd></div>
+                                <div class="flex items-center justify-between gap-3 rounded-[5px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Ngày tạo</dt><dd class="text-right font-extrabold">{{ $user->created_at?->format('H:i d/m/Y') }}</dd></div>
+                                <div class="flex items-center justify-between gap-3 rounded-[5px] bg-slate-50 p-3">
+                                    <dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Email xác thực</dt>
+                                    @if ($user->hasVerifiedEmail())
+                                        <dd class="font-extrabold text-emerald-700">Đã xác thực</dd>
+                                    @else
+                                        <dd><a class="font-extrabold text-amber-700 underline decoration-amber-300 underline-offset-2" href="{{ route('verification.notice') }}">Xác minh ngay</a></dd>
+                                    @endif
+                                </div>
+                                <div class="flex items-start justify-between gap-3 rounded-[5px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Phiên gần nhất</dt><dd class="text-right font-extrabold">{{ $user->last_login_at?->format('H:i d/m/Y') ?? 'Chưa có' }}@if ($user->last_login_ip)<br><span class="font-medium text-slate-500">{{ $user->last_login_ip }}</span>@endif</dd></div>
+                            </dl>
+                        </section>
+
+                        <section class="rounded-[5px] border border-blue-200 bg-blue-50 p-4">
+                            <h2 class="flex items-center gap-2 font-extrabold text-blue-950"><i class="bx bx-shield-quarter text-lg text-blue-600" aria-hidden="true"></i>Khuyến nghị bảo mật</h2>
+                            <ul class="mt-3 grid gap-2 text-sm leading-6 text-blue-900">
+                                <li class="rounded-[5px] bg-white/70 p-3">Xác thực email để bảo vệ và nhận lại đơn guest.</li>
+                                <li class="rounded-[5px] bg-white/70 p-3">Dùng mật khẩu riêng, không trùng với tài khoản game.</li>
+                                <li class="rounded-[5px] bg-white/70 p-3">Kiểm tra lịch sử nếu phát hiện hoạt động bất thường.</li>
+                            </ul>
+                        </section>
+                    </aside>
+                </div>
+            @elseif ($activeTab === 'password')
+                <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
+                    <form class="rounded-[5px] border border-slate-200 bg-white p-4 sm:p-6" method="POST" action="{{ route('account.profile.password.update') }}">
+                        @csrf
+                        @method('PUT')
+                        <h2 class="text-xl font-extrabold text-slate-950">Đổi mật khẩu</h2>
+                        <p class="mt-1 text-sm leading-6 text-slate-500">Nhập mật khẩu hiện tại trước khi thiết lập mật khẩu mới.</p>
+
+                        <div class="mt-5 grid max-w-2xl gap-4">
+                            <label class="client-label">Mật khẩu hiện tại
+                                <input class="client-input" type="password" name="current_password" required autocomplete="current-password">
+                                @error('current_password')<span class="text-xs font-medium text-rose-600">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="client-label">Mật khẩu mới
+                                <input class="client-input" type="password" name="password" required autocomplete="new-password">
+                                @error('password')<span class="text-xs font-medium text-rose-600">{{ $message }}</span>@enderror
+                            </label>
+                            <label class="client-label">Xác nhận mật khẩu mới
+                                <input class="client-input" type="password" name="password_confirmation" required autocomplete="new-password">
+                            </label>
+                        </div>
+
+                        <button class="client-button mt-5 min-h-11 w-full justify-center sm:w-auto" type="submit"><i class="bx bx-key text-lg" aria-hidden="true"></i>Cập nhật mật khẩu</button>
+                    </form>
+                    <aside class="rounded-[5px] border border-amber-200 bg-amber-50 p-4">
+                        <h2 class="flex items-center gap-2 font-extrabold text-amber-950"><i class="bx bx-lock-alt text-lg" aria-hidden="true"></i>Mật khẩu an toàn</h2>
+                        <ul class="mt-3 grid gap-2 text-sm leading-6 text-amber-900">
+                            <li>• Ít nhất 8 ký tự.</li>
+                            <li>• Không dùng lại mật khẩu tài khoản game.</li>
+                            <li>• Không gửi mật khẩu cho nhân viên hỗ trợ.</li>
+                        </ul>
+                    </aside>
+                </div>
+            @elseif ($activeTab === 'api')
+                <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
+                    <div class="grid content-start gap-3">
+                        @if (session('new_api_token'))
+                            <section class="rounded-[5px] border border-emerald-300 bg-emerald-50 p-4">
+                                <h2 class="font-extrabold text-emerald-950">API key mới — chỉ hiển thị một lần</h2>
+                                <p class="mt-1 text-sm text-emerald-800">Sao chép khóa ngay. Hệ thống không thể hiển thị lại sau khi bạn rời trang.</p>
+                                <div class="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row">
+                                    <code class="min-w-0 flex-1 break-all rounded-[5px] border border-emerald-200 bg-white p-3 text-xs text-slate-800">{{ session('new_api_token') }}</code>
+                                    <button class="client-button-secondary min-h-11 shrink-0 bg-white" type="button" data-copy="{{ session('new_api_token') }}"><i class="bx bx-copy text-lg" aria-hidden="true"></i>Sao chép</button>
+                                </div>
+                            </section>
+                        @endif
+
+                        <section class="rounded-[5px] border border-slate-200 bg-white p-4 sm:p-6">
+                            <h2 class="text-xl font-extrabold text-slate-950">Quản lý API key</h2>
+                            <p class="mt-1 text-sm leading-6 text-slate-500">Tạo khóa Sanctum để xác thực các request API của tài khoản.</p>
+                            <form class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end" method="POST" action="{{ route('account.profile.api.store') }}">
+                                @csrf
+                                <label class="client-label min-w-0 flex-1">Tên API key
+                                    <input class="client-input" name="name" value="{{ old('name') }}" maxlength="80" placeholder="Ví dụ: Máy chủ thanh toán" required autocomplete="off">
+                                    @error('name')<span class="text-xs font-medium text-rose-600">{{ $message }}</span>@enderror
+                                </label>
+                                <button class="client-button min-h-11 shrink-0 justify-center" type="submit"><i class="bx bx-plus text-lg" aria-hidden="true"></i>Tạo API key</button>
+                            </form>
+                        </section>
+
+                        <section class="overflow-hidden rounded-[5px] border border-slate-200 bg-white">
+                            <div class="border-b border-slate-200 p-4"><h2 class="font-extrabold text-slate-950">API key đang hoạt động</h2></div>
+                            <div class="divide-y divide-slate-100">
+                                @forelse ($apiTokens as $token)
+                                    <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                                        <div class="min-w-0">
+                                            <p class="truncate font-extrabold text-slate-950">{{ $token->name }}</p>
+                                            <p class="mt-1 text-xs leading-5 text-slate-500">Tạo {{ $token->created_at?->format('d/m/Y H:i') }} · Dùng gần nhất {{ $token->last_used_at?->format('d/m/Y H:i') ?? 'chưa dùng' }} · Hết hạn {{ $token->expires_at?->format('d/m/Y') ?? 'không giới hạn' }}</p>
+                                        </div>
+                                        <form method="POST" action="{{ route('account.profile.api.destroy', $token->id) }}">
+                                            @csrf
+                                            @method('DELETE')
+                                            <button class="client-button-secondary min-h-11 w-full border-rose-200 bg-white text-rose-700 hover:bg-rose-50 sm:w-auto" type="submit"><i class="bx bx-trash text-lg" aria-hidden="true"></i>Thu hồi</button>
+                                        </form>
+                                    </div>
+                                @empty
+                                    <div class="p-8 text-center text-sm text-slate-500">Bạn chưa tạo API key nào.</div>
+                                @endforelse
+                            </div>
+                        </section>
+                    </div>
+
+                    <aside class="rounded-[5px] border border-rose-200 bg-rose-50 p-4">
+                        <h2 class="flex items-center gap-2 font-extrabold text-rose-950"><i class="bx bx-error-circle text-lg" aria-hidden="true"></i>Bảo vệ API key</h2>
+                        <ul class="mt-3 grid gap-2 text-sm leading-6 text-rose-900">
+                            <li>• API key có quyền truy cập API dưới danh nghĩa của bạn.</li>
+                            <li>• Không lưu khóa trong mã nguồn hoặc gửi qua tin nhắn.</li>
+                            <li>• Thu hồi ngay khi nghi ngờ khóa bị lộ.</li>
+                        </ul>
+                    </aside>
+                </div>
+            @elseif ($activeTab === 'logs')
+                <section class="overflow-hidden rounded-[5px] border border-slate-200 bg-white">
+                    <div class="flex flex-col gap-1 border-b border-slate-200 p-4 sm:p-5">
+                        <h2 class="text-xl font-extrabold text-slate-950">Lịch sử người dùng</h2>
+                        <p class="text-sm text-slate-500">Theo dõi các lần đăng nhập và thao tác bảo mật gần đây.</p>
+                    </div>
+                    <div class="divide-y divide-slate-100">
+                        @forelse ($userLogs ?? [] as $log)
+                            <article class="grid min-w-0 gap-3 p-4 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto] sm:items-start sm:p-5">
+                                <span class="grid h-10 w-10 place-items-center rounded-[5px] bg-slate-100 text-xl text-slate-500"><i class="bx bx-history" aria-hidden="true"></i></span>
+                                <div class="min-w-0">
+                                    <h3 class="font-extrabold text-slate-950">{{ $log->description ?: $log->action }}</h3>
+                                    <p class="mt-1 break-words text-xs leading-5 text-slate-500">Hành động: {{ $log->action }}@if ($log->ip) · IP: {{ $log->ip }}@endif</p>
+                                    @if ($log->user_agent)<p class="mt-1 break-all text-xs leading-5 text-slate-400">{{ $log->user_agent }}</p>@endif
+                                </div>
+                                <time class="text-xs font-medium text-slate-400" datetime="{{ $log->created_at?->toISOString() }}">{{ $log->created_at?->format('d/m/Y H:i') }}</time>
+                            </article>
+                        @empty
+                            <div class="p-10 text-center text-sm text-slate-500">Chưa có hoạt động nào được ghi nhận.</div>
+                        @endforelse
+                    </div>
+                    @if ($userLogs?->hasPages())<div class="border-t border-slate-200 p-4">{{ $userLogs->links() }}</div>@endif
+                </section>
+            @elseif ($activeTab === 'wallet')
+                <div class="grid gap-3">
+                    <section class="flex flex-col gap-3 rounded-[5px] border border-slate-200 bg-slate-50 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                        <div>
+                            <p class="text-xs font-bold uppercase tracking-[0.16em] text-slate-400">Số dư hiện tại</p>
+                            <p class="mt-1 text-2xl font-extrabold tabular-nums text-slate-950">{{ number_format((float) ($wallet?->balance ?? 0), 0, ',', '.') }}đ</p>
+                        </div>
+                        <a class="client-button min-h-11 justify-center" href="{{ route('wallet.deposit.index') }}"><i class="bx bx-plus-circle text-lg" aria-hidden="true"></i>Nạp tiền</a>
+                    </section>
+
+                    <section class="overflow-hidden rounded-[5px] border border-slate-200 bg-white">
+                        <div class="border-b border-slate-200 p-4 sm:p-5">
+                            <h2 class="text-xl font-extrabold text-slate-950">Lịch sử dòng tiền</h2>
+                            <p class="mt-1 text-sm text-slate-500">Toàn bộ biến động số dư được ghi theo sổ cái ví.</p>
+                        </div>
+                        <div class="divide-y divide-slate-100">
+                            @forelse ($walletTransactions ?? [] as $transaction)
+                                @php($isCredit = in_array($transaction->type, ['credit', 'refund', 'release'], true))
+                                <article class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+                                    <div class="flex min-w-0 items-start gap-3">
+                                        <span @class(['grid h-10 w-10 shrink-0 place-items-center rounded-[5px] text-xl', 'bg-emerald-50 text-emerald-600' => $isCredit, 'bg-rose-50 text-rose-600' => ! $isCredit])><i class="bx {{ $isCredit ? 'bx-down-arrow-alt' : 'bx-up-arrow-alt' }}" aria-hidden="true"></i></span>
+                                        <div class="min-w-0">
+                                            <h3 class="break-words font-extrabold text-slate-950">{{ $transaction->description ?: 'Giao dịch ví' }}</h3>
+                                            <p class="mt-1 text-xs text-slate-500">{{ $transaction->created_at?->format('d/m/Y H:i') }} · Số dư sau: {{ number_format((float) $transaction->balance_after, 0, ',', '.') }}đ</p>
+                                        </div>
+                                    </div>
+                                    <p @class(['shrink-0 text-lg font-extrabold tabular-nums', 'text-emerald-700' => $isCredit, 'text-rose-700' => ! $isCredit])>{{ $isCredit ? '+' : '-' }}{{ number_format((float) $transaction->amount, 0, ',', '.') }}đ</p>
+                                </article>
+                            @empty
+                                <div class="p-10 text-center text-sm text-slate-500">Chưa có giao dịch ví.</div>
+                            @endforelse
+                        </div>
+                        @if ($walletTransactions?->hasPages())<div class="border-t border-slate-200 p-4">{{ $walletTransactions->links() }}</div>@endif
+                    </section>
+                </div>
+            @endif
+        </div>
+    </div>
+</section>
+@endsection

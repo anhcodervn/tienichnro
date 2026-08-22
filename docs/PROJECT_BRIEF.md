@@ -1,26 +1,25 @@
-# PROJECT_BRIEF
+# Project Brief
 
-## Product
+## Sản phẩm
 
-- Product name: `DailyProxy.vn`.
-- Website trung gian quản lý và niêm yết sản phẩm proxy từ các nhà cung cấp.
-- Credential kết nối nhà cung cấp chỉ nằm ở backend.
+- Tên: Nạp Carot.
+- Website bán topup/Carot cho các game Teamobi.
+- Guest có thể đặt hàng bằng email; tài khoản đã xác minh có thể dùng ví và nhận lại đơn guest cùng email.
 
-## Stack
+## Kiến trúc giao diện
 
-- Laravel 12, Vue 3, Vite, TypeScript, Tailwind CSS 3.
-- Sanctum cho SPA; API key/secret cho reseller API.
-- Pest cho backend tests.
+- Public, checkout, auth và tài khoản: Laravel Blade, CSS, JavaScript thuần.
+- Admin: Vue 3, Vue Router, Pinia và Axios.
+- Không có Client Vue SPA.
 
-## Proxy catalog hiện tại
+## Nghiệp vụ chính
 
-- `ProxyCategory`: nhóm sản phẩm proxy.
-- `ProxyProvider`: tên, code, phương thức thủ công/tự động và dữ liệu kết nối được mã hóa.
-- `ProxyProduct`: sản phẩm thuộc category, gắn provider, giao thức hỗ trợ và giá bán theo proxy/ngày.
-- Trang Services và API `GET /api/v1/proxy/products` chỉ đọc catalog.
+- Game, server và gói nạp được quản trị từ database.
+- Backend tự tính giá và snapshot thông tin gói vào order.
+- Trạng thái thanh toán tách khỏi trạng thái xử lý topup.
+- Chuyển khoản được match theo mã đơn và mã giao dịch duy nhất.
+- Topup chạy qua queue với provider thủ công mặc định.
 
-## Security boundary
+## Hạ tầng tái sử dụng
 
-- Credential provider được mã hóa và không trả ra resource công khai.
-- Client chỉ thấy thương hiệu DailyProxy và dữ liệu catalog công khai.
-- Không log credential, token hoặc raw response nhạy cảm từ provider.
+Authentication, user, wallet ledger, cấu hình ngân hàng, mail, queue, SEO, upload, settings, support và logging được giữ lại sau khi loại bỏ domain sản phẩm cũ.

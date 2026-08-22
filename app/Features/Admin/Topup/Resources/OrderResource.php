@@ -1,0 +1,35 @@
+<?php
+
+namespace App\Features\Admin\Topup\Resources;
+
+use App\Models\OrderRecipient;
+use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
+
+class OrderResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            'id' => $this->id, 'code' => $this->code, 'email' => $this->email,
+            'user_id' => $this->user_id, 'game' => $this->game?->name, 'server' => $this->server?->name,
+            'game_account' => $this->game_account, 'game_character' => $this->game_character,
+            'package_name' => $this->package_name, 'quantity' => $this->quantity,
+            'purchase_mode' => $this->purchase_mode,
+            'checkout_fields' => $this->checkout_fields_snapshot ?? [],
+            'recipients' => $this->whenLoaded('recipients', fn (): array => $this->recipients
+                ->map(fn (OrderRecipient $recipient): array => [
+                    'position' => $recipient->position,
+                    'data' => $recipient->recipient_data,
+                    'quantity' => $recipient->quantity,
+                    'status' => $recipient->status,
+                    'provider_reference' => $recipient->provider_reference,
+                    'failure_reason' => $recipient->failure_reason,
+                ])->all()),
+            'total_amount' => $this->total_amount, 'payment_method' => $this->payment_method->value,
+            'payment_status' => $this->payment_status->value, 'order_status' => $this->order_status->value,
+            'provider_reference' => $this->provider_reference, 'failure_reason' => $this->failure_reason,
+            'paid_at' => $this->paid_at?->toISOString(), 'created_at' => $this->created_at?->toISOString(),
+        ];
+    }
+}

@@ -1,0 +1,67 @@
+<?php
+
+namespace App\Features\Topup\Jobs;
+
+use App\Features\Topup\Enums\TopupProviderStatus;
+use App\Features\Topup\Services\RecipientFulfillmentService;
+use App\Models\OrderRecipient;
+use Illuminate\Contracts\Queue\ShouldBeUnique;
+use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Queue\Middleware\RateLimited;
+use Throwable;
+
+class SyncTopupRecipientStatus implements ShouldBeUnique, ShouldQueue
+{
+    use Queueable;
+
+    public int $tries = 100;
+
+    public int $maxExceptions = 4;
+
+    public int $timeout = 55;
+
+    /** @var array<int, int> */
+    public array $backoff = [10, 30, 60, 120];
+
+    public function __construct(
+        public readonly int $recipientId,
+        public readonly int $unit,
+        public readonly int $checkAttempt,
+    ) {
+        $this->afterCommit();
+        $this->onQueue('topup');
+    }
+
+    public function uniqueId(): string
+    {
+        return $this->recipientId.':'.$this->unit.':'.$this->checkAttempt;
+    }
+
+    /** @return array<int, object> */
+    public function middleware(): array
+    {
+        return [new RateLimited('topup-provider')];
+    }
+
+    public function handle(RecipientFulfillmentService $service): void
+    {
+        $service->syncStatus($this->recipientId, $this->unit, $this->checkAttempt);
+    }
+
+    public function failed(Throwable $exception): void
+    {
+        $recipient = OrderRecipient::query()->find($this->recipientId);
+
+        if (! $recipient instanceof OrderRecipient || in_array($recipient->status, ['completed', 'failed', 'cancelled'], true)) {
+            return;
+        }
+
+        $recipient->forceFill([
+            'status' => 'processing',
+            'provider_status' => TopupProviderStatus::Processing->value,
+            'failure_reason' => 'Không thể đồng bộ trạng thái xử lý; cần đối soát thủ công.',
+            'last_checked_at' => now(),
+        ])->save();
+    }
+}

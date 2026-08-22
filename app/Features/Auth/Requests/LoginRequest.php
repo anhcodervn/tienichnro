@@ -4,11 +4,13 @@ namespace App\Features\Auth\Requests;
 
 use App\Exceptions\ApiException;
 use Illuminate\Auth\Events\Lockout;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Str;
+use Illuminate\Validation\ValidationException;
 
 class LoginRequest extends FormRequest
 {
@@ -18,7 +20,7 @@ class LoginRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
@@ -60,6 +62,10 @@ class LoginRequest extends FormRequest
 
         if (! Auth::attempt($this->credentials(), $this->boolean('remember'))) {
             $this->hitRateLimit();
+
+            if (! $this->expectsJson()) {
+                throw ValidationException::withMessages(['login' => 'Thông tin đăng nhập không chính xác.']);
+            }
 
             throw new ApiException('Thông tin đăng nhập không chính xác.', 422, [
                 'errors' => [
@@ -130,6 +136,10 @@ class LoginRequest extends FormRequest
 
     protected function failedValidation(Validator $validator): void
     {
+        if (! $this->expectsJson()) {
+            parent::failedValidation($validator);
+        }
+
         throw new ApiException($validator->errors()->first(), 422, [
             'errors' => $validator->errors()->toArray(),
         ]);

@@ -57,12 +57,29 @@ class WalletService
 
     public function debit(
         User $user,
-        float $amount,
+        int|string $amount,
         string $referenceType,
         int $referenceId,
         string $description,
         string $type = Wallet::TYPE_MAIN,
+        ?string $idempotencyKey = null,
     ): Wallet {
+        $amount = $this->monetaryInteger($amount);
+
+        $idempotentWallet = $this->resolveIdempotentWallet(
+            user: $user,
+            walletType: $type,
+            transactionType: 'debit',
+            amount: $amount,
+            referenceType: $referenceType,
+            referenceId: $referenceId,
+            idempotencyKey: $idempotencyKey,
+        );
+
+        if ($idempotentWallet instanceof Wallet) {
+            return $idempotentWallet;
+        }
+
         $wallet = Wallet::query()
             ->where('user_id', $user->id)
             ->where('type', $type)
@@ -77,16 +94,16 @@ class WalletService
                 ->firstOrFail();
         }
 
-        if ((float) $wallet->balance < $amount) {
+        if ($this->monetaryInteger((string) $wallet->balance) < $amount) {
             throw new ApiException('Số dư ví chính không đủ để thanh toán đơn hàng.', 422);
         }
 
-        $balanceBefore = (float) $wallet->balance;
+        $balanceBefore = $this->monetaryInteger((string) $wallet->balance);
         $balanceAfter = $balanceBefore - $amount;
 
         $wallet->forceFill([
             'balance' => $balanceAfter,
-            'total_spent' => (float) $wallet->total_spent + $amount,
+            'total_spent' => $this->monetaryInteger((string) $wallet->total_spent) + $amount,
         ])->save();
 
         $transaction = WalletTransaction::query()->create([
@@ -97,6 +114,7 @@ class WalletService
             'balance_after' => $balanceAfter,
             'reference_type' => $referenceType,
             'reference_id' => $referenceId,
+            'idempotency_key' => $idempotencyKey,
             'description' => $description,
             'status' => 'success',
         ]);
@@ -109,24 +127,41 @@ class WalletService
 
     public function credit(
         User $user,
-        float $amount,
+        int|string $amount,
         string $referenceType,
         int $referenceId,
         string $description,
         string $type = Wallet::TYPE_MAIN,
+        ?string $idempotencyKey = null,
     ): Wallet {
+        $amount = $this->monetaryInteger($amount);
+
+        $idempotentWallet = $this->resolveIdempotentWallet(
+            user: $user,
+            walletType: $type,
+            transactionType: 'credit',
+            amount: $amount,
+            referenceType: $referenceType,
+            referenceId: $referenceId,
+            idempotencyKey: $idempotencyKey,
+        );
+
+        if ($idempotentWallet instanceof Wallet) {
+            return $idempotentWallet;
+        }
+
         $wallet = Wallet::query()
             ->where('user_id', $user->id)
             ->where('type', $type)
             ->lockForUpdate()
             ->firstOrFail();
 
-        $balanceBefore = (float) $wallet->balance;
+        $balanceBefore = $this->monetaryInteger((string) $wallet->balance);
         $balanceAfter = $balanceBefore + $amount;
 
         $wallet->forceFill([
             'balance' => $balanceAfter,
-            'total_spent' => max(0, (float) $wallet->total_spent - $amount),
+            'total_spent' => max(0, $this->monetaryInteger((string) $wallet->total_spent) - $amount),
         ])->save();
 
         $transaction = WalletTransaction::query()->create([
@@ -137,6 +172,7 @@ class WalletService
             'balance_after' => $balanceAfter,
             'reference_type' => $referenceType,
             'reference_id' => $referenceId,
+            'idempotency_key' => $idempotencyKey,
             'description' => $description,
             'status' => 'success',
         ]);
@@ -147,7 +183,7 @@ class WalletService
         return $wallet;
     }
 
-    private function broadcastBalanceChanged(User $user, Wallet $wallet, WalletTransaction $transaction, float $signedAmount): void
+    private function broadcastBalanceChanged(User $user, Wallet $wallet, WalletTransaction $transaction, int $signedAmount): void
     {
         WalletBalanceChanged::dispatch(
             userId: $user->id,
@@ -162,5 +198,49 @@ class WalletService
             description: (string) $transaction->description,
             changedAt: $transaction->created_at?->toISOString() ?? now()->toISOString(),
         );
+    }
+
+    private function resolveIdempotentWallet(
+        User $user,
+        string $walletType,
+        string $transactionType,
+        int $amount,
+        string $referenceType,
+        int $referenceId,
+        ?string $idempotencyKey,
+    ): ?Wallet {
+        if ($idempotencyKey === null) {
+            return null;
+        }
+
+        $transaction = WalletTransaction::query()
+            ->with('wallet')
+            ->where('idempotency_key', $idempotencyKey)
+            ->first();
+
+        if (! $transaction instanceof WalletTransaction) {
+            return null;
+        }
+
+        $wallet = $transaction->wallet;
+        $matchesOriginalOperation = $wallet instanceof Wallet
+            && $wallet->user_id === $user->id
+            && $wallet->type === $walletType
+            && $transaction->type === $transactionType
+            && $transaction->status === 'success'
+            && $this->monetaryInteger((string) $transaction->amount) === $amount
+            && $transaction->reference_type === $referenceType
+            && $transaction->reference_id === $referenceId;
+
+        if (! $matchesOriginalOperation) {
+            throw new ApiException('Mã chống trùng giao dịch ví không khớp với thao tác ban đầu.', 409);
+        }
+
+        return $wallet;
+    }
+
+    private function monetaryInteger(int|string $amount): int
+    {
+        return (int) str($amount)->before('.')->toString();
     }
 }

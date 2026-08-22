@@ -73,6 +73,10 @@ export default {
             type: Number,
             default: 500,
         },
+        allowImages: {
+            type: Boolean,
+            default: true,
+        },
     },
 
     emits: ['update:value', 'update:modelValue'],
@@ -84,6 +88,7 @@ export default {
             debounce: number;
             format: 'json' | 'html';
             height: number;
+            allowImages: boolean;
         },
         { emit }: { emit: (event: 'update:value' | 'update:modelValue', value: EditorContentNode[] | string) => void },
     ) {
@@ -96,6 +101,7 @@ export default {
             on: (event: string, callback: () => void) => void;
         } | null = null;
         let isApplyingExternalValue = false;
+        let lastEmittedFingerprint: string | null = null;
         let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
         const getTinyMce = () =>
@@ -103,7 +109,20 @@ export default {
 
         const currentValue = () => props.modelValue ?? props.value ?? (props.format === 'html' ? '' : []);
 
+        const valueFingerprint = (value: unknown): string => {
+            if (typeof value === 'string') {
+                return `html:${value}`;
+            }
+
+            try {
+                return `json:${JSON.stringify(value)}`;
+            } catch {
+                return 'json:[]';
+            }
+        };
+
         const emitValue = (value: EditorContentNode[] | string) => {
+            lastEmittedFingerprint = valueFingerprint(value);
             emit('update:value', value);
             emit('update:modelValue', value);
         };
@@ -373,17 +392,24 @@ export default {
                 language_url: '/assets/libs/tinymce/langs/vi.js',
                 height: props.height,
                 menubar: true,
-                plugins: [
-                    'advlist autolink lists link image charmap print preview anchor',
-                    'searchreplace visualblocks code fullscreen',
-                    'insertdatetime media table paste code help wordcount',
-                    'emoticons hr pagebreak nonbreaking toc',
-                    'save autosave directionality textcolor',
-                ],
-                toolbar: [
-                    'undo redo | formatselect | fontselect fontsizeselect | bold italic underline strikethrough | forecolor backcolor',
-                    'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image emoticons | table | code fullscreen preview | removeformat',
-                ],
+                plugins: props.allowImages
+                    ? [
+                          'advlist autolink lists link image charmap print preview anchor',
+                          'searchreplace visualblocks code fullscreen',
+                          'insertdatetime media table paste code help wordcount',
+                          'emoticons hr pagebreak nonbreaking toc',
+                          'save autosave directionality textcolor',
+                      ]
+                    : ['advlist lists charmap preview searchreplace fullscreen wordcount directionality textcolor'],
+                toolbar: props.allowImages
+                    ? [
+                          'undo redo | formatselect | fontselect fontsizeselect | bold italic underline strikethrough | forecolor backcolor',
+                          'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image emoticons | table | code fullscreen preview | removeformat',
+                      ]
+                    : [
+                          'undo redo | formatselect | fontselect fontsizeselect | bold italic underline strikethrough | forecolor backcolor',
+                          'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | fullscreen preview | removeformat',
+                      ],
                 setup(editor: typeof editorInstance) {
                     editorInstance = editor;
 
@@ -419,16 +445,23 @@ export default {
         watch(
             () => currentValue(),
             (value) => {
+                const fingerprint = valueFingerprint(value);
+
+                if (fingerprint === lastEmittedFingerprint) {
+                    return;
+                }
+
+                lastEmittedFingerprint = null;
                 applyEditorValue(value);
             },
             { deep: true },
         );
 
         return {
-      editorContainer,
-      fallbackContent,
-      handleFallbackInput,
-      useFallback,
+            editorContainer,
+            fallbackContent,
+            handleFallbackInput,
+            useFallback,
         };
     },
 };

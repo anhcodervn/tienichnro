@@ -1,0 +1,92 @@
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class TopupPackage extends Model
+{
+    use HasFactory;
+
+    protected $hidden = [
+        'provider_id',
+        'provider',
+        'provider_service_code',
+        'provider_price',
+        'metadata',
+    ];
+
+    protected $fillable = [
+        'game_id', 'game_server_id', 'provider_id', 'provider_service_code', 'name', 'denomination', 'carot_amount',
+        'reward_x2_amount', 'reward_x3_amount', 'first_topup_reward_amount', 'provider_price',
+        'price', 'original_price', 'description', 'bonus_text',
+        'min_quantity', 'max_quantity', 'status', 'sort_order', 'metadata',
+    ];
+
+    protected $attributes = ['status' => 'active', 'sort_order' => 0, 'min_quantity' => 1];
+
+    protected function casts(): array
+    {
+        return [
+            'denomination' => 'integer', 'carot_amount' => 'integer',
+            'reward_x2_amount' => 'integer', 'reward_x3_amount' => 'integer', 'first_topup_reward_amount' => 'integer',
+            'provider_price' => 'decimal:2', 'price' => 'decimal:2',
+            'original_price' => 'decimal:2', 'discount_percent' => 'decimal:2',
+            'min_quantity' => 'integer', 'max_quantity' => 'integer',
+            'sort_order' => 'integer', 'metadata' => 'array',
+        ];
+    }
+
+    protected static function booted(): void
+    {
+        static::saving(function (self $package): void {
+            $package->discount_percent = $package->calculateDiscountPercent();
+        });
+    }
+
+    public function calculateDiscountPercent(): string
+    {
+        $originalPrice = (int) ($this->original_price ?? 0);
+        $salePrice = (int) ($this->price ?? 0);
+
+        if ($originalPrice <= 0 || $originalPrice < $salePrice) {
+            return '0.00';
+        }
+
+        $discountBasisPoints = intdiv(
+            (($originalPrice - $salePrice) * 10000) + intdiv($originalPrice, 2),
+            $originalPrice,
+        );
+
+        return sprintf('%d.%02d', intdiv($discountBasisPoints, 100), $discountBasisPoints % 100);
+    }
+
+    public function scopeActive(Builder $query): Builder
+    {
+        return $query->where('status', 'active');
+    }
+
+    public function game(): BelongsTo
+    {
+        return $this->belongsTo(Game::class);
+    }
+
+    public function server(): BelongsTo
+    {
+        return $this->belongsTo(GameServer::class, 'game_server_id');
+    }
+
+    public function provider(): BelongsTo
+    {
+        return $this->belongsTo(TopupProvider::class, 'provider_id');
+    }
+
+    public function orders(): HasMany
+    {
+        return $this->hasMany(Order::class);
+    }
+}

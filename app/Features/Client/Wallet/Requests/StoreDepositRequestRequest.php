@@ -3,6 +3,7 @@
 namespace App\Features\Client\Wallet\Requests;
 
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreDepositRequestRequest extends FormRequest
 {
@@ -14,8 +15,12 @@ class StoreDepositRequestRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'amount' => ['required', 'numeric', 'min:1000', 'max:999999999'],
-            'config_id' => ['nullable', 'integer', 'exists:config_recharge,id'],
+            'amount' => ['required', 'integer', 'min:10000', 'max:50000000'],
+            'config_id' => [
+                'nullable',
+                'integer',
+                Rule::exists('config_recharge', 'id')->where('is_active', true),
+            ],
         ];
     }
 }

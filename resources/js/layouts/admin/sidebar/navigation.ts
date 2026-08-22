@@ -1,13 +1,13 @@
 import {
-    BarChart3,
     BellRing,
     BookMarked,
-    Database,
+    Gamepad2,
     LayoutDashboard,
     ListChecks,
     Mail,
     MessagesSquare,
     Settings,
+    ShoppingCart,
     Users,
     WalletCards,
     type LucideIcon,
@@ -35,12 +35,6 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         href: '/admin',
     },
     {
-        key: 'analytics',
-        label: 'Báo cáo vận hành',
-        icon: BarChart3,
-        href: '/admin/analytics',
-    },
-    {
         key: 'support',
         label: 'Tin nhắn hỗ trợ',
         icon: MessagesSquare,
@@ -48,27 +42,33 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         badge: 'support',
     },
     {
-        key: 'proxy',
-        label: 'Kho proxy',
-        icon: Database,
+        key: 'topup-catalog',
+        label: 'Danh mục nạp game',
+        icon: Gamepad2,
         children: [
             {
-                label: 'Chuyên mục proxy',
-                href: '/admin/proxy-taxonomy',
+                label: 'Game',
+                href: '/admin/topup/games',
+            },
+            {
+                label: 'Máy chủ',
+                href: '/admin/topup/servers',
+            },
+            {
+                label: 'Gói nạp',
+                href: '/admin/topup/packages',
             },
             {
                 label: 'Nhà cung cấp',
-                href: '/admin/proxy-providers',
-            },
-            {
-                label: 'Sản phẩm proxy',
-                href: '/admin/proxy-products',
-            },
-            {
-                label: 'API log',
-                href: '/admin/api-logs',
+                href: '/admin/topup/providers',
             },
         ],
+    },
+    {
+        key: 'topup-orders',
+        label: 'Đơn nạp game',
+        icon: ShoppingCart,
+        href: '/admin/topup/orders',
     },
     {
         key: 'recharge',

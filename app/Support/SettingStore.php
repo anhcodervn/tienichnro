@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Setting;
+use Illuminate\Support\Facades\DB;
 
 class SettingStore
 {
@@ -87,16 +88,18 @@ class SettingStore
      */
     public function putMany(array $values): void
     {
-        collect($values)->each(function (mixed $value, string $key): void {
-            $payload = $this->prepareValue($value);
+        DB::transaction(function () use ($values): void {
+            collect($values)->each(function (mixed $value, string $key): void {
+                $payload = $this->prepareValue($value);
 
-            Setting::query()->updateOrCreate(
-                ['key' => $key],
-                [
-                    'value' => $payload['value'],
-                    'type' => $payload['type'],
-                ],
-            );
+                Setting::query()->updateOrCreate(
+                    ['key' => $key],
+                    [
+                        'value' => $payload['value'],
+                        'type' => $payload['type'],
+                    ],
+                );
+            });
         });
     }
 

@@ -1,7 +1,8 @@
 <script setup lang="ts">
+import { useSystemSetting } from '@/composables/useSystemSetting';
 import { useSupportStore } from '@/stores/support.store';
 import { ChevronRight, ShieldCheck, X } from 'lucide-vue-next';
-import { reactive, watch } from 'vue';
+import { computed, onMounted, reactive, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 import { adminMenuGroups, type AdminMenuGroup } from './navigation';
 
@@ -15,6 +16,12 @@ const emit = defineEmits<{
 
 const route = useRoute();
 const supportStore = useSupportStore();
+const { settings, fetchSettings } = useSystemSetting();
+const sidebarLogo = computed(() => settings.value.dark_logo || settings.value.light_logo);
+
+onMounted(() => {
+    void fetchSettings().catch(() => {});
+});
 
 const findBestMatchingChildHref = (hrefs: string[], currentPath: string): string | null => {
     return (
@@ -84,13 +91,22 @@ watch(
         >
             <div class="flex items-center justify-between border-b border-slate-200 px-6 py-5">
                 <RouterLink to="/admin" class="flex items-center gap-3" @click="closeSidebarOnMobile">
+                    <img
+                        v-if="sidebarLogo"
+                        :src="sidebarLogo"
+                        :alt="settings.site_name || 'Nạp Carot'"
+                        class="h-auto w-24 shrink-0 object-contain object-left"
+                    />
                     <div
+                        v-else
                         class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-[0_12px_28px_rgba(6,182,212,0.24)]"
                     >
                         <ShieldCheck class="h-5 w-5" />
                     </div>
                     <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-600">DailyProxy</p>
+                        <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-600">
+                            {{ settings.site_name || 'Nạp Carot' }}
+                        </p>
                         <h1 class="text-lg font-black tracking-tight text-slate-950">Admin Control</h1>
                     </div>
                 </RouterLink>

@@ -65,8 +65,8 @@ class PublicSeoPageController extends Controller
             ->get();
 
         $systemSettings = $this->systemSettings($settingStore);
-        $pageTitle = 'Blog DailyProxy.vn và kiến thức proxy API';
-        $pageDescription = 'Chia sẻ hướng dẫn cấu hình HTTP Cron Jobs, tối ưu lịch chạy, kiểm soát quota, log, cảnh báo và vận hành queue ổn định.';
+        $pageTitle = 'Tin tức và hướng dẫn nạp game Teamobi';
+        $pageDescription = 'Hướng dẫn chọn gói Carot, thanh toán an toàn và xử lý các tình huống thường gặp khi nạp game Teamobi.';
 
         return view('pages.seo.index', [
             'systemSettings' => $systemSettings,
@@ -74,7 +74,7 @@ class PublicSeoPageController extends Controller
             'pageDescription' => $pageDescription,
             'pageMetaTitle' => $search !== ''
                 ? "Tìm kiếm: {$search} | {$pageTitle}"
-                : $pageTitle.' | '.($systemSettings['site_name'] ?: config('app.name', 'DailyProxy.vn')),
+                : $pageTitle.' | '.($systemSettings['site_name'] ?: config('app.name', 'Nạp Carot')),
             'pageMetaDescription' => $pageDescription,
             'pageMetaUrl' => $request->url().($request->getQueryString() ? '?'.$request->getQueryString() : ''),
             'featuredPost' => $featuredPost ? $this->transformPost($featuredPost) : null,
@@ -141,7 +141,7 @@ class PublicSeoPageController extends Controller
             'headingIndex' => $headingIndex,
             'relatedPosts' => $relatedPosts->map(fn (SeoPost $item) => $this->transformPost($item)),
             'sidebarCategories' => $sidebarCategories,
-            'pageMetaTitle' => $post->seo_title ?: $post->title.' | '.($systemSettings['site_name'] ?: config('app.name', 'DailyProxy.vn')),
+            'pageMetaTitle' => $post->seo_title ?: $post->title.' | '.($systemSettings['site_name'] ?: config('app.name', 'Nạp Carot')),
             'pageMetaDescription' => $post->seo_description ?: ($post->excerpt ?: $this->contentRenderer->extractText($content)),
             'pageMetaCanonical' => $post->canonical_url ?: $request->url(),
             'pageMetaUrl' => $request->url(),
@@ -152,7 +152,7 @@ class PublicSeoPageController extends Controller
     protected function systemSettings(SettingStore $settingStore): array
     {
         return $settingStore->getMany([
-            'site_name' => config('app.name', 'DailyProxy.vn'),
+            'site_name' => config('app.name', 'Nạp Carot'),
             'site_domain' => '',
             'site_description' => '',
             'support_email' => '',
@@ -189,7 +189,7 @@ class PublicSeoPageController extends Controller
             'published_at' => $publishedAt,
             'published_label' => $publishedAt?->format('d/m/Y'),
             'reading_minutes' => $this->contentRenderer->estimateReadingMinutes($content),
-            'url' => url('/blog/'.$post->slug),
+            'url' => route('seo.show', $post->slug),
         ];
     }
 }

@@ -2,18 +2,19 @@
 
 namespace App\Features\Auth\Controllers;
 
+use App\Actions\RecordUserLogAction;
 use App\Exceptions\ApiException;
 use App\Features\Auth\Requests\ForgotPasswordRequest;
 use App\Features\Auth\Requests\LoginRequest;
 use App\Features\Auth\Requests\RegisterRequest;
 use App\Features\Auth\Services\GoogleAuthService;
-use App\Features\Client\Profile\Actions\RecordUserLogAction;
 use App\Features\Client\Wallet\Services\WalletService;
+use App\Features\Reporting\Services\DiscordReportService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\MailQueue;
-use App\Utils\SendMessage;
 use Illuminate\Auth\Events\Registered;
+use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -30,6 +31,7 @@ class AuthController extends Controller
         private readonly RecordUserLogAction $recordUserLogAction,
         private readonly MailQueue $mailQueue,
         private readonly GoogleAuthService $googleAuthService,
+        private readonly DiscordReportService $discordReportService,
     ) {}
 
     public function index(): JsonResponse
@@ -40,7 +42,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function login(LoginRequest $request): JsonResponse
+    public function login(LoginRequest $request): JsonResponse|RedirectResponse
     {
         $request->authenticate();
         $request->session()->regenerate();
@@ -53,6 +55,10 @@ class AuthController extends Controller
 
         $this->touchLastLogin($user, $request);
         $this->recordUserLogAction->handle($user, 'login', 'Đăng nhập hệ thống', $request);
+
+        if (! $request->expectsJson()) {
+            return redirect()->intended(route('account.index'));
+        }
 
         return response()->json([
             'status' => true,
@@ -95,7 +101,7 @@ class AuthController extends Controller
         ]);
     }
 
-    public function register(RegisterRequest $request): JsonResponse
+    public function register(RegisterRequest $request): JsonResponse|RedirectResponse
     {
         $validated = $request->validated();
 
@@ -125,16 +131,11 @@ class AuthController extends Controller
         }
 
         event(new Registered($user));
-        SendMessage::sendActivityReport('Người dùng đăng ký mới', [
-            'Loại đăng ký' => 'form',
-            'User ID' => $user->id,
-            'Username' => $user->username,
-            'Họ tên' => $user->name,
-            'Email' => $user->email,
-            'Số điện thoại' => $user->phone,
-            'Trạng thái' => $user->status,
-            'Vai trò' => $user->role,
-        ]);
+        $this->queueRegistrationReport($user, 'form');
+
+        if (! $request->expectsJson()) {
+            return redirect()->route('auth.login')->with('success', 'Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản.');
+        }
 
         return response()->json([
             'status' => true,
@@ -242,16 +243,12 @@ class AuthController extends Controller
             $this->touchLastLogin($user, $request);
             $this->recordUserLogAction->handle($user, 'google_login', 'Đăng nhập bằng Google', $request);
 
+            if ($user->hasVerifiedEmail()) {
+                event(new Verified($user));
+            }
+
             if ($isNewUser) {
-                SendMessage::sendActivityReport('Người dùng đăng ký mới', [
-                    'Loại đăng ký' => 'google',
-                    'User ID' => $user->id,
-                    'Username' => $user->username,
-                    'Họ tên' => $user->name,
-                    'Email' => $user->email,
-                    'Trạng thái' => $user->status,
-                    'Vai trò' => $user->role,
-                ]);
+                $this->queueRegistrationReport($user, 'google');
             }
 
             return redirect('/');
@@ -284,6 +281,22 @@ class AuthController extends Controller
         }
 
         return redirect()->route('login');
+    }
+
+    private function queueRegistrationReport(User $user, string $registrationType): void
+    {
+        $this->discordReportService->queue(
+            channel: 'activity',
+            title: 'Người dùng đăng ký mới',
+            details: [
+                'Loại đăng ký' => $registrationType,
+                'User ID' => $user->id,
+                'Username' => $user->username,
+                'Trạng thái' => $user->status,
+                'Vai trò' => $user->role,
+            ],
+            dedupeKey: "user:{$user->id}:registered",
+        );
     }
 
     /**

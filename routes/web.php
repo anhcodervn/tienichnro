@@ -1,124 +1,90 @@
 <?php
 
 use App\Features\Auth\Controllers\AuthController;
+use App\Features\Client\Profile\Controllers\ProfilePageController;
+use App\Http\Controllers\Account\WalletController;
+use App\Http\Controllers\Auth\EmailVerificationNotificationController;
+use App\Http\Controllers\Auth\EmailVerificationPromptController;
 use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
+use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\Client\SitemapController;
 use App\Http\Controllers\PublicContentPageController;
 use App\Http\Controllers\PublicSeoPageController;
+use App\Models\User;
 use App\Support\SettingStore;
-use Illuminate\Support\Facades\Auth;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware('site.active')->get('/', function (SettingStore $settingStore) {
-    $defaults = [
-        'site_name' => config('app.name', 'DailyProxy.vn'),
-        'site_domain' => '',
-        'site_description' => '',
-        'support_email' => '',
-        'hotline' => '',
-        'address' => '',
-        'facebook' => '',
-        'zalo' => '',
-        'youtube' => '',
-        'meta_title' => '',
-        'meta_description' => '',
-        'gtm_id' => '',
-        'meta_pixel_id' => '',
-        'custom_script' => '',
-        'light_logo' => '',
-        'dark_logo' => '',
-        'favicon' => '',
-        'og_image' => '',
-    ];
-
-    if (Auth::check()) {
-        return view('app', [
-            'systemSettings' => $settingStore->getMany($defaults),
-        ]);
-    }
-
-    return view('pages.landing.index', [
-        'systemSettings' => $settingStore->getMany($defaults),
-    ]);
-});
-
 Route::middleware(['guest', 'site.active'])->group(function (): void {
-    Route::prefix('/auth')->group(function (): void {
-        Route::get('/login', function () {
-            return view('pages.auth.login');
-        })->name('auth.login');
+    Route::view('/dang-nhap', 'pages.auth.login')->name('auth.login');
+    Route::post('/dang-nhap', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('auth.login.submit');
+    Route::view('/dang-ky', 'pages.auth.register')->name('auth.register');
+    Route::post('/dang-ky', [AuthController::class, 'register'])->middleware('throttle:5,1')->name('auth.register.submit');
+    Route::redirect('/login', '/dang-nhap')->name('login');
+    Route::redirect('/auth/login', '/dang-nhap');
+    Route::redirect('/auth/register', '/dang-ky');
 
-        Route::get('/register', function () {
-            return view('pages.auth.register');
-        })->name('auth.register');
-
-        Route::post('/login', [AuthController::class, 'login'])->middleware('throttle:10,1')->name('auth.login.submit');
-        Route::post('/register', [AuthController::class, 'register'])->middleware('throttle:5,1')->name('auth.register.submit');
-        Route::post('/forgot-password', [AuthController::class, 'forgotPassword'])->middleware('throttle:3,1')->name('auth.forgot-password.submit');
-        Route::get('/google/redirect', [AuthController::class, 'redirectToGoogle'])->name('auth.google.redirect');
-        Route::get('/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
-    });
-
-    Route::get('/login', function () {
-        return redirect()->route('auth.login');
-    })->name('login');
-
-    Route::get('/forgot-password', function () {
-        return view('pages.auth.forgot-password');
-    })->name('password.request');
-
-    Route::post('/forgot-password', [PasswordResetLinkController::class, 'store'])
-        ->middleware('throttle:3,1')
-        ->name('password.email');
-
-    Route::get('/reset-password/{token}', function (string $token) {
-        return view('pages.auth.reset-password', [
-            'token' => $token,
-            'email' => request()->string('email')->toString(),
-        ]);
+    Route::view('/quen-mat-khau', 'pages.auth.forgot-password')->name('password.request');
+    Route::post('/quen-mat-khau', [PasswordResetLinkController::class, 'store'])->middleware('throttle:3,1')->name('password.email');
+    Route::get('/dat-lai-mat-khau/{token}', function (string $token) {
+        return view('pages.auth.reset-password', ['token' => $token, 'email' => request()->string('email')->toString()]);
     })->name('password.reset');
+    Route::post('/dat-lai-mat-khau', [NewPasswordController::class, 'store'])->name('password.store');
 
-    Route::post('/reset-password', [NewPasswordController::class, 'store'])
-        ->name('password.store');
+    Route::get('/auth/google/redirect', [AuthController::class, 'redirectToGoogle'])->name('auth.google.redirect');
+    Route::get('/auth/google/callback', [AuthController::class, 'handleGoogleCallback'])->name('auth.google.callback');
 });
 
-Route::middleware('auth')->post('/logout', [AuthController::class, 'logout'])->name('logout');
+Route::middleware('auth')->group(function (): void {
+    Route::post('/dang-xuat', [AuthController::class, 'logout'])->name('logout');
+    Route::get('/verify-email', EmailVerificationPromptController::class)->name('verification.notice');
+    Route::get('/verify-email/{id}/{hash}', VerifyEmailController::class)->middleware('signed')->name('verification.verify');
+    Route::post('/email/verification-notification', EmailVerificationNotificationController::class)
+        ->middleware('throttle:6,1')->name('verification.send');
+
+    Route::prefix('tai-khoan')->name('account.')->group(function (): void {
+        Route::get('/', ProfilePageController::class)->defaults('tab', 'profile')->name('index');
+        Route::get('/so-du', WalletController::class)->name('wallet');
+    });
+});
 
 Route::controller(PublicContentPageController::class)->group(function (): void {
     Route::get('/gioi-thieu', 'show')->defaults('slug', 'gioi-thieu')->name('content.about');
     Route::get('/lien-he', 'show')->defaults('slug', 'lien-he')->name('content.contact');
+    Route::get('/huong-dan', 'show')->defaults('slug', 'huong-dan')->name('content.guide');
     Route::get('/dieu-khoan-su-dung', 'show')->defaults('slug', 'dieu-khoan-su-dung')->name('content.terms');
     Route::get('/chinh-sach-bao-mat', 'show')->defaults('slug', 'chinh-sach-bao-mat')->name('content.privacy');
     Route::get('/chinh-sach-hoan-tien', 'show')->defaults('slug', 'chinh-sach-hoan-tien')->name('content.refund');
     Route::get('/chinh-sach-thanh-toan', 'show')->defaults('slug', 'chinh-sach-thanh-toan')->name('content.payment');
-    Route::get('/chinh-sach-su-dung-api', 'show')->defaults('slug', 'chinh-sach-su-dung-api')->name('content.api-usage');
-    Route::get('/mien-tru-trach-nhiem', 'show')->defaults('slug', 'mien-tru-trach-nhiem')->name('content.disclaimer');
     Route::get('/cau-hoi-thuong-gap', 'show')->defaults('slug', 'cau-hoi-thuong-gap')->name('content.faq');
-    Route::get('/trang-thai-he-thong', 'show')->defaults('slug', 'trang-thai-he-thong')->name('content.system-status');
-    Route::get('/cap-nhat-he-thong', 'show')->defaults('slug', 'cap-nhat-he-thong')->name('content.system-updates');
 });
 
 Route::controller(PublicSeoPageController::class)->group(function (): void {
-    Route::get('/blog', 'index')->name('seo.index');
-    Route::get('/blog/{slug}', 'show')->name('seo.show');
+    Route::get('/tin-tuc', 'index')->name('seo.index');
+    Route::get('/tin-tuc/{slug}', 'show')->name('seo.show');
 });
 
-Route::middleware(['auth', 'site.active'])->get('/{any}', function (SettingStore $settingStore) {
-    return view('app', [
-        'systemSettings' => $settingStore->getMany([
-            'site_name' => config('app.name', 'DailyProxy.vn'),
-            'meta_title' => '',
-            'meta_description' => '',
-            'gtm_id' => '',
-            'meta_pixel_id' => '',
-            'custom_script' => '',
-            'light_logo' => '',
-            'dark_logo' => '',
-            'favicon' => '',
-        ]),
-    ]);
-})->where('any', '.*');
+Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
 
-if (file_exists(base_path('app/Features/BlogPost/routes.php'))) {
-    require base_path('app/Features/BlogPost/routes.php');
+Route::get('/admin/{any?}', function (Request $request, SettingStore $settingStore) {
+    $user = $request->user();
+    abort_unless($user instanceof User && $user->role === 'admin', 403);
+
+    return view('app', ['systemSettings' => $settingStore->getMany([
+        'site_name' => config('app.name', 'Nạp Carot'), 'meta_title' => '', 'meta_description' => '',
+        'light_logo' => '', 'dark_logo' => '', 'favicon' => '',
+    ])]);
+})->middleware('auth')->where('any', '.*')->name('admin.spa');
+
+if (file_exists(base_path('app/Features/Client/Topup/routes.php'))) {
+    require base_path('app/Features/Client/Topup/routes.php');
+}
+
+if (file_exists(base_path('app/Features/Client/Wallet/web.php'))) {
+    require base_path('app/Features/Client/Wallet/web.php');
+}
+
+if (file_exists(base_path('app/Features/Client/Profile/web.php'))) {
+    require base_path('app/Features/Client/Profile/web.php');
 }

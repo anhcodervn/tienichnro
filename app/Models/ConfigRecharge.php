@@ -26,6 +26,12 @@ class ConfigRecharge extends Model
         'is_active',
     ];
 
+    protected $hidden = [
+        'api_key',
+        'api_secret',
+        'webhook_secret',
+    ];
+
     protected function casts(): array
     {
         return [

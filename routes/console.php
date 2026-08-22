@@ -15,6 +15,8 @@ Schedule::command(sprintf('monitor:discord-heartbeat --channel=%s', $heartbeatCh
     ->withoutOverlapping()
     ->when(static fn (): bool => filled(config(sprintf('services.discord.channels.%s', $heartbeatChannel))));
 
-Schedule::command('api:prune-logs')
-    ->daily()
-    ->withoutOverlapping();
+Schedule::command('report:discord-daily-topup')
+    ->dailyAt('23:55')
+    ->withoutOverlapping()
+    ->onOneServer()
+    ->when(static fn (): bool => filled(config('services.discord.channels.sales')));

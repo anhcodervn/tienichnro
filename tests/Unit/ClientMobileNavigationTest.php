@@ -1,0 +1,93 @@
+<?php
+
+test('client mobile navigation uses an accessible off canvas drawer', function (): void {
+    $projectRoot = dirname(__DIR__, 2);
+    $layout = file_get_contents($projectRoot.'/resources/views/client/layouts/app.blade.php');
+    $script = file_get_contents($projectRoot.'/resources/js/client.js');
+    $styles = file_get_contents($projectRoot.'/resources/css/client.css');
+    $accountOrders = file_get_contents($projectRoot.'/resources/views/client/account/orders/index.blade.php');
+    $wallet = file_get_contents($projectRoot.'/resources/views/client/account/wallet.blade.php');
+    $topupGame = file_get_contents($projectRoot.'/resources/views/client/topup/game.blade.php');
+    $payment = file_get_contents($projectRoot.'/resources/views/client/orders/payment.blade.php');
+    $sharedPayment = file_get_contents($projectRoot.'/resources/views/components/client/bank-transfer-payment.blade.php');
+    $contentPage = file_get_contents($projectRoot.'/resources/views/pages/content/show.blade.php');
+    $seoIndex = file_get_contents($projectRoot.'/resources/views/pages/seo/index.blade.php');
+
+    expect($layout)
+        ->toContain('width=device-width, initial-scale=1, viewport-fit=cover')
+        ->toContain('<x-boxicon />')
+        ->toContain('bx bx-home-alt-2')
+        ->toContain('bx bx-wallet-alt')
+        ->toContain('bx bx-search')
+        ->toContain('bx bx-news')
+        ->toContain('id="main-content" class="min-w-0 focus:outline-none" tabindex="-1" data-page-enter')
+        ->toContain('class="fixed inset-0 z-50 lg:hidden" data-mobile-menu aria-hidden="true" hidden')
+        ->toContain('data-menu-backdrop')
+        ->toContain('data-menu-panel')
+        ->toContain('data-menu-item')
+        ->toContain('data-menu-icon-open')
+        ->toContain('data-menu-icon-close')
+        ->toContain('data-account-menu')
+        ->toContain('data-account-menu-toggle')
+        ->toContain('data-account-menu-panel')
+        ->toContain('data-header-wallet-balance')
+        ->toContain('role="dialog"')
+        ->toContain('aria-modal="true"')
+        ->toContain('aria-haspopup="dialog"')
+        ->toContain("route('home')")
+        ->toContain("route('wallet.deposit.index')")
+        ->toContain('<span>Trang chủ</span>')
+        ->toContain('<span>Nạp tiền</span>')
+        ->toContain('<span>Tra cứu đơn nạp</span>')
+        ->toContain('<span>Bài viết</span>')
+        ->toContain("route('seo.index')")
+        ->and($script)
+        ->toContain("{ opacity: 0.82, transform: 'translateX(100%) scale(0.985)' }")
+        ->toContain("const menuItems = () => [...panel.querySelectorAll('[data-menu-item]')]")
+        ->toContain('delay: 70 + index * 35')
+        ->toContain("document.querySelectorAll('[data-page-enter]')")
+        ->toContain('animateAndRelease')
+        ->toContain("document.body.classList.add('client-menu-open')")
+        ->toContain("if (event.key === 'Escape')")
+        ->toContain("event.key !== 'Tab'")
+        ->toContain("window.matchMedia('(min-width: 1024px)')")
+        ->toContain("window.addEventListener('pagehide', resetMenu)")
+        ->toContain("document.querySelectorAll('[data-account-menu]')")
+        ->toContain("event.key === 'Escape' && button.getAttribute('aria-expanded') === 'true'")
+        ->toContain("event.key !== 'ArrowDown'")
+        ->toContain("chevron?.classList.toggle('rotate-180', expanded)")
+        ->and($styles)
+        ->toContain('body.client-menu-open')
+        ->toContain('overflow-x: clip;')
+        ->toContain('body > main')
+        ->toContain('@apply relative min-h-screen w-full max-w-full overflow-x-hidden')
+        ->toContain('@apply mx-auto box-border w-full min-w-0 max-w-6xl px-3 sm:px-6 lg:px-8;')
+        ->toContain('@apply w-full min-w-0 overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-sm;')
+        ->toContain('@apply grid min-w-0 grid-cols-1 lg:grid-cols-[minmax(0,65fr)_minmax(20rem,35fr)];')
+        ->toContain('@apply grid min-w-0 grid-cols-2 gap-2 min-[390px]:grid-cols-3 sm:grid-cols-4;')
+        ->toContain('@media (min-width: 992px)')
+        ->toContain('@apply table-fixed text-[11px] sm:min-w-[32rem] sm:table-auto sm:text-sm;')
+        ->toContain('@apply min-w-[42rem] table-auto;')
+        ->toContain('@apply block w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain;')
+        ->toContain("[data-menu-toggle][aria-expanded='true'] [data-menu-icon-close]")
+        ->toContain('@media (hover: hover) and (pointer: fine)')
+        ->and($accountOrders)
+        ->toContain('data-order-table')
+        ->toContain('data-order-mobile-list')
+        ->toContain('overflow-x-auto overscroll-x-contain')
+        ->toContain('client-button w-full gap-2 sm:w-auto')
+        ->and($wallet)
+        ->toContain('flex flex-col gap-3 p-4 sm:flex-row')
+        ->and($topupGame)
+        ->toContain('class="client-container py-8 sm:py-10 lg:py-12"')
+        ->toContain("'selectedGame' => \$game")
+        ->and($payment)
+        ->toContain('<x-client.bank-transfer-payment')
+        ->and($sharedPayment)
+        ->toContain('grid min-w-0 grid-cols-1 gap-5 lg:grid-cols-[320px_minmax(0,1fr)]')
+        ->toContain('flex min-w-0 flex-col gap-4 sm:flex-row')
+        ->and($contentPage)
+        ->toContain('lg:grid-cols-[250px_minmax(0,1fr)]')
+        ->and($seoIndex)
+        ->toContain('flex min-w-0 flex-col gap-3 p-3 sm:flex-row');
+});

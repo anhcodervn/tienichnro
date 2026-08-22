@@ -3,17 +3,14 @@
 namespace App\Providers;
 
 use App\Features\Client\Wallet\Observers\WalletTransactionObserver;
-use App\Models\ApiKey;
 use App\Models\QueueLog;
 use App\Models\WalletTransaction;
 use App\Utils\SendMessage;
-use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
@@ -29,34 +26,6 @@ class AppServiceProvider extends ServiceProvider
         App::setLocale('vi');
         config(['app.locale' => 'vi']);
         WalletTransaction::observe(WalletTransactionObserver::class);
-
-        Auth::viaRequest('api-key', function (Request $request) {
-            $apiKeyValue = trim((string) $request->header('X-API-KEY'));
-            $apiSecret = trim((string) $request->header('X-API-SECRET'));
-
-            if ($apiKeyValue === '' || $apiSecret === '') {
-                return null;
-            }
-
-            $apiKey = ApiKey::query()
-                ->with('user')
-                ->where('api_key', $apiKeyValue)
-                ->first();
-
-            if (! $apiKey instanceof ApiKey) {
-                return null;
-            }
-
-            $apiKey->markExpiredIfNeeded();
-
-            if (! $apiKey->isActive() || ! $apiKey->matchesSecret($apiSecret) || ! $apiKey->allowsIp($request->ip())) {
-                return null;
-            }
-
-            $request->attributes->set('apiKey', $apiKey);
-
-            return $apiKey->user;
-        });
 
         Queue::before(function (JobProcessing $event): void {
             $payload = $event->job->payload();
@@ -191,6 +160,10 @@ class AppServiceProvider extends ServiceProvider
 
     private function sendQueueProcessedNotification(JobProcessed $event): void
     {
+        if (! (bool) config('services.discord.report_queue_success', false)) {
+            return;
+        }
+
         $payload = $this->sanitizeQueuePayload($event->job->payload());
 
         SendMessage::sendQueueReport('Task xử lý thành công', [

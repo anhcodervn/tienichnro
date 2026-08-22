@@ -2,8 +2,8 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WalletTransaction extends Model
@@ -18,7 +18,9 @@ class WalletTransaction extends Model
         'balance_after',
         'reference_type',
         'reference_id',
+        'idempotency_key',
         'description',
+        'metadata',
         'status',
     ];
 
@@ -29,6 +31,7 @@ class WalletTransaction extends Model
             'balance_before' => 'decimal:2',
             'balance_after' => 'decimal:2',
             'reference_id' => 'integer',
+            'metadata' => 'array',
         ];
     }
 

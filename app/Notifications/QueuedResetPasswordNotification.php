@@ -16,9 +16,15 @@ class QueuedResetPasswordNotification extends Notification implements ShouldQueu
 
     public int $timeout = 30;
 
+    /** @var array<int, int> */
+    public array $backoff = [5, 30, 120];
+
     public function __construct(
         public string $token,
-    ) {}
+    ) {
+        $this->onQueue('mails');
+        $this->afterCommit();
+    }
 
     public function via(object $notifiable): array
     {
@@ -34,7 +40,7 @@ class QueuedResetPasswordNotification extends Notification implements ShouldQueu
         ], false);
 
         return (new MailMessage)
-            ->subject('Hệ thống Auto Cron')
+            ->subject('Đặt lại mật khẩu Nạp Carot')
             ->view('emails.reset-password', [
                 'name' => $notifiable->name ?? $notifiable->username ?? 'bạn',
                 'resetUrl' => $resetUrl,

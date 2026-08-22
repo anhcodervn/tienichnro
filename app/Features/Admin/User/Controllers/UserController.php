@@ -54,7 +54,7 @@ class UserController extends Controller
     ): JsonResponse {
         return response()->json(ApiResponse::success(
             'Điều chỉnh số dư ví thành công.',
-            $action->handle($user, $request->validated(), $this->admin($request)),
+            $action->handle($user, $request->validated(), $this->admin($request), $request),
         ));
     }
 

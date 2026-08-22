@@ -1,27 +1,34 @@
-# ARCHITECTURE
+# Architecture
 
-## Proxy module
+## Request flow
 
 ```text
-Admin
-    -> quản lý category
-    -> quản lý provider và credential mã hóa
-    -> quản lý product, giao thức và giá theo ngày
-
-Client / reseller API
-    -> ProxyCatalogService
-    -> category + product đang hoạt động
+Blade checkout
+  -> Features/Client/Topup/Requests/StoreOrderRequest
+  -> Features/Topup/Services/OrderService
+  -> Features/Topup/Services/OrderPricingService
+  -> orders + wallet ledger
+  -> Features/Topup/Jobs/ProcessTopupOrder
+  -> Features/Topup/Services/TopupService
+  -> Features/Topup/Contracts/TopupProviderInterface
 ```
 
-Hiện tại hệ thống chỉ cung cấp catalog proxy; luồng đặt mua và thực thi provider sẽ được xây dựng lại theo từng bước.
+## Feature ownership
 
-## API hiện có
+- `App\Features\Client\Topup` owns public/account HTTP controllers, form requests and routes.
+- `App\Features\Topup` owns shared order, payment, fulfillment, provider and realtime behavior.
+- `App\Features\Admin\Topup` owns catalog, provider and order administration.
+- `App\Features\Recharge` authenticates bank callbacks before delegating order matching to the Topup domain.
+- Eloquent models remain in `App\Models` and reusable order mailables remain in `App\Mail\Orders`.
 
-- SPA: `GET /api/client/proxy/products`
-- Reseller: `GET /api/v1/proxy/products` với quyền `proxy-products.read`
+## Boundaries
 
-## Provider security
+- Client routes render Blade and only use JavaScript for form preview, copy buttons and payment polling.
+- Admin Vue is mounted only below `/admin` and calls protected `/api/admin-api/*` endpoints.
+- Wallet mutations, payment matching and status transitions are transactional and idempotent.
+- Provider work happens after the database transaction commits.
+- Guest order access requires code plus normalized email, a session grant, ownership, or a signed URL.
 
-- Credential được mã hóa trong model `ProxyProvider`.
-- Resource công khai không trả provider hoặc dữ liệu kết nối.
-- Resource admin chỉ hiển thị credential tại màn sửa được bảo vệ.
+## Domain tables
+
+`games`, `game_servers`, `topup_packages`, `orders`, `admin_audit_logs`, plus the reused `wallets`, `wallet_transactions`, `payment_transactions`, settings and SEO tables.

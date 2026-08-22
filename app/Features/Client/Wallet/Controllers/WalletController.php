@@ -5,10 +5,10 @@ namespace App\Features\Client\Wallet\Controllers;
 use App\Features\Client\Wallet\Requests\DepositRequestIndexRequest;
 use App\Features\Client\Wallet\Requests\StoreDepositRequestRequest;
 use App\Features\Client\Wallet\Requests\WalletOverviewRequest;
+use App\Features\Client\Wallet\Resources\ClientRechargeConfigResource;
 use App\Features\Client\Wallet\Resources\DepositRequestResource;
 use App\Features\Client\Wallet\Services\WalletDepositService;
 use App\Features\Client\Wallet\Services\WalletService;
-use App\Features\Recharge\Resources\RechargeConfigResource;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentTransaction;
 use App\Models\User;
@@ -28,15 +28,14 @@ class WalletController extends Controller
         $user = $this->user($request);
         $resolved = $this->walletDepositService->clientConfig($user);
         $resolvedConfigs = $this->walletDepositService->clientConfigs($user);
-        $amount = (float) ($request->validated('amount') ?? 0);
 
         return response()->json(ApiResponse::success(data: [
             'wallet' => $this->walletService->getWalletInfo($user),
             'recharge_config' => $resolved !== null
-                ? (new RechargeConfigResource($resolved['config'], $user, $amount))->resolve()
+                ? (new ClientRechargeConfigResource($resolved['config']))->resolve()
                 : null,
             'recharge_configs' => collect($resolvedConfigs)
-                ->map(fn (array $item): array => (new RechargeConfigResource($item['config'], $user, $amount))->resolve())
+                ->map(fn (array $item): array => (new ClientRechargeConfigResource($item['config']))->resolve())
                 ->values()
                 ->all(),
         ]));

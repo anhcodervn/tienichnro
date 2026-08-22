@@ -157,7 +157,7 @@
                                     v-model="editingItem.title"
                                     type="text"
                                     class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm text-slate-900 outline-none transition focus:border-slate-500"
-                                    placeholder="Ví dụ: Dịch vụ proxy nổi bật"
+                                    placeholder="Ví dụ: Gói nạp game nổi bật"
                                 />
                             </div>
 

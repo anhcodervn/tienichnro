@@ -40,6 +40,12 @@ export interface GeneralSettingType {
     [key: string]: unknown;
 }
 
+export interface HomepageNoticeSettingType {
+    home_notice_title: string;
+    home_notice_content: unknown[];
+    home_notice_is_published: boolean;
+}
+
 export interface BrandingSettingType {
     light_logo: string;
     dark_logo: string;
@@ -126,17 +132,17 @@ export interface OptionSettingType {
 }
 
 export type ContentPageBaseKey =
-    | "contact_page"
-    | "terms_page"
-    | "faq_page"
-    | "privacy_page"
-    | "about_page"
-    | "refund_policy"
-    | "payment_policy"
-    | "api_usage_policy"
-    | "disclaimer"
-    | "system_status"
-    | "system_updates";
+    | 'contact_page'
+    | 'terms_page'
+    | 'faq_page'
+    | 'privacy_page'
+    | 'about_page'
+    | 'refund_policy'
+    | 'payment_policy'
+    | 'api_usage_policy'
+    | 'disclaimer'
+    | 'system_status'
+    | 'system_updates';
 
 export type ContentPageContentKey = `${ContentPageBaseKey}_content`;
 export type ContentPageTitleKey = `${ContentPageBaseKey}_title`;

@@ -1,18 +1,13 @@
 <?php
 
-use App\Http\Controllers\SpaController;
-use App\Http\Middleware\AuthenticateApiKey;
 use App\Http\Middleware\EnsureAdminUser;
-use App\Http\Middleware\EnsureApiKeyPermission;
 use App\Http\Middleware\EnsureSiteIsActive;
-use App\Http\Middleware\LogApiRequest;
 use App\Support\SettingStore;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Route;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -21,14 +16,6 @@ return Application::configure(basePath: dirname(__DIR__))
         api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        then: function (): void {
-            // Route::middleware('web')->group(base_path('routes/auth.php'));
-            // Route::middleware('web')->group(base_path('routes/settings.php'));
-
-            // Route::middleware(['web', 'auth'])->group(function (): void {
-            //     Route::get('/dashboard', SpaController::class)->name('dashboard');
-            // });
-        },
     )
     ->withBroadcasting(
         __DIR__.'/../routes/channels.php',
@@ -39,9 +26,6 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->trustProxies(at: '*');
         $middleware->alias([
             'admin' => EnsureAdminUser::class,
-            'api-key.auth' => AuthenticateApiKey::class,
-            'api-key.permission' => EnsureApiKeyPermission::class,
-            'api-key.log' => LogApiRequest::class,
             'site.active' => EnsureSiteIsActive::class,
         ]);
     })
@@ -87,7 +71,7 @@ return Application::configure(basePath: dirname(__DIR__))
                 ],
                 'client' => [
                     'primary' => ['label' => 'Về tổng quan', 'href' => '/'],
-                    'secondary' => ['label' => 'Liên hệ & góp ý', 'href' => '/contact'],
+                    'secondary' => ['label' => 'Hướng dẫn', 'href' => '/huong-dan'],
                 ],
                 'admin' => [
                     'primary' => ['label' => 'Về dashboard admin', 'href' => '/admin'],
