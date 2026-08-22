@@ -2,7 +2,7 @@
 import { adminNotificationService } from '@/services/admin-notification.service';
 import type { AdminNotificationItem, AdminNotificationListResponse } from '@/types/notification.type';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { Bell, Plus, Search, Trash2 } from 'lucide-vue-next';
+import { Bell, BellRing, CalendarClock, Eye, Plus, RadioTower, Search, Trash2, UserRound } from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRouter } from 'vue-router';
 
@@ -114,20 +114,48 @@ onMounted(loadNotifications);
 
         <section class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <article class="rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm">
-                <p class="text-xs text-slate-500">Tổng thông báo</p>
-                <p class="mt-1 text-2xl font-bold text-slate-950">{{ stats.total }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500">Tổng thông báo</p>
+                        <p class="mt-1 text-2xl font-bold text-slate-950">{{ stats.total }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700"
+                        ><BellRing class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
             <article class="rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm">
-                <p class="text-xs text-slate-500">Thông báo hệ thống</p>
-                <p class="mt-1 text-2xl font-bold text-indigo-600">{{ stats.system }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500">Thông báo hệ thống</p>
+                        <p class="mt-1 text-2xl font-bold text-indigo-600">{{ stats.system }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"
+                        ><RadioTower class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
             <article class="rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm">
-                <p class="text-xs text-slate-500">Thông báo người dùng</p>
-                <p class="mt-1 text-2xl font-bold text-amber-600">{{ stats.user }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500">Thông báo người dùng</p>
+                        <p class="mt-1 text-2xl font-bold text-amber-600">{{ stats.user }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600"
+                        ><UserRound class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
             <article class="rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm">
-                <p class="text-xs text-slate-500">Hôm nay</p>
-                <p class="mt-1 text-2xl font-bold text-emerald-600">{{ stats.today }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500">Hôm nay</p>
+                        <p class="mt-1 text-2xl font-bold text-emerald-600">{{ stats.today }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"
+                        ><CalendarClock class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
         </section>
 
@@ -212,7 +240,14 @@ onMounted(loadNotifications);
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-sm text-slate-700">{{ item.type || '-' }}</td>
-                            <td class="px-4 py-3 text-sm text-slate-700">{{ item.reads_count }}</td>
+                            <td class="px-4 py-3">
+                                <span
+                                    class="inline-flex items-center gap-1.5 rounded-full bg-sky-50 px-2.5 py-1 text-xs font-bold text-sky-700 ring-1 ring-inset ring-sky-600/20"
+                                >
+                                    <Eye class="h-3.5 w-3.5" aria-hidden="true" />
+                                    {{ item.reads_count }}
+                                </span>
+                            </td>
                             <td class="px-4 py-3 text-sm text-slate-600">{{ item.created_at || '-' }}</td>
                             <td class="px-4 py-3">
                                 <div class="flex justify-end gap-2">

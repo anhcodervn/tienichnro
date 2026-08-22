@@ -1,7 +1,21 @@
 <script setup lang="ts">
 import { adminRechargeHistoryService, type AdminRechargeHistoryItem } from '@/services/admin-recharge-history.service';
 import { handleErrorResponse } from '@/utils/response';
-import { CalendarRange, ChevronLeft, ChevronRight, Filter, Landmark, LoaderCircle, RefreshCcw, Search } from 'lucide-vue-next';
+import {
+    BadgeCheck,
+    CalendarClock,
+    CalendarRange,
+    ChevronLeft,
+    ChevronRight,
+    CircleDollarSign,
+    Filter,
+    Landmark,
+    LoaderCircle,
+    RefreshCcw,
+    ScanSearch,
+    Search,
+    ShieldAlert,
+} from 'lucide-vue-next';
 import { onMounted, reactive, ref } from 'vue';
 import { RouterLink } from 'vue-router';
 
@@ -196,24 +210,62 @@ onMounted(async () => {
 
         <section class="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
             <article class="rounded-[10px] border border-slate-200 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
-                <p class="text-sm font-semibold text-slate-500">Tổng tiền yêu cầu</p>
-                <p class="mt-2 text-2xl font-black tracking-tight text-slate-950">{{ formatCurrency(stats.total_amount) }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-500">Tổng tiền yêu cầu</p>
+                        <p class="mt-2 text-2xl font-black tracking-tight text-slate-950">{{ formatCurrency(stats.total_amount) }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"
+                        ><CircleDollarSign class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
             <article class="rounded-[10px] border border-slate-200 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
-                <p class="text-sm font-semibold text-slate-500">Yêu cầu hôm nay</p>
-                <p class="mt-2 text-2xl font-black tracking-tight text-slate-950">{{ formatNumber(stats.today_count) }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-500">Yêu cầu hôm nay</p>
+                        <p class="mt-2 text-2xl font-black tracking-tight text-slate-950">{{ formatNumber(stats.today_count) }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-sky-50 text-sky-600"
+                        ><CalendarClock class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
             <article class="rounded-[10px] border border-slate-200 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
-                <p class="text-sm font-semibold text-slate-500">Chờ xử lý</p>
-                <p class="mt-2 text-2xl font-black tracking-tight text-amber-600">{{ formatNumber(stats.pending_count) }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-500">Chờ xử lý</p>
+                        <p class="mt-2 text-2xl font-black tracking-tight text-amber-600">{{ formatNumber(stats.pending_count) }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600"
+                        ><ShieldAlert class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
             <article class="rounded-[10px] border border-slate-200 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
-                <p class="text-sm font-semibold text-slate-500">Đang đối soát</p>
-                <p class="mt-2 text-2xl font-black tracking-tight text-sky-600">{{ formatNumber(stats.matched_count) }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-500">Đang đối soát</p>
+                        <p class="mt-2 text-2xl font-black tracking-tight text-sky-600">{{ formatNumber(stats.matched_count) }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600"
+                        ><ScanSearch class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
             <article class="rounded-[10px] border border-slate-200 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.05)]">
-                <p class="text-sm font-semibold text-slate-500">Đã cộng / lỗi</p>
-                <p class="mt-2 text-2xl font-black tracking-tight text-slate-950">{{ formatNumber(stats.success_count) }} / {{ formatNumber(stats.failed_count) }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-sm font-semibold text-slate-500">Đã cộng / lỗi</p>
+                        <p class="mt-2 text-2xl font-black tracking-tight text-slate-950">
+                            <span class="text-emerald-600">{{ formatNumber(stats.success_count) }}</span> /
+                            <span class="text-rose-600">{{ formatNumber(stats.failed_count) }}</span>
+                        </p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600"
+                        ><BadgeCheck class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
         </section>
 
@@ -245,7 +297,10 @@ onMounted(async () => {
                     class="rounded-[8px] border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 outline-none"
                 />
 
-                <select v-model="filters.status" class="rounded-[8px] border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 outline-none">
+                <select
+                    v-model="filters.status"
+                    class="rounded-[8px] border border-slate-200 bg-white px-3 py-2.5 text-sm text-slate-600 outline-none"
+                >
                     <option value="">Trạng thái</option>
                     <option value="pending">Chờ xử lý</option>
                     <option value="processing">Đang đối soát</option>

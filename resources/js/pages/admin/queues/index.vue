@@ -9,6 +9,7 @@ import type {
     AdminQueueOverviewResponse,
 } from '@/types/admin-queue.type';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
+import { Activity, CircleAlert, Clock3, ListTodo, RefreshCw } from 'lucide-vue-next';
 import Swal from 'sweetalert2';
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -197,27 +198,55 @@ onMounted(async () => {
                     :disabled="loadingOverview || loadingLogs || loadingFailedJobs"
                     @click="refreshAll"
                 >
-                    Làm mới
+                    <span class="inline-flex items-center gap-2"><RefreshCw class="h-4 w-4" aria-hidden="true" />Làm mới</span>
                 </button>
             </div>
         </section>
 
         <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <article class="rounded-[10px] border border-slate-200 bg-white p-3 shadow-sm">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending jobs</p>
-                <p class="mt-1 text-2xl font-bold text-slate-900">{{ overview?.summary.total_pending_jobs ?? 0 }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Pending jobs</p>
+                        <p class="mt-1 text-2xl font-bold text-slate-900">{{ overview?.summary.total_pending_jobs ?? 0 }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700"
+                        ><ListTodo class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
             <article class="rounded-[10px] border border-slate-200 bg-white p-3 shadow-sm">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Failed jobs</p>
-                <p class="mt-1 text-2xl font-bold text-rose-600">{{ overview?.summary.total_failed_jobs ?? 0 }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Failed jobs</p>
+                        <p class="mt-1 text-2xl font-bold text-rose-600">{{ overview?.summary.total_failed_jobs ?? 0 }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-600"
+                        ><CircleAlert class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
             <article class="rounded-[10px] border border-slate-200 bg-white p-3 shadow-sm">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Processing logs</p>
-                <p class="mt-1 text-2xl font-bold text-amber-600">{{ overview?.summary.total_processing_logs ?? 0 }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Processing logs</p>
+                        <p class="mt-1 text-2xl font-bold text-amber-600">{{ overview?.summary.total_processing_logs ?? 0 }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-50 text-amber-600"
+                        ><Clock3 class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
             <article class="rounded-[10px] border border-slate-200 bg-white p-3 shadow-sm">
-                <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Failed logs</p>
-                <p class="mt-1 text-2xl font-bold text-rose-600">{{ overview?.summary.total_failed_logs ?? 0 }}</p>
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Failed logs</p>
+                        <p class="mt-1 text-2xl font-bold text-rose-600">{{ overview?.summary.total_failed_logs ?? 0 }}</p>
+                    </div>
+                    <span class="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-rose-50 text-rose-600"
+                        ><Activity class="h-5 w-5"
+                    /></span>
+                </div>
             </article>
         </section>
 
@@ -244,11 +273,31 @@ onMounted(async () => {
                         </tr>
                         <tr v-for="queue in overview?.queues ?? []" :key="queue.queue">
                             <td class="px-3 py-2 text-sm font-semibold text-slate-900">{{ queue.queue }}</td>
-                            <td class="px-3 py-2 text-sm text-slate-700">{{ queue.pending_jobs }}</td>
-                            <td class="px-3 py-2 text-sm text-rose-600">{{ queue.failed_jobs }}</td>
-                            <td class="px-3 py-2 text-sm text-amber-600">{{ queue.processing_logs }}</td>
-                            <td class="px-3 py-2 text-sm text-emerald-600">{{ queue.success_logs }}</td>
-                            <td class="px-3 py-2 text-sm text-rose-600">{{ queue.failed_logs }}</td>
+                            <td class="px-3 py-2">
+                                <span class="inline-flex rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">{{
+                                    queue.pending_jobs
+                                }}</span>
+                            </td>
+                            <td class="px-3 py-2">
+                                <span class="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">{{
+                                    queue.failed_jobs
+                                }}</span>
+                            </td>
+                            <td class="px-3 py-2">
+                                <span class="inline-flex rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{{
+                                    queue.processing_logs
+                                }}</span>
+                            </td>
+                            <td class="px-3 py-2">
+                                <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">{{
+                                    queue.success_logs
+                                }}</span>
+                            </td>
+                            <td class="px-3 py-2">
+                                <span class="inline-flex rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">{{
+                                    queue.failed_logs
+                                }}</span>
+                            </td>
                         </tr>
                     </tbody>
                 </table>
