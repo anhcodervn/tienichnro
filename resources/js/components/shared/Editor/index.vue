@@ -164,6 +164,16 @@ export default {
             const nodes: EditorContentNode[] = [];
 
             parent.childNodes.forEach((node) => {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    if (node.textContent?.trim()) {
+                        nodes.push({
+                            type: 'paragraph',
+                            children: parseInline(node),
+                        });
+                    }
+                    return;
+                }
+
                 if (node.nodeType !== Node.ELEMENT_NODE) {
                     return;
                 }
@@ -254,16 +264,25 @@ export default {
                 return;
             }
 
+            const blockCountBeforeChildren = blocks.length;
+
             node.childNodes.forEach((child) => {
                 if (child.nodeType === Node.ELEMENT_NODE) {
                     parseBlock(child as HTMLElement, blocks);
                 }
             });
+
+            if (blocks.length === blockCountBeforeChildren && node.textContent?.trim()) {
+                blocks.push({
+                    type: 'paragraph',
+                    children: parseInline(node),
+                });
+            }
         }
 
         function parseInline(node: Node, style: EditorInlineNode = {}): EditorInlineNode[] {
             if (node.nodeType === Node.TEXT_NODE) {
-                if (!node.textContent?.trim()) {
+                if (!node.textContent) {
                     return [];
                 }
 
@@ -331,7 +350,8 @@ export default {
         function renderNode(node: EditorContentNode): string {
             if (node.type === 'container') {
                 const children = Array.isArray(node.children) ? (node.children as EditorContentNode[]) : [];
-                return `<${node.tag}>${children.map(renderNode).join('')}</${node.tag}>`;
+                const tag = ['article', 'div', 'section'].includes(node.tag ?? '') ? node.tag : 'div';
+                return `<${tag}>${children.map(renderNode).join('')}</${tag}>`;
             }
 
             return renderBlock(node);
@@ -339,12 +359,14 @@ export default {
 
         function renderBlock(block: EditorContentNode): string {
             switch (block.type) {
-                case 'heading':
-                    return `<h${block.level}>${renderInline(block.children as EditorInlineNode[] | undefined)}</h${block.level}>`;
+                case 'heading': {
+                    const level = Math.max(1, Math.min(Number(block.level) || 2, 6));
+                    return `<h${level}>${renderInline(block.children as EditorInlineNode[] | undefined)}</h${level}>`;
+                }
                 case 'paragraph':
                     return `<p>${renderInline(block.children as EditorInlineNode[] | undefined)}</p>`;
                 case 'image':
-                    return `<img src="${block.src}" alt="${block.alt ?? ''}" />`;
+                    return `<img src="${escapeHtml(block.src ?? '')}" alt="${escapeHtml(block.alt ?? '')}" />`;
                 case 'list': {
                     const tag = block.ordered ? 'ol' : 'ul';
                     return `<${tag}>${(block.items ?? []).map((item) => `<li>${renderInline(item)}</li>`).join('')}</${tag}>`;
@@ -357,7 +379,7 @@ export default {
         function renderInline(children: EditorInlineNode[] = []): string {
             return children
                 .map((item) => {
-                    let text = item.text ?? '';
+                    let text = escapeHtml(item.text ?? '').replace(/\n/g, '<br>');
 
                     if (item.bold) text = `<strong>${text}</strong>`;
                     if (item.italic) text = `<em>${text}</em>`;
@@ -371,6 +393,20 @@ export default {
                     return style ? `<span style="${style}">${text}</span>` : text;
                 })
                 .join('');
+        }
+
+        function escapeHtml(value: string): string {
+            return value.replace(/[&<>"']/g, (character) => {
+                const entities: Record<string, string> = {
+                    '&': '&amp;',
+                    '<': '&lt;',
+                    '>': '&gt;',
+                    '"': '&quot;',
+                    "'": '&#039;',
+                };
+
+                return entities[character];
+            });
         }
 
         function handleFallbackInput(): void {
@@ -400,7 +436,13 @@ export default {
                           'emoticons hr pagebreak nonbreaking toc',
                           'save autosave directionality textcolor',
                       ]
-                    : ['advlist lists charmap preview searchreplace fullscreen wordcount directionality textcolor'],
+                    : [
+                          'advlist autolink lists link charmap print preview anchor',
+                          'searchreplace visualblocks code fullscreen',
+                          'insertdatetime table paste code help wordcount',
+                          'emoticons hr pagebreak nonbreaking toc',
+                          'save autosave directionality textcolor',
+                      ],
                 toolbar: props.allowImages
                     ? [
                           'undo redo | formatselect | fontselect fontsizeselect | bold italic underline strikethrough | forecolor backcolor',
@@ -408,12 +450,12 @@ export default {
                       ]
                     : [
                           'undo redo | formatselect | fontselect fontsizeselect | bold italic underline strikethrough | forecolor backcolor',
-                          'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | fullscreen preview | removeformat',
+                          'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link emoticons | table | code fullscreen preview | removeformat',
                       ],
                 setup(editor: typeof editorInstance) {
                     editorInstance = editor;
 
-                    editor.on('change keyup undo redo', () => {
+                    editor.on('input change keyup undo redo', () => {
                         if (isApplyingExternalValue) {
                             return;
                         }
@@ -466,9 +508,3 @@ export default {
     },
 };
 </script>
-
-<style>
-span#mceu_56 {
-    display: none;
-}
-</style>

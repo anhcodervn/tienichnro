@@ -70,30 +70,13 @@
         @apply mb-4 w-full min-w-0 overflow-hidden rounded-[5px] border border-cyan-200 bg-cyan-50 text-sm text-cyan-950;
     }
 
-    .home-notice-banner summary {
-        @apply flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-4 py-2 font-medium;
+    .home-notice-header {
+        @apply flex min-h-11 items-center gap-2 px-4 py-2 font-medium;
     }
 
-    .home-notice-banner summary::-webkit-details-marker {
-        display: none;
-    }
-
-    .home-notice-banner summary strong,
+    .home-notice-header strong,
     .home-notice-banner a {
         @apply font-bold text-cyan-800;
-    }
-
-    .home-notice-more {
-        @apply shrink-0 text-xs font-bold text-cyan-700;
-    }
-
-    .home-notice-banner[open] .home-notice-more {
-        @apply text-transparent;
-    }
-
-    .home-notice-banner[open] .home-notice-more::after {
-        @apply text-cyan-700;
-        content: 'Thu gọn';
     }
 
     .home-notice-content {

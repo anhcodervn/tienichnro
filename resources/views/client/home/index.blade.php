@@ -14,15 +14,15 @@
 <section class="client-container py-5 sm:py-7">
 
     @if ($homeNoticeIsPublished && $homeNoticeHtml->isNotEmpty())
-        <details class="home-notice-banner" role="note">
-            <summary>
-                <span class="inline-flex min-w-0 items-center gap-2"><i class="bx bx-announcement shrink-0 text-xl text-cyan-700" aria-hidden="true"></i><span><strong>Thông báo:</strong> {{ $homeNoticeTitle }}</span></span>
-                <span class="home-notice-more">Xem chi tiết</span>
-            </summary>
+        <div class="home-notice-banner" role="note" aria-labelledby="home-notice-title">
+            <div class="home-notice-header">
+                <i class="bx bx-announcement shrink-0 text-xl text-cyan-700" aria-hidden="true"></i>
+                <p id="home-notice-title" class="min-w-0"><strong>Thông báo:</strong> {{ $homeNoticeTitle }}</p>
+            </div>
             <div class="home-notice-content">
                 {{ $homeNoticeHtml }}
             </div>
-        </details>
+        </div>
     @endif
 
     @include('client.components.topup-form', ['games' => $games, 'walletBalance' => $walletBalance])

@@ -87,7 +87,6 @@
 
     <script src="{{ asset('assets/libs/tinymce/tinymce.min.js') }}"></script>
 
-
     <!-- Google Tag Manager (noscript) -->
     @if (!empty($settings['gtm_id']))
         <noscript>

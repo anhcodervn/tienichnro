@@ -66,9 +66,12 @@ test('admin can write homepage notice with tinymce content and homepage renders 
     $this->get(route('home'))
         ->assertOk()
         ->assertSee('Ưu đãi hôm nay')
+        ->assertSee('class="home-notice-header"', false)
         ->assertSee('<strong>Khuyến mãi 15%</strong>', false)
         ->assertSee('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;', false)
         ->assertSee('<li>Mỗi mã QR chỉ quét một lần.</li>', false)
+        ->assertDontSee('<details class="home-notice-banner"', false)
+        ->assertDontSee('Xem chi tiết')
         ->assertDontSee('<script>alert("xss")</script>', false);
 });
 
