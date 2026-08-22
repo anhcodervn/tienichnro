@@ -20,6 +20,8 @@ class The9pBalanceCronController extends Controller
             data: [
                 'balance' => $balance->balance,
                 'currency' => $balance->currency,
+                'warning_threshold' => $balance->warningThreshold,
+                'is_below_warning_threshold' => $balance->isBelowWarningThreshold,
                 'checked_at' => now()->toISOString(),
             ],
         ));

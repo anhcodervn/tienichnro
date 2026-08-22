@@ -18,7 +18,7 @@ const filters = reactive({
     page: Math.max(Number(route.query.page || 1), 1),
 });
 const pagination = reactive({ current_page: 1, last_page: 1, total: 0, from: null as number | null, to: null as number | null });
-const form = reactive({ name: '', slug: '', connection_config_text: '' });
+const form = reactive({ name: '', slug: '', balance_warning_threshold: 1000000, connection_config_text: '' });
 
 const emptyConnectionConfig = (): string =>
     '{\n  "base_url": "https://the9p.com/api/rechargews",\n  "partner_id": "",\n  "partner_key": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
@@ -27,6 +27,7 @@ const reset = (): void => {
     connectionJsonError.value = '';
     form.name = '';
     form.slug = '';
+    form.balance_warning_threshold = 1000000;
     form.connection_config_text = emptyConnectionConfig();
 };
 
@@ -80,7 +81,10 @@ const edit = async (row: ProviderRow): Promise<void> => {
     editingId.value = provider.id;
     form.name = provider.name;
     form.slug = provider.slug;
-    form.connection_config_text = JSON.stringify(provider.connection_config || {}, null, 2);
+    const connectionConfig = { ...(provider.connection_config || {}) };
+    form.balance_warning_threshold = Number(connectionConfig.balance_warning_threshold ?? 1000000);
+    delete connectionConfig.balance_warning_threshold;
+    form.connection_config_text = JSON.stringify(connectionConfig, null, 2);
 };
 
 const connectionConfig = (): Record<string, unknown> | null => {
@@ -101,9 +105,17 @@ const connectionConfig = (): Record<string, unknown> | null => {
 const save = async (): Promise<void> => {
     const parsedConnectionConfig = connectionConfig();
     if (!parsedConnectionConfig) return;
+    if (!Number.isInteger(form.balance_warning_threshold) || form.balance_warning_threshold < 0 || form.balance_warning_threshold > 1000000000000) {
+        connectionJsonError.value = 'Ngưỡng cảnh báo phải là số nguyên từ 0 đến 1.000.000.000.000đ.';
+        return;
+    }
     saving.value = true;
     try {
-        await adminTopupService.saveProvider(editingId.value, { name: form.name, slug: form.slug, connection_config: parsedConnectionConfig });
+        await adminTopupService.saveProvider(editingId.value, {
+            name: form.name,
+            slug: form.slug,
+            connection_config: { ...parsedConnectionConfig, balance_warning_threshold: form.balance_warning_threshold },
+        });
         reset();
         await load();
     } finally {
@@ -241,6 +253,22 @@ onMounted(load);
                             pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
                             class="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-3"
                     /></label>
+                    <label class="text-sm font-semibold text-slate-700"
+                        >Ngưỡng cảnh báo số dư
+                        <div class="relative mt-2">
+                            <input
+                                v-model.number="form.balance_warning_threshold"
+                                type="number"
+                                required
+                                min="0"
+                                max="1000000000000"
+                                step="1000"
+                                class="min-h-11 w-full rounded-md border border-slate-300 px-3 pr-12"
+                            />
+                            <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-slate-500">đ</span>
+                        </div>
+                        <small class="mt-1.5 block font-normal text-slate-500">Mặc định 1.000.000đ. Nhập 0 để tắt cảnh báo Discord.</small>
+                    </label>
                     <label class="text-sm font-semibold text-slate-700"
                         >JSON cấu hình kết nối<textarea
                             v-model="form.connection_config_text"

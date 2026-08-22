@@ -43,6 +43,17 @@ class ValidTopupProviderConnectionConfig implements ValidationRule
             return;
         }
 
+        $balanceWarningThreshold = $value['balance_warning_threshold'] ?? null;
+
+        if (
+            array_key_exists('balance_warning_threshold', $value)
+            && (! is_int($balanceWarningThreshold) || $balanceWarningThreshold < 0 || $balanceWarningThreshold > 1_000_000_000_000)
+        ) {
+            $fail('Ngưỡng cảnh báo số dư phải là số nguyên từ 0 đến 1.000.000.000.000đ.');
+
+            return;
+        }
+
         $baseUrl = $value['base_url'] ?? null;
 
         if (is_string($baseUrl) && $baseUrl !== '' && ! $this->hasValidBaseUrl($baseUrl)) {
