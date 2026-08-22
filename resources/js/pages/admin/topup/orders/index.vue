@@ -1,200 +1,694 @@
 <script setup lang="ts">
 import { adminTopupService } from '@/services/admin-topup.service';
-import { BadgeCheck, CircleDollarSign, CircleX, Clock3, LoaderCircle, ReceiptText, RotateCcw, TriangleAlert } from 'lucide-vue-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { handleErrorResponse } from '@/utils/response';
+import {
+    BadgeCheck,
+    ChevronDown,
+    ChevronLeft,
+    ChevronRight,
+    CircleDot,
+    Clock3,
+    Copy,
+    Filter,
+    FolderOpen,
+    LoaderCircle,
+    MoreVertical,
+    Play,
+    ReceiptText,
+    RefreshCcw,
+    RotateCcw,
+    TriangleAlert,
+    X,
+} from 'lucide-vue-next';
+import Swal from 'sweetalert2';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch, type Component } from 'vue';
+import OrderDetailModal from './components/OrderDetailModal.vue';
+import OrderStatusBadge from './components/OrderStatusBadge.vue';
+import type { ActionOption, OrderAction, OrderRow } from './types';
 
-type OrderRow = Record<string, any>;
+type Pagination = {
+    current_page: number;
+    last_page: number;
+    per_page: number;
+    total: number;
+    from: number | null;
+    to: number | null;
+};
+
 const orders = ref<OrderRow[]>([]);
+const orderDetails = ref<Record<string, OrderRow>>({});
 const loading = ref(false);
+const initialLoaded = ref(false);
+const loadError = ref('');
 const actingCode = ref<string | null>(null);
-const filters = reactive({ search: '', payment_status: '', order_status: '', per_page: 50 });
-const summaries = computed(() => [
+const selectedOrder = ref<OrderRow | null>(null);
+const detailModalOpen = ref(false);
+const detailModalLoading = ref(false);
+const detailModalError = ref('');
+const mobileFiltersOpen = ref(false);
+const activeMenuCode = ref<string | null>(null);
+const menuPosition = ref({ top: 0, right: 0 });
+const copiedCode = ref<string | null>(null);
+let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+let previousBodyOverflow = '';
+
+const filters = reactive({ search: '', payment_status: '', order_status: '', per_page: 20, page: 1 });
+const pagination = reactive<Pagination>({ current_page: 1, last_page: 1, per_page: 20, total: 0, from: null, to: null });
+
+const summaries = computed<{ label: string; value: number; icon: Component; classes: string; iconClasses: string }[]>(() => [
     {
-        label: 'Đơn đang hiển thị',
-        value: orders.value.length,
-        icon: ReceiptText,
-        class: 'bg-sky-50 text-sky-700 ring-sky-600/20',
+        label: 'Tổng kết quả',
+        value: pagination.total,
+        icon: FolderOpen,
+        classes: 'border-sky-200/80 bg-gradient-to-br from-sky-50 to-white text-sky-700',
+        iconClasses: 'bg-sky-100 text-sky-700',
     },
     {
-        label: 'Chờ thanh toán',
+        label: 'Chờ thanh toán / trang',
         value: orders.value.filter((order) => order.payment_status === 'pending').length,
         icon: Clock3,
-        class: 'bg-amber-50 text-amber-700 ring-amber-600/20',
+        classes: 'border-amber-200/80 bg-gradient-to-br from-amber-50 to-white text-amber-700',
+        iconClasses: 'bg-amber-100 text-amber-700',
     },
     {
-        label: 'Đang xử lý',
+        label: 'Đang xử lý / trang',
         value: orders.value.filter((order) => order.order_status === 'processing').length,
-        icon: LoaderCircle,
-        class: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20',
+        icon: RefreshCcw,
+        classes: 'border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-white text-indigo-700',
+        iconClasses: 'bg-indigo-100 text-indigo-700',
     },
     {
-        label: 'Đơn lỗi',
+        label: 'Đơn lỗi / trang',
         value: orders.value.filter((order) => order.order_status === 'failed').length,
         icon: TriangleAlert,
-        class: 'bg-rose-50 text-rose-700 ring-rose-600/20',
+        classes: 'border-rose-200/80 bg-gradient-to-br from-rose-50 to-white text-rose-700',
+        iconClasses: 'bg-rose-100 text-rose-700',
     },
 ]);
 
-const paymentStatus = (status: string) => {
-    if (status === 'paid') return { label: 'Đã thanh toán', class: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20', icon: BadgeCheck };
-    if (status === 'pending') return { label: 'Chờ thanh toán', class: 'bg-amber-50 text-amber-700 ring-amber-600/20', icon: Clock3 };
-    if (status === 'refunded') return { label: 'Đã hoàn tiền', class: 'bg-sky-50 text-sky-700 ring-sky-600/20', icon: CircleDollarSign };
-    return { label: status || 'Chưa rõ', class: 'bg-slate-100 text-slate-700 ring-slate-500/20', icon: TriangleAlert };
+const formatMoney = (value: number | string): string => `${new Intl.NumberFormat('vi-VN').format(Number(value || 0))}đ`;
+const formatDateTime = (value: string): string =>
+    new Intl.DateTimeFormat('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(
+        new Date(value),
+    );
+
+const errorMessage = (error: unknown, fallback: string): string => {
+    const candidate = error as { message?: string; response?: { data?: { message?: string } } };
+    return candidate.response?.data?.message || candidate.message || fallback;
 };
 
-const orderStatus = (status: string) => {
-    if (status === 'completed') return { label: 'Hoàn thành', class: 'bg-emerald-50 text-emerald-700 ring-emerald-600/20', icon: BadgeCheck };
-    if (status === 'processing') return { label: 'Đang xử lý', class: 'bg-indigo-50 text-indigo-700 ring-indigo-600/20', icon: LoaderCircle };
-    if (status === 'failed') return { label: 'Thất bại', class: 'bg-rose-50 text-rose-700 ring-rose-600/20', icon: CircleX };
-    return { label: status || 'Chờ xử lý', class: 'bg-slate-100 text-slate-700 ring-slate-500/20', icon: Clock3 };
+const primaryActionFor = (order: OrderRow): ActionOption => {
+    if (order.payment_status === 'pending' && !['completed', 'cancelled'].includes(order.order_status)) {
+        return { action: 'mark_paid', label: 'Đã nhận tiền', tone: 'primary' };
+    }
+    if (order.can_reorder) return { action: 'reorder', label: 'Đẩy lại thẻ lỗi', tone: 'primary' };
+    if (order.payment_status === 'paid' && order.order_status === 'pending') return { action: 'process', label: 'Xử lý đơn', tone: 'primary' };
+    if (order.order_status === 'processing') return { action: 'complete', label: 'Hoàn thành', tone: 'primary' };
+    return { action: 'detail', label: 'Xem chi tiết', tone: 'neutral' };
 };
 
-const load = async () => {
+const secondaryActionsFor = (order: OrderRow): ActionOption[] => {
+    const actions: ActionOption[] = [{ action: 'detail', label: 'Xem chi tiết', tone: 'neutral' }];
+    if (['pending', 'processing'].includes(order.order_status)) actions.push({ action: 'fail', label: 'Báo lỗi đơn', tone: 'danger' });
+    if (!['completed', 'cancelled'].includes(order.order_status)) actions.push({ action: 'cancel', label: 'Hủy đơn', tone: 'danger' });
+    return actions;
+};
+
+const closeMenu = (): void => {
+    activeMenuCode.value = null;
+};
+
+const load = async (): Promise<void> => {
     loading.value = true;
+    loadError.value = '';
+    closeMenu();
     try {
-        const response = await adminTopupService.orders(filters);
-        orders.value = response.data.data.data;
+        const response = await adminTopupService.orders({
+            search: filters.search || undefined,
+            payment_status: filters.payment_status || undefined,
+            order_status: filters.order_status || undefined,
+            per_page: filters.per_page,
+            page: filters.page,
+        });
+        const payload = response.data.data;
+        const meta = payload.meta ?? payload;
+        orders.value = payload.data ?? [];
+        Object.assign(pagination, {
+            current_page: Number(meta.current_page || 1),
+            last_page: Number(meta.last_page || 1),
+            per_page: Number(meta.per_page || filters.per_page),
+            total: Number(meta.total || 0),
+            from: meta.from ?? null,
+            to: meta.to ?? null,
+        });
+    } catch (error) {
+        loadError.value = errorMessage(error, 'Không thể tải danh sách đơn. Vui lòng thử lại.');
     } finally {
         loading.value = false;
+        initialLoaded.value = true;
     }
 };
 
-const act = async (order: OrderRow, action: string) => {
+const applyFilters = async (): Promise<void> => {
+    filters.page = 1;
+    mobileFiltersOpen.value = false;
+    await load();
+};
+
+const clearFilters = async (): Promise<void> => {
+    Object.assign(filters, { search: '', payment_status: '', order_status: '', per_page: 20, page: 1 });
+    await load();
+};
+
+const changePage = async (page: number): Promise<void> => {
+    if (page < 1 || page > pagination.last_page || page === pagination.current_page) return;
+    filters.page = page;
+    await load();
+};
+
+const openDetailModal = async (order: OrderRow): Promise<void> => {
+    closeMenu();
+    selectedOrder.value = orderDetails.value[order.code] ?? order;
+    detailModalOpen.value = true;
+    detailModalError.value = '';
+    if (orderDetails.value[order.code]) return;
+    detailModalLoading.value = true;
+    try {
+        const response = await adminTopupService.order(order.code);
+        orderDetails.value[order.code] = response.data.data;
+        selectedOrder.value = orderDetails.value[order.code];
+    } catch (error) {
+        detailModalError.value = errorMessage(error, 'Không thể tải dữ liệu chi tiết.');
+    } finally {
+        detailModalLoading.value = false;
+    }
+};
+
+const retryDetailModal = async (): Promise<void> => {
+    if (!selectedOrder.value) return;
+    delete orderDetails.value[selectedOrder.value.code];
+    await openDetailModal(selectedOrder.value);
+};
+
+const copyCode = async (code: string): Promise<void> => {
+    try {
+        await navigator.clipboard.writeText(code);
+        copiedCode.value = code;
+        if (copiedTimer) clearTimeout(copiedTimer);
+        copiedTimer = setTimeout(() => (copiedCode.value = null), 1600);
+    } catch {
+        await Swal.fire({ icon: 'warning', title: 'Không thể sao chép', text: `Mã đơn: ${code}` });
+    }
+};
+
+const toggleMenu = async (event: MouseEvent, order: OrderRow): Promise<void> => {
+    if (activeMenuCode.value === order.code) return closeMenu();
+    const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
+    const estimatedMenuHeight = 142;
+    const top = rect.bottom + estimatedMenuHeight + 12 > window.innerHeight ? Math.max(12, rect.top - estimatedMenuHeight - 8) : rect.bottom + 8;
+    menuPosition.value = { top, right: Math.max(12, window.innerWidth - rect.right) };
+    activeMenuCode.value = order.code;
+    await nextTick();
+};
+
+const confirmationFor = (order: OrderRow, action: Exclude<OrderAction, 'detail'>): { title: string; text: string; confirm: string } =>
+    ({
+        mark_paid: {
+            title: 'Xác nhận đã nhận tiền?',
+            text: `Đơn ${order.code} sẽ chuyển sang đã thanh toán và được đưa vào xử lý.`,
+            confirm: 'Đã nhận tiền',
+        },
+        process: { title: 'Xử lý đơn này?', text: `Đơn ${order.code} sẽ được đưa vào queue provider.`, confirm: 'Xử lý đơn' },
+        reorder: {
+            title: 'Đẩy lại thẻ lỗi?',
+            text: `Chỉ các lượt provider đã xác nhận thất bại của đơn ${order.code} được gửi lại.`,
+            confirm: 'Đẩy lại thẻ lỗi',
+        },
+        complete: { title: 'Đánh dấu hoàn thành?', text: `Xác nhận toàn bộ đơn ${order.code} đã hoàn thành.`, confirm: 'Hoàn thành' },
+        fail: { title: 'Báo lỗi đơn?', text: `Đơn ${order.code} sẽ chuyển sang trạng thái lỗi.`, confirm: 'Báo lỗi' },
+        cancel: { title: 'Hủy đơn?', text: `Thao tác này sẽ hủy đơn ${order.code}.`, confirm: 'Hủy đơn' },
+    })[action];
+
+const act = async (order: OrderRow, action: OrderAction): Promise<void> => {
+    closeMenu();
+    if (action === 'detail') return openDetailModal(order);
     if (actingCode.value !== null) return;
-
+    const confirmation = confirmationFor(order, action);
     const needsReason = ['fail', 'cancel'].includes(action);
-    const reason = needsReason ? window.prompt('Nhập lý do để lưu audit:') : undefined;
-    if (needsReason && !reason) return;
-    const confirmation =
-        action === 'reorder'
-            ? `Xác nhận đẩy lại thẻ lỗi của đơn ${order.code}? Hệ thống chỉ gửi lại các lượt provider đã xác nhận thất bại.`
-            : `Xác nhận thao tác “${action}” cho đơn ${order.code}?`;
-    if (!window.confirm(confirmation)) return;
-
+    const result = await Swal.fire({
+        icon: needsReason ? 'warning' : 'question',
+        title: confirmation.title,
+        text: confirmation.text,
+        input: needsReason ? 'textarea' : undefined,
+        inputLabel: needsReason ? 'Lý do thao tác' : undefined,
+        inputPlaceholder: needsReason ? 'Nhập lý do để lưu audit...' : undefined,
+        inputValidator: needsReason ? (value) => (!String(value || '').trim() ? 'Vui lòng nhập lý do.' : undefined) : undefined,
+        showCancelButton: true,
+        confirmButtonText: confirmation.confirm,
+        cancelButtonText: 'Đóng',
+        confirmButtonColor: needsReason ? '#be123c' : '#4f46e5',
+        reverseButtons: true,
+    });
+    if (!result.isConfirmed) return;
     actingCode.value = order.code;
     try {
-        await adminTopupService.updateOrder(order.code, action, reason || undefined);
+        const response = await adminTopupService.updateOrder(order.code, action, needsReason ? String(result.value).trim() : undefined);
+        delete orderDetails.value[order.code];
         await load();
+        const refreshedOrder = orders.value.find((item) => item.code === order.code);
+        if (detailModalOpen.value && selectedOrder.value?.code === order.code && refreshedOrder) await openDetailModal(refreshedOrder);
+        await Swal.fire({
+            icon: 'success',
+            title: 'Thao tác thành công',
+            text: response.data?.message || `Đã cập nhật đơn ${order.code}.`,
+            timer: 1800,
+            showConfirmButton: false,
+        });
+    } catch (error) {
+        handleErrorResponse(error as Parameters<typeof handleErrorResponse>[0]);
     } finally {
         actingCode.value = null;
     }
 };
 
-onMounted(load);
+const runPrimaryAction = async (order: OrderRow): Promise<void> => act(order, primaryActionFor(order).action);
+const activeMenuOrder = computed(() => orders.value.find((order) => order.code === activeMenuCode.value) ?? null);
+const handleEscape = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') closeMenu();
+};
+
+watch(detailModalOpen, (isOpen) => {
+    if (isOpen) {
+        previousBodyOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        return;
+    }
+    document.body.style.overflow = previousBodyOverflow;
+});
+
+onMounted(() => {
+    document.addEventListener('click', closeMenu);
+    window.addEventListener('resize', closeMenu);
+    window.addEventListener('scroll', closeMenu, true);
+    window.addEventListener('keydown', handleEscape);
+    void load();
+});
+onBeforeUnmount(() => {
+    document.removeEventListener('click', closeMenu);
+    window.removeEventListener('resize', closeMenu);
+    window.removeEventListener('scroll', closeMenu, true);
+    window.removeEventListener('keydown', handleEscape);
+    document.body.style.overflow = previousBodyOverflow;
+    if (copiedTimer) clearTimeout(copiedTimer);
+});
 </script>
 
 <template>
-    <section class="space-y-6">
-        <header>
-            <p class="text-sm font-semibold text-emerald-700">Order operations</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-950">Đơn nạp game</h1>
-            <p class="mt-2 text-sm text-slate-500">Payment status và order status được quản lý độc lập; thao tác nhạy cảm có audit log.</p>
+    <section class="space-y-5">
+        <header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+                <p class="text-sm font-bold text-indigo-600">Order operations</p>
+                <h1 class="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Đơn nạp game</h1>
+                <p class="mt-1 max-w-2xl text-sm leading-6 text-slate-500">
+                    Theo dõi thanh toán, tiến độ provider và xử lý từng đơn từ một bảng duy nhất.
+                </p>
+            </div>
+            <button
+                type="button"
+                class="inline-flex min-h-11 items-center justify-center gap-2 self-start rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm transition hover:border-indigo-200 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50 lg:self-auto"
+                :disabled="loading"
+                @click="load"
+            >
+                <RefreshCcw class="h-4 w-4" :class="loading ? 'animate-spin' : ''" />Làm mới dữ liệu
+            </button>
         </header>
-        <div class="flex flex-wrap gap-2" aria-label="Tổng quan đơn hàng đang hiển thị">
-            <span
+
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Tổng quan đơn hàng">
+            <article
                 v-for="summary in summaries"
                 :key="summary.label"
-                class="inline-flex items-center gap-2 rounded-full px-3 py-2 text-xs font-bold ring-1 ring-inset"
-                :class="summary.class"
+                class="flex min-h-24 items-center gap-4 rounded-2xl border p-4 shadow-[0_8px_24px_-18px_rgba(15,23,42,0.28)]"
+                :class="summary.classes"
             >
-                <component :is="summary.icon" class="h-4 w-4" aria-hidden="true" />
-                {{ summary.label }}
-                <strong class="rounded-full bg-white/80 px-2 py-0.5 text-sm">{{ loading ? '—' : summary.value }}</strong>
-            </span>
-        </div>
-        <form class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-4" @submit.prevent="load">
-            <input
-                v-model="filters.search"
-                class="min-h-11 rounded-xl border border-slate-300 px-3 sm:col-span-2"
-                placeholder="Mã đơn hoặc email"
-            /><select v-model="filters.payment_status" class="min-h-11 rounded-xl border border-slate-300 px-3">
-                <option value="">Mọi thanh toán</option>
-                <option v-for="status in ['pending', 'paid', 'expired', 'cancelled', 'refunded']" :key="status">{{ status }}</option></select
-            ><select v-model="filters.order_status" class="min-h-11 rounded-xl border border-slate-300 px-3">
-                <option value="">Mọi trạng thái đơn</option>
-                <option v-for="status in ['pending', 'processing', 'completed', 'failed', 'cancelled']" :key="status">{{ status }}</option></select
-            ><button class="min-h-11 rounded-xl bg-emerald-600 px-4 font-semibold text-white sm:col-start-4" type="submit">Lọc đơn</button>
-        </form>
-        <div class="grid gap-4">
-            <div v-if="loading" class="rounded-2xl border border-slate-200 bg-white p-10 text-center text-slate-500">Đang tải...</div>
-            <article v-for="order in orders" v-else :key="order.id" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-                <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-                    <div>
-                        <div class="flex flex-wrap items-center gap-2">
-                            <strong class="text-lg">{{ order.code }}</strong>
-                            <span
-                                class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset"
-                                :class="paymentStatus(order.payment_status).class"
-                            >
-                                <component :is="paymentStatus(order.payment_status).icon" class="h-3.5 w-3.5" aria-hidden="true" />
-                                {{ paymentStatus(order.payment_status).label }}
-                            </span>
-                            <span
-                                class="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-bold ring-1 ring-inset"
-                                :class="orderStatus(order.order_status).class"
-                            >
-                                <component :is="orderStatus(order.order_status).icon" class="h-3.5 w-3.5" aria-hidden="true" />
-                                {{ orderStatus(order.order_status).label }}
-                            </span>
-                        </div>
-                        <p class="mt-2 text-sm text-slate-600">
-                            {{ order.game }} · {{ order.game_account }} · {{ order.package_name }} × {{ order.quantity }}
-                        </p>
-                        <p class="mt-1 text-xs text-slate-400">{{ order.email }} · {{ new Date(order.created_at).toLocaleString('vi-VN') }}</p>
-                    </div>
-                    <div class="xl:text-right">
-                        <p class="text-xl font-bold">{{ Number(order.total_amount).toLocaleString('vi-VN') }}đ</p>
-                        <div class="mt-3 flex flex-wrap gap-2 xl:justify-end">
-                            <button
-                                v-if="order.payment_status === 'pending'"
-                                class="rounded-lg bg-blue-600 px-3 py-2 text-xs font-semibold text-white"
-                                @click="act(order, 'mark_paid')"
-                            >
-                                Đánh dấu đã trả</button
-                            ><button
-                                v-if="order.payment_status === 'paid' && order.order_status === 'pending'"
-                                class="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white"
-                                :disabled="actingCode !== null"
-                                @click="act(order, 'process')"
-                            >
-                                Xử lý</button
-                            ><button
-                                v-if="order.can_reorder"
-                                type="button"
-                                class="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-                                :disabled="actingCode !== null"
-                                title="Gửi lại các lượt provider đã xác nhận thất bại"
-                                @click="act(order, 'reorder')"
-                            >
-                                <LoaderCircle v-if="actingCode === order.code" class="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                                <RotateCcw v-else class="h-3.5 w-3.5" aria-hidden="true" />
-                                {{ actingCode === order.code ? 'Đang đẩy lại...' : 'Đẩy lại thẻ lỗi' }}</button
-                            ><button
-                                v-if="order.order_status === 'processing'"
-                                class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"
-                                @click="act(order, 'complete')"
-                            >
-                                Hoàn thành</button
-                            ><button
-                                v-if="!['completed', 'cancelled'].includes(order.order_status)"
-                                class="rounded-lg border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700"
-                                @click="act(order, 'fail')"
-                            >
-                                Thất bại</button
-                            ><button
-                                v-if="!['completed', 'cancelled'].includes(order.order_status)"
-                                class="rounded-lg border border-slate-300 px-3 py-2 text-xs font-semibold text-slate-600"
-                                @click="act(order, 'cancel')"
-                            >
-                                Hủy
-                            </button>
-                        </div>
-                    </div>
+                <span class="grid h-12 w-12 shrink-0 place-items-center rounded-2xl shadow-sm" :class="summary.iconClasses"
+                    ><component :is="summary.icon" class="h-6 w-6"
+                /></span>
+                <div>
+                    <p class="text-sm font-semibold opacity-90">{{ summary.label }}</p>
+                    <strong class="mt-1 block text-2xl font-black tabular-nums leading-none">{{
+                        !initialLoaded && loading ? '—' : summary.value
+                    }}</strong
+                    ><span class="mt-1 block text-xs opacity-70">đơn</span>
                 </div>
             </article>
-            <div v-if="!loading && !orders.length" class="rounded-2xl border border-dashed border-slate-300 p-10 text-center text-slate-500">
-                Không có đơn phù hợp.
-            </div>
         </div>
+
+        <div class="rounded-2xl border border-slate-200 bg-white p-3 shadow-[0_12px_35px_-24px_rgba(15,23,42,0.35)] sm:p-4">
+            <button
+                type="button"
+                class="flex min-h-11 w-full items-center justify-between rounded-xl bg-slate-50 px-3 text-sm font-bold text-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 lg:hidden"
+                :aria-expanded="mobileFiltersOpen"
+                @click="mobileFiltersOpen = !mobileFiltersOpen"
+            >
+                <span class="inline-flex items-center gap-2"><Filter class="h-4 w-4" />Bộ lọc đơn hàng</span
+                ><ChevronDown class="h-4 w-4 transition" :class="mobileFiltersOpen ? 'rotate-180' : ''" />
+            </button>
+            <form
+                :class="mobileFiltersOpen ? 'grid' : 'hidden lg:grid'"
+                class="mt-3 gap-3 lg:mt-0 lg:grid-cols-[minmax(260px,1fr)_190px_190px_110px_auto] lg:items-end"
+                @submit.prevent="applyFilters"
+            >
+                <label class="text-sm font-bold text-slate-700"
+                    >Tìm đơn<span class="relative mt-1.5 block"
+                        ><Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input
+                            v-model.trim="filters.search"
+                            class="min-h-11 w-full rounded-xl border-slate-200 bg-slate-50 pl-9 pr-3 font-normal outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-indigo-100"
+                            placeholder="Mã đơn hoặc email..." /></span
+                ></label>
+                <label class="text-sm font-bold text-slate-700"
+                    >Thanh toán<select
+                        v-model="filters.payment_status"
+                        class="mt-1.5 min-h-11 w-full rounded-xl border-slate-200 bg-slate-50 px-3 font-normal focus:border-indigo-500 focus:ring-indigo-100"
+                    >
+                        <option value="">Tất cả</option>
+                        <option value="pending">Chờ thanh toán</option>
+                        <option value="paid">Đã thanh toán</option>
+                        <option value="refunded">Đã hoàn tiền</option>
+                        <option value="expired">Hết hạn</option>
+                        <option value="cancelled">Đã hủy</option>
+                    </select></label
+                >
+                <label class="text-sm font-bold text-slate-700"
+                    >Xử lý<select
+                        v-model="filters.order_status"
+                        class="mt-1.5 min-h-11 w-full rounded-xl border-slate-200 bg-slate-50 px-3 font-normal focus:border-indigo-500 focus:ring-indigo-100"
+                    >
+                        <option value="">Tất cả</option>
+                        <option value="pending">Chờ xử lý</option>
+                        <option value="processing">Đang xử lý</option>
+                        <option value="completed">Hoàn thành</option>
+                        <option value="failed">Báo lỗi</option>
+                        <option value="cancelled">Đã hủy</option>
+                    </select></label
+                >
+                <label class="text-sm font-bold text-slate-700"
+                    >Số dòng<select
+                        v-model.number="filters.per_page"
+                        class="mt-1.5 min-h-11 w-full rounded-xl border-slate-200 bg-slate-50 px-3 font-normal focus:border-indigo-500 focus:ring-indigo-100"
+                    >
+                        <option :value="10">10</option>
+                        <option :value="20">20</option>
+                        <option :value="50">50</option>
+                        <option :value="100">100</option>
+                    </select></label
+                >
+                <div class="flex gap-2">
+                    <button
+                        type="submit"
+                        class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 lg:flex-none"
+                    >
+                        <Filter class="h-4 w-4" />Áp dụng</button
+                    ><button
+                        type="button"
+                        class="grid h-11 w-11 place-items-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        aria-label="Xóa bộ lọc"
+                        title="Xóa bộ lọc"
+                        @click="clearFilters"
+                    >
+                        <X class="h-4 w-4" />
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <section
+            class="relative overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_14px_40px_-28px_rgba(15,23,42,0.38)]"
+            aria-label="Bảng đơn nạp game"
+            :aria-busy="loading"
+        >
+            <div v-if="loading && initialLoaded" class="absolute inset-x-0 top-0 z-10 h-0.5 overflow-hidden bg-indigo-100">
+                <span class="block h-full w-1/3 animate-pulse bg-indigo-600" />
+            </div>
+            <div v-if="loadError" class="m-4 rounded-xl border border-rose-200 bg-rose-50 p-4" role="alert">
+                <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                        <p class="font-bold text-rose-800">Không tải được danh sách đơn</p>
+                        <p class="mt-1 text-sm text-rose-700">{{ loadError }}</p>
+                    </div>
+                    <button type="button" class="min-h-10 rounded-lg bg-rose-700 px-4 text-sm font-bold text-white" @click="load">Thử lại</button>
+                </div>
+            </div>
+            <div v-else-if="loading && !initialLoaded" class="space-y-3 p-4" aria-label="Đang tải đơn hàng">
+                <div v-for="index in 6" :key="index" class="h-16 animate-pulse rounded-xl bg-slate-100" />
+            </div>
+            <div v-else-if="orders.length === 0" class="grid min-h-72 place-items-center px-5 text-center">
+                <div>
+                    <ReceiptText class="mx-auto h-10 w-10 text-slate-300" />
+                    <p class="mt-3 font-bold text-slate-800">Không có đơn phù hợp</p>
+                    <p class="mt-1 text-sm text-slate-500">Thử thay đổi từ khóa hoặc bộ lọc trạng thái.</p>
+                    <button type="button" class="mt-4 text-sm font-bold text-indigo-700 hover:underline" @click="clearFilters">Xóa bộ lọc</button>
+                </div>
+            </div>
+
+            <template v-else>
+                <div class="hidden overflow-x-auto lg:block">
+                    <table class="w-full min-w-[1180px] text-left text-sm">
+                        <thead class="border-b border-slate-200 bg-slate-50/80 text-xs font-black uppercase tracking-wider text-slate-500">
+                            <tr>
+                                <th class="w-[205px] px-4 py-3.5">Đơn hàng</th>
+                                <th class="w-[230px] px-4 py-3.5">Game / Tài khoản</th>
+                                <th class="w-[190px] px-4 py-3.5">Gói nạp</th>
+                                <th class="w-[175px] px-4 py-3.5">Thanh toán</th>
+                                <th class="w-[190px] px-4 py-3.5">Xử lý provider</th>
+                                <th class="px-4 py-3.5 text-right">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-slate-100">
+                            <tr
+                                v-for="order in orders"
+                                :key="order.id"
+                                class="cursor-pointer align-top transition-colors focus-within:bg-indigo-50/35 hover:bg-indigo-50/35"
+                                tabindex="0"
+                                @click="openDetailModal(order)"
+                                @keydown.enter="openDetailModal(order)"
+                            >
+                                <td class="px-4 py-4">
+                                    <div class="flex items-center gap-1">
+                                        <span class="font-mono text-sm font-black text-indigo-700">{{ order.code }}</span
+                                        ><button
+                                            type="button"
+                                            class="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-white hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            :aria-label="`Sao chép mã đơn ${order.code}`"
+                                            @click.stop="copyCode(order.code)"
+                                        >
+                                            <BadgeCheck v-if="copiedCode === order.code" class="h-4 w-4 text-emerald-600" /><Copy
+                                                v-else
+                                                class="h-3.5 w-3.5"
+                                            />
+                                        </button>
+                                    </div>
+                                    <p class="mt-1 max-w-[185px] truncate text-xs text-slate-500" :title="order.email">{{ order.email }}</p>
+                                    <p class="mt-1 text-xs text-slate-400">{{ formatDateTime(order.created_at) }}</p>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <p class="font-bold text-slate-900">{{ order.game || 'Chưa xác định game' }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">{{ order.server || 'Mọi máy chủ' }}</p>
+                                    <p
+                                        class="mt-2 inline-flex max-w-[205px] rounded-lg bg-slate-100 px-2 py-1 font-mono text-xs font-semibold text-slate-700"
+                                    >
+                                        {{ order.game_account || 'Chưa có tài khoản' }}
+                                    </p>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <p class="font-bold text-slate-900">{{ order.package_name }}</p>
+                                    <p class="mt-1 text-xs text-slate-500">
+                                        Số lượng: <strong class="text-slate-700">{{ order.quantity }}</strong>
+                                    </p>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <p class="text-base font-black tabular-nums text-slate-950">{{ formatMoney(order.total_amount) }}</p>
+                                    <OrderStatusBadge class="mt-2" kind="payment" :status="order.payment_status" />
+                                </td>
+                                <td class="px-4 py-4">
+                                    <OrderStatusBadge kind="order" :status="order.order_status" />
+                                    <p
+                                        v-if="order.provider_reference"
+                                        class="mt-2 max-w-[175px] truncate font-mono text-xs text-slate-500"
+                                        :title="order.provider_reference"
+                                    >
+                                        Ref: {{ order.provider_reference }}
+                                    </p>
+                                    <p
+                                        v-if="order.failure_reason"
+                                        class="mt-2 line-clamp-2 text-xs leading-5 text-rose-600"
+                                        :title="order.failure_reason"
+                                    >
+                                        {{ order.failure_reason }}
+                                    </p>
+                                </td>
+                                <td class="px-4 py-4">
+                                    <div class="flex items-center justify-end gap-2">
+                                        <button
+                                            type="button"
+                                            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3.5 text-sm font-bold shadow-sm transition focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:cursor-not-allowed disabled:opacity-50"
+                                            :class="
+                                                primaryActionFor(order).action === 'detail'
+                                                    ? 'border border-slate-200 bg-white text-slate-700 hover:border-indigo-200 hover:text-indigo-700'
+                                                    : 'bg-indigo-600 text-white hover:bg-indigo-700'
+                                            "
+                                            :disabled="actingCode === order.code"
+                                            @click.stop="runPrimaryAction(order)"
+                                        >
+                                            <LoaderCircle v-if="actingCode === order.code" class="h-4 w-4 animate-spin" /><RotateCcw
+                                                v-else-if="primaryActionFor(order).action === 'reorder'"
+                                                class="h-4 w-4"
+                                            /><Play v-else class="h-4 w-4" />{{ primaryActionFor(order).label }}</button
+                                        ><button
+                                            type="button"
+                                            class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-indigo-200 hover:text-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                            :aria-expanded="activeMenuCode === order.code"
+                                            :aria-label="`Thêm thao tác cho đơn ${order.code}`"
+                                            @click.stop="toggleMenu($event, order)"
+                                        >
+                                            <MoreVertical class="h-5 w-5" />
+                                        </button>
+                                    </div>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="divide-y divide-slate-100 lg:hidden">
+                    <article
+                        v-for="order in orders"
+                        :key="order.id"
+                        class="cursor-pointer p-4 transition hover:bg-indigo-50/30"
+                        @click="openDetailModal(order)"
+                    >
+                        <div class="flex items-start justify-between gap-3">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-1">
+                                    <p class="truncate font-mono text-sm font-black text-indigo-700">{{ order.code }}</p>
+                                    <button
+                                        type="button"
+                                        class="grid h-9 w-9 shrink-0 place-items-center rounded-lg text-slate-400"
+                                        aria-label="Sao chép mã đơn"
+                                        @click.stop="copyCode(order.code)"
+                                    >
+                                        <BadgeCheck v-if="copiedCode === order.code" class="h-4 w-4 text-emerald-600" /><Copy
+                                            v-else
+                                            class="h-4 w-4"
+                                        />
+                                    </button>
+                                </div>
+                                <p class="truncate text-xs text-slate-500">{{ order.email }}</p>
+                            </div>
+                            <p class="shrink-0 text-base font-black tabular-nums text-slate-950">{{ formatMoney(order.total_amount) }}</p>
+                        </div>
+                        <div class="mt-3 grid grid-cols-2 gap-3 rounded-xl bg-slate-50 p-3 text-sm">
+                            <div>
+                                <p class="text-xs text-slate-500">Game / tài khoản</p>
+                                <p class="mt-1 font-bold text-slate-800">{{ order.game || 'Chưa xác định' }}</p>
+                                <p class="mt-0.5 truncate font-mono text-xs text-slate-600">{{ order.game_account || '—' }}</p>
+                            </div>
+                            <div>
+                                <p class="text-xs text-slate-500">Gói nạp</p>
+                                <p class="mt-1 font-bold text-slate-800">{{ order.package_name }}</p>
+                                <p class="mt-0.5 text-xs text-slate-600">Số lượng: {{ order.quantity }}</p>
+                            </div>
+                        </div>
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                            <OrderStatusBadge kind="payment" :status="order.payment_status" /><OrderStatusBadge
+                                kind="order"
+                                :status="order.order_status"
+                            />
+                        </div>
+                        <div class="mt-4 flex items-center gap-2">
+                            <button
+                                type="button"
+                                class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-indigo-600 px-3 text-sm font-bold text-white shadow-sm disabled:opacity-50"
+                                :disabled="actingCode === order.code"
+                                @click.stop="runPrimaryAction(order)"
+                            >
+                                <LoaderCircle v-if="actingCode === order.code" class="h-4 w-4 animate-spin" /><CircleDot v-else class="h-4 w-4" />{{
+                                    primaryActionFor(order).label
+                                }}</button
+                            ><button
+                                type="button"
+                                class="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-slate-200 text-slate-600"
+                                aria-label="Thêm thao tác"
+                                @click.stop="toggleMenu($event, order)"
+                            >
+                                <MoreVertical class="h-5 w-5" />
+                            </button>
+                        </div>
+                    </article>
+                </div>
+            </template>
+
+            <footer
+                v-if="!loadError && initialLoaded"
+                class="flex flex-col gap-3 border-t border-slate-100 px-4 py-3.5 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between"
+            >
+                <span>Hiển thị {{ pagination.from || 0 }}–{{ pagination.to || 0 }} trong tổng số {{ pagination.total }} đơn</span>
+                <div class="flex items-center justify-between gap-2 sm:justify-end">
+                    <button
+                        type="button"
+                        class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        :disabled="pagination.current_page <= 1 || loading"
+                        aria-label="Trang trước"
+                        @click="changePage(pagination.current_page - 1)"
+                    >
+                        <ChevronLeft class="h-4 w-4" /></button
+                    ><span class="min-w-24 text-center font-bold text-slate-700">Trang {{ pagination.current_page }}/{{ pagination.last_page }}</span
+                    ><button
+                        type="button"
+                        class="grid h-10 w-10 place-items-center rounded-xl border border-slate-200 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40"
+                        :disabled="pagination.current_page >= pagination.last_page || loading"
+                        aria-label="Trang sau"
+                        @click="changePage(pagination.current_page + 1)"
+                    >
+                        <ChevronRight class="h-4 w-4" />
+                    </button>
+                </div>
+            </footer>
+        </section>
+
+        <Teleport to="body">
+            <div
+                v-if="activeMenuOrder"
+                class="fixed z-[60] w-52 overflow-hidden rounded-xl border border-slate-200 bg-white p-1.5 shadow-[0_18px_50px_-12px_rgba(15,23,42,0.35)]"
+                :style="{ top: `${menuPosition.top}px`, right: `${menuPosition.right}px` }"
+                role="menu"
+                @click.stop
+            >
+                <button
+                    v-for="option in secondaryActionsFor(activeMenuOrder)"
+                    :key="option.action"
+                    type="button"
+                    class="flex min-h-10 w-full items-center rounded-lg px-3 text-left text-sm font-semibold transition hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-indigo-500"
+                    :class="option.tone === 'danger' ? 'text-rose-700 hover:bg-rose-50' : 'text-slate-700'"
+                    role="menuitem"
+                    @click="act(activeMenuOrder, option.action)"
+                >
+                    {{ option.label }}
+                </button>
+            </div>
+        </Teleport>
+
+        <p class="sr-only" aria-live="polite">{{ copiedCode ? `Đã sao chép mã đơn ${copiedCode}` : '' }}</p>
+        <OrderDetailModal
+            :open="detailModalOpen"
+            :order="selectedOrder"
+            :loading="detailModalLoading"
+            :error="detailModalError"
+            :primary-action="selectedOrder ? primaryActionFor(selectedOrder) : null"
+            :acting="selectedOrder ? actingCode === selectedOrder.code : false"
+            @close="detailModalOpen = false"
+            @retry="retryDetailModal"
+            @copy="copyCode"
+            @action="selectedOrder && act(selectedOrder, $event)"
+        />
     </section>
 </template>
