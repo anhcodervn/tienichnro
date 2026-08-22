@@ -46,3 +46,41 @@ test('supervisor worker processes every application queue', function () {
             'default',
         ]);
 });
+
+test('supervisor commands use the production php binary and resilient process options', function () {
+    $projectRoot = dirname(__DIR__, 2);
+    $config = file_get_contents($projectRoot.'/deploy/supervisor/napcarot.conf');
+
+    expect($config)
+        ->toContain('command=/usr/bin/php8.2 /var/www/napcarot.vn/laravel-app/artisan queue:work')
+        ->toContain('--sleep=1 --tries=3 --timeout=60 --backoff=3 --memory=256 --max-time=3600 --no-interaction')
+        ->toContain('startsecs=10')
+        ->toContain('startretries=5')
+        ->toContain('stopsignal=TERM')
+        ->toContain('environment=HOME="/var/www",USER="www-data"')
+        ->not->toContain('xemphatnguoi');
+});
+
+test('supervisor uses isolated worker logs and a bounded graceful shutdown window', function () {
+    $projectRoot = dirname(__DIR__, 2);
+    $config = file_get_contents($projectRoot.'/deploy/supervisor/napcarot.conf');
+
+    preg_match('/\[program:napcarot-worker\](.*?)(?=\r?\n\[program:)/s', $config, $matches);
+
+    expect($matches)->toHaveKey(1)
+        ->and($matches[1])
+        ->toContain('numprocs=2')
+        ->toContain('stopwaitsecs=120')
+        ->toContain('stdout_logfile=/var/www/napcarot.vn/laravel-app/storage/logs/queue-worker-%(process_num)02d.log');
+});
+
+test('supervisor keeps scheduler and reverb on explicit production commands', function () {
+    $projectRoot = dirname(__DIR__, 2);
+    $config = file_get_contents($projectRoot.'/deploy/supervisor/napcarot.conf');
+
+    expect($config)
+        ->toContain('command=/usr/bin/php8.2 /var/www/napcarot.vn/laravel-app/artisan schedule:work --no-interaction')
+        ->toContain('stdout_logfile=/var/www/napcarot.vn/laravel-app/storage/logs/scheduler.log')
+        ->toContain('command=/usr/bin/php8.2 /var/www/napcarot.vn/laravel-app/artisan reverb:start --host=127.0.0.1 --port=8082 --no-interaction')
+        ->toContain('stdout_logfile=/var/www/napcarot.vn/laravel-app/storage/logs/reverb.log');
+});
