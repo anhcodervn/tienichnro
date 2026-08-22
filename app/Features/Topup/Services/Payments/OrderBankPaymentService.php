@@ -76,9 +76,37 @@ class OrderBankPaymentService
             'account_number' => $paymentTransaction->account_number,
             'amount' => (int) $paymentTransaction->amount,
             'content' => $paymentTransaction->content,
-            'qr_url' => $raw['qr_url'] ?? null,
+            'qr_url' => $this->resolveQrUrl($order, $paymentTransaction, $raw),
             'expires_at' => $raw['expires_at'] ?? null,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $raw
+     */
+    private function resolveQrUrl(Order $order, PaymentTransaction $paymentTransaction, array $raw): ?string
+    {
+        $storedQrUrl = (string) ($raw['qr_url'] ?? '');
+
+        if ($storedQrUrl !== '' && ! $this->rechargeConfigService->hasUnresolvedPlaceholders($storedQrUrl)) {
+            return $storedQrUrl;
+        }
+
+        $configId = isset($raw['recharge_config_id']) ? (int) $raw['recharge_config_id'] : null;
+        $config = $this->rechargeConfigService->resolveById($configId);
+
+        if (! $config instanceof ConfigRecharge || blank($config->qr_template)) {
+            return null;
+        }
+
+        $rebuiltQrUrl = $this->rechargeConfigService->buildQrUrlForTransfer(
+            config: $config,
+            amount: $paymentTransaction->amount,
+            userId: $order->user_id ?? $order->code,
+            transferContent: (string) $paymentTransaction->content,
+        );
+
+        return $this->rechargeConfigService->hasUnresolvedPlaceholders($rebuiltQrUrl) ? null : $rebuiltQrUrl;
     }
 
     private function createApiBankVnRequest(Order $order, ConfigRecharge $config): PaymentTransaction

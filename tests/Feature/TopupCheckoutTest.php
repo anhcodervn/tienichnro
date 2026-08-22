@@ -226,7 +226,7 @@ test('bank transfer order creates one shared payment request through the configu
         'bank_name' => 'MBBank',
         'account_name' => 'NGUYEN VAN A',
         'account_number' => '0123456789',
-        'qr_template' => 'https://img.vietqr.io/image/{bank_name}-{account_number}-compact2.png?amount={amount}&addInfo={nd}',
+        'qr_template' => 'https://img.vietqr.io/image/{bank_code}-{account_number}-compact2.png?amount={amount}&addInfo={nd}',
         'transfer_prefix' => 'NAP',
         'api_base_url' => 'https://apibankvn.com',
         'api_key' => 'private-api-key',
@@ -262,13 +262,16 @@ test('bank transfer order creates one shared payment request through the configu
     expect($paymentTransaction->order_id)->toBe($order->id)
         ->and($paymentTransaction->transaction_code)->toBe($order->code)
         ->and($paymentTransaction->raw_data['remote_order_code'])->toBe('ABV-TOPUP-001')
-        ->and($paymentTransaction->raw_data['recharge_config_id'])->toBe($config->id);
+        ->and($paymentTransaction->raw_data['recharge_config_id'])->toBe($config->id)
+        ->and($paymentTransaction->raw_data['qr_url'])->not->toContain('{bank_code}')
+        ->and($paymentTransaction->raw_data['qr_url'])->toContain('MBBank-0123456789-compact2.png');
 
     $this->get(route('orders.payment', $order))
         ->assertSuccessful()
         ->assertSee('MBBank')
         ->assertSee('0123456789')
         ->assertSee('NAP '.$order->code)
+        ->assertDontSee('{bank_code}', false)
         ->assertSee('data-order-realtime-channel="orders.', false)
         ->assertDontSee('private-api-key')
         ->assertDontSee('private-api-secret')
@@ -280,6 +283,56 @@ test('bank transfer order creates one shared payment request through the configu
         && $request->data()['client_order_code'] === $order->code
         && $request->data()['transfer_content'] === 'NAP '.$order->code
         && $request->data()['amount'] === 180000);
+});
+
+test('payment page rebuilds a stored QR URL that still contains a template placeholder', function (): void {
+    [$game, $server, $package] = topupCatalog();
+    $user = User::factory()->create();
+    $config = ConfigRecharge::query()->create([
+        'provider' => 'apibankvn_api',
+        'bank_name' => 'MBBank',
+        'account_name' => 'NGUYEN VAN A',
+        'account_number' => '0123456789',
+        'qr_template' => 'https://img.vietqr.io/image/{bank_code}-{account_number}-compact2.png?amount={amount}&addInfo={nd}',
+        'transfer_prefix' => 'NAP',
+        'api_base_url' => 'https://apibankvn.com',
+        'api_key' => 'private-api-key',
+        'api_secret' => 'private-api-secret',
+        'webhook_secret' => 'private-webhook-secret',
+        'api_bank_id' => 99,
+        'is_active' => true,
+    ]);
+    $order = Order::factory()->for($user)->forServer($server)->create([
+        'game_id' => $game->id,
+        'topup_package_id' => $package->id,
+        'payment_method' => PaymentMethod::BankTransfer,
+        'payment_status' => PaymentStatus::Pending,
+        'order_status' => OrderStatus::Pending,
+        'total_amount' => 180000,
+    ]);
+    PaymentTransaction::query()->create([
+        'user_id' => $user->id,
+        'order_id' => $order->id,
+        'bank_code' => 'MBBank',
+        'account_number' => '0123456789',
+        'transaction_code' => $order->code,
+        'amount' => 180000,
+        'content' => 'NAP '.$order->code,
+        'status' => 'pending',
+        'raw_data' => [
+            'provider' => 'apibankvn_api',
+            'recharge_config_id' => $config->id,
+            'account_name' => 'NGUYEN VAN A',
+            'qr_url' => 'https://img.vietqr.io/image/{bank_code}-0123456789-compact2.png?amount=180000&addInfo=NAP%20'.$order->code,
+            'gateway_unavailable' => true,
+        ],
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('orders.payment', $order))
+        ->assertSuccessful()
+        ->assertSee('https://img.vietqr.io/image/MBBank-0123456789-compact2.png', false)
+        ->assertDontSee('{bank_code}', false);
 });
 
 test('order detail presents status progress recipients and payment summary', function (): void {

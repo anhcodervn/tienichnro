@@ -134,6 +134,7 @@ class RechargeConfigService
         return $this->replaceTemplate(
             template: (string) $config->qr_template,
             replacements: [
+                'bank_code' => (string) $config->bank_name,
                 'bank_name' => (string) $config->bank_name,
                 'account_name' => (string) $config->account_name,
                 'account_number' => (string) $config->account_number,
@@ -150,6 +151,7 @@ class RechargeConfigService
         return $this->replaceTemplate(
             template: (string) $config->qr_template,
             replacements: [
+                'bank_code' => (string) $config->bank_name,
                 'bank_name' => (string) $config->bank_name,
                 'account_name' => (string) $config->account_name,
                 'account_number' => (string) $config->account_number,
@@ -191,5 +193,10 @@ class RechargeConfigService
         }
 
         return strtr($template, $map);
+    }
+
+    public function hasUnresolvedPlaceholders(string $value): bool
+    {
+        return preg_match('/\{[A-Za-z0-9_]+\}/', $value) === 1;
     }
 }
