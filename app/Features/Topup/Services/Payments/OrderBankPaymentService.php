@@ -4,6 +4,7 @@ namespace App\Features\Topup\Services\Payments;
 
 use App\Enums\PaymentMethod;
 use App\Features\Recharge\Services\ApiBankVnPartnerService;
+use App\Features\Recharge\Services\BankTransferContentService;
 use App\Features\Recharge\Services\RechargeConfigService;
 use App\Features\Reporting\Services\TopupDiscordReporterService;
 use App\Models\ConfigRecharge;
@@ -18,6 +19,7 @@ class OrderBankPaymentService
 {
     public function __construct(
         private readonly RechargeConfigService $rechargeConfigService,
+        private readonly BankTransferContentService $bankTransferContentService,
         private readonly ApiBankVnPartnerService $apiBankVnPartnerService,
         private readonly TopupDiscordReporterService $discordReporter,
     ) {}
@@ -111,7 +113,7 @@ class OrderBankPaymentService
 
     private function createApiBankVnRequest(Order $order, ConfigRecharge $config): PaymentTransaction
     {
-        $transferContent = $this->transferContent($order);
+        $transferContent = $this->bankTransferContentService->generate($config);
 
         try {
             $partnerOrder = $this->apiBankVnPartnerService->createRechargeOrder(
@@ -127,7 +129,7 @@ class OrderBankPaymentService
             ]);
             $this->discordReporter->paymentGatewayFallback($order);
 
-            return $this->createLocalRequest($order, $config, true);
+            return $this->createLocalRequest($order, $config, true, $transferContent);
         }
 
         $qrUrl = (string) ($partnerOrder['qr_url'] ?? $partnerOrder['qr_code_url'] ?? '');
@@ -149,6 +151,7 @@ class OrderBankPaymentService
             'transaction_code' => $order->code,
             'amount' => $order->total_amount,
             'content' => $transferContent,
+            'transfer_reference' => $transferContent,
             'status' => $this->localStatus((string) ($partnerOrder['status'] ?? 'pending')),
             'raw_data' => [
                 'provider' => 'apibankvn_api',
@@ -159,13 +162,19 @@ class OrderBankPaymentService
                 'remote_order_code' => $partnerOrder['order_code'] ?? null,
                 'remote_status' => $partnerOrder['status'] ?? null,
                 'client_order_code' => $partnerOrder['client_order_code'] ?? $order->code,
+                'transfer_prefix' => $this->bankTransferContentService->normalizePrefix((string) $config->transfer_prefix),
+                'transfer_content' => $transferContent,
             ],
         ]);
     }
 
-    private function createLocalRequest(Order $order, ConfigRecharge $config, bool $gatewayUnavailable = false): PaymentTransaction
-    {
-        $transferContent = $this->transferContent($order);
+    private function createLocalRequest(
+        Order $order,
+        ConfigRecharge $config,
+        bool $gatewayUnavailable = false,
+        ?string $transferContent = null,
+    ): PaymentTransaction {
+        $transferContent ??= $this->bankTransferContentService->generate($config);
         $qrUrl = $this->rechargeConfigService->buildQrUrlForTransfer(
             config: $config,
             amount: $order->total_amount,
@@ -181,6 +190,7 @@ class OrderBankPaymentService
             'transaction_code' => $order->code,
             'amount' => $order->total_amount,
             'content' => $transferContent,
+            'transfer_reference' => $transferContent,
             'status' => 'pending',
             'raw_data' => [
                 'provider' => $this->rechargeConfigService->isApiBankVnProvider($config) ? 'apibankvn_api' : 'manual',
@@ -190,13 +200,10 @@ class OrderBankPaymentService
                 'expires_at' => now()->addHour()->toISOString(),
                 'gateway_unavailable' => $gatewayUnavailable,
                 'client_order_code' => $order->code,
+                'transfer_prefix' => $this->bankTransferContentService->normalizePrefix((string) $config->transfer_prefix),
+                'transfer_content' => $transferContent,
             ],
         ]);
-    }
-
-    private function transferContent(Order $order): string
-    {
-        return 'NAP '.$order->code;
     }
 
     private function localStatus(string $status): string

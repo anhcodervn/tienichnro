@@ -4,7 +4,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Features\Reporting\Jobs\SendDiscordReport;
 use App\Features\Reporting\Services\TopupDiscordReporterService;
-use App\Features\Topup\Jobs\ProcessTopupOrder;
+use App\Features\Topup\Jobs\ProcessTopupRecipient;
 use App\Features\Topup\Jobs\ReportReorderedOrderSuccess;
 use App\Features\Topup\Services\RecipientFulfillmentService;
 use App\Features\Topup\Services\TopupProviderBalanceService;
@@ -74,7 +74,9 @@ test('admin reorders only confirmed failed units with a fresh request id and rep
         ])
         ->and($recipient->provider_response['reorder_history'][0]['items'][0]['request_id'])->toBe($order->code.'-OLD-R001-U002');
 
-    Queue::assertPushed(ProcessTopupOrder::class, 1);
+    Queue::assertPushed(ProcessTopupRecipient::class, 1);
+    Queue::assertPushed(ProcessTopupRecipient::class, fn (ProcessTopupRecipient $job): bool => $job->recipientId === $recipient->id && $job->unit === 2);
+    Queue::assertNotPushed(ProcessTopupRecipient::class, fn (ProcessTopupRecipient $job): bool => $job->recipientId === $recipient->id && $job->unit === 1);
     expect(AdminAuditLog::query()->where([
         'admin_id' => $admin->id,
         'action' => 'order_reorder',
@@ -86,7 +88,7 @@ test('admin reorders only confirmed failed units with a fresh request id and rep
         ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'reorder'])
         ->assertUnprocessable()
         ->assertJsonValidationErrors('reorder');
-    Queue::assertPushed(ProcessTopupOrder::class, 1);
+    Queue::assertPushed(ProcessTopupRecipient::class, 1);
 
     app(RecipientFulfillmentService::class)->submit($recipient->id, 1);
     app(RecipientFulfillmentService::class)->submit($recipient->id, 2);
@@ -154,7 +156,7 @@ test('reorder rejects unpaid manual and ambiguous provider states without dispat
         ->assertUnprocessable()
         ->assertJsonValidationErrors('reorder');
 
-    Queue::assertNotPushed(ProcessTopupOrder::class);
+    Queue::assertNotPushed(ProcessTopupRecipient::class);
     Http::assertNothingSent();
 });
 

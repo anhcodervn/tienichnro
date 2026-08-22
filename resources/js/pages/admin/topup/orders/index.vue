@@ -67,7 +67,7 @@ const act = async (order: OrderRow, action: string) => {
     if (needsReason && !reason) return;
     const confirmation =
         action === 'reorder'
-            ? `Xác nhận đã nạp tiền vào provider và reorder đơn ${order.code}? Hệ thống chỉ gửi lại các lượt đã thất bại.`
+            ? `Xác nhận đẩy lại thẻ lỗi của đơn ${order.code}? Hệ thống chỉ gửi lại các lượt provider đã xác nhận thất bại.`
             : `Xác nhận thao tác “${action}” cho đơn ${order.code}?`;
     if (!window.confirm(confirmation)) return;
 
@@ -168,7 +168,7 @@ onMounted(load);
                             >
                                 <LoaderCircle v-if="actingCode === order.code" class="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
                                 <RotateCcw v-else class="h-3.5 w-3.5" aria-hidden="true" />
-                                {{ actingCode === order.code ? 'Đang reorder...' : 'Reorder' }}</button
+                                {{ actingCode === order.code ? 'Đang đẩy lại...' : 'Đẩy lại thẻ lỗi' }}</button
                             ><button
                                 v-if="order.order_status === 'processing'"
                                 class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"

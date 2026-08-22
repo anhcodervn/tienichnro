@@ -7,11 +7,12 @@ use App\Models\ConfigRecharge;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
-use Illuminate\Support\Str;
 
 class ApiBankVnPartnerService
 {
     private const DEFAULT_BASE_URL = 'https://apibankvn.com';
+
+    public function __construct(private readonly BankTransferContentService $bankTransferContentService) {}
 
     /**
      * @return array<string, mixed>
@@ -29,7 +30,7 @@ class ApiBankVnPartnerService
         ];
 
         if (filled($transferContent)) {
-            $payload['transfer_prefix'] = Str::upper(trim((string) $config->transfer_prefix));
+            $payload['transfer_prefix'] = $this->bankTransferContentService->normalizePrefix((string) $config->transfer_prefix);
             $payload['transfer_content'] = trim((string) $transferContent);
         }
 

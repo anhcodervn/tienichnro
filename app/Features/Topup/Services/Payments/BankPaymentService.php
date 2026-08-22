@@ -8,8 +8,11 @@ use App\Features\Topup\Jobs\ProcessTopupOrder;
 use App\Mail\Orders\PaymentReceivedMail;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Str;
 
 class BankPaymentService
 {
@@ -18,7 +21,8 @@ class BankPaymentService
     {
         $content = trim((string) ($payload['transfer_content'] ?? $payload['transaction_description'] ?? ''));
         $clientOrderCode = trim((string) ($payload['client_order_code'] ?? ''));
-        $orderCode = $this->extractOrderCode($content.' '.$clientOrderCode);
+        $amount = (int) str((string) ($payload['amount'] ?? 0))->before('.')->toString();
+        $orderCode = $this->resolveOrderCode($content, $clientOrderCode, $amount);
 
         if ($orderCode === null) {
             return null;
@@ -30,7 +34,6 @@ class BankPaymentService
             throw new ApiException('Giao dịch ngân hàng thiếu mã tham chiếu duy nhất.', 422);
         }
 
-        $amount = (int) str((string) ($payload['amount'] ?? 0))->before('.')->toString();
         $shouldDispatch = false;
 
         $transaction = DB::transaction(function () use ($payload, $rawPayload, $orderCode, $providerReference, $amount, &$shouldDispatch): PaymentTransaction {
@@ -67,7 +70,7 @@ class BankPaymentService
                     'bank_code' => $payload['bank_name'] ?? $transaction->bank_code,
                     'account_number' => $payload['account_number'] ?? $transaction->account_number,
                     'provider_transaction_id' => $providerReference,
-                    'content' => $payload['transfer_content'] ?? $payload['transaction_description'] ?? $transaction->content,
+                    'content' => $transaction->content ?: ($payload['transfer_content'] ?? $payload['transaction_description'] ?? null),
                     'raw_data' => $rawData,
                     'status' => 'success',
                 ])->save();
@@ -101,6 +104,55 @@ class BankPaymentService
         }
 
         return $transaction;
+    }
+
+    private function resolveOrderCode(string $content, string $clientOrderCode, int $amount): ?string
+    {
+        $clientOrderReference = $this->extractOrderCode($clientOrderCode);
+
+        if ($clientOrderReference !== null) {
+            return $clientOrderReference;
+        }
+
+        $normalizedContent = Str::upper(trim($content));
+
+        if ($normalizedContent !== '') {
+            $transaction = PaymentTransaction::query()
+                ->with('order:id,code')
+                ->whereNotNull('order_id')
+                ->where(function (Builder $query) use ($normalizedContent): void {
+                    $query->where('transfer_reference', $normalizedContent)
+                        ->orWhere('content', $normalizedContent);
+                })
+                ->latest('id')
+                ->first();
+
+            if ($transaction?->order instanceof Order) {
+                return $transaction->order->code;
+            }
+
+            /** @var Collection<int, PaymentTransaction> $candidates */
+            $candidates = PaymentTransaction::query()
+                ->with('order:id,code')
+                ->whereNotNull('order_id')
+                ->whereIn('status', ['pending', 'matched'])
+                ->when($amount > 0, fn (Builder $query) => $query->where('amount', $amount))
+                ->latest('id')
+                ->limit(100)
+                ->get();
+
+            $transaction = $candidates->first(function (PaymentTransaction $candidate) use ($normalizedContent): bool {
+                $reference = Str::upper(trim((string) ($candidate->transfer_reference ?: $candidate->content)));
+
+                return $reference !== '' && str_contains($normalizedContent, $reference);
+            });
+
+            if ($transaction?->order instanceof Order) {
+                return $transaction->order->code;
+            }
+        }
+
+        return $this->extractOrderCode($content.' '.$clientOrderCode);
     }
 
     private function extractOrderCode(string $content): ?string

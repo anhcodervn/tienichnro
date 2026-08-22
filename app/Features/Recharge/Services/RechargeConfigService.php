@@ -5,10 +5,11 @@ namespace App\Features\Recharge\Services;
 use App\Models\ConfigRecharge;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Str;
 
 class RechargeConfigService
 {
+    public function __construct(private readonly BankTransferContentService $bankTransferContentService) {}
+
     /**
      * @return array<string, string>
      */
@@ -21,7 +22,7 @@ class RechargeConfigService
             '{amount}' => '500000',
             '{user_id}' => '123',
             '{prefix}' => 'NOIDUNG',
-            '{nd}' => 'NOIDUNG123'.now()->format('dmy'),
+            '{nd}' => 'NOIDUNGABC12345',
         ];
     }
 
@@ -165,20 +166,17 @@ class RechargeConfigService
 
     public function previewTransferContent(string $prefix, int|string $userId = 123): string
     {
-        return $this->buildTransferContent(
-            prefix: $prefix,
-            userId: $userId,
-        );
+        return $this->bankTransferContentService->preview($prefix);
     }
 
     public function normalizePrefix(string $prefix): string
     {
-        return Str::upper(trim($prefix));
+        return $this->bankTransferContentService->normalizePrefix($prefix);
     }
 
     public function buildTransferContent(string $prefix, int|string $userId): string
     {
-        return $this->normalizePrefix($prefix).$userId.now()->format('dmy');
+        return $this->bankTransferContentService->fromReference($prefix, $userId);
     }
 
     /**

@@ -5,6 +5,7 @@ namespace App\Features\Client\Wallet\Services;
 use App\Events\WalletDepositCredited;
 use App\Exceptions\ApiException;
 use App\Features\Recharge\Services\ApiBankVnPartnerService;
+use App\Features\Recharge\Services\BankTransferContentService;
 use App\Features\Recharge\Services\RechargeConfigService;
 use App\Features\Reporting\Services\DiscordReportService;
 use App\Models\ConfigRecharge;
@@ -23,6 +24,7 @@ class WalletDepositService
 {
     public function __construct(
         private readonly RechargeConfigService $rechargeConfigService,
+        private readonly BankTransferContentService $bankTransferContentService,
         private readonly ApiBankVnPartnerService $apiBankVnPartnerService,
         private readonly DiscordReportService $discordReportService,
     ) {}
@@ -177,7 +179,7 @@ class WalletDepositService
     private function createManualRequest(User $user, ConfigRecharge $config, float $amount): PaymentTransaction
     {
         $transactionCode = 'DEP'.strtoupper(Str::random(10));
-        $transferContent = $this->rechargeConfigService->transferContentFor($user, $config);
+        $transferContent = $this->bankTransferContentService->generate($config);
         $qrUrl = $this->rechargeConfigService->buildQrUrlForTransfer($config, $amount, $user->id, $transferContent);
 
         return PaymentTransaction::query()->create([
@@ -187,6 +189,7 @@ class WalletDepositService
             'transaction_code' => $transactionCode,
             'amount' => $amount,
             'content' => $transferContent,
+            'transfer_reference' => $transferContent,
             'status' => 'pending',
             'raw_data' => [
                 'provider' => 'manual',
@@ -196,7 +199,10 @@ class WalletDepositService
                 'account_name' => $config->account_name,
                 'qr_template' => $config->qr_template,
                 'qr_url' => $qrUrl,
-                'transfer_prefix' => $config->transfer_prefix,
+                'transfer_prefix' => $this->rechargeConfigService->normalizePrefix((string) $config->transfer_prefix),
+                'transfer_content' => $transferContent,
+                'requested_transfer_prefix' => $this->rechargeConfigService->normalizePrefix((string) $config->transfer_prefix),
+                'requested_transfer_content' => $transferContent,
                 'bonus_amount' => 0,
                 'confirmed_at' => null,
                 'expires_at' => now()->addDay()->toISOString(),
@@ -207,7 +213,7 @@ class WalletDepositService
     private function createApiBankVnRequest(User $user, ConfigRecharge $config, float $amount): PaymentTransaction
     {
         $transactionCode = 'DEP'.strtoupper(Str::random(10));
-        $requestedTransferContent = $this->rechargeConfigService->transferContentFor($user, $config);
+        $requestedTransferContent = $this->bankTransferContentService->generate($config);
         $partnerOrder = $this->apiBankVnPartnerService->createRechargeOrder(
             $config,
             $amount,
@@ -223,6 +229,7 @@ class WalletDepositService
             'transaction_code' => $transactionCode,
             'amount' => $amount,
             'content' => $resolvedTransferContent,
+            'transfer_reference' => $resolvedTransferContent,
             'status' => $this->mapPartnerStatusToLocal((string) ($partnerOrder['status'] ?? 'pending')),
             'raw_data' => [
                 'provider' => 'apibankvn_api',
@@ -434,31 +441,50 @@ class WalletDepositService
         $clientOrderCode = trim((string) ($payload['client_order_code'] ?? ''));
 
         if ($clientOrderCode !== '') {
-            return PaymentTransaction::query()
+            $paymentTransaction = PaymentTransaction::query()
+                ->whereNull('order_id')
                 ->where('transaction_code', $clientOrderCode)
                 ->where('raw_data->provider', 'apibankvn_api')
                 ->latest('id')
                 ->first();
+
+            if ($paymentTransaction instanceof PaymentTransaction) {
+                return $paymentTransaction;
+            }
         }
 
         $remoteOrderCode = trim((string) ($payload['order_code'] ?? ''));
 
         if ($remoteOrderCode !== '') {
-            return PaymentTransaction::query()
+            $paymentTransaction = PaymentTransaction::query()
+                ->whereNull('order_id')
                 ->where('raw_data->provider', 'apibankvn_api')
                 ->where('raw_data->remote_order_code', $remoteOrderCode)
                 ->latest('id')
                 ->first();
+
+            if ($paymentTransaction instanceof PaymentTransaction) {
+                return $paymentTransaction;
+            }
         }
 
         $transferContent = trim((string) ($payload['transfer_content'] ?? ''));
 
         if ($transferContent !== '') {
-            return PaymentTransaction::query()
-                ->where('content', $transferContent)
+            $normalizedTransferContent = Str::upper($transferContent);
+            $paymentTransaction = PaymentTransaction::query()
+                ->whereNull('order_id')
+                ->where(function (Builder $query) use ($normalizedTransferContent): void {
+                    $query->where('transfer_reference', $normalizedTransferContent)
+                        ->orWhere('content', $normalizedTransferContent);
+                })
                 ->where('raw_data->provider', 'apibankvn_api')
                 ->latest('id')
                 ->first();
+
+            if ($paymentTransaction instanceof PaymentTransaction) {
+                return $paymentTransaction;
+            }
         }
 
         $transactionDescription = trim((string) ($payload['transaction_description'] ?? ''));
@@ -570,6 +596,7 @@ class WalletDepositService
 
         /** @var Collection<int, PaymentTransaction> $candidates */
         $candidates = PaymentTransaction::query()
+            ->whereNull('order_id')
             ->where('raw_data->provider', 'apibankvn_api')
             ->whereIn('status', ['pending', 'matched'])
             ->when($amount !== null, fn (Builder $query) => $query->where('amount', $amount))

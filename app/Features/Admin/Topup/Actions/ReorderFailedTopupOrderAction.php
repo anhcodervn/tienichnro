@@ -5,7 +5,7 @@ namespace App\Features\Admin\Topup\Actions;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Features\Topup\Enums\TopupProviderStatus;
-use App\Features\Topup\Jobs\ProcessTopupOrder;
+use App\Features\Topup\Jobs\ProcessTopupRecipient;
 use App\Features\Topup\Services\OrderStatusService;
 use App\Features\Topup\Services\TopupProviderBalanceService;
 use App\Models\AdminAuditLog;
@@ -40,7 +40,8 @@ class ReorderFailedTopupOrderAction
             ]);
         }
 
-        $order = DB::transaction(function () use ($order, $admin, $request, $balanceBefore): Order {
+        /** @var array{order: Order, failed_units: array<int, array<int, int>>} $result */
+        $result = DB::transaction(function () use ($order, $admin, $request, $balanceBefore): array {
             $lockedOrder = Order::query()
                 ->with('provider')
                 ->lockForUpdate()
@@ -161,12 +162,19 @@ class ReorderFailedTopupOrderAction
                 'user_agent' => $request->userAgent(),
             ]);
 
-            return $lockedOrder->refresh();
+            return [
+                'order' => $lockedOrder->refresh(),
+                'failed_units' => $failedUnits,
+            ];
         }, 3);
 
-        ProcessTopupOrder::dispatch($order->id)->afterCommit();
+        foreach ($result['failed_units'] as $recipientId => $units) {
+            foreach ($units as $unit) {
+                ProcessTopupRecipient::dispatch($recipientId, $unit)->afterCommit();
+            }
+        }
 
-        return $order;
+        return $result['order'];
     }
 
     /** @return array<int, array<int, int>> */

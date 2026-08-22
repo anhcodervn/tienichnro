@@ -19,6 +19,7 @@ class PaymentTransaction extends Model
         'provider_transaction_id',
         'amount',
         'content',
+        'transfer_reference',
         'raw_data',
         'status',
     ];

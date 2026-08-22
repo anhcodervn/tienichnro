@@ -26,7 +26,8 @@ type LocalBankOption = {
     hint: string;
 };
 
-const DEFAULT_QR_TEMPLATE = 'https://img.vietqr.io/image/{bank_code}-{account_number}-compact2.png?amount={amount}&addInfo={nd}&accountName={account_name}';
+const DEFAULT_QR_TEMPLATE =
+    'https://img.vietqr.io/image/{bank_code}-{account_number}-compact2.png?amount={amount}&addInfo={nd}&accountName={account_name}';
 const LOCAL_BANK_OPTIONS: LocalBankOption[] = [
     { code: 'mbbank', name: 'MBBank', hint: 'Ngân hàng local phổ biến' },
     { code: 'vietcombank', name: 'Vietcombank', hint: 'Dùng cho QR local' },
@@ -49,18 +50,11 @@ const form = ref<RechargeConfigForm>(emptyForm());
 const isApiProvider = computed(() => form.value.provider === 'apibankvn_api');
 const canVerify = computed(() => form.value.api_key.trim() !== '' && form.value.api_secret.trim() !== '' && !verifying.value);
 const selectedBank = computed(() => bankAccounts.value.find((bank) => String(bank.bank_id) === form.value.api_bank_id) ?? null);
-const selectedLocalBank = computed(() => LOCAL_BANK_OPTIONS.find((bank) => bank.name.toLowerCase() === form.value.bank_name.trim().toLowerCase()) ?? null);
-const transferDateSuffix = computed(() => {
-    return new Intl.DateTimeFormat('en-GB', {
-        timeZone: 'Asia/Ho_Chi_Minh',
-        day: '2-digit',
-        month: '2-digit',
-        year: '2-digit',
-    })
-        .format(new Date())
-        .replace(/\D/g, '');
-});
-const previewTransferContent = computed(() => `${form.value.transfer_prefix.trim().toUpperCase() || 'NOIDUNG'}123${transferDateSuffix.value}`);
+const selectedLocalBank = computed(
+    () => LOCAL_BANK_OPTIONS.find((bank) => bank.name.toLowerCase() === form.value.bank_name.trim().toLowerCase()) ?? null,
+);
+const normalizedTransferPrefix = computed(() => form.value.transfer_prefix.replace(/[^a-z0-9]/gi, '').toUpperCase());
+const previewTransferContent = computed(() => `${normalizedTransferPrefix.value || 'NOIDUNG'}ABC12345`);
 const previewQrUrl = computed(() => {
     const template = form.value.qr_template.trim();
     if (!template) {
@@ -75,7 +69,7 @@ const previewQrUrl = computed(() => {
         '{account_number}': encodeURIComponent(form.value.account_number.trim() || '0123456789'),
         '{amount}': encodeURIComponent('500000'),
         '{nd}': encodeURIComponent(previewTransferContent.value),
-        '{prefix}': encodeURIComponent(form.value.transfer_prefix.trim().toUpperCase() || 'NOIDUNG'),
+        '{prefix}': encodeURIComponent(normalizedTransferPrefix.value || 'NOIDUNG'),
         '{user_id}': encodeURIComponent('123'),
     };
 
@@ -250,7 +244,7 @@ async function saveConfig(): Promise<void> {
             account_name: form.value.account_name.trim(),
             account_number: form.value.account_number.trim(),
             qr_template: form.value.qr_template.trim(),
-            transfer_prefix: form.value.transfer_prefix.trim().toUpperCase(),
+            transfer_prefix: normalizedTransferPrefix.value,
             api_base_url: isApiProvider.value ? 'https://apibankvn.com' : null,
             api_key: form.value.api_key.trim() || null,
             api_secret: form.value.api_secret.trim() || null,
@@ -259,9 +253,7 @@ async function saveConfig(): Promise<void> {
             is_active: form.value.is_active,
         };
 
-        await (editingId.value
-            ? adminRechargeConfigService.update(editingId.value, payload)
-            : adminRechargeConfigService.create(payload));
+        await (editingId.value ? adminRechargeConfigService.update(editingId.value, payload) : adminRechargeConfigService.create(payload));
 
         await loadConfigs();
         closeModal();
@@ -314,7 +306,9 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                         <span class="font-medium text-slate-600">Recharge Config</span>
                     </div>
                     <h1 class="text-[28px] font-black tracking-[-0.04em] text-slate-950">Cấu hình nạp tiền</h1>
-                    <p class="max-w-2xl text-sm leading-6 text-slate-500">Quản lý danh sách bank local hoặc ApiBankVn. Form thêm và sửa được gom vào modal để page gọn hơn.</p>
+                    <p class="max-w-2xl text-sm leading-6 text-slate-500">
+                        Quản lý danh sách bank local hoặc ApiBankVn. Form thêm và sửa được gom vào modal để page gọn hơn.
+                    </p>
                 </div>
 
                 <div class="grid gap-3 sm:grid-cols-2">
@@ -363,7 +357,10 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                     class="rounded-[10px] border border-slate-200 bg-white p-4 transition hover:border-slate-300 hover:shadow-sm"
                 >
                     <div class="flex items-start gap-3">
-                        <div class="flex h-10 w-10 items-center justify-center rounded-[10px] text-white" :class="config.provider === 'apibankvn_api' ? 'bg-indigo-600' : 'bg-emerald-500'">
+                        <div
+                            class="flex h-10 w-10 items-center justify-center rounded-[10px] text-white"
+                            :class="config.provider === 'apibankvn_api' ? 'bg-indigo-600' : 'bg-emerald-500'"
+                        >
                             <Building2 v-if="config.provider === 'manual'" class="h-4.5 w-4.5" />
                             <ShieldCheck v-else class="h-4.5 w-4.5" />
                         </div>
@@ -371,7 +368,10 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                         <div class="min-w-0 flex-1">
                             <div class="flex flex-wrap items-center gap-2">
                                 <p class="truncate font-semibold text-slate-950">{{ config.bank_name }}</p>
-                                <span class="rounded-full px-2 py-0.5 text-[11px] font-semibold" :class="config.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'">
+                                <span
+                                    class="rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                                    :class="config.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                                >
                                     {{ config.is_active ? 'Đang bật' : 'Đã tắt' }}
                                 </span>
                             </div>
@@ -382,14 +382,20 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                     </div>
 
                     <div class="mt-4 grid grid-cols-3 gap-2">
-                        <button type="button" class="inline-flex items-center justify-center gap-2 rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" @click="openEditModal(config)">
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center gap-2 rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                            @click="openEditModal(config)"
+                        >
                             <Pencil class="h-4 w-4" />
                             Sửa
                         </button>
                         <button
                             type="button"
                             class="inline-flex items-center justify-center gap-2 rounded-[10px] border px-3 py-2 text-sm font-semibold transition"
-                            :class="config.is_active ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'"
+                            :class="
+                                config.is_active ? 'border-amber-200 bg-amber-50 text-amber-700' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                            "
                             :disabled="togglingId === config.id"
                             @click="toggleConfig(config)"
                         >
@@ -415,7 +421,9 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                 <div class="border-b border-slate-200 px-5 py-4">
                     <div class="flex items-start justify-between gap-4">
                         <div>
-                            <h2 class="text-xl font-black tracking-[-0.03em] text-slate-950">{{ editingId ? 'Sửa cấu hình bank' : 'Thêm cấu hình bank' }}</h2>
+                            <h2 class="text-xl font-black tracking-[-0.03em] text-slate-950">
+                                {{ editingId ? 'Sửa cấu hình bank' : 'Thêm cấu hình bank' }}
+                            </h2>
                             <p class="mt-1 text-sm leading-6 text-slate-500">Chọn local hoặc ApiBankVn, nhập thông tin rồi lưu cấu hình.</p>
                         </div>
                     </div>
@@ -449,20 +457,35 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                         <div class="grid gap-3 md:grid-cols-2">
                             <label class="space-y-2">
                                 <span class="text-sm font-semibold text-slate-800">YOUR_API_KEY</span>
-                                <input v-model="form.api_key" type="text" class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400" />
+                                <input
+                                    v-model="form.api_key"
+                                    type="text"
+                                    class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400"
+                                />
                             </label>
                             <label class="space-y-2">
                                 <span class="text-sm font-semibold text-slate-800">YOUR_API_SECRET</span>
-                                <input v-model="form.api_secret" type="text" class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400" />
+                                <input
+                                    v-model="form.api_secret"
+                                    type="text"
+                                    class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400"
+                                />
                             </label>
                             <label class="space-y-2 md:col-span-2">
                                 <span class="text-sm font-semibold text-slate-800">WEBHOOK_SECRET</span>
-                                <input v-model="form.webhook_secret" type="text" class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400" />
+                                <input
+                                    v-model="form.webhook_secret"
+                                    type="text"
+                                    class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400"
+                                />
                             </label>
                         </div>
 
                         <div class="flex flex-wrap items-center justify-between gap-3">
-                            <p v-if="verifiedUser" class="text-sm text-slate-600">Đã kết nối với <span class="font-semibold">{{ verifiedUser.username || verifiedUser.email || '--' }}</span>.</p>
+                            <p v-if="verifiedUser" class="text-sm text-slate-600">
+                                Đã kết nối với <span class="font-semibold">{{ verifiedUser.username || verifiedUser.email || '--' }}</span
+                                >.
+                            </p>
                             <button
                                 type="button"
                                 class="inline-flex items-center justify-center gap-2 rounded-[10px] border border-indigo-200 bg-indigo-50 px-4 py-2.5 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-100 disabled:opacity-60"
@@ -483,14 +506,18 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                                 :key="method.key"
                                 type="button"
                                 class="rounded-[10px] border px-4 py-4 text-left transition"
-                                :class="method.selected ? 'border-indigo-300 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'"
+                                :class="
+                                    method.selected ? 'border-indigo-300 bg-indigo-50 shadow-sm' : 'border-slate-200 bg-white hover:border-slate-300'
+                                "
                                 @click="selectMethodCard(method.key)"
                             >
                                 <div class="flex items-start justify-between gap-3">
                                     <div>
                                         <div class="flex flex-wrap items-center gap-2">
                                             <p class="font-semibold text-slate-950">{{ method.title }}</p>
-                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{{ method.tag }}</span>
+                                            <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-semibold text-slate-500">{{
+                                                method.tag
+                                            }}</span>
                                         </div>
                                         <p class="mt-1 text-sm leading-6 text-slate-500">{{ method.subtitle }}</p>
                                     </div>
@@ -498,35 +525,72 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                                 </div>
                             </button>
                         </div>
-                        <div v-else class="rounded-[10px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                            {{ isApiProvider ? 'Chưa có bank từ API. Hãy bấm lấy bank từ API trước.' : 'Chọn một bank local hoặc nhập tay thông tin bên dưới.' }}
+                        <div
+                            v-else
+                            class="rounded-[10px] border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500"
+                        >
+                            {{
+                                isApiProvider
+                                    ? 'Chưa có bank từ API. Hãy bấm lấy bank từ API trước.'
+                                    : 'Chọn một bank local hoặc nhập tay thông tin bên dưới.'
+                            }}
                         </div>
                     </div>
 
                     <div class="grid gap-3 md:grid-cols-2">
                         <label class="space-y-2">
                             <span class="text-sm font-semibold text-slate-800">Tên ngân hàng</span>
-                            <input v-model="form.bank_name" type="text" class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400" />
+                            <input
+                                v-model="form.bank_name"
+                                type="text"
+                                class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400"
+                            />
                         </label>
                         <label class="space-y-2">
                             <span class="text-sm font-semibold text-slate-800">Số tài khoản</span>
-                            <input v-model="form.account_number" type="text" class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400" />
+                            <input
+                                v-model="form.account_number"
+                                type="text"
+                                class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400"
+                            />
                         </label>
                         <label class="space-y-2 md:col-span-2">
                             <span class="text-sm font-semibold text-slate-800">Chủ tài khoản</span>
-                            <input v-model="form.account_name" type="text" class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400" />
+                            <input
+                                v-model="form.account_name"
+                                type="text"
+                                class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400"
+                            />
                         </label>
                         <label class="space-y-2 md:col-span-2">
                             <span class="text-sm font-semibold text-slate-800">QR template</span>
-                            <textarea v-model="form.qr_template" rows="3" class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400"></textarea>
+                            <textarea
+                                v-model="form.qr_template"
+                                rows="3"
+                                class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm outline-none transition focus:border-indigo-400"
+                            ></textarea>
                         </label>
                         <label class="space-y-2">
                             <span class="text-sm font-semibold text-slate-800">Tiền tố nội dung</span>
-                            <input v-model="form.transfer_prefix" type="text" class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm uppercase outline-none transition focus:border-indigo-400" />
+                            <input
+                                v-model="form.transfer_prefix"
+                                type="text"
+                                maxlength="50"
+                                pattern="[A-Za-z0-9]+"
+                                autocomplete="off"
+                                class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm uppercase outline-none transition focus:border-indigo-400"
+                            />
+                            <span class="block text-xs leading-5 text-slate-500"
+                                >Chỉ dùng chữ và số. Hệ thống sẽ thêm 8 ký tự đối soát viết liền sau prefix.</span
+                            >
                         </label>
                         <label class="flex items-center justify-between rounded-[10px] border border-slate-200 bg-white px-4 py-3">
                             <span class="text-sm font-semibold text-slate-800">Bật cấu hình</span>
-                            <input v-model="form.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />
+                            <input
+                                v-model="form.is_active"
+                                type="checkbox"
+                                class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                            />
                         </label>
                     </div>
                 </div>
@@ -564,7 +628,11 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
             <template #footer>
                 <div class="border-t border-slate-200 px-5 py-4">
                     <div class="flex flex-col gap-2 sm:flex-row sm:justify-end">
-                        <button type="button" class="inline-flex items-center justify-center rounded-[10px] border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" @click="closeModal">
+                        <button
+                            type="button"
+                            class="inline-flex items-center justify-center rounded-[10px] border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                            @click="closeModal"
+                        >
                             Đóng
                         </button>
                         <button

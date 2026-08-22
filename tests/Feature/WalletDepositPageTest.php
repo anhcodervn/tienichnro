@@ -182,16 +182,20 @@ test('authenticated user creates an apibank recharge order through the wallet fe
 
     expect($transaction->user_id)->toBe($user->id)
         ->and($transaction->amount)->toBe('100000.00')
+        ->and($transaction->content)->toMatch('/^NAP[A-Z0-9]{8}$/')
+        ->and($transaction->transfer_reference)->toBe($transaction->content)
         ->and($transaction->raw_data['provider'])->toBe('apibankvn_api')
         ->and($transaction->raw_data['remote_order_code'])->toBe('ABV123456')
         ->and($response->content())->not->toContain('private-api-key')
         ->not->toContain('private-api-secret');
 
-    Http::assertSent(function (Request $request): bool {
+    Http::assertSent(function (Request $request) use ($transaction): bool {
         return $request->url() === 'https://apibankvn.com/api/v1/recharge-orders'
             && $request->hasHeader('X-API-KEY', 'private-api-key')
             && $request->data()['bank_id'] === 99
-            && $request->data()['amount'] === 100000;
+            && $request->data()['amount'] === 100000
+            && $request->data()['transfer_prefix'] === 'NAP'
+            && $request->data()['transfer_content'] === $transaction->content;
     });
 });
 
