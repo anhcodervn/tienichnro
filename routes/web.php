@@ -1,5 +1,6 @@
 <?php
 
+use App\Features\Admin\Setting\Controllers\SiteCustomAssetController;
 use App\Features\Auth\Controllers\AuthController;
 use App\Features\Client\Profile\Controllers\ProfilePageController;
 use App\Http\Controllers\Account\WalletController;
@@ -15,6 +16,9 @@ use App\Models\User;
 use App\Support\SettingStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/site-custom.css', [SiteCustomAssetController::class, 'css'])->name('site_custom.css');
+Route::get('/site-custom.js', [SiteCustomAssetController::class, 'javascript'])->name('site_custom.js');
 
 Route::middleware(['guest', 'site.active'])->group(function (): void {
     Route::view('/dang-nhap', 'pages.auth.login')->name('auth.login');

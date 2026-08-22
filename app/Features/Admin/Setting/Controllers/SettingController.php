@@ -2,6 +2,7 @@
 
 namespace App\Features\Admin\Setting\Controllers;
 
+use App\Features\Admin\Setting\Actions\UpdateCustomCodeSettingsAction;
 use App\Features\Admin\Setting\Requests\UpdateOptionSettingRequest;
 use App\Features\Admin\Setting\Requests\UpdateSystemSettingRequest;
 use App\Features\Admin\Setting\Requests\UpdateTabSettingRequest;
@@ -55,7 +56,12 @@ class SettingController extends Controller
                 'robots' => 'index,follow',
                 'gtm_id' => '',
                 'meta_pixel_id' => '',
-                'custom_script' => '',
+            ],
+            'custom-code' => [
+                'custom_css' => '',
+                'custom_css_enabled' => false,
+                'custom_js' => '',
+                'custom_js_enabled' => false,
             ],
             'options' => [
                 'terms_of_use' => [],
@@ -196,7 +202,12 @@ class SettingController extends Controller
                 'robots' => 'robots',
                 'gtm_id' => 'gtm_id',
                 'meta_pixel_id' => 'meta_pixel_id',
-                'custom_script' => 'custom_script',
+            ],
+            'custom-code' => [
+                'custom_css' => 'custom_css',
+                'custom_css_enabled' => 'custom_css_enabled',
+                'custom_js' => 'custom_js',
+                'custom_js_enabled' => 'custom_js_enabled',
             ],
             'options' => [
                 'terms_of_use' => 'terms_of_use',
@@ -301,12 +312,30 @@ class SettingController extends Controller
         ]);
     }
 
-    public function update(string $tab, UpdateTabSettingRequest $request, SettingStore $settingStore): JsonResponse
-    {
+    public function update(
+        string $tab,
+        UpdateTabSettingRequest $request,
+        SettingStore $settingStore,
+        UpdateCustomCodeSettingsAction $updateCustomCodeSettings,
+    ): JsonResponse {
         abort_if($tab === self::SYSTEM_TAB || $tab === 'options', 404);
         abort_if(! $this->tabExists($tab), 404);
 
         $validated = $request->validated();
+
+        if ($tab === 'custom-code') {
+            $settings = $updateCustomCodeSettings->execute($request->user(), $validated, $request);
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Cập nhật mã tùy chỉnh thành công.',
+                'data' => [
+                    'tab' => $tab,
+                    'settings' => $settings,
+                ],
+            ]);
+        }
+
         $storageMap = Arr::only($this->tabStorageMap()[$tab], array_keys($validated));
         $this->writeTab($settingStore, $validated, $storageMap);
         $settings = $this->readTab($settingStore, $this->tabDefaults()[$tab], $this->tabStorageMap()[$tab]);

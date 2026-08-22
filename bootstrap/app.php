@@ -24,6 +24,10 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->statefulApi();
         $middleware->trustProxies(at: '*');
+        $middleware->trimStrings(except: ['content.*', '*_content.*', 'custom_css', 'custom_js']);
+        $middleware->convertEmptyStringsToNull(except: [
+            fn (Request $request): bool => $request->is('api/admin-api/settings/custom-code'),
+        ]);
         $middleware->alias([
             'admin' => EnsureAdminUser::class,
             'site.active' => EnsureSiteIsActive::class,

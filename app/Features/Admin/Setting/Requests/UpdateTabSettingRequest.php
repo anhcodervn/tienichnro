@@ -2,6 +2,7 @@
 
 namespace App\Features\Admin\Setting\Requests;
 
+use App\Models\User;
 use App\Rules\ValidHomepageNoticeContent;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -11,7 +12,9 @@ class UpdateTabSettingRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $user = $this->user();
+
+        return $user instanceof User && $user->role === 'admin';
     }
 
     /**
@@ -55,7 +58,12 @@ class UpdateTabSettingRequest extends FormRequest
                 'robots' => ['nullable', 'string', 'max:100'],
                 'gtm_id' => ['nullable', 'string', 'max:100'],
                 'meta_pixel_id' => ['nullable', 'string', 'max:100'],
-                'custom_script' => ['nullable', 'string'],
+            ],
+            'custom-code' => [
+                'custom_css' => ['sometimes', 'nullable', 'string', 'max:100000'],
+                'custom_css_enabled' => ['sometimes', 'boolean'],
+                'custom_js' => ['sometimes', 'nullable', 'string', 'max:100000'],
+                'custom_js_enabled' => ['sometimes', 'boolean'],
             ],
             'content-pages' => $this->contentPageRules(),
             'home-category' => [
@@ -150,7 +158,10 @@ class UpdateTabSettingRequest extends FormRequest
             'robots' => 'robots',
             'gtm_id' => 'Google Tag Manager ID',
             'meta_pixel_id' => 'Meta Pixel ID',
-            'custom_script' => 'script tùy chỉnh',
+            'custom_css' => 'CSS tùy chỉnh',
+            'custom_css_enabled' => 'trạng thái CSS tùy chỉnh',
+            'custom_js' => 'JavaScript tùy chỉnh',
+            'custom_js_enabled' => 'trạng thái JavaScript tùy chỉnh',
             'category_ids' => 'danh mục trang chủ',
             'items' => 'danh sách slider',
             'discord_webhooks' => 'danh sách webhook Discord',

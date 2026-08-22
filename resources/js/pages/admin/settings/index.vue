@@ -3,6 +3,7 @@ import Breadcrumb from '@/components/MasterLayouts/Breadcrumb/index.vue';
 import Editor from '@/components/shared/Editor/index.vue';
 import UploadImage from '@/components/shared/UpladImage/index.vue';
 import { useSystemSetting } from '@/composables/useSystemSetting';
+import CustomCodeSettings from '@/pages/admin/settings/CustomCodeSettings.vue';
 import { adminSettingService } from '@/services/admin-setting.service';
 import type {
     BrandingSettingType,
@@ -16,7 +17,7 @@ import type {
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { computed, onMounted, ref } from 'vue';
 
-type TabKey = 'general' | 'homepage' | 'branding' | 'contact' | 'seo' | 'monitoring';
+type TabKey = 'general' | 'homepage' | 'branding' | 'contact' | 'seo' | 'custom-code' | 'monitoring';
 
 const tabs: Array<{ key: TabKey; label: string; description: string }> = [
     {
@@ -42,7 +43,12 @@ const tabs: Array<{ key: TabKey; label: string; description: string }> = [
     {
         key: 'seo',
         label: 'SEO & chia sẻ',
-        description: 'Metadata, robots và script đo lường.',
+        description: 'Metadata, robots và mã đo lường tiêu chuẩn.',
+    },
+    {
+        key: 'custom-code',
+        label: 'Mã tùy chỉnh',
+        description: 'CSS và JavaScript tin cậy chỉ áp dụng cho giao diện public.',
     },
     {
         key: 'monitoring',
@@ -60,6 +66,7 @@ const saving = ref<Record<TabKey, boolean>>({
     branding: false,
     contact: false,
     seo: false,
+    'custom-code': false,
     monitoring: false,
 });
 
@@ -102,7 +109,6 @@ const seoForm = ref<SeoSettingType>({
     robots: 'index,follow',
     gtm_id: '',
     meta_pixel_id: '',
-    custom_script: '',
 });
 
 const monitoringForm = ref<MonitoringSettingType>({
@@ -776,15 +782,6 @@ onMounted(async () => {
                                         class="w-full rounded-[10px] border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400"
                                     />
                                 </label>
-                                <label class="space-y-1">
-                                    <span class="text-xs font-semibold text-slate-600">Custom script</span>
-                                    <textarea
-                                        v-model="seoForm.custom_script"
-                                        rows="6"
-                                        class="w-full rounded-[10px] border border-slate-200 px-3 py-2 font-mono text-xs outline-none focus:border-indigo-400"
-                                        placeholder="<script>...</script>"
-                                    />
-                                </label>
                             </div>
                         </article>
                     </div>
@@ -801,6 +798,8 @@ onMounted(async () => {
                         </div>
                     </aside>
                 </div>
+
+                <CustomCodeSettings v-show="activeTab === 'custom-code'" />
 
                 <div v-show="activeTab === 'monitoring'" class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
                     <article class="rounded-[10px] border border-slate-200 bg-white p-4">

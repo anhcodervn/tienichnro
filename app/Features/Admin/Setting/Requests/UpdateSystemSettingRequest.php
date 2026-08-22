@@ -42,7 +42,6 @@ class UpdateSystemSettingRequest extends FormRequest
             'robots' => ['nullable', 'string', 'max:100'],
             'gtm_id' => ['nullable', 'string', 'max:100'],
             'meta_pixel_id' => ['nullable', 'string', 'max:100'],
-            'custom_script' => ['nullable', 'string'],
         ];
     }
 

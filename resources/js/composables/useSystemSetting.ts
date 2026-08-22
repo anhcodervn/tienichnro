@@ -1,29 +1,28 @@
-import { clientSystemSettingService } from "@/services/client-system-setting.service";
-import type { SystemSettingType } from "@/types/setting.type";
-import { ref } from "vue";
+import { clientSystemSettingService } from '@/services/client-system-setting.service';
+import type { SystemSettingType } from '@/types/setting.type';
+import { ref } from 'vue';
 
 const defaultSettings: SystemSettingType = {
-    site_name: "Nạp Carot",
-    site_domain: "",
-    site_description: "",
+    site_name: 'Nạp Carot',
+    site_domain: '',
+    site_description: '',
     site_active: true,
     allow_register: true,
-    light_logo: "",
-    dark_logo: "",
-    favicon: "",
-    og_image: "",
-    support_email: "",
-    hotline: "",
-    address: "",
-    facebook: "",
-    zalo: "",
-    youtube: "",
-    meta_title: "",
-    meta_description: "",
-    robots: "index,follow",
-    gtm_id: "",
-    meta_pixel_id: "",
-    custom_script: "",
+    light_logo: '',
+    dark_logo: '',
+    favicon: '',
+    og_image: '',
+    support_email: '',
+    hotline: '',
+    address: '',
+    facebook: '',
+    zalo: '',
+    youtube: '',
+    meta_title: '',
+    meta_description: '',
+    robots: 'index,follow',
+    gtm_id: '',
+    meta_pixel_id: '',
 };
 
 const settings = ref<SystemSettingType>({ ...defaultSettings });

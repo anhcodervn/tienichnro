@@ -42,7 +42,10 @@
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=be-vietnam-pro:400,500,600,700,800" rel="stylesheet">
     <x-boxicon />
-    @vite(['resources/css/client.css', 'resources/js/client.js'])
+    @vite('resources/css/client.css')
+    @if (($customCodeAssets['css'] ?? false) && ! request()->routeIs(['auth.*', 'password.*', 'verification.*']))
+        <link rel="stylesheet" href="{{ route('site_custom.css') }}" data-site-custom-css>
+    @endif
 </head>
 <body data-authenticated="{{ auth()->check() ? 'true' : 'false' }}" data-order-lookup-url="{{ route('orders.lookup') }}">
     <a href="#main-content" class="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[5px] focus:bg-slate-950 focus:px-4 focus:py-3 focus:text-white">Bỏ qua điều hướng</a>
@@ -220,5 +223,9 @@
             <div><p class="font-bold">Hỗ trợ</p><div class="mt-3 grid gap-2 text-sm text-slate-600"><a href="{{ route('content.guide') }}">Hướng dẫn</a><a href="{{ route('content.contact') }}">Liên hệ</a></div></div>
         </div>
     </footer>
+    @vite('resources/js/client.js')
+    @if (($customCodeAssets['js'] ?? false) && ! request()->routeIs(['auth.*', 'password.*', 'verification.*']))
+        <script src="{{ route('site_custom.js') }}" data-site-custom-js></script>
+    @endif
 </body>
 </html>

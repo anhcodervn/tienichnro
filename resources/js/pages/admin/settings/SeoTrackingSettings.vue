@@ -13,7 +13,7 @@
                         :disabled="isSaving"
                         @click="submitForm"
                     >
-                        {{ isSaving ? "Đang lưu..." : "Lưu thay đổi" }}
+                        {{ isSaving ? 'Đang lưu...' : 'Lưu thay đổi' }}
                     </button>
                 </div>
 
@@ -72,16 +72,6 @@
                             placeholder="1234567890"
                         />
                     </div>
-
-                    <div class="space-y-2">
-                        <label class="text-sm font-medium text-slate-700">Script tùy biến</label>
-                        <textarea
-                            v-model="formData.custom_script"
-                            rows="5"
-                            class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs outline-none focus:border-slate-900"
-                            placeholder="<script>...</script>"
-                        />
-                    </div>
                 </div>
             </div>
         </section>
@@ -107,19 +97,18 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { adminSettingService } from "@/services/admin-setting.service";
-import type { SeoSettingType } from "@/types/setting.type";
-import { handleErrorResponse, handleSuccessResponse } from "@/utils/response";
+import { adminSettingService } from '@/services/admin-setting.service';
+import type { SeoSettingType } from '@/types/setting.type';
+import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
+import { onMounted, ref } from 'vue';
 
 const isSaving = ref(false);
 const formData = ref<SeoSettingType>({
-    meta_title: "",
-    meta_description: "",
-    robots: "index,follow",
-    gtm_id: "",
-    meta_pixel_id: "",
-    custom_script: "",
+    meta_title: '',
+    meta_description: '',
+    robots: 'index,follow',
+    gtm_id: '',
+    meta_pixel_id: '',
 });
 
 const loadData = async (): Promise<void> => {
@@ -136,7 +125,7 @@ const submitForm = async (): Promise<void> => {
         isSaving.value = true;
         const res = await adminSettingService.updateSeo(formData.value);
         formData.value = { ...res.settings };
-        handleSuccessResponse({ data: { status: true, message: "Cập nhật cài đặt SEO và tracking thành công" } });
+        handleSuccessResponse({ data: { status: true, message: 'Cập nhật cài đặt SEO và tracking thành công' } });
     } catch (err) {
         handleErrorResponse(err);
     } finally {

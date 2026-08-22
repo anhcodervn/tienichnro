@@ -95,9 +95,6 @@
         </noscript>
     @endif
     <!-- End Google Tag Manager (noscript) -->
-
-    <!-- custom js -->
-    {!! $settings['custom_script'] ?? '' !!}
 </body>
 
 </html>

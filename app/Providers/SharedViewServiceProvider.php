@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\User;
 use App\Support\SettingStore;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -17,7 +18,7 @@ class SharedViewServiceProvider extends ServiceProvider
     public function boot(SettingStore $settingStore): void
     {
         ViewFacade::composer('client.layouts.app', function (View $view) use ($settingStore): void {
-            $sharedSettings = $settingStore->getMany([
+            $storedSettings = $settingStore->getMany([
                 'site_name' => config('app.name', 'Nạp Carot'),
                 'site_domain' => '',
                 'site_description' => '',
@@ -31,6 +32,16 @@ class SharedViewServiceProvider extends ServiceProvider
                 'color_primary' => '#0F172A',
                 'color_accent' => '#2563EB',
                 'color_surface' => '#F8FAFC',
+                'custom_css' => '',
+                'custom_css_enabled' => false,
+                'custom_js' => '',
+                'custom_js_enabled' => false,
+            ]);
+            $sharedSettings = Arr::except($storedSettings, [
+                'custom_css',
+                'custom_css_enabled',
+                'custom_js',
+                'custom_js_enabled',
             ]);
             $viewSettings = $view->getData()['systemSettings'] ?? [];
             $user = auth()->user();
@@ -54,6 +65,10 @@ class SharedViewServiceProvider extends ServiceProvider
             $view->with('systemSettings', [
                 ...$sharedSettings,
                 ...(is_array($viewSettings) ? $viewSettings : []),
+            ]);
+            $view->with('customCodeAssets', [
+                'css' => $storedSettings['custom_css_enabled'] === true && $storedSettings['custom_css'] !== '',
+                'js' => $storedSettings['custom_js_enabled'] === true && $storedSettings['custom_js'] !== '',
             ]);
         });
     }

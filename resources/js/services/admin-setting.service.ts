@@ -3,6 +3,7 @@ import type {
     BrandingSettingType,
     ContactSettingType,
     ContentPageSettingsType,
+    CustomCodeSettingType,
     GeneralSettingType,
     HomeCategorySettingType,
     HomepageNoticeSettingType,
@@ -72,6 +73,12 @@ export const adminSettingService = {
     },
     updateSeo(payload: SeoSettingType) {
         return updateTab<SeoSettingType>('seo', payload);
+    },
+    getCustomCode() {
+        return getTab<CustomCodeSettingType>('custom-code');
+    },
+    updateCustomCode(payload: Partial<CustomCodeSettingType>) {
+        return updateTab<CustomCodeSettingType>('custom-code', payload);
     },
     getMonitoring() {
         return getTab<MonitoringSettingType>('monitoring');
