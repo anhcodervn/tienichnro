@@ -2,6 +2,7 @@
 
 namespace App\Features\Topup\Providers;
 
+use App\Features\Topup\Contracts\TopupProviderBalanceInterface;
 use App\Features\Topup\Contracts\TopupProviderInterface;
 use App\Features\Topup\DTOs\TopupProviderBalanceDto;
 use App\Features\Topup\DTOs\TopupProviderResultDto;
@@ -15,7 +16,7 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 
-class The9pTopupProvider implements TopupProviderInterface
+class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProviderInterface
 {
     private const DEFAULT_ENDPOINT = 'https://the9p.com/api/rechargews';
 

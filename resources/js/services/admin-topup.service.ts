@@ -21,5 +21,5 @@ export const adminTopupService = {
         id ? axios.put(`${root}/topup-packages/${id}`, payload) : axios.post(`${root}/topup-packages`, payload),
     deletePackage: (id: number) => axios.delete(`${root}/topup-packages/${id}`),
     orders: (params = {}) => axios.get(`${root}/orders`, { params }),
-    updateOrder: (id: number, action: string, reason?: string) => axios.put(`${root}/orders/${id}`, { action, reason }),
+    updateOrder: (code: string, action: string, reason?: string) => axios.put(`${root}/orders/${code}`, { action, reason }),
 };

@@ -4,6 +4,7 @@ namespace App\Features\Admin\Topup\Services;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Features\Admin\Topup\Actions\ReorderFailedTopupOrderAction;
 use App\Features\Topup\Jobs\ProcessTopupOrder;
 use App\Features\Topup\Services\OrderStatusService;
 use App\Mail\Orders\OrderCompletedMail;
@@ -26,7 +27,10 @@ use Illuminate\Validation\ValidationException;
 
 class TopupAdminService
 {
-    public function __construct(private readonly OrderStatusService $orderStatusService) {}
+    public function __construct(
+        private readonly OrderStatusService $orderStatusService,
+        private readonly ReorderFailedTopupOrderAction $reorderFailedTopupOrder,
+    ) {}
 
     /** @param array<string, mixed> $filters */
     public function games(array $filters): LengthAwarePaginator
@@ -98,7 +102,7 @@ class TopupAdminService
 
     public function orders(Request $request): LengthAwarePaginator
     {
-        return Order::query()->with(['game:id,name', 'server:id,name'])
+        return Order::query()->with(['game:id,name', 'server:id,name', 'provider:id,name,slug'])
             ->when($request->filled('search'), function (Builder $query) use ($request): void {
                 $search = trim($request->string('search')->toString());
                 $query->where(fn (Builder $nested) => $nested->where('code', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
@@ -189,6 +193,10 @@ class TopupAdminService
 
     public function updateOrder(Order $order, string $action, ?string $reason, User $admin, Request $request): Order
     {
+        if ($action === 'reorder') {
+            return $this->reorderFailedTopupOrder->handle($order, $admin, $request);
+        }
+
         $dispatchTopup = false;
 
         $order = DB::transaction(function () use ($order, $action, $reason, $admin, $request, &$dispatchTopup): Order {

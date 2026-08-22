@@ -22,7 +22,7 @@ class OrderController extends Controller
 
     public function show(Order $order): OrderResource
     {
-        return OrderResource::make($order->load(['game:id,name', 'server:id,name', 'recipients']));
+        return OrderResource::make($order->load(['game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients']));
     }
 
     public function update(UpdateOrderStatusRequest $request, Order $order): OrderResource
@@ -37,6 +37,6 @@ class OrderController extends Controller
             $request,
         );
 
-        return OrderResource::make($order->load(['game:id,name', 'server:id,name', 'recipients']));
+        return OrderResource::make($order->load(['game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients']));
     }
 }

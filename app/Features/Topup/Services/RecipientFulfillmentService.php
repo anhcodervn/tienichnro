@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Features\Topup\DTOs\TopupProviderResultDto;
 use App\Features\Topup\Enums\TopupProviderStatus;
+use App\Features\Topup\Jobs\ReportReorderedOrderSuccess;
 use App\Features\Topup\Jobs\SyncTopupRecipientStatus;
 use App\Mail\Orders\OrderCompletedMail;
 use App\Mail\Orders\OrderFailedMail;
@@ -311,5 +312,13 @@ class RecipientFulfillmentService
         Mail::to($order->email)->queue(
             $mail === 'completed' ? new OrderCompletedMail($order) : new OrderFailedMail($order),
         );
+
+        $reorderAttempt = (int) data_get($order->metadata, 'reorder.attempt');
+
+        if ($mail === 'completed'
+            && $reorderAttempt > 0
+            && data_get($order->metadata, 'reorder.status') === 'queued') {
+            ReportReorderedOrderSuccess::dispatch($order->id, $reorderAttempt)->afterCommit();
+        }
     }
 }

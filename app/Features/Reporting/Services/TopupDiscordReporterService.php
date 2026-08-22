@@ -108,6 +108,33 @@ class TopupDiscordReporterService
         );
     }
 
+    public function reorderSucceeded(
+        Order $order,
+        int $attempt,
+        int $adminId,
+        int $balanceBefore,
+        int $balanceAfter,
+        string $currency,
+    ): bool {
+        $order->loadMissing('provider:id,name');
+
+        return $this->discordReportService->queue(
+            channel: 'provider',
+            title: 'Reorder đơn nạp game thành công',
+            details: [
+                'Mã đơn' => $order->code,
+                'Nhà cung cấp' => $order->provider?->name ?? 'Không xác định',
+                'Lần reorder' => $attempt,
+                'Admin ID' => $adminId,
+                'Số dư trước' => $this->formatProviderBalance($balanceBefore, $currency),
+                'Số dư sau' => $this->formatProviderBalance($balanceAfter, $currency),
+                'Biến động' => $this->formatProviderBalance($balanceAfter - $balanceBefore, $currency, true),
+                'Hoàn tất lúc' => $order->completed_at,
+            ],
+            dedupeKey: "topup-order:{$order->id}:reorder:{$attempt}:completed",
+        );
+    }
+
     public function dailySummary(CarbonInterface $date): bool
     {
         $day = CarbonImmutable::instance($date);
@@ -163,5 +190,12 @@ class TopupDiscordReporterService
     private function formatMoney(int $amount): string
     {
         return number_format($amount, 0, ',', '.').'đ';
+    }
+
+    private function formatProviderBalance(int $amount, string $currency, bool $withSign = false): string
+    {
+        $sign = $withSign && $amount > 0 ? '+' : '';
+
+        return $sign.number_format($amount, 0, ',', '.').' '.strtoupper($currency);
     }
 }

@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { adminTopupService } from '@/services/admin-topup.service';
-import { BadgeCheck, CircleDollarSign, CircleX, Clock3, LoaderCircle, ReceiptText, TriangleAlert } from 'lucide-vue-next';
+import { BadgeCheck, CircleDollarSign, CircleX, Clock3, LoaderCircle, ReceiptText, RotateCcw, TriangleAlert } from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
 type OrderRow = Record<string, any>;
 const orders = ref<OrderRow[]>([]);
 const loading = ref(false);
+const actingCode = ref<string | null>(null);
 const filters = reactive({ search: '', payment_status: '', order_status: '', per_page: 50 });
 const summaries = computed(() => [
     {
@@ -59,12 +60,24 @@ const load = async () => {
 };
 
 const act = async (order: OrderRow, action: string) => {
+    if (actingCode.value !== null) return;
+
     const needsReason = ['fail', 'cancel'].includes(action);
     const reason = needsReason ? window.prompt('Nhập lý do để lưu audit:') : undefined;
     if (needsReason && !reason) return;
-    if (!window.confirm(`Xác nhận thao tác “${action}” cho đơn ${order.code}?`)) return;
-    await adminTopupService.updateOrder(order.id, action, reason || undefined);
-    await load();
+    const confirmation =
+        action === 'reorder'
+            ? `Xác nhận đã nạp tiền vào provider và reorder đơn ${order.code}? Hệ thống chỉ gửi lại các lượt đã thất bại.`
+            : `Xác nhận thao tác “${action}” cho đơn ${order.code}?`;
+    if (!window.confirm(confirmation)) return;
+
+    actingCode.value = order.code;
+    try {
+        await adminTopupService.updateOrder(order.code, action, reason || undefined);
+        await load();
+    } finally {
+        actingCode.value = null;
+    }
 };
 
 onMounted(load);
@@ -139,11 +152,23 @@ onMounted(load);
                             >
                                 Đánh dấu đã trả</button
                             ><button
-                                v-if="order.payment_status === 'paid' && ['pending', 'failed'].includes(order.order_status)"
+                                v-if="order.payment_status === 'paid' && order.order_status === 'pending'"
                                 class="rounded-lg bg-amber-500 px-3 py-2 text-xs font-semibold text-white"
+                                :disabled="actingCode !== null"
                                 @click="act(order, 'process')"
                             >
                                 Xử lý</button
+                            ><button
+                                v-if="order.can_reorder"
+                                type="button"
+                                class="inline-flex min-h-9 items-center gap-1.5 rounded-lg bg-violet-600 px-3 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
+                                :disabled="actingCode !== null"
+                                title="Gửi lại các lượt provider đã xác nhận thất bại"
+                                @click="act(order, 'reorder')"
+                            >
+                                <LoaderCircle v-if="actingCode === order.code" class="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
+                                <RotateCcw v-else class="h-3.5 w-3.5" aria-hidden="true" />
+                                {{ actingCode === order.code ? 'Đang reorder...' : 'Reorder' }}</button
                             ><button
                                 v-if="order.order_status === 'processing'"
                                 class="rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white"

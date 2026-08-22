@@ -2,6 +2,8 @@
 
 namespace App\Features\Admin\Topup\Resources;
 
+use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Models\OrderRecipient;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -28,6 +30,9 @@ class OrderResource extends JsonResource
                 ])->all()),
             'total_amount' => $this->total_amount, 'payment_method' => $this->payment_method->value,
             'payment_status' => $this->payment_status->value, 'order_status' => $this->order_status->value,
+            'can_reorder' => $this->payment_status === PaymentStatus::Paid
+                && $this->order_status === OrderStatus::Failed
+                && $this->provider?->slug === 'the9p',
             'provider_reference' => $this->provider_reference, 'failure_reason' => $this->failure_reason,
             'paid_at' => $this->paid_at?->toISOString(), 'created_at' => $this->created_at?->toISOString(),
         ];
