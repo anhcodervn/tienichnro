@@ -226,12 +226,39 @@ class EditorContentRenderer
                 }
 
                 if ($styles !== []) {
-                    return '<span style="'.implode(';', $styles).'">'.$text.'</span>';
+                    $text = '<span style="'.implode(';', $styles).'">'.$text.'</span>';
+                }
+
+                $href = $this->safeHref($child['href'] ?? null);
+
+                if ($href !== null) {
+                    $target = in_array($child['target'] ?? null, ['_blank', '_self'], true) ? (string) $child['target'] : null;
+                    $targetAttribute = $target !== null ? ' target="'.e($target).'"' : '';
+                    $relAttribute = $target === '_blank' ? ' rel="noopener noreferrer"' : '';
+
+                    $text = '<a href="'.e($href).'"'.$targetAttribute.$relAttribute.'>'.$text.'</a>';
                 }
 
                 return $text;
             })
             ->implode('');
+    }
+
+    protected function safeHref(mixed $value): ?string
+    {
+        if (! is_string($value) || $value === '' || strlen($value) > 2048 || trim($value) !== $value) {
+            return null;
+        }
+
+        if (preg_match('/[\x00-\x20\x7F\\\\]/', $value) === 1 || str_starts_with($value, '//')) {
+            return null;
+        }
+
+        if (str_starts_with($value, '/') || str_starts_with($value, '#')) {
+            return $value;
+        }
+
+        return preg_match('/^(?:https?:\/\/|mailto:|tel:)/i', $value) === 1 ? $value : null;
     }
 
     /**

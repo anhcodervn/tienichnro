@@ -74,7 +74,7 @@ class ValidHomepageNoticeContent implements ValidationRule
 
     private function isValidInlineNode(mixed $node): bool
     {
-        if (! is_array($node) || array_diff(array_keys($node), ['text', 'bold', 'italic', 'underline', 'strike', 'color', 'background']) !== []) {
+        if (! is_array($node) || array_diff(array_keys($node), ['text', 'bold', 'italic', 'underline', 'strike', 'color', 'background', 'href', 'target']) !== []) {
             return false;
         }
 
@@ -94,7 +94,34 @@ class ValidHomepageNoticeContent implements ValidationRule
             }
         }
 
+        if (array_key_exists('href', $node) && ! $this->isSafeHref($node['href'])) {
+            return false;
+        }
+
+        if (array_key_exists('target', $node)) {
+            if (! array_key_exists('href', $node) || ! in_array($node['target'], ['_blank', '_self'], true)) {
+                return false;
+            }
+        }
+
         return true;
+    }
+
+    private function isSafeHref(mixed $value): bool
+    {
+        if (! is_string($value) || $value === '' || strlen($value) > 2048 || trim($value) !== $value) {
+            return false;
+        }
+
+        if (preg_match('/[\x00-\x20\x7F\\\\]/', $value) === 1 || str_starts_with($value, '//')) {
+            return false;
+        }
+
+        if (str_starts_with($value, '/') || str_starts_with($value, '#')) {
+            return true;
+        }
+
+        return preg_match('/^(?:https?:\/\/|mailto:|tel:)/i', $value) === 1;
     }
 
     private function isSafeColor(mixed $value): bool

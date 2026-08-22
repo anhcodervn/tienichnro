@@ -35,6 +35,13 @@ test('admin can write homepage notice with tinymce content and homepage renders 
             'children' => [
                 ['text' => 'Khuyến mãi 15%', 'bold' => true],
                 ['text' => '<script>alert("xss")</script>'],
+                [
+                    'text' => ' Mở ưu đãi',
+                    'bold' => true,
+                    'color' => '#0f766e',
+                    'href' => 'https://napcarot.com/uu-dai?from=notice&day=1',
+                    'target' => '_blank',
+                ],
             ],
         ],
         [
@@ -68,12 +75,44 @@ test('admin can write homepage notice with tinymce content and homepage renders 
         ->assertSee('Ưu đãi hôm nay')
         ->assertSee('class="home-notice-header"', false)
         ->assertSee('<strong>Khuyến mãi 15%</strong>', false)
+        ->assertSee(
+            '<a href="https://napcarot.com/uu-dai?from=notice&amp;day=1" target="_blank" rel="noopener noreferrer"><span style="color:#0f766e"><strong> Mở ưu đãi</strong></span></a>',
+            false,
+        )
         ->assertSee('&lt;script&gt;alert(&quot;xss&quot;)&lt;/script&gt;', false)
         ->assertSee('<li>Mỗi mã QR chỉ quét một lần.</li>', false)
         ->assertDontSee('<details class="home-notice-banner"', false)
         ->assertDontSee('Xem chi tiết')
         ->assertDontSee('<script>alert("xss")</script>', false);
 });
+
+test('homepage notice rejects unsafe tinymce links', function (string $href): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $settings = $this->actingAs($admin)
+        ->getJson('/api/admin-api/settings/homepage')
+        ->assertOk()
+        ->json('data.settings');
+
+    $this->actingAs($admin)
+        ->patchJson('/api/admin-api/settings/homepage', [
+            ...$settings,
+            'home_notice_content' => [
+                [
+                    'type' => 'paragraph',
+                    'children' => [['text' => 'Liên kết', 'href' => $href]],
+                ],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('data.errors.home_notice_content.0', 'Nội dung thông báo chứa định dạng không được hỗ trợ.');
+})->with([
+    'javascript scheme' => 'javascript:alert(1)',
+    'data scheme' => 'data:text/html,<script>alert(1)</script>',
+    'vbscript scheme' => 'vbscript:msgbox(1)',
+    'protocol relative url' => '//example.com/phishing',
+    'backslash protocol relative url' => '/\\example.com/phishing',
+    'whitespace obfuscation' => "java\nscript:alert(1)",
+]);
 
 test('homepage tab reads existing setting keys and content pages no longer own them', function (): void {
     app(SettingStore::class)->putMany([

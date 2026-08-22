@@ -53,3 +53,17 @@ test('tinymce captures all text input and preserves whitespace and html characte
         ->toContain("value.replace(/[&<>\"']/g")
         ->toContain('blocks.length === blockCountBeforeChildren');
 });
+
+test('tinymce preserves safe links through its json conversion', function (): void {
+    $editorPath = dirname(__DIR__, 2).'/resources/js/components/shared/Editor/index.vue';
+    $source = file_get_contents($editorPath);
+
+    expect($source)
+        ->toContain("if (tag === 'a')")
+        ->toContain('next.href = href')
+        ->toContain("target?: '_blank' | '_self'")
+        ->toContain('const href = normalizeSafeHref(item.href)')
+        ->toContain('rel="noopener noreferrer"')
+        ->toContain("href.startsWith('//')")
+        ->toContain('/^(?:https?:\\/\\/|mailto:|tel:)/i');
+});

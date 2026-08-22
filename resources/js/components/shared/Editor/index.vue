@@ -24,6 +24,8 @@ type EditorInlineNode = {
     strike?: boolean;
     color?: string;
     background?: string;
+    href?: string;
+    target?: '_blank' | '_self';
 };
 
 type EditorContentNode = {
@@ -302,6 +304,18 @@ export default {
             if (tag === 'u') next.underline = true;
             if (tag === 's' || tag === 'strike') next.strike = true;
 
+            if (tag === 'a') {
+                const href = normalizeSafeHref(element.getAttribute('href'));
+                const target = element.getAttribute('target');
+
+                if (href) {
+                    next.href = href;
+                    if (target === '_blank' || target === '_self') {
+                        next.target = target;
+                    }
+                }
+            }
+
             if (element.style?.color) next.color = element.style.color;
             if (element.style?.backgroundColor) next.background = element.style.backgroundColor;
 
@@ -390,9 +404,37 @@ export default {
                     if (item.color) style += `color:${item.color};`;
                     if (item.background) style += `background-color:${item.background};`;
 
-                    return style ? `<span style="${style}">${text}</span>` : text;
+                    if (style) {
+                        text = `<span style="${style}">${text}</span>`;
+                    }
+
+                    const href = normalizeSafeHref(item.href);
+                    if (href) {
+                        const target = item.target === '_blank' || item.target === '_self' ? ` target="${item.target}"` : '';
+                        const rel = item.target === '_blank' ? ' rel="noopener noreferrer"' : '';
+                        text = `<a href="${escapeHtml(href)}"${target}${rel}>${text}</a>`;
+                    }
+
+                    return text;
                 })
                 .join('');
+        }
+
+        function normalizeSafeHref(value: string | null | undefined): string | null {
+            if (!value) {
+                return null;
+            }
+
+            const href = value.trim();
+            if (!href || href.length > 2048 || /[\u0000-\u0020\u007f\\]/.test(href) || href.startsWith('//')) {
+                return null;
+            }
+
+            if (href.startsWith('/') || href.startsWith('#')) {
+                return href;
+            }
+
+            return /^(?:https?:\/\/|mailto:|tel:)/i.test(href) ? href : null;
         }
 
         function escapeHtml(value: string): string {
