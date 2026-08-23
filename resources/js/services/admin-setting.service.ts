@@ -10,6 +10,7 @@ import type {
     MonitoringSettingType,
     OptionSettingType,
     SeoSettingType,
+    ServiceArticlesSettingType,
     SettingApiResponse,
     SliderImageSettingType,
     SystemSettingType,
@@ -43,6 +44,12 @@ export const adminSettingService = {
     },
     updateHomepage(payload: HomepageNoticeSettingType) {
         return updateTab<HomepageNoticeSettingType>('homepage', payload);
+    },
+    getServiceArticles() {
+        return getTab<ServiceArticlesSettingType>('service-articles');
+    },
+    updateServiceArticles(payload: ServiceArticlesSettingType) {
+        return updateTab<ServiceArticlesSettingType>('service-articles', payload);
     },
     getBranding() {
         return getTab<BrandingSettingType>('branding');

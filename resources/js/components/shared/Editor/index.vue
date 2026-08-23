@@ -13,6 +13,7 @@
 </template>
 
 <script lang="ts">
+import { uploadEditorImageFile } from '@/utils/editor-image-upload';
 import Swal from 'sweetalert2';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
@@ -39,6 +40,11 @@ type EditorContentNode = {
     level?: number;
     children?: EditorInlineNode[] | EditorContentNode[];
     items?: EditorInlineNode[][];
+};
+
+type TinyMceBlobInfo = {
+    blob: () => Blob;
+    filename: () => string;
 };
 
 declare global {
@@ -142,6 +148,37 @@ export default {
             saveTimer = setTimeout(() => {
                 emitValue(value);
             }, props.debounce);
+        };
+
+        const hasPendingLocalImages = (html: string): boolean => /<img\b[^>]*\bsrc=["'](?:data:image\/|blob:)/i.test(html);
+
+        const emitCurrentEditorContent = (): void => {
+            if (!editorInstance || isApplyingExternalValue) {
+                return;
+            }
+
+            const html = editorInstance.getContent();
+            if (hasPendingLocalImages(html)) {
+                return;
+            }
+
+            emitDebounced(htmlToValue(html));
+        };
+
+        const handleImageUpload = (
+            blobInfo: TinyMceBlobInfo,
+            success: (url: string) => void,
+            failure: (message: string) => void,
+            progress?: (percent: number) => void,
+        ): void => {
+            uploadEditorImageFile(blobInfo.blob(), blobInfo.filename(), progress)
+                .then((uploadedUrl) => {
+                    success(uploadedUrl);
+                    window.setTimeout(emitCurrentEditorContent, 0);
+                })
+                .catch((error: unknown) => {
+                    failure(error instanceof Error ? error.message : 'Không thể tải ảnh lên. Vui lòng thử lại.');
+                });
         };
 
         const normalizeValue = (value: unknown): EditorContentNode[] => (Array.isArray(value) ? (value as EditorContentNode[]) : []);
@@ -494,15 +531,20 @@ export default {
                           'undo redo | formatselect | fontselect fontsizeselect | bold italic underline strikethrough | forecolor backcolor',
                           'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link emoticons | table | code fullscreen preview | removeformat',
                       ],
+                ...(props.allowImages
+                    ? {
+                          paste_data_images: true,
+                          automatic_uploads: true,
+                          images_file_types: 'jpg,jpeg,png,webp',
+                          images_reuse_filename: false,
+                          images_upload_handler: handleImageUpload,
+                      }
+                    : {}),
                 setup(editor: typeof editorInstance) {
                     editorInstance = editor;
 
                     editor.on('input change keyup undo redo', () => {
-                        if (isApplyingExternalValue) {
-                            return;
-                        }
-
-                        emitDebounced(htmlToValue(editor.getContent()));
+                        emitCurrentEditorContent();
                     });
                 },
                 init_instance_callback(editor: typeof editorInstance) {

@@ -13,11 +13,13 @@ import type {
     HomepageNoticeSettingType,
     MonitoringSettingType,
     SeoSettingType,
+    ServiceArticlesSettingType,
 } from '@/types/setting.type';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
+import { Gamepad2, Plus, Trash2 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 
-type TabKey = 'general' | 'homepage' | 'branding' | 'contact' | 'seo' | 'custom-code' | 'monitoring';
+type TabKey = 'general' | 'homepage' | 'service-articles' | 'branding' | 'contact' | 'seo' | 'custom-code' | 'monitoring';
 
 const tabs: Array<{ key: TabKey; label: string; description: string }> = [
     {
@@ -29,6 +31,11 @@ const tabs: Array<{ key: TabKey; label: string; description: string }> = [
         key: 'homepage',
         label: 'Thông báo trang chủ',
         description: 'Soạn nội dung hiển thị phía trên form nạp game trên trang chủ.',
+    },
+    {
+        key: 'service-articles',
+        label: 'Bài viết dịch vụ',
+        description: 'Bật liên kết dịch vụ game và cấu hình địa chỉ chuyển hướng trên menu client.',
     },
     {
         key: 'branding',
@@ -63,6 +70,7 @@ const loading = ref(true);
 const saving = ref<Record<TabKey, boolean>>({
     general: false,
     homepage: false,
+    'service-articles': false,
     branding: false,
     contact: false,
     seo: false,
@@ -82,6 +90,11 @@ const homepageForm = ref<HomepageNoticeSettingType>({
     home_notice_title: 'Thông báo quan trọng',
     home_notice_content: [],
     home_notice_is_published: true,
+});
+
+const serviceArticlesForm = ref<ServiceArticlesSettingType>({
+    game_service_enabled: false,
+    game_service_items: [],
 });
 
 const brandingForm = ref<BrandingSettingType>({
@@ -132,9 +145,10 @@ const loadData = async (): Promise<void> => {
     try {
         loading.value = true;
 
-        const [general, homepage, branding, contact, seo, monitoring] = await Promise.all([
+        const [general, homepage, serviceArticles, branding, contact, seo, monitoring] = await Promise.all([
             adminSettingService.getGeneral(),
             adminSettingService.getHomepage(),
+            adminSettingService.getServiceArticles(),
             adminSettingService.getBranding(),
             adminSettingService.getContact(),
             adminSettingService.getSeo(),
@@ -146,6 +160,16 @@ const loadData = async (): Promise<void> => {
             ...homepageForm.value,
             ...homepage.settings,
             home_notice_content: Array.isArray(homepage.settings.home_notice_content) ? homepage.settings.home_notice_content : [],
+        };
+        serviceArticlesForm.value = {
+            ...serviceArticlesForm.value,
+            ...serviceArticles.settings,
+            game_service_items: Array.isArray(serviceArticles.settings.game_service_items)
+                ? serviceArticles.settings.game_service_items.map((item) => ({
+                      label: String(item.label ?? ''),
+                      url: String(item.url ?? ''),
+                  }))
+                : [],
         };
         brandingForm.value = { ...brandingForm.value, ...branding.settings };
         contactForm.value = { ...contactForm.value, ...contact.settings };
@@ -197,6 +221,39 @@ const saveHomepage = async (): Promise<void> => {
         };
         handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật thông báo trang chủ.' } });
     });
+};
+
+const saveServiceArticles = async (): Promise<void> => {
+    await withSaving('service-articles', async () => {
+        const response = await adminSettingService.updateServiceArticles({
+            ...serviceArticlesForm.value,
+            game_service_items: serviceArticlesForm.value.game_service_items.map((item) => ({
+                label: item.label.trim(),
+                url: item.url.trim(),
+            })),
+        });
+        serviceArticlesForm.value = {
+            ...serviceArticlesForm.value,
+            ...response.settings,
+            game_service_items: Array.isArray(response.settings.game_service_items) ? response.settings.game_service_items : [],
+        };
+        handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật submenu dịch vụ game.' } });
+    });
+};
+
+const addServiceArticleItem = (): void => {
+    if (serviceArticlesForm.value.game_service_items.length >= 20) {
+        return;
+    }
+
+    serviceArticlesForm.value.game_service_items.push({
+        label: '',
+        url: '',
+    });
+};
+
+const removeServiceArticleItem = (index: number): void => {
+    serviceArticlesForm.value.game_service_items.splice(index, 1);
 };
 
 const saveBranding = async (): Promise<void> => {
@@ -447,6 +504,153 @@ onMounted(async () => {
                                 :class="homepageForm.home_notice_is_published ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'"
                             >
                                 {{ homepageForm.home_notice_is_published ? 'Đang hiển thị' : 'Đang ẩn' }}
+                            </span>
+                        </div>
+                    </aside>
+                </div>
+
+                <div v-show="activeTab === 'service-articles'" class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <article class="rounded-[10px] border border-slate-200 bg-white p-4">
+                        <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-900">Submenu dịch vụ game</h3>
+                                <p class="text-sm text-slate-500">Thêm từng trang dịch vụ bằng tên hiển thị và liên kết SEO tương ứng.</p>
+                            </div>
+
+                            <div class="flex flex-wrap gap-2">
+                                <button
+                                    type="button"
+                                    class="inline-flex items-center gap-2 rounded-[10px] border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 transition hover:border-indigo-300 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                    :disabled="serviceArticlesForm.game_service_items.length >= 20"
+                                    @click="addServiceArticleItem"
+                                >
+                                    <Plus class="h-4 w-4" aria-hidden="true" />
+                                    Thêm dịch vụ
+                                </button>
+                                <button
+                                    type="button"
+                                    class="rounded-[10px] bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+                                    :disabled="saving['service-articles']"
+                                    @click="saveServiceArticles"
+                                >
+                                    {{ saving['service-articles'] ? 'Đang lưu...' : 'Lưu submenu' }}
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid gap-4 pt-4">
+                            <label
+                                class="flex items-center justify-between gap-3 rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700"
+                            >
+                                <span>
+                                    <span class="block font-semibold text-slate-900">Hiển thị “Dịch vụ game” trên menu</span>
+                                    <span class="mt-1 block text-xs text-slate-500"
+                                        >Tắt để ẩn toàn bộ submenu nhưng vẫn giữ danh sách đã cấu hình.</span
+                                    >
+                                </span>
+                                <input v-model="serviceArticlesForm.game_service_enabled" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+                            </label>
+
+                            <div
+                                v-if="serviceArticlesForm.game_service_items.length === 0"
+                                class="grid min-h-40 place-items-center rounded-[10px] border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center"
+                            >
+                                <div>
+                                    <Gamepad2 class="mx-auto h-9 w-9 text-slate-300" aria-hidden="true" />
+                                    <p class="mt-3 text-sm font-semibold text-slate-700">Chưa có dịch vụ nào</p>
+                                    <p class="mt-1 text-xs leading-5 text-slate-500">Bấm “Thêm dịch vụ” để tạo liên kết đầu tiên.</p>
+                                </div>
+                            </div>
+
+                            <div v-else class="grid gap-3">
+                                <div
+                                    v-for="(item, index) in serviceArticlesForm.game_service_items"
+                                    :key="index"
+                                    class="rounded-[10px] border border-slate-200 bg-slate-50 p-3"
+                                >
+                                    <div class="mb-3 flex items-center justify-between gap-3">
+                                        <span
+                                            class="inline-flex h-7 min-w-7 items-center justify-center rounded-full bg-indigo-100 px-2 text-xs font-bold text-indigo-700"
+                                        >
+                                            {{ index + 1 }}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            class="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                                            :aria-label="`Xóa dịch vụ ${index + 1}`"
+                                            @click="removeServiceArticleItem(index)"
+                                        >
+                                            <Trash2 class="h-4 w-4" aria-hidden="true" />
+                                        </button>
+                                    </div>
+
+                                    <div class="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                                        <label class="grid gap-1">
+                                            <span class="text-xs font-semibold text-slate-600">Label dịch vụ</span>
+                                            <input
+                                                v-model="item.label"
+                                                type="text"
+                                                maxlength="80"
+                                                class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                                                placeholder="Ví dụ: Nạp Ngọc Rồng"
+                                            />
+                                        </label>
+                                        <label class="grid gap-1">
+                                            <span class="text-xs font-semibold text-slate-600">Link bài SEO/dịch vụ</span>
+                                            <input
+                                                v-model="item.url"
+                                                type="text"
+                                                maxlength="2048"
+                                                class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                                                placeholder="/bai-viet/nap-ngoc-rong"
+                                            />
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <p class="text-xs leading-5 text-slate-500">
+                                Tối đa 20 mục. Nên trỏ link nội bộ đến bài dịch vụ đã xuất bản với title, meta description, H1 và nội dung riêng để hỗ
+                                trợ SEO.
+                            </p>
+                        </div>
+                    </article>
+
+                    <aside class="rounded-[10px] border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-xs uppercase tracking-[0.18em] text-slate-400">Preview menu client</p>
+                        <div class="mt-3 rounded-[10px] border border-slate-200 bg-white p-4">
+                            <div class="flex items-center gap-2 text-sm font-semibold text-slate-900">
+                                <span class="grid h-9 w-9 place-items-center rounded-[8px] bg-indigo-50 text-indigo-600">
+                                    <Gamepad2 class="h-5 w-5" aria-hidden="true" />
+                                </span>
+                                <span>Dịch vụ game</span>
+                            </div>
+
+                            <div v-if="serviceArticlesForm.game_service_items.length > 0" class="mt-3 grid gap-1 border-l border-slate-200 pl-3">
+                                <div
+                                    v-for="(item, index) in serviceArticlesForm.game_service_items"
+                                    :key="`preview-${index}`"
+                                    class="rounded-[6px] px-2 py-1.5 text-xs text-slate-600"
+                                >
+                                    <span class="block truncate font-semibold text-slate-700">{{ item.label.trim() || `Dịch vụ ${index + 1}` }}</span>
+                                    <span class="block truncate text-slate-400">{{ item.url.trim() || 'Chưa nhập liên kết' }}</span>
+                                </div>
+                            </div>
+                            <p v-else class="mt-3 text-xs leading-5 text-slate-500">Chưa có mục con trong submenu.</p>
+
+                            <span
+                                class="mt-3 inline-flex rounded-[5px] px-2 py-1 text-xs font-semibold"
+                                :class="
+                                    serviceArticlesForm.game_service_enabled && serviceArticlesForm.game_service_items.length > 0
+                                        ? 'bg-emerald-50 text-emerald-700'
+                                        : 'bg-slate-100 text-slate-500'
+                                "
+                            >
+                                {{
+                                    serviceArticlesForm.game_service_enabled && serviceArticlesForm.game_service_items.length > 0
+                                        ? `${serviceArticlesForm.game_service_items.length} dịch vụ sẽ hiển thị`
+                                        : 'Đang ẩn'
+                                }}
                             </span>
                         </div>
                     </aside>

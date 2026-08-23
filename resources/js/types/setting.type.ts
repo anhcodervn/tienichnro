@@ -45,6 +45,16 @@ export interface HomepageNoticeSettingType {
     home_notice_is_published: boolean;
 }
 
+export interface GameServiceMenuItem {
+    label: string;
+    url: string;
+}
+
+export interface ServiceArticlesSettingType {
+    game_service_enabled: boolean;
+    game_service_items: GameServiceMenuItem[];
+}
+
 export interface BrandingSettingType {
     light_logo: string;
     dark_logo: string;

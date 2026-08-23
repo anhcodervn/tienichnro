@@ -4,6 +4,8 @@ namespace App\Features\Admin\Setting\Requests;
 
 use App\Models\User;
 use App\Rules\ValidHomepageNoticeContent;
+use App\Support\SafeNavigationUrl;
+use Closure;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -34,6 +36,22 @@ class UpdateTabSettingRequest extends FormRequest
                 'home_notice_title' => ['required', 'string', 'max:255'],
                 'home_notice_content' => ['present', 'array', new ValidHomepageNoticeContent],
                 'home_notice_is_published' => ['required', 'boolean'],
+            ],
+            'service-articles' => [
+                'game_service_enabled' => ['required', 'boolean'],
+                'game_service_items' => [
+                    'present',
+                    'array',
+                    'max:20',
+                    function (string $attribute, mixed $value, Closure $fail): void {
+                        if ($this->boolean('game_service_enabled') && is_array($value) && $value === []) {
+                            $fail('Vui lòng thêm ít nhất một dịch vụ game trước khi bật hiển thị.');
+                        }
+                    },
+                ],
+                'game_service_items.*' => ['required', 'array:label,url'],
+                'game_service_items.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
+                'game_service_items.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeServiceUrlRule()],
             ],
             'branding' => [
                 'light_logo' => ['nullable', 'string', 'max:2048'],
@@ -129,6 +147,11 @@ class UpdateTabSettingRequest extends FormRequest
             'color_primary.regex' => 'Màu chính phải đúng mã HEX.',
             'color_accent.regex' => 'Màu nhấn phải đúng mã HEX.',
             'color_surface.regex' => 'Màu nền phải đúng mã HEX.',
+            'game_service_items.max' => 'Chỉ được cấu hình tối đa 20 dịch vụ game.',
+            'game_service_items.*.label.required' => 'Vui lòng nhập tên dịch vụ.',
+            'game_service_items.*.label.max' => 'Tên dịch vụ không được vượt quá 80 ký tự.',
+            'game_service_items.*.url.required' => 'Vui lòng nhập liên kết dịch vụ.',
+            'game_service_items.*.url.distinct' => 'Liên kết dịch vụ không được trùng nhau.',
         ];
     }
 
@@ -143,6 +166,10 @@ class UpdateTabSettingRequest extends FormRequest
             'site_description' => 'mô tả hệ thống',
             'site_active' => 'trạng thái website',
             'allow_register' => 'trạng thái đăng ký',
+            'game_service_enabled' => 'trạng thái dịch vụ game',
+            'game_service_items' => 'danh sách dịch vụ game',
+            'game_service_items.*.label' => 'tên dịch vụ',
+            'game_service_items.*.url' => 'liên kết dịch vụ',
             'light_logo' => 'logo nền tối',
             'dark_logo' => 'logo nền sáng',
             'favicon' => 'favicon',
@@ -177,5 +204,45 @@ class UpdateTabSettingRequest extends FormRequest
                 'errors' => $validator->errors(),
             ],
         ], 422));
+    }
+
+    protected function prepareForValidation(): void
+    {
+        if ((string) $this->route('tab') !== 'service-articles' || ! $this->exists('game_service_items')) {
+            return;
+        }
+
+        $items = $this->input('game_service_items');
+
+        if (! is_array($items)) {
+            return;
+        }
+
+        $this->merge([
+            'game_service_items' => array_map(static function (mixed $item): mixed {
+                if (! is_array($item)) {
+                    return $item;
+                }
+
+                return [
+                    ...$item,
+                    'label' => is_string($item['label'] ?? null) ? trim($item['label']) : ($item['label'] ?? null),
+                    'url' => is_string($item['url'] ?? null) ? trim($item['url']) : ($item['url'] ?? null),
+                ];
+            }, $items),
+        ]);
+    }
+
+    private function safeServiceUrlRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+
+            if (! SafeNavigationUrl::passes($value)) {
+                $fail('Liên kết dịch vụ game phải là URL http/https hoặc đường dẫn nội bộ bắt đầu bằng /.');
+            }
+        };
     }
 }

@@ -16,6 +16,8 @@
         $shareImage = $shareImage !== '' && ! \Illuminate\Support\Str::startsWith($shareImage, ['http://', 'https://'])
             ? url($shareImage)
             : $shareImage;
+        $gameServiceItems = is_array($settings['game_service_items'] ?? null) ? $settings['game_service_items'] : [];
+        $showGameServiceMenu = ($settings['game_service_enabled'] ?? false) === true && $gameServiceItems !== [];
     @endphp
     <title>{{ $title }}{{ $title !== $siteName ? ' | '.$siteName : '' }}</title>
     <meta name="description" content="{{ $description }}">
@@ -59,11 +61,31 @@
                     <span class="truncate font-extrabold tracking-tight text-slate-950">{{ $siteName }}</span>
                 @endif
             </a>
-            <nav class="hidden items-center gap-6 text-sm font-semibold text-slate-700 lg:flex" aria-label="Điều hướng chính">
+            <nav class="hidden items-center gap-3 text-xs font-semibold text-slate-700 lg:flex xl:gap-6 xl:text-sm" aria-label="Điều hướng chính">
                 <a @class(['inline-flex items-center gap-1.5', 'text-emerald-700' => request()->routeIs('home'), 'hover:text-emerald-700' => ! request()->routeIs('home')]) href="{{ route('home') }}" @if (request()->routeIs('home')) aria-current="page" @endif><i class="bx bx-home-alt-2 text-lg" aria-hidden="true"></i><span>Trang chủ</span></a>
                 <a @class(['inline-flex items-center gap-1.5', 'text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i><span>Nạp tiền</span></a>
                 <a @class(['inline-flex items-center gap-1.5', 'text-emerald-700' => request()->routeIs('orders.*'), 'hover:text-emerald-700' => ! request()->routeIs('orders.*')]) href="{{ route('orders.lookup') }}" @if (request()->routeIs('orders.*')) aria-current="page" @endif><i class="bx bx-search text-lg" aria-hidden="true"></i><span>Tra cứu đơn nạp</span></a>
                 <a @class(['inline-flex items-center gap-1.5', 'text-emerald-700' => request()->routeIs('seo.*'), 'hover:text-emerald-700' => ! request()->routeIs('seo.*')]) href="{{ route('seo.index') }}" @if (request()->routeIs('seo.*')) aria-current="page" @endif><i class="bx bx-news text-lg" aria-hidden="true"></i><span>Bài viết</span></a>
+                @if ($showGameServiceMenu)
+                    <details class="group relative" data-game-service-menu>
+                        <summary class="flex cursor-pointer list-none items-center gap-1.5 rounded-[5px] py-2 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden">
+                            <i class="bx bx-game text-lg" aria-hidden="true"></i>
+                            <span>Dịch vụ game</span>
+                            <i class="bx bx-chevron-down text-base transition-transform group-open:rotate-180" aria-hidden="true"></i>
+                        </summary>
+                        <div class="absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 rounded-[10px] border border-slate-200 bg-white p-2 shadow-xl">
+                            <p class="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Chọn dịch vụ</p>
+                            <div class="grid gap-1">
+                                @foreach ($gameServiceItems as $gameServiceItem)
+                                    <a class="flex items-center justify-between gap-3 rounded-[8px] px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700" href="{{ $gameServiceItem['url'] }}" data-game-service-link>
+                                        <span>{{ $gameServiceItem['label'] }}</span>
+                                        <i class="bx bx-right-arrow-alt text-lg text-slate-400" aria-hidden="true"></i>
+                                    </a>
+                                @endforeach
+                            </div>
+                        </div>
+                    </details>
+                @endif
             </nav>
             <div class="hidden items-center gap-2 lg:flex">
                 @auth
@@ -166,6 +188,23 @@
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-xl" aria-hidden="true"></i><span>Nạp tiền</span></a>
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('orders.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('orders.*')]) href="{{ route('orders.lookup') }}" @if (request()->routeIs('orders.*')) aria-current="page" @endif><i class="bx bx-search text-xl" aria-hidden="true"></i><span>Tra cứu đơn nạp</span></a>
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('seo.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('seo.*')]) href="{{ route('seo.index') }}" @if (request()->routeIs('seo.*')) aria-current="page" @endif><i class="bx bx-news text-xl" aria-hidden="true"></i><span>Bài viết</span></a>
+                    @if ($showGameServiceMenu)
+                        <details class="group rounded-[8px] border border-slate-200 bg-slate-50" data-game-service-menu>
+                            <summary class="flex cursor-pointer list-none items-center gap-3 rounded-[8px] px-4 py-3 text-sm font-semibold text-slate-700 transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden">
+                                <i class="bx bx-game text-xl" aria-hidden="true"></i>
+                                <span class="flex-1">Dịch vụ game</span>
+                                <i class="bx bx-chevron-down text-xl transition-transform group-open:rotate-180" aria-hidden="true"></i>
+                            </summary>
+                            <div class="grid gap-1 border-t border-slate-200 bg-white p-2">
+                                @foreach ($gameServiceItems as $gameServiceItem)
+                                    <a data-menu-item class="flex items-center gap-3 rounded-[6px] px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700" href="{{ $gameServiceItem['url'] }}" data-game-service-link>
+                                        <i class="bx bx-subdirectory-right text-lg text-slate-400" aria-hidden="true"></i>
+                                        <span>{{ $gameServiceItem['label'] }}</span>
+                                    </a>
+                                @endforeach
+                            </div>
+                        </details>
+                    @endif
                 </div>
             </nav>
 

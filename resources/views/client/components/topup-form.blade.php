@@ -234,10 +234,10 @@
                 @foreach ($games as $game)
                     @php
                         $checkoutFields = collect($game->checkoutFields());
-                        $fieldLabels = $checkoutFields->pluck('label')->push('Số lượng')->implode(' | ');
+                        $fieldLabels = $checkoutFields->pluck('label')->push('Số lượng thẻ')->implode(' | ');
                         $fieldPlaceholders = $checkoutFields
                             ->map(fn ($field) => filled($field['placeholder'] ?? null) ? $field['placeholder'] : $field['label'])
-                            ->push('Số lượng')
+                            ->push('Số lượng thẻ')
                             ->implode('|');
                     @endphp
                     <p class="home-bulk-schema" data-bulk-schema="{{ $game->id }}" data-bulk-placeholder="{{ $fieldPlaceholders }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
@@ -257,8 +257,9 @@
                 >{{ old('bulk_recipients') }}</textarea>
                 <div class="home-bulk-summary">
                     <span>Dòng trống được bỏ qua.</span>
-                    <strong><span data-bulk-account-count>{{ $initialBulkRecipientCount }}</span> tài khoản · Tổng số lượng: <span data-bulk-count>{{ $initialBulkQuantity }}</span></strong>
+                    <strong><span data-bulk-account-count>{{ $initialBulkRecipientCount }}</span> tài khoản · Tổng số thẻ: <span data-bulk-count>{{ $initialBulkQuantity }}</span></strong>
                 </div>
+                <p class="home-field-error" data-bulk-format-error role="alert" aria-live="polite" hidden></p>
                 @error('bulk_recipients')<p class="home-field-error">{{ $message }}</p>@enderror
             </div>
 
@@ -276,7 +277,7 @@
             <h2 id="order-summary-title" class="flex items-center gap-2"><i class="bx bx-receipt text-xl text-cyan-700" aria-hidden="true"></i>Tóm tắt đơn</h2>
             <dl class="home-summary-list">
                 <div><dt>Gói nạp</dt><dd data-summary-package>{{ $initialPackage?->denomination ? number_format($initialPackage->denomination, 0, ',', '.').'đ' : ($initialPackage?->name ?? 'Chưa chọn') }}</dd></div>
-                <div><dt>Số lượng</dt><dd data-summary-quantity>{{ $initialQuantity }}</dd></div>
+                <div><dt data-summary-quantity-label>{{ $initialPurchaseMode === 'bulk' ? 'Tổng số thẻ' : 'Số lượng thẻ' }}</dt><dd data-summary-quantity>{{ $initialQuantity }}</dd></div>
                 <div><dt>Giá gốc</dt><dd data-summary-original>{{ number_format($initialOriginalTotal, 0, ',', '.') }}đ</dd></div>
                 <div class="home-summary-discount"><dt>Chiết khấu</dt><dd data-order-discount>-{{ number_format($initialDiscountTotal, 0, ',', '.') }}đ</dd></div>
                 <div class="home-summary-total"><dt>Thanh toán</dt><dd data-order-total>{{ number_format($initialPaymentTotal, 0, ',', '.') }}đ</dd></div>

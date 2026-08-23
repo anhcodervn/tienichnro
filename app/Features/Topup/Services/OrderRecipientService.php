@@ -85,28 +85,35 @@ class OrderRecipientService
             ->map(function (string $line, int $index) use ($fields): array {
                 $values = explode('|', $line);
                 $expectedColumnCount = count($fields) + 1;
+                $accountIdentifier = trim((string) ($values[0] ?? ''));
 
-                if (count($values) !== $expectedColumnCount) {
-                    $labels = collect($fields)->pluck('label')->push('Số lượng')->implode(' | ');
-
+                if (! str_contains($line, '|') || $accountIdentifier === '') {
                     throw ValidationException::withMessages([
-                        'bulk_recipients' => 'Dòng '.($index + 1)." phải có đúng {$expectedColumnCount} cột theo thứ tự: {$labels}.",
+                        'bulk_recipients' => $this->invalidBulkFormatMessage($accountIdentifier, $index + 1),
+                    ]);
+                }
+
+                if (count($values) > $expectedColumnCount) {
+                    throw ValidationException::withMessages([
+                        'bulk_recipients' => $this->invalidBulkFormatMessage($accountIdentifier, $index + 1),
                     ]);
                 }
 
                 $quantityValue = trim((string) array_pop($values));
                 if (preg_match('/^[1-9]\d*$/D', $quantityValue) !== 1) {
                     throw ValidationException::withMessages([
-                        'bulk_recipients' => 'Số lượng ở dòng '.($index + 1).' phải là số nguyên lớn hơn 0.',
+                        'bulk_recipients' => $this->invalidBulkFormatMessage($accountIdentifier, $index + 1),
                     ]);
                 }
 
                 $quantity = (int) $quantityValue;
                 if ($quantity > self::MAX_QUANTITY_PER_RECIPIENT) {
                     throw ValidationException::withMessages([
-                        'bulk_recipients' => 'Số lượng ở dòng '.($index + 1).' không được vượt quá '.self::MAX_QUANTITY_PER_RECIPIENT.'.',
+                        'bulk_recipients' => 'Số lượng thẻ ở dòng '.($index + 1).' không được vượt quá '.self::MAX_QUANTITY_PER_RECIPIENT.'.',
                     ]);
                 }
+
+                $values = array_pad($values, count($fields), '');
 
                 return [
                     'data' => $this->normalizeRecipient(
@@ -119,6 +126,13 @@ class OrderRecipientService
                 ];
             })
             ->all();
+    }
+
+    private function invalidBulkFormatMessage(string $accountIdentifier, int $lineNumber): string
+    {
+        $identifier = $accountIdentifier !== '' ? Str::limit($accountIdentifier, 80, '…') : 'ở dòng '.$lineNumber;
+
+        return "Tài khoản {$identifier} định dạng không hợp lệ. Vui lòng nhập đúng định dạng param|số lượng.";
     }
 
     /**

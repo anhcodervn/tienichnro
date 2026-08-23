@@ -82,6 +82,36 @@ test('the9p submission uses a stable request id and queues status synchronizatio
     Queue::assertPushed(SyncTopupRecipientStatus::class, 2);
 });
 
+test('multiple recipients submit once each with the same selected denomination', function (): void {
+    [$order, $firstRecipient] = the9pOrderFixture(['quantity' => 1]);
+    $secondRecipient = $order->recipients()->create([
+        'position' => 2,
+        'recipient_data' => ['game_account' => 'player-two'],
+        'quantity' => 1,
+    ]);
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::sequence()
+            ->push(['status' => 'success', 'data' => ['order_code' => 'THE9P-MULTI-1', 'status' => 'pending']])
+            ->push(['status' => 'success', 'data' => ['order_code' => 'THE9P-MULTI-2', 'status' => 'pending']]),
+    ]);
+
+    $fulfillmentService = app(RecipientFulfillmentService::class);
+    $fulfillmentService->submit($firstRecipient->id);
+    $fulfillmentService->submit($secondRecipient->id);
+
+    $topupRequests = Http::recorded()
+        ->map(fn (array $record): array => $record[0]->data())
+        ->values();
+
+    expect($topupRequests)->toHaveCount(2)
+        ->and($topupRequests->pluck('amount')->all())->toBe([10000, 10000])
+        ->and($topupRequests->pluck('account_info.username')->all())->toBe(['player-one', 'player-two'])
+        ->and($topupRequests->pluck('request_id')->all())->toBe([
+            $order->code.'-R001',
+            $order->code.'-R002',
+        ]);
+});
+
 test('provider status completion updates recipient and parent order then queues email', function (): void {
     [$order, $recipient] = the9pOrderFixture([
         'quantity' => 1,

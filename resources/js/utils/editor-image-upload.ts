@@ -1,4 +1,4 @@
-import api from "@/config/axios";
+import api from '@/config/axios';
 
 type EditorInlineNode = {
     text?: string;
@@ -25,7 +25,7 @@ type EditorContentNode = {
 };
 
 const isBase64ImageSource = (src: unknown): src is string => {
-    return typeof src === "string" && src.startsWith("data:image/");
+    return typeof src === 'string' && src.startsWith('data:image/');
 };
 
 const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
@@ -35,17 +35,12 @@ const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
 
 const convertBlobToWebp = (blob: Blob): Promise<Blob> => {
     return new Promise((resolve) => {
-        if (blob.type === "image/webp") {
-            resolve(blob);
-            return;
-        }
-
         const img = new Image();
         const objectUrl = URL.createObjectURL(blob);
 
         img.onload = () => {
-            const canvas = document.createElement("canvas");
-            const context = canvas.getContext("2d");
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
 
             if (!context) {
                 URL.revokeObjectURL(objectUrl);
@@ -65,7 +60,7 @@ const convertBlobToWebp = (blob: Blob): Promise<Blob> => {
                     URL.revokeObjectURL(objectUrl);
                     resolve(webpBlob ?? blob);
                 },
-                "image/webp",
+                'image/webp',
                 0.82,
             );
         };
@@ -79,13 +74,78 @@ const convertBlobToWebp = (blob: Blob): Promise<Blob> => {
     });
 };
 
-const dataUrlToFile = async (dataUrl: string, name: string): Promise<File> => {
-    const sourceBlob = await dataUrlToBlob(dataUrl);
-    const optimizedBlob = await convertBlobToWebp(sourceBlob);
+const extensionForMimeType = (mimeType: string): string => {
+    if (mimeType === 'image/jpeg') {
+        return 'jpg';
+    }
 
-    return new File([optimizedBlob], name, {
-        type: optimizedBlob.type || "image/webp",
+    if (mimeType === 'image/png') {
+        return 'png';
+    }
+
+    return 'webp';
+};
+
+const uploadErrorMessage = (error: unknown): string => {
+    if (typeof error === 'object' && error !== null && 'response' in error) {
+        const response = (error as { response?: { data?: { message?: unknown } } }).response;
+        const message = response?.data?.message;
+
+        if (typeof message === 'string' && message.trim() !== '') {
+            return message;
+        }
+    }
+
+    if (error instanceof Error && error.message.trim() !== '') {
+        return error.message;
+    }
+
+    return 'Không thể tải ảnh lên. Vui lòng thử lại.';
+};
+
+export const uploadEditorImageFile = async (
+    sourceBlob: Blob,
+    originalName = 'editor-image',
+    progress?: (percent: number) => void,
+): Promise<string> => {
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(sourceBlob.type)) {
+        throw new Error('Chỉ hỗ trợ ảnh JPG, PNG hoặc WebP.');
+    }
+
+    if (sourceBlob.size > 10 * 1024 * 1024) {
+        throw new Error('Ảnh tải lên không được vượt quá 10 MB.');
+    }
+
+    const optimizedBlob = await convertBlobToWebp(sourceBlob);
+    const extension = extensionForMimeType(optimizedBlob.type);
+    const basename = (originalName.replace(/\.[^.]+$/, '').trim() || 'editor-image').slice(0, 120);
+    const file = new File([optimizedBlob], `${basename}.${extension}`, {
+        type: optimizedBlob.type || 'image/webp',
     });
+    const formData = new FormData();
+
+    formData.append('image', file);
+    formData.append('name', basename);
+
+    try {
+        const response = await api.post('/api/uploads/image', formData, {
+            onUploadProgress: (event) => {
+                if (progress && event.total) {
+                    progress(Math.round((event.loaded / event.total) * 100));
+                }
+            },
+        });
+
+        const uploadedUrl = response.data?.data?.url;
+
+        if (typeof uploadedUrl !== 'string' || uploadedUrl === '') {
+            throw new Error('Không nhận được URL ảnh sau khi tải lên.');
+        }
+
+        return uploadedUrl;
+    } catch (error) {
+        throw new Error(uploadErrorMessage(error));
+    }
 };
 
 const uploadEditorImage = async (dataUrl: string, cache: Map<string, string>): Promise<string> => {
@@ -95,24 +155,8 @@ const uploadEditorImage = async (dataUrl: string, cache: Map<string, string>): P
         return cachedUrl;
     }
 
-    const file = await dataUrlToFile(dataUrl, `editor-image-${Date.now()}.webp`);
-    const formData = new FormData();
-
-    formData.append("image", file);
-    formData.append("name", "editor-image");
-
-    const response = await api.post("/api/uploads/image", formData, {
-        headers: {
-            "Content-Type": "multipart/form-data",
-        },
-    });
-
-    const uploadedUrl = response.data?.data?.url;
-
-    if (typeof uploadedUrl !== "string" || uploadedUrl === "") {
-        throw new Error("Không nhận được URL ảnh sau khi upload.");
-    }
-
+    const sourceBlob = await dataUrlToBlob(dataUrl);
+    const uploadedUrl = await uploadEditorImageFile(sourceBlob, `editor-image-${Date.now()}`);
     cache.set(dataUrl, uploadedUrl);
 
     return uploadedUrl;
@@ -129,13 +173,11 @@ const transformNode = async (node: EditorContentNode, cache: Map<string, string>
 
     if (Array.isArray(clonedNode.children) && clonedNode.children.length > 0) {
         const looksLikeContentNodes = clonedNode.children.some(
-            (child) => typeof child === "object" && child !== null && ("type" in child || "src" in child || "children" in child),
+            (child) => typeof child === 'object' && child !== null && ('type' in child || 'src' in child || 'children' in child),
         );
 
         if (looksLikeContentNodes) {
-            clonedNode.children = await Promise.all(
-                (clonedNode.children as EditorContentNode[]).map((child) => transformNode(child, cache)),
-            );
+            clonedNode.children = await Promise.all((clonedNode.children as EditorContentNode[]).map((child) => transformNode(child, cache)));
         }
     }
 

@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\User;
+use App\Support\SafeNavigationUrl;
 use App\Support\SettingStore;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\View as ViewFacade;
@@ -32,6 +33,9 @@ class SharedViewServiceProvider extends ServiceProvider
                 'color_primary' => '#0F172A',
                 'color_accent' => '#2563EB',
                 'color_surface' => '#F8FAFC',
+                'game_service_enabled' => false,
+                'game_service_items' => [],
+                'game_service_url' => '',
                 'custom_css' => '',
                 'custom_css_enabled' => false,
                 'custom_js' => '',
@@ -43,6 +47,16 @@ class SharedViewServiceProvider extends ServiceProvider
                 'custom_js',
                 'custom_js_enabled',
             ]);
+            $gameServiceItems = $this->normalizeGameServiceItems($storedSettings['game_service_items']);
+
+            if ($gameServiceItems === [] && SafeNavigationUrl::passes($storedSettings['game_service_url'])) {
+                $gameServiceItems = [[
+                    'label' => 'Dịch vụ game',
+                    'url' => $storedSettings['game_service_url'],
+                ]];
+            }
+
+            $sharedSettings['game_service_items'] = $gameServiceItems;
             $viewSettings = $view->getData()['systemSettings'] ?? [];
             $user = auth()->user();
 
@@ -65,11 +79,44 @@ class SharedViewServiceProvider extends ServiceProvider
             $view->with('systemSettings', [
                 ...$sharedSettings,
                 ...(is_array($viewSettings) ? $viewSettings : []),
+                'game_service_items' => $gameServiceItems,
             ]);
             $view->with('customCodeAssets', [
                 'css' => $storedSettings['custom_css_enabled'] === true && $storedSettings['custom_css'] !== '',
                 'js' => $storedSettings['custom_js_enabled'] === true && $storedSettings['custom_js'] !== '',
             ]);
         });
+    }
+
+    /**
+     * @return array<int, array{label: string, url: string}>
+     */
+    private function normalizeGameServiceItems(mixed $items): array
+    {
+        if (! is_array($items)) {
+            return [];
+        }
+
+        return collect($items)
+            ->filter(function (mixed $item): bool {
+                if (! is_array($item)) {
+                    return false;
+                }
+
+                $label = $item['label'] ?? null;
+
+                return is_string($label)
+                    && trim($label) !== ''
+                    && mb_strlen(trim($label)) <= 80
+                    && preg_match('/[\x00-\x1F\x7F]/u', $label) !== 1
+                    && SafeNavigationUrl::passes($item['url'] ?? null);
+            })
+            ->take(20)
+            ->map(fn (array $item): array => [
+                'label' => trim($item['label']),
+                'url' => trim($item['url']),
+            ])
+            ->values()
+            ->all();
     }
 }

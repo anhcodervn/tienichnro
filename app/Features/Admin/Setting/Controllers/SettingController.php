@@ -33,6 +33,10 @@ class SettingController extends Controller
                 'home_notice_content' => [],
                 'home_notice_is_published' => true,
             ],
+            'service-articles' => [
+                'game_service_enabled' => false,
+                'game_service_items' => [],
+            ],
             'branding' => [
                 'light_logo' => '',
                 'dark_logo' => '',
@@ -178,6 +182,10 @@ class SettingController extends Controller
                 'home_notice_title' => 'home_notice_title',
                 'home_notice_content' => 'home_notice_content',
                 'home_notice_is_published' => 'home_notice_is_published',
+            ],
+            'service-articles' => [
+                'game_service_enabled' => 'game_service_enabled',
+                'game_service_items' => 'game_service_items',
             ],
             'branding' => [
                 'light_logo' => 'light_logo',

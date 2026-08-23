@@ -145,8 +145,8 @@ test('home renders the checkout fields configured for each game', function (): v
         ->assertSee('name="recipient_fields[player_id]"', false)
         ->assertSee('name="recipient_fields[zone]"', false)
         ->assertSee('Mỗi dòng theo thứ tự:', false)
-        ->assertSee('ID người chơi | Khu vực | Số lượng')
-        ->assertSee('data-bulk-placeholder="Nhập ID số|Ví dụ: Asia|Số lượng"', false);
+        ->assertSee('ID người chơi | Khu vực | Số lượng thẻ')
+        ->assertSee('data-bulk-placeholder="Nhập ID số|Ví dụ: Asia|Số lượng thẻ"', false);
 });
 
 function topupCatalog(array $packageAttributes = []): array
@@ -404,12 +404,12 @@ test('order detail supports legacy recipients and prioritizes failure support', 
         ->assertDontSee('Thanh toán đơn hàng');
 });
 
-test('bulk checkout derives quantity and total from valid recipient lines', function (): void {
+test('bulk checkout derives quantity and total from recipient card quantities', function (): void {
     [$game, $server, $package] = topupCatalog();
 
     $response = $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
         'purchase_mode' => 'bulk',
-        'bulk_recipients' => "account-1|hero-1|2\r\n\r\naccount-2|hero-2|3\naccount-3||1",
+        'bulk_recipients' => "account-1|hero-1|2\r\n\r\naccount-2|hero-2|3\naccount-3|1",
         'quantity' => 1,
         'single_quantity' => 1,
         'recipient_fields' => ['game_account' => 'forged-account'],
@@ -442,7 +442,7 @@ test('bulk checkout rejects malformed rows and rolls back the order', function (
     $this->from(route('topup.game', $game))
         ->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
             'purchase_mode' => 'bulk',
-            'bulk_recipients' => "valid-account|hero|1\nmissing-second-column|1",
+            'bulk_recipients' => "valid-account|hero|1\n|missing-account|1",
         ]))
         ->assertRedirect(route('topup.game', $game))
         ->assertSessionHasErrors('bulk_recipients');
@@ -450,7 +450,24 @@ test('bulk checkout rejects malformed rows and rolls back the order', function (
     expect(Order::query()->count())->toBe(0);
 });
 
-test('bulk checkout rejects an invalid quantity column', function (string $quantity): void {
+test('bulk checkout rejects an account line without the quantity delimiter', function (): void {
+    [$game, $server, $package] = topupCatalog();
+
+    $this->from(route('topup.game', $game))
+        ->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+            'purchase_mode' => 'bulk',
+            'bulk_recipients' => "valid-account|hero|2\naccount-without-quantity",
+        ]))
+        ->assertRedirect(route('topup.game', $game))
+        ->assertSessionHasErrors([
+            'bulk_recipients' => 'Tài khoản account-without-quantity định dạng không hợp lệ. Vui lòng nhập đúng định dạng param|số lượng.',
+        ]);
+
+    expect(Order::query()->count())->toBe(0)
+        ->and(OrderRecipient::query()->count())->toBe(0);
+});
+
+test('bulk checkout rejects an invalid card quantity', function (string $quantity): void {
     [$game, $server, $package] = topupCatalog();
 
     $this->from(route('topup.game', $game))
@@ -464,7 +481,7 @@ test('bulk checkout rejects an invalid quantity column', function (string $quant
     expect(Order::query()->count())->toBe(0);
 })->with(['zero' => '0', 'negative' => '-1', 'decimal' => '1.5', 'text' => 'abc', 'over per-account limit' => '101']);
 
-test('bulk checkout applies the package limit to the sum of recipient quantities', function (): void {
+test('bulk checkout applies the package limit to the sum of card quantities', function (): void {
     [$game, $server, $package] = topupCatalog();
 
     $this->from(route('topup.game', $game))

@@ -469,6 +469,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
     const bulkRecipients = form.querySelector('[data-bulk-recipients]');
     const bulkAccountCount = form.querySelector('[data-bulk-account-count]');
     const bulkCount = form.querySelector('[data-bulk-count]');
+    const bulkFormatError = form.querySelector('[data-bulk-format-error]');
     const singleQuantity = form.querySelector('[data-single-quantity]');
     const quantityDecrease = form.querySelector('[data-quantity-decrease]');
     const quantityIncrease = form.querySelector('[data-quantity-increase]');
@@ -477,6 +478,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
     const total = form.querySelector('[data-order-total]');
     const discount = form.querySelector('[data-order-discount]');
     const summaryPackage = form.querySelector('[data-summary-package]');
+    const summaryQuantityLabel = form.querySelector('[data-summary-quantity-label]');
     const summaryQuantity = form.querySelector('[data-summary-quantity]');
     const summaryOriginal = form.querySelector('[data-summary-original]');
     const summaryRewards = form.querySelector('[data-summary-rewards]');
@@ -597,17 +599,53 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
 
     const countBulkRecipients = () => {
         const lines = (bulkRecipients?.value || '').split(/\r\n|\r|\n/).filter((line) => line.trim() !== '');
-        const quantity = lines.reduce((totalQuantity, line) => {
+        const activeSchema = bulkSchemas.find((schema) => !schema.hidden);
+        const maximumColumnCount = (activeSchema?.dataset.bulkPlaceholder || '').split('|').filter(Boolean).length;
+        let quantity = 0;
+        let validAccountCount = 0;
+        let firstInvalidLine = 0;
+        let firstInvalidAccount = '';
+
+        lines.forEach((line, index) => {
             const values = line.split('|');
-            const value = values[values.length - 1]?.trim() || '';
+            const account = values[0]?.trim() || '';
+            const quantityValue = values[values.length - 1]?.trim() || '';
+            const parsedQuantity = Number(quantityValue);
+            const hasValidFormat =
+                line.includes('|') &&
+                account !== '' &&
+                /^[1-9]\d*$/.test(quantityValue) &&
+                parsedQuantity <= 100 &&
+                (maximumColumnCount === 0 || values.length <= maximumColumnCount);
 
-            return /^[1-9]\d*$/.test(value) ? totalQuantity + Number(value) : totalQuantity;
-        }, 0);
+            if (!hasValidFormat) {
+                if (firstInvalidLine === 0) {
+                    firstInvalidLine = index + 1;
+                    firstInvalidAccount = account || `ở dòng ${index + 1}`;
+                }
 
-        if (bulkAccountCount) bulkAccountCount.textContent = String(lines.length);
-        if (bulkCount) bulkCount.textContent = String(quantity);
+                return;
+            }
 
-        return quantity;
+            validAccountCount += 1;
+            quantity += parsedQuantity;
+        });
+
+        const hasInvalidRows = firstInvalidLine > 0;
+        const formatMessage = hasInvalidRows
+            ? `Tài khoản ${firstInvalidAccount} định dạng không hợp lệ. Vui lòng nhập đúng định dạng param|số lượng.`
+            : '';
+
+        if (bulkAccountCount) bulkAccountCount.textContent = String(validAccountCount);
+        if (bulkCount) bulkCount.textContent = hasInvalidRows ? '—' : String(quantity);
+        if (bulkFormatError) {
+            bulkFormatError.textContent = formatMessage;
+            bulkFormatError.hidden = !hasInvalidRows;
+        }
+        bulkRecipients?.setCustomValidity(formatMessage);
+        bulkRecipients?.setAttribute('aria-invalid', String(hasInvalidRows));
+
+        return { quantity, hasInvalidRows, firstInvalidLine };
     };
 
     const syncPaymentMethod = (paymentTotal, hasPackage) => {
@@ -635,24 +673,27 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         const option = topupPackage?.selectedOptions[0];
         const price = Number(option?.dataset.price || 0);
         const originalPrice = Number(option?.dataset.original || price);
-        const count = purchaseMode?.value === 'bulk' ? countBulkRecipients() : Math.max(1, Number(singleQuantity?.value || 1));
+        const bulkResult = purchaseMode?.value === 'bulk' ? countBulkRecipients() : { quantity: 0, hasInvalidRows: false, firstInvalidLine: 0 };
+        const count =
+            purchaseMode?.value === 'bulk' ? (bulkResult.hasInvalidRows ? 0 : bulkResult.quantity) : Math.max(1, Number(singleQuantity?.value || 1));
         const originalTotal = originalPrice * count;
         const paymentTotal = price * count;
         const discountTotal = Math.max(0, originalTotal - paymentTotal);
         const hasPackage = Boolean(topupPackage?.value);
-        const rewardAmount = Number(option?.dataset.reward || 0) * count;
-        const rewardX2Amount = Number(option?.dataset.rewardX2 || 0) * count;
-        const rewardX3Amount = Number(option?.dataset.rewardX3 || 0) * count;
         const rewardLabel = option?.dataset.rewardLabel || 'Thực nhận';
         const minimum = Number(option?.dataset.min || 1);
         const maximum = Number(option?.dataset.max || 100);
         const hasServer = Boolean(server?.value);
-        const canSubmit = hasServer && hasPackage && count >= minimum && count <= maximum;
+        const canSubmit = hasServer && hasPackage && !bulkResult.hasInvalidRows && count >= minimum && count <= maximum;
         const packageLabel = option?.dataset.denomination ? formatMoney(Number(option.dataset.denomination)) : option?.dataset.name || 'Chưa chọn';
+        const rewardAmount = Number(option?.dataset.reward || 0) * count;
+        const rewardX2Amount = Number(option?.dataset.rewardX2 || 0) * count;
+        const rewardX3Amount = Number(option?.dataset.rewardX3 || 0) * count;
 
         if (total) total.textContent = formatMoney(paymentTotal);
         if (discount) discount.textContent = `-${formatMoney(discountTotal)}`;
         if (summaryPackage) summaryPackage.textContent = hasPackage ? packageLabel : 'Chưa chọn';
+        if (summaryQuantityLabel) summaryQuantityLabel.textContent = purchaseMode?.value === 'bulk' ? 'Tổng số thẻ' : 'Số lượng thẻ';
         if (summaryQuantity) summaryQuantity.textContent = String(count);
         if (summaryOriginal) summaryOriginal.textContent = formatMoney(originalTotal);
         syncPaymentMethod(paymentTotal, hasPackage);
@@ -676,11 +717,13 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
                 ? 'CHỌN MÁY CHỦ'
                 : !hasPackage
                   ? 'CHỌN GÓI NẠP'
-                  : canSubmit
-                    ? `NẠP NGAY ${formatMoney(paymentTotal)}`
-                    : count === 0
-                      ? 'NHẬP DANH SÁCH TÀI KHOẢN'
-                      : 'KIỂM TRA SỐ LƯỢNG';
+                  : bulkResult.hasInvalidRows
+                    ? `KIỂM TRA DÒNG ${bulkResult.firstInvalidLine}`
+                    : canSubmit
+                      ? `NẠP NGAY ${formatMoney(paymentTotal)}`
+                      : count === 0
+                        ? 'NHẬP DANH SÁCH TÀI KHOẢN'
+                        : 'KIỂM TRA SỐ LƯỢNG';
         }
 
         playAnimation(
@@ -738,6 +781,11 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         if (bulkRecipients) {
             bulkRecipients.disabled = mode !== 'bulk';
             bulkRecipients.required = mode === 'bulk';
+            if (mode !== 'bulk') {
+                bulkRecipients.setCustomValidity('');
+                bulkRecipients.setAttribute('aria-invalid', 'false');
+                if (bulkFormatError) bulkFormatError.hidden = true;
+            }
         }
         serverPickers.forEach((picker) => {
             const active = picker.dataset.serverPicker === mode;

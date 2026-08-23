@@ -67,3 +67,28 @@ test('tinymce preserves safe links through its json conversion', function (): vo
         ->toContain("href.startsWith('//')")
         ->toContain('/^(?:https?:\\/\\/|mailto:|tel:)/i');
 });
+
+test('tinymce uploads pasted and dropped images as optimized webp files', function (): void {
+    $projectRoot = dirname(__DIR__, 2);
+    $editor = file_get_contents($projectRoot.'/resources/js/components/shared/Editor/index.vue');
+    $uploader = file_get_contents($projectRoot.'/resources/js/utils/editor-image-upload.ts');
+
+    expect($editor)
+        ->toContain("import { uploadEditorImageFile } from '@/utils/editor-image-upload';")
+        ->toContain('paste_data_images: true')
+        ->toContain('automatic_uploads: true')
+        ->toContain("images_file_types: 'jpg,jpeg,png,webp'")
+        ->toContain('images_upload_handler: handleImageUpload')
+        ->toContain('uploadEditorImageFile(blobInfo.blob(), blobInfo.filename(), progress)')
+        ->toContain('hasPendingLocalImages(html)')
+        ->toContain('(?:data:image\\/|blob:)');
+
+    expect($uploader)
+        ->toContain('export const uploadEditorImageFile = async')
+        ->toContain('convertBlobToWebp(sourceBlob)')
+        ->toContain("'image/webp'")
+        ->toContain('0.82')
+        ->toContain('const maxDimension = 1800')
+        ->toContain('formData.append')
+        ->toContain('onUploadProgress');
+});
