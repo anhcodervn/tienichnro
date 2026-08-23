@@ -66,7 +66,8 @@ Route::controller(PublicContentPageController::class)->group(function (): void {
 
 Route::controller(PublicSeoPageController::class)->group(function (): void {
     Route::get('/tin-tuc', 'index')->name('seo.index');
-    Route::get('/tin-tuc/{slug}', 'show')->name('seo.show');
+    Route::get('/tin-tuc/{slug}', 'category')->where('slug', '[a-z0-9-]+')->name('seo.category');
+    Route::get('/bai-viet/{slug}', 'legacyShow')->where('slug', '[a-z0-9-]+')->name('seo.legacy.show');
 });
 
 Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
@@ -92,3 +93,10 @@ if (file_exists(base_path('app/Features/Client/Wallet/web.php'))) {
 if (file_exists(base_path('app/Features/Client/Profile/web.php'))) {
     require base_path('app/Features/Client/Profile/web.php');
 }
+
+Route::get('/{categorySlug}/{postSlug}', [PublicSeoPageController::class, 'show'])
+    ->where([
+        'categorySlug' => '[a-z0-9]+(?:-[a-z0-9]+)*',
+        'postSlug' => '[a-z0-9]+(?:-[a-z0-9]+)*',
+    ])
+    ->name('seo.show');

@@ -16,7 +16,7 @@ const saving = ref(false);
 const loading = ref(false);
 const slugManuallyEdited = ref(false);
 const canonicalMode = ref<'auto' | 'custom'>('auto');
-const categories = ref<Array<{ id: number; name: string }>>([]);
+const categories = ref<Array<{ id: number; name: string; slug: string }>>([]);
 
 const editingId = computed(() => {
     const raw = Number(route.params.seo_post_id);
@@ -44,7 +44,12 @@ const form = reactive<AdminSeoPostPayload>({
 });
 
 const pageTitle = computed(() => (editingId.value ? 'Cập nhật bài viết SEO' : 'Tạo bài viết SEO'));
-const publicUrl = computed(() => `${window.location.origin}/tin-tuc/${form.slug.trim() || 'duong-dan-bai-viet'}`);
+const selectedCategorySlug = computed(
+    () => categories.value.find((category) => category.id === form.seo_category_id)?.slug || 'danh-muc',
+);
+const publicUrl = computed(
+    () => `${window.location.origin}/${selectedCategorySlug.value}/${form.slug.trim() || 'duong-dan-bai-viet'}`,
+);
 const generatedCanonicalUrl = computed(() => publicUrl.value);
 const effectiveCanonicalUrl = computed(() =>
     canonicalMode.value === 'custom' && form.canonical_url?.trim() ? form.canonical_url.trim() : generatedCanonicalUrl.value,
@@ -126,7 +131,7 @@ const toLocalDatetime = (value: string | null): string | null => {
 
 const fetchMeta = async (): Promise<void> => {
     const response = await adminSeoService.listCategories();
-    categories.value = response.map((category) => ({ id: category.id, name: category.name }));
+    categories.value = response.map((category) => ({ id: category.id, name: category.name, slug: category.slug }));
 };
 
 const fetchPost = async (): Promise<void> => {
@@ -275,16 +280,16 @@ onMounted(async () => {
                                 placeholder="huong-dan-nap-ngoc-rong"
                                 @change="markSlugAsEdited"
                             />
-                            <span class="truncate text-xs text-slate-400">/tin-tuc/{{ form.slug || 'duong-dan-bai-viet' }}</span>
+                            <span class="truncate text-xs text-slate-400">/{{ selectedCategorySlug }}/{{ form.slug || 'duong-dan-bai-viet' }}</span>
                         </label>
 
                         <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Danh mục</span>
+                            <span class="text-sm font-semibold text-slate-700">Danh mục <span v-if="form.status !== 'draft'" class="text-rose-500">*</span></span>
                             <select
                                 v-model="form.seo_category_id"
                                 class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                             >
-                                <option :value="null">Không gắn danh mục</option>
+                                <option :value="null">Không gắn danh mục (chỉ bản nháp)</option>
                                 <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
                             </select>
                         </label>
@@ -493,7 +498,7 @@ onMounted(async () => {
                                 type="url"
                                 maxlength="2048"
                                 class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                placeholder="https://napcarot.com/tin-tuc/duong-dan-chinh"
+                                placeholder="https://napcarot.com/danh-muc/duong-dan-chinh"
                             />
                             <span
                                 v-if="canonicalUsesExternalDomain"

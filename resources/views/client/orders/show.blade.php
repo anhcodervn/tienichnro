@@ -333,7 +333,7 @@
 
                     <div class="grid gap-2 border-t border-slate-200 bg-slate-50 p-4">
                         @if ($isTerminalFailure)
-                            <a class="client-button w-full gap-2" href="{{ route('content.contact') }}"><i class="bx bx-support text-lg" aria-hidden="true"></i>Liên hệ hỗ trợ</a>
+                            <a class="client-button w-full gap-2" href="{{ route('content.contact') }}"><i class="bx bx-message-circle-dots text-lg" aria-hidden="true"></i>Liên hệ hỗ trợ</a>
                         @elseif ($isCompleted)
                             <a class="client-button w-full gap-2" href="{{ route('home') }}"><i class="bx bx-refresh-cw text-lg" aria-hidden="true"></i>Tạo đơn mới</a>
                         @elseif ($needsBankPayment)

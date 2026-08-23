@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use App\Models\User;
 
@@ -69,7 +70,14 @@ test('seo post cover image and canonical values are validated', function (array 
 ]);
 
 test('public seo page prefers the dedicated cover image over the first editor image', function (): void {
+    $category = SeoCategory::query()->create([
+        'name' => 'Hướng dẫn game',
+        'slug' => 'huong-dan-game',
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
     $post = SeoPost::query()->create([
+        'seo_category_id' => $category->id,
         'title' => 'Bài SEO có ảnh đại diện',
         'slug' => 'bai-seo-co-anh-dai-dien',
         'content' => [
@@ -82,16 +90,164 @@ test('public seo page prefers the dedicated cover image over the first editor im
         'published_at' => now(),
     ]);
 
-    $this->get(route('seo.show', $post->slug))
+    $this->get(route('seo.show', ['categorySlug' => $category->slug, 'postSlug' => $post->slug]))
         ->assertOk()
+        ->assertSee('Hướng dẫn game')
+        ->assertSee('href="'.route('seo.category', $category->slug).'"', false)
         ->assertSee('src="/storage/uploads/image/dedicated-cover.webp"', false)
         ->assertSee('alt="Ảnh đại diện riêng của bài SEO"', false)
+        ->assertSee('<script type="application/ld+json">', false)
         ->assertSee('<meta property="og:image" content="'.url('/storage/uploads/image/dedicated-cover.webp').'">', false);
+});
+
+test('categorized seo posts use category urls and render seo metadata', function (): void {
+    $category = SeoCategory::query()->create([
+        'name' => 'Mẹo nạp game',
+        'slug' => 'meo-nap-game',
+        'seo_title' => 'Mẹo nạp game an toàn',
+        'seo_description' => 'Tổng hợp hướng dẫn nạp game an toàn.',
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
+    $post = SeoPost::query()->create([
+        'seo_category_id' => $category->id,
+        'title' => 'Kiểm tra giao dịch nạp game',
+        'slug' => 'kiem-tra-giao-dich-nap-game',
+        'content' => [['type' => 'heading', 'level' => 2, 'children' => [['text' => 'Các bước kiểm tra']]]],
+        'robots' => 'index,follow',
+        'status' => 'published',
+        'published_at' => now(),
+    ]);
+    $newUrl = route('seo.show', ['categorySlug' => $category->slug, 'postSlug' => $post->slug]);
+
+    $this->get($newUrl)
+        ->assertOk()
+        ->assertSee('<link rel="canonical" href="'.$newUrl.'">', false)
+        ->assertSee('Các bước kiểm tra')
+        ->assertSee('BreadcrumbList');
+});
+
+test('legacy seo post urls redirect permanently to the categorized url', function (): void {
+    $category = SeoCategory::query()->create([
+        'name' => 'Mẹo nạp game',
+        'slug' => 'meo-nap-game',
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
+    $post = SeoPost::query()->create([
+        'seo_category_id' => $category->id,
+        'title' => 'Kiểm tra giao dịch nạp game',
+        'slug' => 'kiem-tra-giao-dich-nap-game',
+        'content' => [],
+        'robots' => 'index,follow',
+        'status' => 'published',
+        'published_at' => now(),
+    ]);
+    $newUrl = route('seo.show', ['categorySlug' => $category->slug, 'postSlug' => $post->slug]);
+
+    $this->get('/tin-tuc/'.$post->slug)
+        ->assertRedirect($newUrl)
+        ->assertStatus(301);
+
+    $this->get('/bai-viet/'.$post->slug)
+        ->assertRedirect($newUrl)
+        ->assertStatus(301);
+});
+
+test('seo category page lists its posts with the categorized url', function (): void {
+    $category = SeoCategory::query()->create([
+        'name' => 'Mẹo nạp game',
+        'slug' => 'meo-nap-game',
+        'seo_title' => 'Mẹo nạp game an toàn',
+        'seo_description' => 'Tổng hợp hướng dẫn nạp game an toàn.',
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
+    $post = SeoPost::query()->create([
+        'seo_category_id' => $category->id,
+        'title' => 'Kiểm tra giao dịch nạp game',
+        'slug' => 'kiem-tra-giao-dich-nap-game',
+        'content' => [],
+        'robots' => 'index,follow',
+        'status' => 'published',
+        'published_at' => now(),
+    ]);
+    $newUrl = route('seo.show', ['categorySlug' => $category->slug, 'postSlug' => $post->slug]);
+
+    $this->get(route('seo.category', $category->slug))
+        ->assertOk()
+        ->assertSee('Mẹo nạp game an toàn')
+        ->assertSee('href="'.$newUrl.'"', false);
+});
+
+test('seo post url rejects a mismatched or inactive category', function (): void {
+    $activeCategory = SeoCategory::query()->create([
+        'name' => 'Danh mục đúng',
+        'slug' => 'danh-muc-dung',
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
+    $inactiveCategory = SeoCategory::query()->create([
+        'name' => 'Danh mục ẩn',
+        'slug' => 'danh-muc-an',
+        'robots' => 'index,follow',
+        'is_active' => false,
+    ]);
+    $post = SeoPost::query()->create([
+        'seo_category_id' => $activeCategory->id,
+        'title' => 'Bài viết đúng danh mục',
+        'slug' => 'bai-viet-dung-danh-muc',
+        'content' => [],
+        'robots' => 'index,follow',
+        'status' => 'published',
+        'published_at' => now(),
+    ]);
+
+    $this->get(route('seo.show', ['categorySlug' => $inactiveCategory->slug, 'postSlug' => $post->slug]))
+        ->assertNotFound();
+
+    $post->update(['seo_category_id' => $inactiveCategory->id]);
+
+    $this->get(route('seo.show', ['categorySlug' => $inactiveCategory->slug, 'postSlug' => $post->slug]))
+        ->assertNotFound();
+    $this->get('/tin-tuc/'.$post->slug)->assertNotFound();
+});
+
+test('admin rejects reserved category slugs and requires a category for published posts', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin-api/seo/categories', [
+            'name' => 'Tài khoản',
+            'slug' => 'tai-khoan',
+            'robots' => 'index,follow',
+            'is_active' => true,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Slug danh mục này trùng với đường dẫn hệ thống.');
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin-api/seo/posts', [
+            'title' => 'Bài viết thiếu danh mục',
+            'slug' => 'bai-viet-thieu-danh-muc',
+            'content' => [],
+            'robots' => 'index,follow',
+            'status' => 'published',
+            'published_at' => now()->toISOString(),
+        ])
+        ->assertUnprocessable();
 });
 
 test('scheduled seo posts require a future schedule time', function (?string $scheduledAt, bool $valid): void {
     $admin = User::factory()->create(['role' => 'admin']);
+    $category = SeoCategory::query()->create([
+        'name' => 'Tin game '.uniqid(),
+        'slug' => 'tin-game-'.uniqid(),
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
     $response = $this->actingAs($admin)->postJson('/api/admin-api/seo/posts', [
+        'seo_category_id' => $category->id,
         'title' => 'Bài SEO hẹn lịch',
         'slug' => 'bai-seo-hen-lich-'.($valid ? 'hop-le' : 'khong-hop-le'),
         'content' => [],

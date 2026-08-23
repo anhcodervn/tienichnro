@@ -3,6 +3,7 @@
 namespace App\Features\Admin\Seo\Requests;
 
 use App\Exceptions\ApiException;
+use App\Models\SeoCategory;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -29,6 +30,7 @@ class UpsertSeoCategoryRequest extends FormRequest
                 'string',
                 'max:255',
                 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
+                Rule::notIn(SeoCategory::RESERVED_SLUGS),
                 Rule::unique('seo_categories', 'slug')->ignore($categoryId),
             ],
             'seo_title' => ['nullable', 'string', 'max:255'],
@@ -43,6 +45,7 @@ class UpsertSeoCategoryRequest extends FormRequest
     {
         return [
             'slug.regex' => 'Slug chỉ được chứa chữ thường, số và dấu gạch nối.',
+            'slug.not_in' => 'Slug danh mục này trùng với đường dẫn hệ thống.',
         ];
     }
 

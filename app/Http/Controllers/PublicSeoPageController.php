@@ -8,8 +8,10 @@ use App\Support\EditorContentRenderer;
 use App\Support\SettingStore;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Str;
 
 class PublicSeoPageController extends Controller
 {
@@ -19,14 +21,57 @@ class PublicSeoPageController extends Controller
 
     public function index(Request $request, SettingStore $settingStore): View
     {
-        $search = trim($request->string('q')->toString());
-        $categorySlug = trim($request->string('category')->toString());
+        return $this->renderIndex($request, $settingStore);
+    }
 
-        $baseQuery = SeoPost::query()
-            ->with(['category:id,name,slug'])
-            ->where('status', 'published')
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
+    public function category(string $slug, Request $request, SettingStore $settingStore): View|RedirectResponse
+    {
+        $category = SeoCategory::query()
+            ->where('slug', $slug)
+            ->where('is_active', true)
+            ->first();
+
+        if ($category instanceof SeoCategory) {
+            return $this->renderIndex($request, $settingStore, $category);
+        }
+
+        return $this->legacyShow($slug, $request, $settingStore);
+    }
+
+    public function legacyShow(string $slug, Request $request, SettingStore $settingStore): View|RedirectResponse
+    {
+        $post = $this->publishedPosts()
+            ->with('category:id,name,slug,is_active')
+            ->where('slug', $slug)
+            ->firstOrFail();
+
+        if ($post->category?->is_active) {
+            return redirect()->to($this->postUrl($post), 301);
+        }
+
+        return $this->renderPost($post, $request, $settingStore);
+    }
+
+    public function show(string $categorySlug, string $postSlug, Request $request, SettingStore $settingStore): View
+    {
+        $post = $this->publishedPosts()
+            ->with('category:id,name,slug,is_active')
+            ->where('slug', $postSlug)
+            ->whereHas('category', function (Builder $query) use ($categorySlug): void {
+                $query->where('slug', $categorySlug)->where('is_active', true);
+            })
+            ->firstOrFail();
+
+        return $this->renderPost($post, $request, $settingStore);
+    }
+
+    protected function renderIndex(Request $request, SettingStore $settingStore, ?SeoCategory $activeCategory = null): View
+    {
+        $search = trim($request->string('q')->toString());
+        $categorySlug = $activeCategory?->slug ?: trim($request->string('category')->toString());
+
+        $baseQuery = $this->publishedPosts()
+            ->with(['category:id,name,slug,is_active'])
             ->when($search !== '', function (Builder $builder) use ($search): void {
                 $builder->where(function (Builder $query) use ($search): void {
                     $query
@@ -46,11 +91,11 @@ class PublicSeoPageController extends Controller
         $posts = (clone $baseQuery)
             ->orderByDesc('published_at')
             ->orderByDesc('id')
+            ->take(7)
             ->get();
 
         $featuredPost = $posts->first();
         $latestPosts = $posts->skip($featuredPost ? 1 : 0)->take(6)->values();
-        $sidebarPosts = $posts->take(3)->values();
 
         $categories = SeoCategory::query()
             ->where('is_active', true)
@@ -65,8 +110,13 @@ class PublicSeoPageController extends Controller
             ->get();
 
         $systemSettings = $this->systemSettings($settingStore);
-        $pageTitle = 'Tin tức và hướng dẫn nạp game Teamobi';
-        $pageDescription = 'Hướng dẫn chọn gói Carot, thanh toán an toàn và xử lý các tình huống thường gặp khi nạp game Teamobi.';
+        $defaultTitle = 'Tin tức và hướng dẫn nạp game Teamobi';
+        $defaultDescription = 'Hướng dẫn chọn gói Carot, thanh toán an toàn và xử lý các tình huống thường gặp khi nạp game Teamobi.';
+        $pageTitle = $activeCategory?->seo_title ?: ($activeCategory?->name ?: $defaultTitle);
+        $pageDescription = $activeCategory?->seo_description ?: $defaultDescription;
+        $pageUrl = $activeCategory
+            ? route('seo.category', $activeCategory->slug)
+            : route('seo.index');
 
         return view('pages.seo.index', [
             'systemSettings' => $systemSettings,
@@ -76,12 +126,13 @@ class PublicSeoPageController extends Controller
                 ? "Tìm kiếm: {$search} | {$pageTitle}"
                 : $pageTitle.' | '.($systemSettings['site_name'] ?: config('app.name', 'Nạp Carot')),
             'pageMetaDescription' => $pageDescription,
-            'pageMetaUrl' => $request->url().($request->getQueryString() ? '?'.$request->getQueryString() : ''),
+            'pageMetaUrl' => $pageUrl,
+            'pageMetaRobots' => $search !== '' ? 'noindex,follow' : ($activeCategory?->robots ?: 'index,follow'),
             'featuredPost' => $featuredPost ? $this->transformPost($featuredPost) : null,
             'latestPosts' => $latestPosts->map(fn (SeoPost $post) => $this->transformPost($post)),
-            'sidebarPosts' => $sidebarPosts->map(fn (SeoPost $post) => $this->transformPost($post)),
             'categories' => $categories,
             'activeCategorySlug' => $categorySlug,
+            'activeCategory' => $activeCategory,
             'search' => $search,
             'popularTags' => $posts
                 ->pluck('focus_keyword')
@@ -93,22 +144,11 @@ class PublicSeoPageController extends Controller
         ]);
     }
 
-    public function show(string $slug, Request $request, SettingStore $settingStore): View
+    protected function renderPost(SeoPost $post, Request $request, SettingStore $settingStore): View
     {
-        $post = SeoPost::query()
-            ->with('category:id,name,slug')
-            ->where('slug', $slug)
-            ->where('status', 'published')
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
-            ->firstOrFail();
-
-        $relatedPosts = SeoPost::query()
-            ->with('category:id,name,slug')
+        $relatedPosts = $this->publishedPosts()
+            ->with('category:id,name,slug,is_active')
             ->where('id', '!=', $post->id)
-            ->where('status', 'published')
-            ->whereNotNull('published_at')
-            ->where('published_at', '<=', now())
             ->when($post->seo_category_id, fn (Builder $builder) => $builder->where('seo_category_id', $post->seo_category_id))
             ->orderByDesc('published_at')
             ->take(3)
@@ -131,6 +171,10 @@ class PublicSeoPageController extends Controller
         $contentHtml = $this->contentRenderer->renderNodes($content);
         $coverImage = $post->cover_image ?: $this->contentRenderer->firstImage($content);
         $headingIndex = $this->contentRenderer->headingIndex($content);
+        $postUrl = $this->postUrl($post);
+        $siteName = $systemSettings['site_name'] ?: config('app.name', 'Nạp Carot');
+        $absoluteCoverImage = $coverImage && ! Str::startsWith($coverImage, ['http://', 'https://']) ? url($coverImage) : $coverImage;
+        $canonicalUrl = $this->canonicalUrl($post, $request, $postUrl);
 
         return view('pages.seo.show', [
             'systemSettings' => $systemSettings,
@@ -141,12 +185,80 @@ class PublicSeoPageController extends Controller
             'headingIndex' => $headingIndex,
             'relatedPosts' => $relatedPosts->map(fn (SeoPost $item) => $this->transformPost($item)),
             'sidebarCategories' => $sidebarCategories,
-            'pageMetaTitle' => $post->seo_title ?: $post->title.' | '.($systemSettings['site_name'] ?: config('app.name', 'Nạp Carot')),
+            'pageMetaTitle' => $post->seo_title ?: $post->title.' | '.$siteName,
             'pageMetaDescription' => $post->seo_description ?: ($post->excerpt ?: $this->contentRenderer->extractText($content)),
-            'pageMetaCanonical' => $post->canonical_url ?: $request->url(),
-            'pageMetaUrl' => $request->url(),
+            'pageMetaCanonical' => $canonicalUrl,
+            'pageMetaUrl' => $postUrl,
             'pageMetaImage' => $coverImage,
+            'articleSchema' => $post->article_schema ? array_filter([
+                '@context' => 'https://schema.org',
+                '@type' => 'Article',
+                'headline' => $post->title,
+                'description' => $post->seo_description ?: $post->excerpt,
+                'image' => $absoluteCoverImage,
+                'datePublished' => $post->published_at?->toAtomString(),
+                'dateModified' => $post->updated_at?->toAtomString(),
+                'mainEntityOfPage' => $canonicalUrl,
+                'publisher' => ['@type' => 'Organization', 'name' => $siteName],
+            ]) : null,
+            'breadcrumbSchema' => $post->breadcrumb_schema ? [
+                '@context' => 'https://schema.org',
+                '@type' => 'BreadcrumbList',
+                'itemListElement' => collect([
+                    ['name' => 'Trang chủ', 'url' => route('home')],
+                    ['name' => 'Tin tức', 'url' => route('seo.index')],
+                    $post->category ? ['name' => $post->category->name, 'url' => route('seo.category', $post->category->slug)] : null,
+                    ['name' => $post->title, 'url' => $canonicalUrl],
+                ])->filter()->values()->map(fn (array $item, int $index): array => [
+                    '@type' => 'ListItem',
+                    'position' => $index + 1,
+                    'name' => $item['name'],
+                    'item' => $item['url'],
+                ])->all(),
+            ] : null,
         ]);
+    }
+
+    protected function publishedPosts(): Builder
+    {
+        return SeoPost::query()
+            ->where('status', 'published')
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->where(function (Builder $query): void {
+                $query
+                    ->whereNull('seo_category_id')
+                    ->orWhereHas('category', fn (Builder $categoryQuery) => $categoryQuery->where('is_active', true));
+            });
+    }
+
+    protected function postUrl(SeoPost $post): string
+    {
+        if ($post->category?->is_active && $post->category->slug) {
+            return route('seo.show', [
+                'categorySlug' => $post->category->slug,
+                'postSlug' => $post->slug,
+            ]);
+        }
+
+        return route('seo.legacy.show', $post->slug);
+    }
+
+    protected function canonicalUrl(SeoPost $post, Request $request, string $postUrl): string
+    {
+        $canonicalUrl = trim((string) $post->canonical_url);
+
+        if ($canonicalUrl === '') {
+            return $postUrl;
+        }
+
+        $canonicalHost = parse_url($canonicalUrl, PHP_URL_HOST);
+        $canonicalPath = parse_url($canonicalUrl, PHP_URL_PATH);
+        $legacyPaths = ['/tin-tuc/'.$post->slug, '/bai-viet/'.$post->slug];
+
+        return $canonicalHost === $request->getHost() && in_array($canonicalPath, $legacyPaths, true)
+            ? $postUrl
+            : $canonicalUrl;
     }
 
     protected function systemSettings(SettingStore $settingStore): array
@@ -189,7 +301,7 @@ class PublicSeoPageController extends Controller
             'published_at' => $publishedAt,
             'published_label' => $publishedAt?->format('d/m/Y'),
             'reading_minutes' => $this->contentRenderer->estimateReadingMinutes($content),
-            'url' => route('seo.show', $post->slug),
+            'url' => $this->postUrl($post),
         ];
     }
 }

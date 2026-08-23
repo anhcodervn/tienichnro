@@ -609,7 +609,7 @@ onMounted(async () => {
                                                 type="text"
                                                 maxlength="2048"
                                                 class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-400"
-                                                placeholder="/bai-viet/nap-ngoc-rong"
+                                                placeholder="/huong-dan-game/nap-ngoc-rong"
                                             />
                                         </label>
                                     </div>

@@ -5,6 +5,7 @@ test('client mobile navigation uses an accessible off canvas drawer', function (
     $layout = file_get_contents($projectRoot.'/resources/views/client/layouts/app.blade.php');
     $script = file_get_contents($projectRoot.'/resources/js/client.js');
     $styles = file_get_contents($projectRoot.'/resources/css/client.css');
+    $boxicons = file_get_contents($projectRoot.'/public/assets/icon/boxicons/fonts/basic/boxicons.min.css');
     $accountOrders = file_get_contents($projectRoot.'/resources/views/client/account/orders/index.blade.php');
     $accountProfile = file_get_contents($projectRoot.'/resources/views/client/account/profile.blade.php');
     $wallet = file_get_contents($projectRoot.'/resources/views/client/account/wallet.blade.php');
@@ -13,6 +14,7 @@ test('client mobile navigation uses an accessible off canvas drawer', function (
     $sharedPayment = file_get_contents($projectRoot.'/resources/views/components/client/bank-transfer-payment.blade.php');
     $contentPage = file_get_contents($projectRoot.'/resources/views/pages/content/show.blade.php');
     $seoIndex = file_get_contents($projectRoot.'/resources/views/pages/seo/index.blade.php');
+    $floatingSupport = file_get_contents($projectRoot.'/resources/views/components/client/floating-support.blade.php');
 
     expect($layout)
         ->toContain('width=device-width, initial-scale=1, viewport-fit=cover')
@@ -42,6 +44,8 @@ test('client mobile navigation uses an accessible off canvas drawer', function (
         ->toContain('<span>Lịch sử đơn hàng</span>')
         ->toContain('<span>Bài viết</span>')
         ->toContain("route('seo.index')")
+        ->toContain("request()->routeIs('content.contact')")
+        ->toContain('<x-client.floating-support :raised=')
         ->and($script)
         ->toContain("{ opacity: 0.82, transform: 'translateX(100%) scale(0.985)' }")
         ->toContain("const menuItems = () => [...panel.querySelectorAll('[data-menu-item]')]")
@@ -100,5 +104,15 @@ test('client mobile navigation uses an accessible off canvas drawer', function (
         ->and($contentPage)
         ->toContain('lg:grid-cols-[250px_minmax(0,1fr)]')
         ->and($seoIndex)
-        ->toContain('flex min-w-0 flex-col gap-3 p-3 sm:flex-row');
+        ->toContain('flex min-w-0 flex-col gap-3 p-3 sm:flex-row')
+        ->and($floatingSupport)
+        ->toContain("route('content.contact')")
+        ->toContain('data-floating-support')
+        ->toContain('bx-message-circle-dots')
+        ->not->toContain('bx-support')
+        ->toContain('motion-safe:animate-ping')
+        ->toContain('bottom-[calc(env(safe-area-inset-bottom)+6rem)]')
+        ->toContain('Liên hệ hỗ trợ')
+        ->and($boxicons)
+        ->toContain('.bx-message-circle-dots:before');
 });

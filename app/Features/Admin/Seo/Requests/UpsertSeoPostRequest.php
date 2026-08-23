@@ -29,7 +29,11 @@ class UpsertSeoPostRequest extends FormRequest
         $postId = $this->route('seoPost')?->id ?? $this->route('seoPost');
 
         return [
-            'seo_category_id' => ['nullable', 'exists:seo_categories,id'],
+            'seo_category_id' => [
+                Rule::requiredIf(in_array($this->input('status'), ['published', 'scheduled'], true)),
+                'nullable',
+                'exists:seo_categories,id',
+            ],
             'title' => ['required', 'string', 'max:255'],
             'slug' => [
                 'required',

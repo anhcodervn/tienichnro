@@ -50,6 +50,7 @@
     @if (($customCodeAssets['css'] ?? false) && ! request()->routeIs(['auth.*', 'password.*', 'verification.*']))
         <link rel="stylesheet" href="{{ route('site_custom.css') }}" data-site-custom-css>
     @endif
+    @stack('head')
 </head>
 <body data-authenticated="{{ auth()->check() ? 'true' : 'false' }}" data-order-lookup-url="{{ route('orders.lookup') }}" data-order-detail-url-template="{{ route('orders.details', ['order' => '__ORDER__']) }}">
     <a href="#main-content" class="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[5px] focus:bg-slate-950 focus:px-4 focus:py-3 focus:text-white">Bỏ qua điều hướng</a>
@@ -249,6 +250,10 @@
         @include('client.partials.flash')
         @yield('content')
     </main>
+
+    @unless (request()->routeIs('content.contact'))
+        <x-client.floating-support :raised="request()->routeIs('wallet.deposit.*')" />
+    @endunless
 
     <footer class="mt-16 border-t border-slate-200 bg-white">
         <div class="client-container grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
