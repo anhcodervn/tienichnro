@@ -18,6 +18,12 @@ class TopupProvider extends Model
         'name',
         'slug',
         'connection_config',
+        'balance',
+        'balance_currency',
+        'balance_status',
+        'balance_checked_at',
+        'balance_error_code',
+        'balance_error_message',
     ];
 
     protected $hidden = [
@@ -28,6 +34,8 @@ class TopupProvider extends Model
     {
         return [
             'connection_config' => 'encrypted:array',
+            'balance' => 'integer',
+            'balance_checked_at' => 'datetime',
         ];
     }
 

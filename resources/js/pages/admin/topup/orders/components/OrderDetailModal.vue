@@ -140,6 +140,23 @@ const recipientData = (recipient: RecipientRow): string =>
                                 Ref: {{ recipient.provider_reference }}
                             </p>
                             <p v-if="recipient.failure_reason" class="mt-2 text-sm text-rose-700">{{ recipient.failure_reason }}</p>
+                            <div v-if="recipient.provider_items?.length" class="mt-3 space-y-2 border-t border-slate-200 pt-3">
+                                <div
+                                    v-for="item in recipient.provider_items"
+                                    :key="item.unit || 0"
+                                    class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                                >
+                                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
+                                        <span class="font-bold text-slate-800">Thẻ #{{ item.unit || 1 }}</span>
+                                        <span>Trạng thái: {{ item.status || '—' }}</span>
+                                        <span v-if="item.http_status">HTTP {{ item.http_status }}</span>
+                                        <span v-if="item.provider_code">Mã provider: {{ item.provider_code }}</span>
+                                        <span v-if="item.check_attempts">Kiểm tra: {{ item.check_attempts }} lần</span>
+                                    </div>
+                                    <p v-if="item.message" class="mt-1 font-semibold leading-5 text-rose-700">{{ item.message }}</p>
+                                    <p v-if="item.last_checked_at" class="mt-1 text-slate-500">Cập nhật: {{ formatDateTime(item.last_checked_at) }}</p>
+                                </div>
+                            </div>
                         </article>
                         <div
                             v-if="!displayOrder.recipients?.length"

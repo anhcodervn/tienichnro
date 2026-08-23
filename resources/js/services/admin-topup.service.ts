@@ -8,6 +8,8 @@ export const adminTopupService = {
     saveProvider: (id: number | null, payload: Record<string, unknown>) =>
         id ? axios.put(`${root}/topup-providers/${id}`, payload) : axios.post(`${root}/topup-providers`, payload),
     deleteProvider: (id: number) => axios.delete(`${root}/topup-providers/${id}`),
+    refreshProviderBalances: (providerIds: number[]) =>
+        axios.post(`${root}/topup-providers/refresh-balances`, { provider_ids: providerIds }),
     games: (params = {}) => axios.get(`${root}/games`, { params }),
     saveGame: (id: number | null, payload: Record<string, unknown>) =>
         id ? axios.put(`${root}/games/${id}`, payload) : axios.post(`${root}/games`, payload),

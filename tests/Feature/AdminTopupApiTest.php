@@ -8,10 +8,12 @@ use App\Models\TopupPackage;
 use App\Models\TopupProvider;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
 
 test('topup admin api rejects guests and ordinary users', function (): void {
     $this->getJson('/api/admin-api/games')->assertUnauthorized();
     $this->getJson('/api/admin-api/topup-providers')->assertUnauthorized();
+    $this->postJson('/api/admin-api/topup-providers/refresh-balances', ['provider_ids' => [1]])->assertUnauthorized();
 
     $this->actingAs(User::factory()->create())
         ->getJson('/api/admin-api/games')
@@ -20,6 +22,57 @@ test('topup admin api rejects guests and ordinary users', function (): void {
     $this->actingAs(User::factory()->create())
         ->getJson('/api/admin-api/topup-providers')
         ->assertForbidden();
+});
+
+test('admin provider page refreshes and stores a valid low balance response', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $provider = TopupProvider::factory()->create(['slug' => 'the9p']);
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::response([
+            'status' => 'success',
+            'message' => 'Thành công',
+            'data' => ['balance' => 200, 'currency' => 'VND'],
+        ]),
+    ]);
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin-api/topup-providers/refresh-balances', ['provider_ids' => [$provider->id]])
+        ->assertOk()
+        ->assertJsonPath('data.0.id', $provider->id)
+        ->assertJsonPath('data.0.balance', 200)
+        ->assertJsonPath('data.0.balance_currency', 'VND')
+        ->assertJsonPath('data.0.balance_status', 'success')
+        ->assertJsonPath('data.0.balance_error_code', null);
+
+    expect($provider->refresh()->balance)->toBe(200)
+        ->and($provider->balance_status)->toBe('success')
+        ->and($provider->balance_checked_at)->not->toBeNull();
+});
+
+test('failed provider balance refresh keeps last balance and exposes a safe diagnostic', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $provider = TopupProvider::factory()->create([
+        'slug' => 'the9p',
+        'balance' => 500000,
+        'balance_currency' => 'VND',
+        'balance_status' => 'success',
+    ]);
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::response(['message' => 'secret-key must not leak'], 403),
+    ]);
+
+    $response = $this->actingAs($admin)
+        ->postJson('/api/admin-api/topup-providers/refresh-balances', ['provider_ids' => [$provider->id]])
+        ->assertOk()
+        ->assertJsonPath('data.0.balance', 500000)
+        ->assertJsonPath('data.0.balance_status', 'failed')
+        ->assertJsonPath('data.0.balance_error_code', 'authentication_failed');
+
+    expect($response->getContent())->not->toContain('secret-key')
+        ->and($provider->refresh()->balance)->toBe(500000)
+        ->and($provider->balance_error_message)->toContain('IP whitelist');
 });
 
 test('catalog lists support server side search filters and pagination', function (): void {

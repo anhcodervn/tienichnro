@@ -5,7 +5,6 @@ namespace App\Features\Topup\Services;
 use App\Features\Reporting\Services\DiscordReportService;
 use App\Features\Topup\DTOs\TopupProviderBalanceDto;
 use App\Features\Topup\Exceptions\The9pBalanceUnavailableException;
-use App\Features\Topup\Providers\The9pTopupProvider;
 use App\Models\TopupProvider;
 use Illuminate\Support\Facades\Cache;
 use Throwable;
@@ -15,7 +14,7 @@ class The9pBalanceService
     private const DEFAULT_WARNING_THRESHOLD = 1_000_000;
 
     public function __construct(
-        private readonly The9pTopupProvider $the9pProvider,
+        private readonly TopupProviderBalanceService $providerBalanceService,
         private readonly DiscordReportService $discordReportService,
     ) {}
 
@@ -26,7 +25,7 @@ class The9pBalanceService
                 ->where('slug', 'the9p')
                 ->firstOrFail();
 
-            $balance = $this->the9pProvider->balance($provider);
+            $balance = $this->providerBalanceService->forProvider($provider);
         } catch (Throwable $exception) {
             throw new The9pBalanceUnavailableException(previous: $exception);
         }

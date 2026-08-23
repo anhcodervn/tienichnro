@@ -3,6 +3,7 @@
 namespace App\Features\Topup\Jobs;
 
 use App\Features\Topup\Enums\TopupProviderStatus;
+use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Services\RecipientFulfillmentService;
 use App\Models\OrderRecipient;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
@@ -54,10 +55,11 @@ class ProcessTopupRecipient implements ShouldBeUnique, ShouldQueue
             return;
         }
 
+        $diagnostic = TopupProviderConnectionException::fromThrowable($exception);
         $recipient->forceFill([
             'status' => 'processing',
             'provider_status' => TopupProviderStatus::Processing->value,
-            'failure_reason' => 'Hệ thống xử lý đang quá tải hoặc mất kết nối; cần đối soát thủ công.',
+            'failure_reason' => "[{$diagnostic->errorCode}] {$diagnostic->getMessage()} Cần đối soát thủ công.",
             'last_checked_at' => now(),
         ])->save();
     }

@@ -11,6 +11,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin-api')->name('admin.t
     Route::apiResource('games', GameController::class);
     Route::apiResource('game-servers', GameServerController::class)->parameters(['game-servers' => 'gameServer']);
     Route::apiResource('topup-packages', TopupPackageController::class)->parameters(['topup-packages' => 'topupPackage']);
+    Route::post('topup-providers/refresh-balances', [TopupProviderController::class, 'refreshBalances'])->name('topup-providers.refresh-balances');
     Route::apiResource('topup-providers', TopupProviderController::class)->parameters(['topup-providers' => 'topupProvider']);
     Route::apiResource('orders', OrderController::class)->only(['index', 'show', 'update']);
 });

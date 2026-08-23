@@ -3,13 +3,27 @@ import { adminTopupService } from '@/services/admin-topup.service';
 import { onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
-type ProviderRow = { id: number; name: string; slug: string; has_connection_config: boolean; packages_count?: number };
+type ProviderRow = {
+    id: number;
+    name: string;
+    slug: string;
+    has_connection_config: boolean;
+    packages_count?: number;
+    supports_balance: boolean;
+    balance: number | null;
+    balance_currency: string | null;
+    balance_status: 'unchecked' | 'success' | 'failed';
+    balance_checked_at: string | null;
+    balance_error_code: string | null;
+    balance_error_message: string | null;
+};
 
 const route = useRoute();
 const router = useRouter();
 const providers = ref<ProviderRow[]>([]);
 const loading = ref(false);
 const saving = ref(false);
+const refreshingBalances = ref(false);
 const editingId = ref<number | null>(null);
 const connectionJsonError = ref('');
 const filters = reactive({
@@ -45,10 +59,33 @@ const load = async (): Promise<void> => {
             from: meta.from ?? null,
             to: meta.to ?? null,
         });
+        void refreshBalances();
     } finally {
         loading.value = false;
     }
 };
+
+const refreshBalances = async (): Promise<void> => {
+    const providerIds = providers.value.filter((provider) => provider.supports_balance).map((provider) => provider.id);
+    if (providerIds.length === 0 || refreshingBalances.value) return;
+
+    refreshingBalances.value = true;
+    try {
+        const response = await adminTopupService.refreshProviderBalances(providerIds);
+        const refreshed = new Map<number, ProviderRow>((response.data.data ?? []).map((provider: ProviderRow) => [provider.id, provider]));
+        providers.value = providers.value.map((provider) => refreshed.get(provider.id) ?? provider);
+    } finally {
+        refreshingBalances.value = false;
+    }
+};
+
+const formatBalance = (provider: ProviderRow): string =>
+    provider.balance === null
+        ? 'Chưa có dữ liệu'
+        : `${new Intl.NumberFormat('vi-VN').format(provider.balance)} ${provider.balance_currency || 'VND'}`;
+
+const formatCheckedAt = (value: string | null): string =>
+    value ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : 'Chưa kiểm tra';
 
 const syncQuery = async (): Promise<void> => {
     const query: Record<string, string | number> = {};
@@ -140,10 +177,20 @@ onMounted(load);
 
 <template>
     <section class="space-y-5">
-        <header>
-            <p class="text-sm font-semibold text-emerald-700">Danh mục nạp game</p>
-            <h1 class="mt-1 text-2xl font-bold text-slate-950">Nhà cung cấp</h1>
-            <p class="mt-1 text-sm text-slate-500">Tìm kiếm provider và quản lý JSON kết nối tới hệ thống bên thứ ba.</p>
+        <header class="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+                <p class="text-sm font-semibold text-emerald-700">Danh mục nạp game</p>
+                <h1 class="mt-1 text-2xl font-bold text-slate-950">Nhà cung cấp</h1>
+                <p class="mt-1 text-sm text-slate-500">Tìm kiếm provider và quản lý JSON kết nối tới hệ thống bên thứ ba.</p>
+            </div>
+            <button
+                type="button"
+                class="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 shadow-sm disabled:cursor-wait disabled:opacity-60"
+                :disabled="refreshingBalances"
+                @click="refreshBalances"
+            >
+                {{ refreshingBalances ? 'Đang kiểm tra số dư...' : 'Cập nhật số dư' }}
+            </button>
         </header>
         <div class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
             <div class="min-w-0 space-y-4">
@@ -182,12 +229,13 @@ onMounted(load);
                     <div v-if="loading" class="p-10 text-center text-slate-500">Đang tải provider...</div>
                     <div v-else-if="providers.length === 0" class="p-10 text-center text-slate-500">Không tìm thấy provider phù hợp.</div>
                     <div v-else class="overflow-x-auto">
-                        <table class="w-full min-w-[720px] text-sm">
+                        <table class="w-full min-w-[900px] text-sm">
                             <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
                                 <tr>
                                     <th class="p-4">Tên provider</th>
                                     <th class="p-4">Slug</th>
                                     <th class="p-4">Kết nối</th>
+                                    <th class="p-4">Số dư provider</th>
                                     <th class="p-4">Gói nạp</th>
                                     <th class="p-4 text-right">Thao tác</th>
                                 </tr>
@@ -202,6 +250,40 @@ onMounted(load);
                                             :class="provider.has_connection_config ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'"
                                             >{{ provider.has_connection_config ? 'Đã cấu hình' : 'Chưa cấu hình' }}</span
                                         >
+                                    </td>
+                                    <td class="p-4">
+                                        <div class="min-w-[210px]">
+                                            <div class="flex items-center gap-2">
+                                                <span
+                                                    class="inline-flex h-8 w-8 items-center justify-center rounded-lg"
+                                                    :class="
+                                                        provider.balance_status === 'success'
+                                                            ? 'bg-emerald-50 text-emerald-700'
+                                                            : provider.balance_status === 'failed'
+                                                              ? 'bg-rose-50 text-rose-700'
+                                                              : 'bg-slate-100 text-slate-500'
+                                                    "
+                                                    aria-hidden="true"
+                                                >₫</span>
+                                                <div>
+                                                    <p class="font-bold text-slate-950">{{ formatBalance(provider) }}</p>
+                                                    <p class="mt-0.5 text-xs text-slate-500">
+                                                        {{ refreshingBalances && provider.supports_balance ? 'Đang cập nhật...' : formatCheckedAt(provider.balance_checked_at) }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div
+                                                v-if="provider.balance_status === 'failed'"
+                                                class="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-2 text-xs leading-5 text-rose-700"
+                                            >
+                                                <p class="font-bold">{{ provider.balance_error_code }}</p>
+                                                <p>{{ provider.balance_error_message }}</p>
+                                                <p v-if="provider.balance !== null" class="mt-1 font-semibold">Đang hiển thị số dư gần nhất.</p>
+                                            </div>
+                                            <span v-else-if="provider.balance_status === 'success'" class="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">
+                                                Kết nối tốt
+                                            </span>
+                                        </div>
                                     </td>
                                     <td class="p-4 font-semibold">{{ provider.packages_count || 0 }}</td>
                                     <td class="p-4 text-right">

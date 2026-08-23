@@ -7,6 +7,8 @@ use App\Features\Admin\Topup\Requests\StoreTopupProviderRequest;
 use App\Features\Admin\Topup\Requests\UpdateTopupProviderRequest;
 use App\Features\Admin\Topup\Resources\TopupProviderResource;
 use App\Features\Admin\Topup\Services\TopupAdminService;
+use App\Features\Topup\Exceptions\TopupProviderConnectionException;
+use App\Features\Topup\Services\TopupProviderBalanceService;
 use App\Http\Controllers\Controller;
 use App\Models\TopupProvider;
 use App\Models\User;
@@ -16,7 +18,10 @@ use Illuminate\Validation\ValidationException;
 
 class TopupProviderController extends Controller
 {
-    public function __construct(private readonly TopupAdminService $service) {}
+    public function __construct(
+        private readonly TopupAdminService $service,
+        private readonly TopupProviderBalanceService $balanceService,
+    ) {}
 
     public function index(ListTopupProviderRequest $request): JsonResponse
     {
@@ -59,6 +64,32 @@ class TopupProviderController extends Controller
         $this->service->delete($topupProvider, $this->admin($request), $request);
 
         return response()->json(['status' => true, 'message' => 'Provider đã được xóa.']);
+    }
+
+    public function refreshBalances(Request $request): JsonResponse
+    {
+        $providerIds = collect($request->validate([
+            'provider_ids' => ['required', 'array', 'max:100'],
+            'provider_ids.*' => ['integer', 'distinct', 'exists:topup_providers,id'],
+        ])['provider_ids']);
+
+        $providers = TopupProvider::query()
+            ->whereIn('id', $providerIds)
+            ->where('slug', 'the9p')
+            ->get();
+
+        foreach ($providers as $provider) {
+            try {
+                $this->balanceService->forProvider($provider);
+            } catch (TopupProviderConnectionException) {
+                // Chẩn đoán an toàn đã được lưu để hiển thị trong bảng quản trị.
+            }
+        }
+
+        return response()->json([
+            'status' => true,
+            'data' => TopupProviderResource::collection($providers->map->fresh()),
+        ]);
     }
 
     private function admin(Request $request): User

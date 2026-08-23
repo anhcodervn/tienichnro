@@ -217,7 +217,7 @@ class RecipientFulfillmentService
                 },
                 'provider_response' => $providerResponse,
                 'status_check_attempts' => max($recipient->status_check_attempts, $attempt),
-                'failure_reason' => $recipientStatus === 'failed' ? 'Một hoặc nhiều lượt nạp không thành công.' : null,
+                'failure_reason' => $recipientStatus === 'failed' ? $this->failedItemsReason($items) : null,
                 'submitted_at' => $submitted ? ($recipient->submitted_at ?? now()) : $recipient->submitted_at,
                 'last_checked_at' => $submitted ? $recipient->last_checked_at : now(),
                 'completed_at' => $recipientStatus === 'completed' ? now() : null,
@@ -296,7 +296,15 @@ class RecipientFulfillmentService
             }
 
             if ($total > 0 && $completed + $failed === $total && $failed > 0) {
-                $this->orderStatusService->transition($order, OrderStatus::Failed, 'Một hoặc nhiều tài khoản nạp thất bại.');
+                $reason = (string) $order->recipients()
+                    ->where('status', 'failed')
+                    ->whereNotNull('failure_reason')
+                    ->value('failure_reason');
+                $this->orderStatusService->transition(
+                    $order,
+                    OrderStatus::Failed,
+                    $reason !== '' ? mb_substr($reason, 0, 500) : 'Một hoặc nhiều tài khoản nạp thất bại.',
+                );
 
                 return 'failed';
             }
@@ -320,5 +328,21 @@ class RecipientFulfillmentService
             && data_get($order->metadata, 'reorder.status') === 'queued') {
             ReportReorderedOrderSuccess::dispatch($order->id, $reorderAttempt)->afterCommit();
         }
+    }
+
+    /** @param array<int|string, mixed> $items */
+    private function failedItemsReason(array $items): string
+    {
+        $messages = collect($items)
+            ->filter(fn (mixed $item): bool => is_array($item) && ($item['status'] ?? null) === TopupProviderStatus::Failed->value)
+            ->map(fn (array $item): string => trim(strip_tags((string) ($item['message'] ?? ''))))
+            ->filter()
+            ->unique()
+            ->take(3)
+            ->implode('; ');
+
+        return $messages !== ''
+            ? mb_substr($messages, 0, 500)
+            : 'Một hoặc nhiều lượt nạp không thành công.';
     }
 }

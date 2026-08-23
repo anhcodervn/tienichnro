@@ -8,13 +8,20 @@ use RuntimeException;
 
 class The9pBalanceUnavailableException extends RuntimeException
 {
+    public readonly string $errorCode;
+
     public function __construct(?\Throwable $previous = null)
     {
-        parent::__construct('Không thể kiểm tra số dư provider vào lúc này.', 0, $previous);
+        $diagnostic = TopupProviderConnectionException::fromThrowable($previous ?? new RuntimeException);
+        $this->errorCode = $diagnostic->errorCode;
+
+        parent::__construct($diagnostic->getMessage(), 0, $previous);
     }
 
     public function render(): JsonResponse
     {
-        return response()->json(ApiResponse::error($this->getMessage()), 502);
+        return response()->json(ApiResponse::error($this->getMessage(), [
+            'error_code' => $this->errorCode,
+        ]), 502);
     }
 }

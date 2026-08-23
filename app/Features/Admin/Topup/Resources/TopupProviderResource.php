@@ -22,6 +22,13 @@ class TopupProviderResource extends JsonResource
                 fn (): array => $this->maskedConnectionConfig(),
             ),
             'packages_count' => $this->whenCounted('packages'),
+            'supports_balance' => $this->slug === 'the9p',
+            'balance' => $this->balance,
+            'balance_currency' => $this->balance_currency,
+            'balance_status' => $this->balance_status,
+            'balance_checked_at' => $this->balance_checked_at?->toISOString(),
+            'balance_error_code' => $this->balance_error_code,
+            'balance_error_message' => $this->balance_error_message,
             'created_at' => $this->created_at?->toISOString(),
             'updated_at' => $this->updated_at?->toISOString(),
         ];

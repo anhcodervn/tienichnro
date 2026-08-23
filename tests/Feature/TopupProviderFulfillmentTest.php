@@ -216,7 +216,7 @@ test('failed provider status fails the recipient and parent order', function ():
     Http::fake([
         'https://the9p.com/api/rechargews' => Http::response([
             'status' => 'success',
-            'data' => ['order_code' => 'THE9P-FAILED', 'status' => 'failed'],
+            'data' => ['order_code' => 'THE9P-FAILED', 'status' => 'failed', 'message' => 'Provider hết số dư'],
         ]),
     ]);
 
@@ -224,8 +224,10 @@ test('failed provider status fails the recipient and parent order', function ():
 
     expect($recipient->refresh()->status)->toBe('failed')
         ->and($recipient->provider_status)->toBe('failed')
+        ->and($recipient->failure_reason)->toBe('Provider hết số dư')
         ->and($recipient->failed_at)->not->toBeNull()
         ->and($order->refresh()->order_status)->toBe(OrderStatus::Failed)
+        ->and($order->failure_reason)->toBe('Provider hết số dư')
         ->and($order->failed_at)->not->toBeNull();
     Mail::assertQueued(OrderFailedMail::class, 1);
     Queue::assertNotPushed(SyncTopupRecipientStatus::class);

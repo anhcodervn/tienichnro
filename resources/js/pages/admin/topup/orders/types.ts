@@ -5,6 +5,15 @@ export type RecipientRow = {
     status: string;
     provider_reference?: string | null;
     failure_reason?: string | null;
+    provider_items?: Array<{
+        unit?: number | null;
+        status?: string | null;
+        message?: string | null;
+        http_status?: number | null;
+        provider_code?: string | number | null;
+        check_attempts?: number;
+        last_checked_at?: string | null;
+    }>;
 };
 
 export type OrderRow = {

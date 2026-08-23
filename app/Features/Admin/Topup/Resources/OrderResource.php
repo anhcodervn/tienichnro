@@ -27,6 +27,17 @@ class OrderResource extends JsonResource
                     'status' => $recipient->status,
                     'provider_reference' => $recipient->provider_reference,
                     'failure_reason' => $recipient->failure_reason,
+                    'provider_items' => collect(data_get($recipient->provider_response, 'items', []))
+                        ->filter(fn (mixed $item): bool => is_array($item))
+                        ->map(fn (array $item): array => [
+                            'unit' => $item['unit'] ?? null,
+                            'status' => $item['status'] ?? null,
+                            'message' => $item['message'] ?? null,
+                            'http_status' => data_get($item, 'response.http_status'),
+                            'provider_code' => data_get($item, 'response.provider_code'),
+                            'check_attempts' => $item['check_attempts'] ?? 0,
+                            'last_checked_at' => $item['last_checked_at'] ?? null,
+                        ])->values()->all(),
                 ])->all()),
             'total_amount' => $this->total_amount, 'payment_method' => $this->payment_method->value,
             'payment_status' => $this->payment_status->value, 'order_status' => $this->order_status->value,

@@ -7,6 +7,7 @@ use App\Features\Topup\Contracts\TopupProviderInterface;
 use App\Features\Topup\DTOs\TopupProviderBalanceDto;
 use App\Features\Topup\DTOs\TopupProviderResultDto;
 use App\Features\Topup\Enums\TopupProviderStatus;
+use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Models\GameServer;
 use App\Models\Order;
 use App\Models\OrderRecipient;
@@ -15,6 +16,7 @@ use App\Models\TopupProvider;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
+use Throwable;
 
 class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProviderInterface
 {
@@ -114,20 +116,24 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             || filter_var($config['base_url'], FILTER_VALIDATE_URL) === false
             || parse_url($config['base_url'], PHP_URL_SCHEME) !== 'https'
         ) {
-            throw new \RuntimeException('Cấu hình kết nối The9p chưa đầy đủ.');
+            throw new TopupProviderConnectionException('invalid_configuration', 'Cấu hình The9p chưa đầy đủ hoặc base URL không dùng HTTPS.');
         }
 
         $command = 'getbalance';
-        $response = Http::acceptJson()
-            ->asJson()
-            ->connectTimeout($config['connect_timeout'])
-            ->timeout($config['timeout'])
-            ->post($config['base_url'], [
-                'command' => $command,
-                'partner_id' => $config['partner_id'],
-                'sign' => md5($config['partner_key'].$config['partner_id'].$command),
-            ])
-            ->throw();
+        try {
+            $response = Http::acceptJson()
+                ->asJson()
+                ->connectTimeout($config['connect_timeout'])
+                ->timeout($config['timeout'])
+                ->post($config['base_url'], [
+                    'command' => $command,
+                    'partner_id' => $config['partner_id'],
+                    'sign' => md5($config['partner_key'].$config['partner_id'].$command),
+                ])
+                ->throw();
+        } catch (Throwable $exception) {
+            throw TopupProviderConnectionException::fromThrowable($exception);
+        }
 
         $body = $response->json();
         $data = is_array($body) && is_array($body['data'] ?? null) ? $body['data'] : [];
@@ -141,7 +147,10 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             || $currency === ''
             || strlen($currency) > 10
         ) {
-            throw new \UnexpectedValueException('Phản hồi số dư The9p không hợp lệ.');
+            throw new TopupProviderConnectionException(
+                'invalid_response',
+                'Provider trả trạng thái lỗi hoặc dữ liệu số dư không đúng định dạng.',
+            );
         }
 
         return new TopupProviderBalanceDto(
@@ -153,23 +162,18 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
     /** @param array{base_url:string,partner_id:string,partner_key:string,connect_timeout:int,timeout:int,max_status_checks:int} $config */
     private function request(array $config, array $payload, ?string $fallbackReference): TopupProviderResultDto
     {
-        $response = Http::acceptJson()
-            ->asJson()
-            ->connectTimeout($config['connect_timeout'])
-            ->timeout($config['timeout'])
-            ->post($config['base_url'], $payload);
+        try {
+            $response = Http::acceptJson()
+                ->asJson()
+                ->connectTimeout($config['connect_timeout'])
+                ->timeout($config['timeout'])
+                ->post($config['base_url'], $payload);
 
-        if ($response->status() === 429 || $response->serverError()) {
-            $response->throw();
-        }
-
-        if ($response->clientError()) {
-            return new TopupProviderResultDto(
-                TopupProviderStatus::Failed,
-                $fallbackReference,
-                'Yêu cầu nạp chưa được hệ thống xử lý chấp nhận.',
-                ['http_status' => $response->status()],
-            );
+            if ($response->status() === 429 || $response->serverError()) {
+                $response->throw();
+            }
+        } catch (Throwable $exception) {
+            throw TopupProviderConnectionException::fromThrowable($exception);
         }
 
         return $this->resultFromResponse($response, $fallbackReference);
@@ -199,6 +203,14 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
         $message = filled($data['message'] ?? null)
             ? (string) $data['message']
             : (filled($body['message'] ?? null) ? (string) $body['message'] : null);
+
+        if ($response->clientError() && blank($message)) {
+            $message = match ($response->status()) {
+                401, 403 => 'Provider từ chối xác thực; kiểm tra credential hoặc IP whitelist.',
+                422 => 'Provider từ chối dữ liệu đơn nạp.',
+                default => 'Provider từ chối yêu cầu nạp (HTTP '.$response->status().').',
+            };
+        }
 
         return new TopupProviderResultDto(
             status: $status,
