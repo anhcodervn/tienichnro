@@ -14,3 +14,7 @@ Broadcast::channel('users.{userId}.support', function (User $user, int $userId):
 Broadcast::channel('admin.support', function (User $user): bool {
     return $user->role === 'admin';
 });
+
+Broadcast::channel('admin.topup.orders', function (User $user): bool {
+    return $user->role === 'admin';
+});

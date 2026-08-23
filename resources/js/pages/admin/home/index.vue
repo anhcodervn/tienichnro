@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { adminTopupService } from '@/services/admin-topup.service';
+import { echo } from '@laravel/echo-vue';
 import { BadgeCheck, CircleDollarSign, CircleX, Clock3, Gamepad2, LoaderCircle, ReceiptText, TriangleAlert } from 'lucide-vue-next';
-import { computed, onMounted, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const games = ref<any[]>([]);
 const orders = ref<any[]>([]);
 const loading = ref(true);
+const realtimeChannelName = 'admin.topup.orders';
+const realtimeEventName = '.admin.topup.order.updated';
+let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 const paidRevenue = computed(() =>
     orders.value.filter((order) => order.payment_status === 'paid').reduce((sum, order) => sum + Number(order.total_amount), 0),
 );
@@ -55,17 +59,41 @@ const orderStatus = (status: string) => {
     return { label: status || 'Chờ xử lý', class: 'bg-slate-100 text-slate-700 ring-slate-500/20', icon: Clock3 };
 };
 
+const loadOrders = async (): Promise<void> => {
+    const response = await adminTopupService.orders({ per_page: 100 });
+    orders.value = response.data.data.data;
+};
+
+const handleRealtimeOrderUpdated = (event: { code: string; payment_status: string; order_status: string }): void => {
+    orders.value = orders.value.map((order) =>
+        order.code === event.code
+            ? { ...order, payment_status: event.payment_status, order_status: event.order_status }
+            : order,
+    );
+
+    if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
+    realtimeRefreshTimer = setTimeout(() => void loadOrders().catch(() => undefined), 180);
+};
+
 onMounted(async () => {
+    const realtimeChannel = echo().private(realtimeChannelName);
+    realtimeChannel.listen(realtimeEventName, handleRealtimeOrderUpdated);
+    realtimeChannel.subscribed(() => {
+        if (!loading.value) void loadOrders().catch(() => undefined);
+    });
+
     try {
-        const [gameResponse, orderResponse] = await Promise.all([
-            adminTopupService.games({ per_page: 100 }),
-            adminTopupService.orders({ per_page: 100 }),
-        ]);
+        const [gameResponse] = await Promise.all([adminTopupService.games({ per_page: 100 }), loadOrders()]);
         games.value = gameResponse.data.data.data;
-        orders.value = orderResponse.data.data.data;
     } finally {
         loading.value = false;
     }
+});
+
+onBeforeUnmount(() => {
+    echo().private(realtimeChannelName).stopListening(realtimeEventName, handleRealtimeOrderUpdated);
+    echo().leave(realtimeChannelName);
+    if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
 });
 </script>
 

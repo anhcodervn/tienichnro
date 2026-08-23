@@ -4,6 +4,7 @@ namespace App\Features\Topup\Observers;
 
 use App\Enums\PaymentStatus;
 use App\Features\Reporting\Services\TopupDiscordReporterService;
+use App\Features\Topup\Events\AdminTopupOrderUpdated;
 use App\Features\Topup\Events\OrderStatusUpdated;
 use App\Models\Order;
 
@@ -14,6 +15,7 @@ class OrderObserver
     public function created(Order $order): void
     {
         $this->discordReporter->orderCreated($order);
+        AdminTopupOrderUpdated::dispatch($order);
     }
 
     public function updated(Order $order): void
@@ -30,7 +32,7 @@ class OrderObserver
             $this->discordReporter->orderStatusChanged($order);
         }
 
-        if (! $order->wasChanged([
+        $publicStatusChanged = $order->wasChanged([
             'payment_status',
             'order_status',
             'paid_at',
@@ -38,10 +40,29 @@ class OrderObserver
             'completed_at',
             'failed_at',
             'cancelled_at',
-        ])) {
+        ]);
+        $adminVisibleStateChanged = $order->wasChanged([
+            'payment_status',
+            'order_status',
+            'provider_reference',
+            'failure_reason',
+            'paid_at',
+            'processing_at',
+            'completed_at',
+            'failed_at',
+            'cancelled_at',
+        ]);
+
+        if (! $publicStatusChanged && ! $adminVisibleStateChanged) {
             return;
         }
 
-        OrderStatusUpdated::dispatch($order);
+        if ($publicStatusChanged) {
+            OrderStatusUpdated::dispatch($order);
+        }
+
+        if ($adminVisibleStateChanged) {
+            AdminTopupOrderUpdated::dispatch($order);
+        }
     }
 }

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { adminTopupService } from '@/services/admin-topup.service';
 import { handleErrorResponse } from '@/utils/response';
+import { echo } from '@laravel/echo-vue';
 import {
     BadgeCheck,
     ChevronDown,
@@ -35,6 +36,11 @@ type Pagination = {
     to: number | null;
 };
 
+type AdminTopupOrderUpdatedEvent = Pick<
+    OrderRow,
+    'id' | 'code' | 'payment_status' | 'order_status' | 'can_reorder' | 'provider_reference' | 'failure_reason' | 'paid_at'
+> & { updated_at: string };
+
 const orders = ref<OrderRow[]>([]);
 const orderDetails = ref<Record<string, OrderRow>>({});
 const loading = ref(false);
@@ -50,7 +56,13 @@ const activeMenuCode = ref<string | null>(null);
 const menuPosition = ref({ top: 0, right: 0 });
 const copiedCode = ref<string | null>(null);
 let copiedTimer: ReturnType<typeof setTimeout> | null = null;
+let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let realtimeRefreshRunning = false;
+let realtimeRefreshQueued = false;
 let previousBodyOverflow = '';
+const realtimeChannelName = 'admin.topup.orders';
+const realtimeEventName = '.admin.topup.order.updated';
+const pendingRealtimeCodes = new Set<string>();
 
 const filters = reactive({ search: '', payment_status: '', order_status: '', per_page: 20, page: 1 });
 const pagination = reactive<Pagination>({ current_page: 1, last_page: 1, per_page: 20, total: 0, from: null, to: null });
@@ -118,8 +130,8 @@ const closeMenu = (): void => {
     activeMenuCode.value = null;
 };
 
-const load = async (): Promise<void> => {
-    loading.value = true;
+const load = async (showLoading = true): Promise<void> => {
+    if (showLoading) loading.value = true;
     loadError.value = '';
     closeMenu();
     try {
@@ -144,9 +156,77 @@ const load = async (): Promise<void> => {
     } catch (error) {
         loadError.value = errorMessage(error, 'Không thể tải danh sách đơn. Vui lòng thử lại.');
     } finally {
-        loading.value = false;
+        if (showLoading) loading.value = false;
         initialLoaded.value = true;
     }
+};
+
+const applyRealtimeSnapshot = (event: AdminTopupOrderUpdatedEvent): void => {
+    const snapshot: Partial<OrderRow> = {
+        payment_status: event.payment_status,
+        order_status: event.order_status,
+        can_reorder: event.can_reorder,
+        provider_reference: event.provider_reference,
+        failure_reason: event.failure_reason,
+        paid_at: event.paid_at,
+    };
+
+    orders.value = orders.value.map((order) => (order.code === event.code ? { ...order, ...snapshot } : order));
+
+    if (orderDetails.value[event.code]) {
+        orderDetails.value[event.code] = { ...orderDetails.value[event.code], ...snapshot };
+    }
+
+    if (selectedOrder.value?.code === event.code) {
+        selectedOrder.value = { ...selectedOrder.value, ...snapshot };
+    }
+};
+
+const flushRealtimeRefresh = async (): Promise<void> => {
+    if (realtimeRefreshRunning) {
+        realtimeRefreshQueued = true;
+        return;
+    }
+
+    realtimeRefreshRunning = true;
+    const changedCodes = [...pendingRealtimeCodes];
+    pendingRealtimeCodes.clear();
+    realtimeRefreshTimer = null;
+
+    try {
+        await load(false);
+
+        for (const code of changedCodes) {
+            delete orderDetails.value[code];
+
+            if (!detailModalOpen.value || selectedOrder.value?.code !== code) continue;
+
+            try {
+                const response = await adminTopupService.order(code);
+                orderDetails.value[code] = response.data.data;
+                selectedOrder.value = orderDetails.value[code];
+                detailModalError.value = '';
+            } catch (error) {
+                detailModalError.value = errorMessage(error, 'Không thể đồng bộ chi tiết đơn theo thời gian thực.');
+            }
+        }
+    } finally {
+        realtimeRefreshRunning = false;
+
+        if (realtimeRefreshQueued || pendingRealtimeCodes.size > 0) {
+            realtimeRefreshQueued = false;
+            if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
+            realtimeRefreshTimer = setTimeout(() => void flushRealtimeRefresh(), 180);
+        }
+    }
+};
+
+const handleRealtimeOrderUpdated = (event: AdminTopupOrderUpdatedEvent): void => {
+    applyRealtimeSnapshot(event);
+    pendingRealtimeCodes.add(event.code);
+
+    if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
+    realtimeRefreshTimer = setTimeout(() => void flushRealtimeRefresh(), 180);
 };
 
 const applyFilters = async (): Promise<void> => {
@@ -253,10 +333,15 @@ const act = async (order: OrderRow, action: OrderAction): Promise<void> => {
     actingCode.value = order.code;
     try {
         const response = await adminTopupService.updateOrder(order.code, action, needsReason ? String(result.value).trim() : undefined);
+        const updatedOrder = response.data.data as OrderRow;
         delete orderDetails.value[order.code];
+
+        if (detailModalOpen.value && selectedOrder.value?.code === order.code) {
+            orderDetails.value[order.code] = updatedOrder;
+            selectedOrder.value = updatedOrder;
+        }
+
         await load();
-        const refreshedOrder = orders.value.find((item) => item.code === order.code);
-        if (detailModalOpen.value && selectedOrder.value?.code === order.code && refreshedOrder) await openDetailModal(refreshedOrder);
         await Swal.fire({
             icon: 'success',
             title: 'Thao tác thành công',
@@ -291,6 +376,11 @@ onMounted(() => {
     window.addEventListener('resize', closeMenu);
     window.addEventListener('scroll', closeMenu, true);
     window.addEventListener('keydown', handleEscape);
+    const realtimeChannel = echo().private(realtimeChannelName);
+    realtimeChannel.listen(realtimeEventName, handleRealtimeOrderUpdated);
+    realtimeChannel.subscribed(() => {
+        if (initialLoaded.value) void load(false);
+    });
     void load();
 });
 onBeforeUnmount(() => {
@@ -298,8 +388,11 @@ onBeforeUnmount(() => {
     window.removeEventListener('resize', closeMenu);
     window.removeEventListener('scroll', closeMenu, true);
     window.removeEventListener('keydown', handleEscape);
+    echo().private(realtimeChannelName).stopListening(realtimeEventName, handleRealtimeOrderUpdated);
+    echo().leave(realtimeChannelName);
     document.body.style.overflow = previousBodyOverflow;
     if (copiedTimer) clearTimeout(copiedTimer);
+    if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
 });
 </script>
 

@@ -3,6 +3,7 @@
 namespace App\Features\Topup\Observers;
 
 use App\Features\Reporting\Services\TopupDiscordReporterService;
+use App\Features\Topup\Events\AdminTopupOrderUpdated;
 use App\Features\Topup\Events\OrderStatusUpdated;
 use App\Models\OrderRecipient;
 
@@ -17,15 +18,37 @@ class OrderRecipientObserver
             $this->discordReporter->recipientNeedsAttention($recipient);
         }
 
-        if (! $recipient->wasChanged([
+        $publicStatusChanged = $recipient->wasChanged([
             'status',
             'provider_status',
             'completed_at',
             'failed_at',
-        ])) {
+        ]);
+        $adminVisibleStateChanged = $recipient->wasChanged([
+            'status',
+            'provider_status',
+            'provider_reference',
+            'provider_response',
+            'failure_reason',
+            'status_check_attempts',
+            'submitted_at',
+            'last_checked_at',
+            'completed_at',
+            'failed_at',
+        ]);
+
+        if (! $publicStatusChanged && ! $adminVisibleStateChanged) {
             return;
         }
 
-        OrderStatusUpdated::dispatch($recipient->order()->firstOrFail());
+        $order = $recipient->order()->firstOrFail();
+
+        if ($publicStatusChanged) {
+            OrderStatusUpdated::dispatch($order);
+        }
+
+        if ($adminVisibleStateChanged) {
+            AdminTopupOrderUpdated::dispatch($order);
+        }
     }
 }

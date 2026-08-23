@@ -2,16 +2,30 @@
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Features\Topup\Events\AdminTopupOrderUpdated;
 use App\Features\Topup\Events\OrderStatusUpdated;
 use App\Features\Topup\Services\OrderStatusService;
 use App\Features\Topup\Support\OrderRealtimeChannel;
 use App\Models\Order;
 use App\Models\OrderRecipient;
+use App\Models\User;
 use Illuminate\Broadcasting\Channel;
+use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcastNow;
 use Illuminate\Contracts\Broadcasting\ShouldRescue;
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Support\Facades\Event;
+
+test('a newly created order dispatches the private admin realtime event', function (): void {
+    Event::fake([AdminTopupOrderUpdated::class]);
+
+    $order = Order::factory()->create();
+
+    Event::assertDispatched(
+        AdminTopupOrderUpdated::class,
+        fn (AdminTopupOrderUpdated $event): bool => $event->orderId === $order->id && $event->code === $order->code,
+    );
+});
 
 test('a status transition dispatches a realtime order event', function (): void {
     $order = Order::factory()->create([
@@ -19,7 +33,7 @@ test('a status transition dispatches a realtime order event', function (): void 
         'payment_status' => PaymentStatus::Paid,
     ]);
 
-    Event::fake([OrderStatusUpdated::class]);
+    Event::fake([OrderStatusUpdated::class, AdminTopupOrderUpdated::class]);
 
     app(OrderStatusService::class)->transition($order, OrderStatus::Processing);
 
@@ -28,28 +42,31 @@ test('a status transition dispatches a realtime order event', function (): void 
             && $event->paymentStatus === PaymentStatus::Paid->value
             && $event->channelName === OrderRealtimeChannel::for($order);
     });
+    Event::assertDispatched(AdminTopupOrderUpdated::class, fn (AdminTopupOrderUpdated $event): bool => $event->code === $order->code);
 });
 
-test('unrelated order updates do not dispatch a realtime event', function (): void {
+test('provider reference updates only dispatch the private admin realtime event', function (): void {
     $order = Order::factory()->create();
 
-    Event::fake([OrderStatusUpdated::class]);
+    Event::fake([OrderStatusUpdated::class, AdminTopupOrderUpdated::class]);
 
     $order->forceFill(['provider_reference' => 'provider-reference-123'])->save();
 
     Event::assertNotDispatched(OrderStatusUpdated::class);
+    Event::assertDispatched(AdminTopupOrderUpdated::class);
 });
 
 test('a recipient provider status update dispatches the same realtime order event', function (): void {
     $order = Order::factory()->create();
     $recipient = OrderRecipient::factory()->for($order)->create();
 
-    Event::fake([OrderStatusUpdated::class]);
+    Event::fake([OrderStatusUpdated::class, AdminTopupOrderUpdated::class]);
 
     $recipient->update(['status' => 'processing', 'provider_status' => 'pending']);
 
     Event::assertDispatched(OrderStatusUpdated::class, fn (OrderStatusUpdated $event): bool => $event->channelName === OrderRealtimeChannel::for($order)
         && $event->recipientSummary['processing'] === 1);
+    Event::assertDispatched(AdminTopupOrderUpdated::class, fn (AdminTopupOrderUpdated $event): bool => $event->code === $order->code);
 });
 
 test('provider bookkeeping without a visible status change does not broadcast', function (): void {
@@ -59,7 +76,7 @@ test('provider bookkeeping without a visible status change does not broadcast', 
         'provider_status' => 'processing',
     ]);
 
-    Event::fake([OrderStatusUpdated::class]);
+    Event::fake([OrderStatusUpdated::class, AdminTopupOrderUpdated::class]);
 
     $recipient->update([
         'provider_reference' => 'provider-reference-123',
@@ -68,6 +85,47 @@ test('provider bookkeeping without a visible status change does not broadcast', 
     ]);
 
     Event::assertNotDispatched(OrderStatusUpdated::class);
+    Event::assertDispatched(AdminTopupOrderUpdated::class);
+});
+
+test('admin order event uses the private admin channel and sends the row snapshot', function (): void {
+    $order = Order::factory()->create([
+        'payment_status' => PaymentStatus::Paid,
+        'order_status' => OrderStatus::Failed,
+        'provider_reference' => 'THE9P-REF',
+        'failure_reason' => 'Provider hết số dư',
+    ]);
+
+    $event = new AdminTopupOrderUpdated($order);
+    $channel = $event->broadcastOn();
+
+    expect($event)
+        ->toBeInstanceOf(ShouldBroadcastNow::class)
+        ->toBeInstanceOf(ShouldDispatchAfterCommit::class)
+        ->toBeInstanceOf(ShouldRescue::class)
+        ->and($channel)->toBeInstanceOf(PrivateChannel::class)
+        ->and($channel->name)->toBe('private-admin.topup.orders')
+        ->and($event->broadcastAs())->toBe('admin.topup.order.updated')
+        ->and($event->broadcastWith())->toMatchArray([
+            'id' => $order->id,
+            'code' => $order->code,
+            'payment_status' => 'paid',
+            'order_status' => 'failed',
+            'provider_reference' => 'THE9P-REF',
+            'failure_reason' => 'Provider hết số dư',
+        ]);
+});
+
+test('only admins can authorize the private topup order channel', function (): void {
+    $payload = ['socket_id' => '1234.5678', 'channel_name' => 'private-admin.topup.orders'];
+
+    $this->actingAs(User::factory()->create())
+        ->postJson('/broadcasting/auth', $payload)
+        ->assertForbidden();
+
+    $this->actingAs(User::factory()->create(['role' => 'admin']))
+        ->postJson('/broadcasting/auth', $payload)
+        ->assertSuccessful();
 });
 
 test('the realtime event uses an opaque channel and exposes only status data', function (): void {
