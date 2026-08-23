@@ -56,7 +56,9 @@ const writeGuestOrderHistory = (orders) => {
 };
 
 const rememberGuestOrder = (code, createdAtValue = '') => {
-    const normalizedCode = String(code || '').trim().toUpperCase();
+    const normalizedCode = String(code || '')
+        .trim()
+        .toUpperCase();
 
     if (!/^TOP[A-Z0-9]{6,32}$/.test(normalizedCode)) return readGuestOrderHistory();
 
@@ -71,51 +73,81 @@ const rememberGuestOrder = (code, createdAtValue = '') => {
     return nextOrders;
 };
 
+const filterGuestOrderHistory = (history) => {
+    const search = history?.querySelector('[data-guest-order-history-search]');
+    const count = history?.querySelector('[data-guest-order-history-count]');
+    const filterEmpty = history?.querySelector('[data-guest-order-history-filter-empty]');
+    const rows = Array.from(history?.querySelectorAll('[data-guest-order-history-row]') || []);
+    const query = search?.value.trim().toUpperCase() || '';
+    let visibleRows = 0;
+
+    rows.forEach((row) => {
+        const isVisible = !query || row.dataset.guestOrderHistoryCode?.includes(query);
+        row.hidden = !isVisible;
+        if (isVisible) visibleRows += 1;
+    });
+
+    if (count) count.textContent = query ? `${visibleRows}/${rows.length} đơn` : `${rows.length} đơn`;
+    if (filterEmpty) filterEmpty.classList.toggle('hidden', rows.length === 0 || visibleRows > 0);
+};
+
 const renderGuestOrderHistory = (orders) => {
     const history = document.querySelector('[data-guest-order-history]');
     const list = history?.querySelector('[data-guest-order-history-list]');
     const empty = history?.querySelector('[data-guest-order-history-empty]');
+    const table = history?.querySelector('[data-guest-order-history-table]');
     const template = history?.querySelector('[data-guest-order-history-item]');
-    const lookupUrl = document.body.dataset.orderLookupUrl;
     const detailUrlTemplate = document.body.dataset.orderDetailUrlTemplate;
 
-    if (!history || !list || !(template instanceof HTMLTemplateElement) || !lookupUrl) return;
+    if (!history || !list || !(template instanceof HTMLTemplateElement)) return;
 
     list.replaceChildren();
 
     if (orders.length === 0) {
+        if (table) table.hidden = true;
         if (empty) {
             empty.hidden = false;
             history.hidden = false;
         }
 
+        filterGuestOrderHistory(history);
+
         return;
     }
 
     if (empty) empty.hidden = true;
+    if (table) table.hidden = false;
 
-    orders.forEach((entry) => {
+    orders.forEach((entry, index) => {
         const item = template.content.cloneNode(true);
+        const row = item.querySelector('[data-guest-order-history-row]');
+        const orderIndex = item.querySelector('[data-guest-order-history-index]');
         const orderCode = item.querySelector('[data-guest-order-history-code]');
         const orderTime = item.querySelector('[data-guest-order-history-time]');
-        const orderLink = item.querySelector('[data-guest-order-history-link]');
-        const detailTrigger = item.querySelector('[data-guest-order-detail]');
-        const url = new URL(lookupUrl, window.location.origin);
-        url.searchParams.set('code', entry.code);
+        const expiryTime = item.querySelector('[data-guest-order-history-expiry]');
+        const detailTriggers = item.querySelectorAll('[data-guest-order-detail]');
 
+        if (row) row.dataset.guestOrderHistoryCode = entry.code;
+        if (orderIndex) orderIndex.textContent = String(index + 1);
         if (orderCode) orderCode.textContent = entry.code;
         if (orderTime) {
             orderTime.dateTime = entry.createdAt;
             orderTime.textContent = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(entry.createdAt));
         }
-        if (orderLink) orderLink.href = url.toString();
-        if (detailTrigger && detailUrlTemplate) {
+        if (expiryTime) {
+            expiryTime.dateTime = new Date(entry.expiresAt).toISOString();
+            expiryTime.textContent = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short' }).format(new Date(entry.expiresAt));
+        }
+        detailTriggers.forEach((detailTrigger) => {
+            if (!detailUrlTemplate) return;
+
             detailTrigger.dataset.orderCode = entry.code;
             detailTrigger.dataset.orderDetailUrl = detailUrlTemplate.replace('__ORDER__', encodeURIComponent(entry.code));
-        }
+        });
         list.append(item);
     });
 
+    filterGuestOrderHistory(history);
     history.hidden = false;
 };
 
@@ -129,6 +161,9 @@ const initializeGuestOrderHistory = () => {
     if (/^TOP[A-Z0-9]{6,32}$/.test(code)) orders = rememberGuestOrder(code, orderMarker?.dataset.guestOrderCreatedAt || '');
 
     renderGuestOrderHistory(orders);
+    document
+        .querySelector('[data-guest-order-history-search]')
+        ?.addEventListener('input', (event) => filterGuestOrderHistory(event.currentTarget.closest('[data-guest-order-history]')));
 };
 
 initializeGuestOrderHistory();

@@ -132,8 +132,8 @@
         </div>
     </form>
 
-    <div class="client-card mt-5 hidden overflow-hidden lg:block" data-order-table>
-        <div class="w-full min-w-0 overflow-x-auto overscroll-x-contain">
+    <div class="client-card mt-5 overflow-hidden" data-order-datatable data-order-table>
+        <div class="w-full min-w-0 overflow-x-auto overscroll-x-contain" tabindex="0" role="region" aria-label="Bảng lịch sử đơn hàng">
             <table class="w-full min-w-[920px] table-auto text-left text-sm">
                 <thead class="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500">
                     <tr>
@@ -173,42 +173,13 @@
                 </tbody>
             </table>
         </div>
+        <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+            <p class="text-sm text-slate-500">Hiển thị <strong class="text-slate-900">{{ $orders->firstItem() ?? 0 }}–{{ $orders->lastItem() ?? 0 }}</strong> trong tổng số <strong class="text-slate-900">{{ number_format($orders->total()) }}</strong> đơn.</p>
+            @if ($orders->hasPages())
+                <div class="min-w-0">{{ $orders->onEachSide(1)->links() }}</div>
+            @endif
+        </footer>
     </div>
-
-    <div class="mt-5 grid gap-3 lg:hidden" data-order-mobile-list>
-        @forelse ($orders as $order)
-            <article class="client-card min-w-0 p-4">
-                <div class="flex min-w-0 items-start justify-between gap-3">
-                    <div class="min-w-0">
-                        <button class="break-all text-left font-extrabold text-indigo-700" type="button" data-order-detail-trigger data-order-code="{{ $order->code }}" data-order-detail-url="{{ route('orders.details', $order) }}">{{ $order->code }}</button>
-                        <p class="mt-1 text-xs text-slate-500">{{ $order->created_at?->format('d/m/Y H:i') }}</p>
-                    </div>
-                    <strong class="shrink-0 whitespace-nowrap text-right text-slate-950">{{ number_format((int) $order->total_amount, 0, ',', '.') }}đ</strong>
-                </div>
-                <div class="mt-4 grid min-w-0 grid-cols-2 gap-3 rounded-[5px] bg-slate-50 p-3 text-sm">
-                    <div class="min-w-0"><p class="text-xs text-slate-500">Game</p><p class="mt-1 break-words font-bold">{{ $order->game?->name ?? 'Game đã xóa' }}</p></div>
-                    <div class="min-w-0"><p class="text-xs text-slate-500">Máy chủ</p><p class="mt-1 break-words font-bold">{{ $order->server?->name ?? 'Không xác định' }}</p></div>
-                    <div class="col-span-2 min-w-0"><p class="text-xs text-slate-500">Gói nạp</p><p class="mt-1 break-words font-bold">{{ $order->package_name }} × {{ number_format($order->quantity) }}</p></div>
-                    <div class="col-span-2 min-w-0"><p class="text-xs text-slate-500">Tài khoản game</p><p class="mt-1 break-all font-bold">{{ $order->game_account }}</p></div>
-                </div>
-                <div class="mt-3 flex flex-wrap gap-2">
-                    <span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $paymentClasses[$order->payment_status->value] ?? 'border-slate-200 bg-slate-50 text-slate-600' }}">{{ $paymentLabels[$order->payment_status->value] ?? $order->payment_status->value }}</span>
-                    <span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $orderClasses[$order->order_status->value] ?? 'border-slate-200 bg-slate-50 text-slate-600' }}">{{ $orderLabels[$order->order_status->value] ?? $order->order_status->value }}</span>
-                </div>
-                <button class="client-button-secondary mt-4 w-full gap-2 bg-white" type="button" data-order-detail-trigger data-order-code="{{ $order->code }}" data-order-detail-url="{{ route('orders.details', $order) }}">Xem chi tiết<i class="bx bx-show text-lg" aria-hidden="true"></i></button>
-            </article>
-        @empty
-            <div class="client-card p-8 text-center">
-                <i class="bx bx-receipt mb-3 text-4xl text-slate-300" aria-hidden="true"></i>
-                <p class="font-bold text-slate-700">Không tìm thấy đơn hàng phù hợp.</p>
-                @if ($hasFilters)<a class="mt-3 inline-flex font-bold text-emerald-700" href="{{ route('account.orders.index') }}">Xóa bộ lọc</a>@endif
-            </div>
-        @endforelse
-    </div>
-
-    @if ($orders->hasPages())
-        <div class="mt-6">{{ $orders->onEachSide(1)->links() }}</div>
-    @endif
 </section>
 
 <x-client.order-detail-modal />

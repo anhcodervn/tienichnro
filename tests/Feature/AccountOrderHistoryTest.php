@@ -28,7 +28,7 @@ test('guest is redirected to login from account order history', function (): voi
         ->assertRedirect(route('login'));
 });
 
-test('account order history renders server paginated table filters and mobile cards for owner only', function (): void {
+test('account order history renders one responsive server paginated data table for owner only', function (): void {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
     $game = Game::factory()->create(['name' => 'Ngọc Rồng Online']);
@@ -44,8 +44,11 @@ test('account order history renders server paginated table filters and mobile ca
         ->assertSuccessful()
         ->assertSee('Lịch sử đơn hàng')
         ->assertSee('data-order-filters', false)
+        ->assertSee('data-order-datatable', false)
         ->assertSee('data-order-table', false)
-        ->assertSee('data-order-mobile-list', false)
+        ->assertDontSee('data-order-mobile-list', false)
+        ->assertSee('aria-label="Bảng lịch sử đơn hàng"', false)
+        ->assertSee('Hiển thị <strong class="text-slate-900">1–1</strong>', false)
         ->assertSee('data-order-detail-modal', false)
         ->assertSee('data-order-detail-trigger', false)
         ->assertSee(route('orders.details', $ownerOrder), false)
