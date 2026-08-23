@@ -2,6 +2,7 @@
 
 use App\Features\Topup\Services\OrderClaimService;
 use App\Models\Game;
+use App\Models\GameServer;
 use App\Models\Order;
 use App\Models\User;
 
@@ -60,15 +61,23 @@ test('wrong email cannot view guest order', function (): void {
 
 test('guest history unlock returns modal detail url and grants session access', function (): void {
     $game = Game::factory()->create(['name' => 'Ngọc Rồng Online']);
+    $server = GameServer::factory()->for($game)->create(['name' => 'Máy chủ 7']);
     $order = Order::factory()->create([
         'game_id' => $game->id,
+        'game_server_id' => $server->id,
         'topup_package_id' => null,
         'email' => 'owner@example.com',
         'normalized_email' => 'owner@example.com',
+        'game_account' => 'guest-player',
+        'quantity' => 4,
+        'total_amount' => 34000,
         'package_name' => 'Gói 10.000đ',
     ]);
 
     $this->get(route('orders.details', $order))->assertForbidden();
+    $this->postJson(route('orders.history'), ['codes' => [$order->code]])
+        ->assertSuccessful()
+        ->assertJsonCount(0, 'data.orders');
 
     $this->postJson(route('orders.lookup.submit'), [
         'code' => $order->code,
@@ -78,6 +87,16 @@ test('guest history unlock returns modal detail url and grants session access', 
         ->assertJsonPath('status', true)
         ->assertJsonPath('data.code', $order->code)
         ->assertJsonPath('data.detail_url', route('orders.details', $order));
+
+    $this->postJson(route('orders.history'), ['codes' => [$order->code]])
+        ->assertSuccessful()
+        ->assertJsonPath('data.orders.0.code', $order->code)
+        ->assertJsonPath('data.orders.0.account', 'guest-player')
+        ->assertJsonPath('data.orders.0.server', 'Máy chủ 7')
+        ->assertJsonPath('data.orders.0.quantity', 4)
+        ->assertJsonPath('data.orders.0.total_amount', 34000)
+        ->assertJsonMissingPath('data.orders.0.email')
+        ->assertJsonMissingPath('data.orders.0.provider_reference');
 
     $this->get(route('orders.details', $order))
         ->assertSuccessful()

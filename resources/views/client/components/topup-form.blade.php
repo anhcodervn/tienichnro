@@ -1,6 +1,8 @@
 @php
     $selectedGame = $selectedGame ?? null;
     $walletBalance = $walletBalance ?? 0;
+    $turnstileEnabled = (bool) ($turnstileEnabled ?? false);
+    $turnstileSiteKey = (string) ($turnstileSiteKey ?? '');
     $requestedGame = old('game_id', $selectedGame?->id ?? $games->first()?->id);
     $initialGame = $games->contains(fn ($game) => (string) $game->id === (string) $requestedGame)
         ? $requestedGame
@@ -36,9 +38,23 @@
     $initialPaymentMethod = $initialCanPayWithWallet && old('payment_method') !== 'bank_transfer'
         ? 'wallet'
         : 'bank_transfer';
-    $initialCanSubmit = $initialPackage
-        && $initialQuantity >= (int) $initialPackage->min_quantity
-        && $initialQuantity <= (int) ($initialPackage->max_quantity ?: 100);
+    $initialBulkQuantitiesAreValid = $initialBulkLines->isNotEmpty()
+        && $initialBulkLines->every(function ($line) use ($initialPackage): bool {
+            if (! $initialPackage) {
+                return false;
+            }
+
+            $values = explode('|', $line);
+            $quantity = trim((string) end($values));
+
+            return preg_match('/^[1-9]\d*$/D', $quantity) === 1
+                && (int) $quantity >= (int) $initialPackage->min_quantity
+                && (int) $quantity <= min(10, (int) ($initialPackage->max_quantity ?: 10));
+        });
+    $initialCanSubmit = $initialPackage && ($initialPurchaseMode === 'bulk'
+        ? $initialBulkQuantitiesAreValid
+        : $initialQuantity >= (int) $initialPackage->min_quantity
+            && $initialQuantity <= min(10, (int) ($initialPackage->max_quantity ?: 10)));
 @endphp
 
 <form method="POST" action="{{ route('checkout.store') }}" class="home-checkout-card" data-topup-form>
@@ -93,7 +109,7 @@
                                 data-price="{{ (int) $package->price }}"
                                 data-discount="{{ (float) $package->discount_percent }}"
                                 data-min="{{ $package->min_quantity }}"
-                                data-max="{{ $package->max_quantity ?: 100 }}"
+                                data-max="{{ min(10, (int) ($package->max_quantity ?: 10)) }}"
                                 data-reward-label="{{ $game->reward_label ?: 'Thực nhận' }}"
                                 data-reward="{{ $package->carot_amount }}"
                                 data-reward-x2="{{ $package->reward_x2_amount }}"
@@ -205,7 +221,7 @@
                             <label for="topup-single-quantity">Số lượng</label>
                             <div class="home-quantity-control">
                                 <button type="button" data-quantity-decrease aria-label="Giảm số lượng">−</button>
-                                <input id="topup-single-quantity" type="number" name="single_quantity" min="1" max="100" value="{{ $initialSingleQuantity }}" inputmode="numeric" data-single-quantity required @disabled($initialPurchaseMode !== 'single')>
+                                <input id="topup-single-quantity" type="number" name="single_quantity" min="1" max="10" value="{{ $initialSingleQuantity }}" inputmode="numeric" data-single-quantity required @disabled($initialPurchaseMode !== 'single')>
                                 <button type="button" data-quantity-increase aria-label="Tăng số lượng">+</button>
                             </div>
                             @error('single_quantity')<p class="home-field-error">{{ $message }}</p>@enderror
@@ -270,6 +286,17 @@
                     <p class="home-field-help">Dùng để gửi trạng thái và tra cứu đơn hàng.</p>
                     @error('email')<p class="home-field-error">{{ $message }}</p>@enderror
                 </div>
+
+                @if ($turnstileEnabled && $turnstileSiteKey !== '')
+                    <div class="home-field" data-turnstile-checkout>
+                        <div class="cf-turnstile" data-sitekey="{{ $turnstileSiteKey }}" data-action="guest_checkout" data-theme="light"></div>
+                        <p class="home-field-help">Xác minh bạn không phải bot trước khi tạo đơn.</p>
+                        @error('cf-turnstile-response')<p class="home-field-error">{{ $message }}</p>@enderror
+                    </div>
+                    @once
+                        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer data-turnstile-script></script>
+                    @endonce
+                @endif
             @endguest
         </div>
 

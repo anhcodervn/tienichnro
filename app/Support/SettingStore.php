@@ -3,6 +3,7 @@
 namespace App\Support;
 
 use App\Models\Setting;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
 
 class SettingStore
@@ -54,6 +55,17 @@ class SettingStore
             [
                 'value' => $value,
                 'type' => 'string',
+            ],
+        );
+    }
+
+    public function putEncryptedString(string $key, string $value): Setting
+    {
+        return Setting::query()->updateOrCreate(
+            ['key' => $key],
+            [
+                'value' => Crypt::encryptString($value),
+                'type' => 'encrypted',
             ],
         );
     }
@@ -118,6 +130,10 @@ class SettingStore
 
         if ($setting->type === 'boolean') {
             return filter_var($setting->value, FILTER_VALIDATE_BOOL, FILTER_NULL_ON_FAILURE) ?? (bool) $default;
+        }
+
+        if ($setting->type === 'encrypted') {
+            return filled($setting->value) ? Crypt::decryptString((string) $setting->value) : $default;
         }
 
         return $setting->value ?? $default;

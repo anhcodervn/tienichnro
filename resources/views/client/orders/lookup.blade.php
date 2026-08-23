@@ -15,7 +15,7 @@
     </header>
 
     <div class="mt-6 grid min-w-0 gap-5 lg:grid-cols-[minmax(0,1fr)_22rem] lg:items-start">
-        <section class="client-card min-w-0 overflow-hidden" data-guest-order-history>
+        <section class="client-card min-w-0 overflow-hidden" data-guest-order-history data-guest-order-history-url="{{ route('orders.history') }}">
             <div class="flex flex-col gap-2 border-b border-slate-200 bg-slate-50 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
                 <div>
                     <h2 class="flex items-center gap-2 font-extrabold text-slate-950"><i class="bx bx-receipt text-xl text-cyan-700" aria-hidden="true"></i>Đơn nạp gần đây</h2>
@@ -35,15 +35,15 @@
 
             <div data-guest-order-history-table hidden>
                 <div class="w-full min-w-0 overflow-x-auto overscroll-x-contain" tabindex="0" role="region" aria-label="Bảng lịch sử đơn hàng trên thiết bị">
-                    <table class="w-full min-w-[760px] table-auto text-left text-sm">
+                    <table class="w-full min-w-[860px] table-auto text-left text-sm">
                         <thead class="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500">
                             <tr>
                                 <th class="w-14 px-4 py-3 text-center">STT</th>
-                                <th class="px-4 py-3">Mã đơn</th>
-                                <th class="px-4 py-3">Ngày tạo</th>
-                                <th class="px-4 py-3">Lưu đến</th>
-                                <th class="px-4 py-3">Nguồn</th>
-                                <th class="px-4 py-3 text-right">Thao tác</th>
+                                <th class="px-4 py-3">Mã đơn<br><span class="normal-case tracking-normal text-slate-400">Thời gian tạo</span></th>
+                                <th class="px-4 py-3">Thông tin<br><span class="normal-case tracking-normal text-slate-400">Account · Server · Số lượng</span></th>
+                                <th class="px-4 py-3 text-right">Tổng tiền</th>
+                                <th class="px-4 py-3">Trạng thái</th>
+                                <th class="px-4 py-3 text-right">Xem chi tiết</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100" data-guest-order-history-list></tbody>
@@ -61,10 +61,10 @@
             <template data-guest-order-history-item>
                 <tr class="transition hover:bg-slate-50/80" data-guest-order-history-row>
                     <td class="px-4 py-4 text-center align-middle font-semibold text-slate-500" data-guest-order-history-index></td>
-                    <td class="px-4 py-4 align-middle"><button class="font-extrabold text-indigo-700 transition hover:text-indigo-800" type="button" data-guest-order-detail data-order-detail-trigger data-guest-order-history-code></button></td>
-                    <td class="whitespace-nowrap px-4 py-4 align-middle text-slate-600"><time data-guest-order-history-time></time></td>
-                    <td class="whitespace-nowrap px-4 py-4 align-middle text-slate-600"><time data-guest-order-history-expiry></time></td>
-                    <td class="px-4 py-4 align-middle"><span class="inline-flex items-center gap-1.5 rounded-[5px] border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700"><i class="bx bx-devices" aria-hidden="true"></i>Thiết bị này</span></td>
+                    <td class="px-4 py-4 align-middle"><button class="font-extrabold text-indigo-700 transition hover:text-indigo-800" type="button" data-guest-order-detail data-order-detail-trigger data-guest-order-history-code></button><time class="mt-1 block whitespace-nowrap text-xs text-slate-500" data-guest-order-history-time></time></td>
+                    <td class="min-w-64 px-4 py-4 align-middle"><p class="max-w-72 break-all font-bold text-slate-900" data-guest-order-history-account>Đang tải...</p><p class="mt-1 text-xs text-slate-500">SV: <strong class="text-slate-700" data-guest-order-history-server>—</strong></p><p class="mt-1 text-xs text-slate-500">Số lượng: <strong class="text-slate-700" data-guest-order-history-quantity>—</strong></p></td>
+                    <td class="whitespace-nowrap px-4 py-4 text-right align-middle font-extrabold text-slate-950" data-guest-order-history-total>—</td>
+                    <td class="px-4 py-4 align-middle"><span class="inline-flex rounded-[5px] border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-bold text-slate-600" data-guest-order-history-status>Đang tải...</span></td>
                     <td class="px-4 py-4 text-right align-middle"><button class="client-button-secondary min-h-10 shrink-0 gap-2 bg-white" type="button" data-guest-order-detail data-order-detail-trigger><i class="bx bx-show text-lg" aria-hidden="true"></i>Chi tiết</button></td>
                 </tr>
             </template>

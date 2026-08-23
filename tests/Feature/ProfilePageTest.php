@@ -15,6 +15,7 @@ test('profile tabs require authentication', function (string $routeName): void {
     'profile' => 'account.profile.edit',
     'password' => 'account.profile.password',
     'api key' => 'account.profile.api',
+    'api docs' => 'account.profile.api.docs',
     'user logs' => 'account.profile.logs',
     'wallet history' => 'account.profile.wallet',
 ]);
@@ -27,6 +28,7 @@ test('authenticated user can navigate every profile tab', function (): void {
         'account.profile.edit' => 'Hồ sơ hiển thị',
         'account.profile.password' => 'Đổi mật khẩu',
         'account.profile.api' => 'Quản lý API key',
+        'account.profile.api.docs' => 'Tài liệu API nạp game',
         'account.profile.logs' => 'Lịch sử người dùng',
         'account.profile.wallet' => 'Lịch sử dòng tiền',
     ];
@@ -39,9 +41,39 @@ test('authenticated user can navigate every profile tab', function (): void {
             ->assertSee('Thông tin user')
             ->assertSee('Đổi mật khẩu')
             ->assertSee('API key')
+            ->assertSee('Tài liệu API')
             ->assertSee('Lịch sử người dùng')
             ->assertSee('Lịch sử dòng tiền');
     }
+});
+
+test('api documentation describes every endpoint and multi recipient limit without exposing credentials', function (): void {
+    $user = User::factory()->create();
+    $privateSecret = 'ncs_private_secret_must_not_be_rendered';
+
+    $this->withSession([
+        'new_api_credentials' => [
+            'api_key' => 'nck_private_key_must_not_be_rendered',
+            'api_secret' => $privateSecret,
+        ],
+    ])->actingAs($user)
+        ->get(route('account.profile.api.docs'))
+        ->assertSuccessful()
+        ->assertSee('GET')
+        ->assertSee('/api/v1/balance')
+        ->assertSee('POST')
+        ->assertSee('/api/v1/tasks')
+        ->assertSee('/api/v1/tasks/TASK_ID')
+        ->assertSee('X-API-KEY')
+        ->assertSee('X-API-SECRET')
+        ->assertSee('request_id')
+        ->assertSee('tài khoản tối đa trong một task')
+        ->assertSee('thẻ tối đa cho mỗi tài khoản')
+        ->assertSee('6 + 5 = 11 thẻ vẫn hợp lệ.')
+        ->assertSee('YOUR_API_KEY')
+        ->assertSee('YOUR_API_SECRET')
+        ->assertDontSee($privateSecret)
+        ->assertDontSee('nck_private_key_must_not_be_rendered');
 });
 
 test('user can update profile fields but not account identity', function (): void {
@@ -187,6 +219,15 @@ test('activity and wallet tabs show only records owned by the signed in user', f
         'status' => 'success',
     ]);
     WalletTransaction::query()->create([
+        'wallet_id' => $user->wallet()->firstOrFail()->id,
+        'type' => 'adjustment',
+        'amount' => -30000,
+        'balance_before' => 100000,
+        'balance_after' => 70000,
+        'description' => 'OWN WALLET DEBIT ENTRY',
+        'status' => 'success',
+    ]);
+    WalletTransaction::query()->create([
         'wallet_id' => $otherUser->wallet()->firstOrFail()->id,
         'type' => 'credit',
         'amount' => 200000,
@@ -205,6 +246,16 @@ test('activity and wallet tabs show only records owned by the signed in user', f
     $this->actingAs($user)
         ->get(route('account.profile.wallet'))
         ->assertSuccessful()
+        ->assertSee('data-wallet-datatable', false)
         ->assertSee('OWN WALLET ENTRY')
+        ->assertSee('OWN WALLET DEBIT ENTRY')
+        ->assertSee('Tiền vào')
+        ->assertSee('Điều chỉnh giảm')
+        ->assertSee('data-wallet-operation="+"', false)
+        ->assertSee('data-wallet-operation="-"', false)
+        ->assertSee('0 đồng cộng 100.000 đồng bằng 100.000 đồng')
+        ->assertSee('100.000 đồng trừ 30.000 đồng bằng 70.000 đồng')
+        ->assertSee('text-emerald-700', false)
+        ->assertSee('text-rose-700', false)
         ->assertDontSee('FOREIGN WALLET ENTRY');
 });

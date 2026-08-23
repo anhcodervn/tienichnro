@@ -33,8 +33,8 @@ class StoreTopupPackageRequest extends FormRequest
             'original_price' => ['required', 'integer', 'min:1', 'max:999999999999', 'gte:price'],
             'discount_percent' => ['prohibited'],
             'description' => ['nullable', 'string'], 'bonus_text' => ['nullable', 'string', 'max:255'],
-            'min_quantity' => ['required', 'integer', 'min:1', 'max:100'],
-            'max_quantity' => ['nullable', 'integer', 'gte:min_quantity', 'max:100'],
+            'min_quantity' => ['required', 'integer', 'min:1', 'max:10'],
+            'max_quantity' => ['nullable', 'integer', 'gte:min_quantity', 'max:10'],
             'status' => ['required', Rule::in(['active', 'inactive'])], 'sort_order' => ['required', 'integer', 'min:0'],
             'metadata' => ['nullable', 'array'],
         ];

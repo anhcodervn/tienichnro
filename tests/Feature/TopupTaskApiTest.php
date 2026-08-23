@@ -167,6 +167,41 @@ test('api creates a wallet task for one or many recipients with server-side pric
     Mail::assertQueued(OrderCreatedMail::class, 1);
 });
 
+test('api allows more than ten cards in total when each recipient has at most ten', function (): void {
+    [$game, $server, $package] = topupApiCatalog();
+    $user = User::factory()->create();
+    $user->wallet()->update(['balance' => 2000000]);
+
+    $this->withHeaders(topupApiCredentials($user))
+        ->postJson('/api/v1/tasks', topupApiPayload($game, $server, $package, [
+            'recipients' => [
+                ['data' => ['game_account' => 'player-one'], 'quantity' => 6],
+                ['data' => ['game_account' => 'player-two'], 'quantity' => 5],
+            ],
+        ]))
+        ->assertCreated()
+        ->assertJsonPath('data.quantity', 11)
+        ->assertJsonPath('data.amount', 990000);
+
+    expect(Order::query()->sole()->recipients()->orderBy('position')->pluck('quantity')->all())->toBe([6, 5]);
+});
+
+test('api rejects more than ten cards for a single recipient', function (): void {
+    [$game, $server, $package] = topupApiCatalog();
+    $user = User::factory()->create();
+    $user->wallet()->update(['balance' => 2000000]);
+
+    $this->withHeaders(topupApiCredentials($user))
+        ->postJson('/api/v1/tasks', topupApiPayload($game, $server, $package, [
+            'recipients' => [
+                ['data' => ['game_account' => 'player-one'], 'quantity' => 11],
+            ],
+        ]))
+        ->assertUnprocessable();
+
+    expect(Order::query()->count())->toBe(0);
+});
+
 test('repeating request id returns the same task without a second debit or job', function (): void {
     [$game, $server, $package] = topupApiCatalog();
     $user = User::factory()->create();

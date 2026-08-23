@@ -479,20 +479,23 @@ test('bulk checkout rejects an invalid card quantity', function (string $quantit
         ->assertSessionHasErrors('bulk_recipients');
 
     expect(Order::query()->count())->toBe(0);
-})->with(['zero' => '0', 'negative' => '-1', 'decimal' => '1.5', 'text' => 'abc', 'over per-account limit' => '101']);
+})->with(['zero' => '0', 'negative' => '-1', 'decimal' => '1.5', 'text' => 'abc', 'over per-account limit' => '11']);
 
-test('bulk checkout applies the package limit to the sum of card quantities', function (): void {
+test('bulk checkout applies the package limit to each account instead of the summed quantity', function (): void {
     [$game, $server, $package] = topupCatalog();
 
-    $this->from(route('topup.game', $game))
+    $response = $this->from(route('topup.game', $game))
         ->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
             'purchase_mode' => 'bulk',
             'bulk_recipients' => "account-1|hero-1|6\naccount-2|hero-2|5",
-        ]))
-        ->assertRedirect(route('topup.game', $game))
-        ->assertSessionHasErrors('bulk_recipients');
+        ]));
 
-    expect(Order::query()->count())->toBe(0);
+    $order = Order::query()->sole();
+
+    $response->assertRedirect(route('orders.payment', $order));
+    expect($order->quantity)->toBe(11)
+        ->and($order->recipients()->orderBy('position')->pluck('quantity')->all())->toBe([6, 5])
+        ->and((int) $order->total_amount)->toBe(990000);
 });
 
 test('recipient quantity backfill preserves historical single and bulk order semantics', function (): void {

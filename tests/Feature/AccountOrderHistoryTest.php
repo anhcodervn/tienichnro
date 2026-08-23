@@ -4,6 +4,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Models\Game;
+use App\Models\GameServer;
 use App\Models\Order;
 use App\Models\User;
 use Illuminate\Support\Carbon;
@@ -32,10 +33,15 @@ test('account order history renders one responsive server paginated data table f
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
     $game = Game::factory()->create(['name' => 'Ngọc Rồng Online']);
+    $server = GameServer::factory()->for($game)->create(['name' => 'Máy chủ 3']);
     $ownerOrder = createAccountHistoryOrder($user, $game, [
+        'game_server_id' => $server->id,
         'game_account' => 'owner-player',
         'package_name' => 'Gói 100.000đ',
+        'quantity' => 3,
         'total_amount' => 85000,
+        'payment_status' => PaymentStatus::Paid,
+        'order_status' => OrderStatus::Completed,
     ]);
     $otherOrder = createAccountHistoryOrder($otherUser, $game, ['game_account' => 'private-other-player']);
 
@@ -48,6 +54,7 @@ test('account order history renders one responsive server paginated data table f
         ->assertSee('data-order-table', false)
         ->assertDontSee('data-order-mobile-list', false)
         ->assertSee('aria-label="Bảng lịch sử đơn hàng"', false)
+        ->assertSee('Account · Server · Số lượng')
         ->assertSee('Hiển thị <strong class="text-slate-900">1–1</strong>', false)
         ->assertSee('data-order-detail-modal', false)
         ->assertSee('data-order-detail-trigger', false)
@@ -57,7 +64,10 @@ test('account order history renders one responsive server paginated data table f
         ->assertSee('name="date_from"', false)
         ->assertSee($ownerOrder->code)
         ->assertSee('owner-player')
+        ->assertSee('Máy chủ 3')
+        ->assertSee('Số lượng: <strong class="text-slate-700">3</strong>', false)
         ->assertSee('85.000đ')
+        ->assertSee('Hoàn thành')
         ->assertDontSee($otherOrder->code)
         ->assertDontSee('private-other-player');
 });

@@ -2,6 +2,7 @@
 
 namespace App\Features\Client\Topup\Controllers;
 
+use App\Features\Client\Topup\Requests\GuestOrderHistoryRequest;
 use App\Features\Client\Topup\Requests\LookupOrderRequest;
 use App\Features\Topup\Services\Payments\OrderBankPaymentService;
 use App\Features\Topup\Support\OrderRealtimeChannel;
@@ -59,6 +60,35 @@ class OrderController extends Controller
         return redirect()->route('orders.show', $order);
     }
 
+    public function history(GuestOrderHistoryRequest $request): JsonResponse
+    {
+        $codes = collect($request->validated('codes'))
+            ->map(fn (mixed $code): string => Str::upper((string) $code))
+            ->filter(fn (string $code): bool => (bool) $request->session()->get("orders.access.{$code}", false))
+            ->values();
+
+        $orders = Order::query()
+            ->select([
+                'id', 'code', 'game_server_id', 'game_account', 'quantity', 'total_amount',
+                'payment_status', 'order_status', 'created_at',
+            ])
+            ->with('server:id,name')
+            ->whereIn('code', $codes)
+            ->get()
+            ->keyBy('code');
+
+        return response()->json([
+            'status' => true,
+            'data' => [
+                'orders' => $codes
+                    ->map(fn (string $code): ?array => $orders->has($code) ? $this->historyItem($orders->get($code)) : null)
+                    ->filter()
+                    ->values()
+                    ->all(),
+            ],
+        ]);
+    }
+
     public function details(Request $request, Order $order): View
     {
         $this->authorizeAccess($request, $order);
@@ -107,5 +137,22 @@ class OrderController extends Controller
         $hasSessionAccess = (bool) $request->session()->get("orders.access.{$order->code}", false);
 
         abort_unless($isOwner || $hasSessionAccess || $request->hasValidSignature(), 403);
+    }
+
+    /**
+     * @return array{code: string, created_at: ?string, account: string, server: ?string, quantity: int, total_amount: int, payment_status: string, order_status: string}
+     */
+    private function historyItem(Order $order): array
+    {
+        return [
+            'code' => $order->code,
+            'created_at' => $order->created_at?->toISOString(),
+            'account' => (string) $order->game_account,
+            'server' => $order->server?->name,
+            'quantity' => (int) $order->quantity,
+            'total_amount' => (int) $order->total_amount,
+            'payment_status' => $order->payment_status->value,
+            'order_status' => $order->order_status->value,
+        ];
     }
 }

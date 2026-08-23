@@ -28,7 +28,7 @@ class AccountOrderHistoryService
                 'payment_status', 'order_status', 'created_at',
             ])
             ->whereBelongsTo($user)
-            ->with(['game:id,name', 'server:id,name'])
+            ->with('server:id,name')
             ->when($search !== '', function (Builder $query) use ($search): void {
                 $query->where(function (Builder $searchQuery) use ($search): void {
                     $searchQuery

@@ -20,6 +20,9 @@ Route::middleware('site.active')->group(function (): void {
     Route::post('/tra-cuu-don-hang', [OrderController::class, 'find'])
         ->middleware('throttle:6,1')
         ->name('orders.lookup.submit');
+    Route::post('/lich-su-don-hang/du-lieu', [OrderController::class, 'history'])
+        ->middleware('throttle:20,1')
+        ->name('orders.history');
     Route::get('/don-hang/{order}/chi-tiet-modal', [OrderController::class, 'details'])
         ->middleware('throttle:30,1')
         ->name('orders.details');

@@ -99,6 +99,11 @@ class UpdateTabSettingRequest extends FormRequest
                 'discord_webhooks.*.events' => ['nullable', 'array'],
                 'discord_webhooks.*.events.*' => ['string', 'in:test_ping,user_registered,recharge_success'],
             ],
+            'security' => [
+                'turnstile_enabled' => ['required', 'boolean'],
+                'turnstile_site_key' => ['nullable', 'string', 'max:255', 'required_if:turnstile_enabled,true'],
+                'turnstile_secret_key' => ['nullable', 'string', 'max:512'],
+            ],
             default => [],
         };
     }
@@ -192,6 +197,9 @@ class UpdateTabSettingRequest extends FormRequest
             'category_ids' => 'danh mục trang chủ',
             'items' => 'danh sách slider',
             'discord_webhooks' => 'danh sách webhook Discord',
+            'turnstile_enabled' => 'trạng thái Cloudflare Turnstile',
+            'turnstile_site_key' => 'Turnstile Site Key',
+            'turnstile_secret_key' => 'Turnstile Secret Key',
         ];
     }
 

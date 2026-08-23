@@ -2,6 +2,7 @@
 
 namespace App\Features\Client\Topup\Controllers;
 
+use App\Features\Client\Topup\Services\TurnstileService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\User;
@@ -12,8 +13,12 @@ use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
-    public function __invoke(Request $request, SettingStore $settingStore, EditorContentRenderer $contentRenderer): View
-    {
+    public function __invoke(
+        Request $request,
+        SettingStore $settingStore,
+        EditorContentRenderer $contentRenderer,
+        TurnstileService $turnstileService,
+    ): View {
         $games = Game::query()
             ->select(['id', 'name', 'slug', 'short_name', 'reward_label', 'description', 'checkout_fields', 'status', 'sort_order'])
             ->active()
@@ -58,6 +63,8 @@ class HomeController extends Controller
             'homeNoticeTitle' => (string) $systemSettings['home_notice_title'],
             'homeNoticeHtml' => $contentRenderer->renderNodes($homeNoticeContent),
             'homeNoticeIsPublished' => (bool) $systemSettings['home_notice_is_published'],
+            'turnstileEnabled' => $turnstileService->isEnabled(),
+            'turnstileSiteKey' => $turnstileService->siteKey(),
         ]);
     }
 }

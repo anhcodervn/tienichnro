@@ -6,6 +6,7 @@ test('client mobile navigation uses an accessible off canvas drawer', function (
     $script = file_get_contents($projectRoot.'/resources/js/client.js');
     $styles = file_get_contents($projectRoot.'/resources/css/client.css');
     $accountOrders = file_get_contents($projectRoot.'/resources/views/client/account/orders/index.blade.php');
+    $accountProfile = file_get_contents($projectRoot.'/resources/views/client/account/profile.blade.php');
     $wallet = file_get_contents($projectRoot.'/resources/views/client/account/wallet.blade.php');
     $topupGame = file_get_contents($projectRoot.'/resources/views/client/topup/game.blade.php');
     $payment = file_get_contents($projectRoot.'/resources/views/client/orders/payment.blade.php');
@@ -73,9 +74,19 @@ test('client mobile navigation uses an accessible off canvas drawer', function (
         ->toContain('@media (hover: hover) and (pointer: fine)')
         ->and($accountOrders)
         ->toContain('data-order-table')
-        ->toContain('data-order-mobile-list')
+        ->not->toContain('data-order-mobile-list')
         ->toContain('overflow-x-auto overscroll-x-contain')
         ->toContain('client-button w-full gap-2 sm:w-auto')
+        ->and($accountProfile)
+        ->toContain('data-account-tabs')
+        ->toContain('data-account-tab-active')
+        ->toContain('snap-x snap-mandatory')
+        ->toContain('md:grid-cols-2 lg:grid-cols-3')
+        ->toContain('Kéo ngang')
+        ->and($script)
+        ->toContain("document.querySelectorAll('[data-account-tabs]')")
+        ->toContain('const activeTabBounds = activeTab.getBoundingClientRect()')
+        ->toContain("tabs.scrollTo({ left: Math.max(0, left), behavior: 'auto' })")
         ->and($wallet)
         ->toContain('flex flex-col gap-3 p-4 sm:flex-row')
         ->and($topupGame)

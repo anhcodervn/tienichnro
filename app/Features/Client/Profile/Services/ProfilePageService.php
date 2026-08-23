@@ -2,6 +2,7 @@
 
 namespace App\Features\Client\Profile\Services;
 
+use App\Features\Topup\Services\OrderRecipientService;
 use App\Models\User;
 use App\Models\WalletTransaction;
 
@@ -12,7 +13,7 @@ class ProfilePageService
      */
     public function data(User $user, string $activeTab): array
     {
-        abort_unless(in_array($activeTab, ['profile', 'password', 'api', 'logs', 'wallet'], true), 404);
+        abort_unless(in_array($activeTab, ['profile', 'password', 'api', 'api-docs', 'logs', 'wallet'], true), 404);
 
         $wallet = $user->wallet()->first(['id', 'user_id', 'balance']);
 
@@ -27,6 +28,16 @@ class ProfilePageService
                     ->latest('id')
                     ->get(['id', 'name', 'api_key', 'permissions', 'last_used_at', 'expired_at', 'created_at'])
                 : collect(),
+            'apiDocumentation' => $activeTab === 'api-docs'
+                ? [
+                    'base_url' => url('/api/v1'),
+                    'balance_endpoint' => route('api.v1.balance'),
+                    'create_task_endpoint' => route('api.v1.tasks.store'),
+                    'task_status_endpoint' => route('api.v1.tasks.show', ['task' => 'TASK_ID']),
+                    'max_recipients' => OrderRecipientService::MAX_RECIPIENTS,
+                    'max_quantity_per_recipient' => OrderRecipientService::MAX_QUANTITY_PER_RECIPIENT,
+                ]
+                : null,
             'userLogs' => $activeTab === 'logs'
                 ? $user->userLogs()->latest('id')->paginate(12, ['id', 'action', 'description', 'ip', 'user_agent', 'created_at'], 'logs_page')->withQueryString()
                 : null,
@@ -34,7 +45,7 @@ class ProfilePageService
                 ? WalletTransaction::query()
                     ->where('wallet_id', $wallet->id)
                     ->latest('id')
-                    ->paginate(12, ['id', 'wallet_id', 'type', 'amount', 'balance_after', 'description', 'status', 'created_at'], 'wallet_page')
+                    ->paginate(12, ['id', 'wallet_id', 'type', 'amount', 'balance_before', 'balance_after', 'description', 'status', 'created_at'], 'wallet_page')
                     ->withQueryString()
                 : null,
         ];

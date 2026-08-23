@@ -2,6 +2,7 @@
 
 namespace App\Features\Client\Topup\Controllers;
 
+use App\Features\Client\Topup\Services\TurnstileService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\User;
@@ -17,7 +18,7 @@ class TopupController extends Controller
         return view('client.topup.index', compact('games'));
     }
 
-    public function show(Request $request, Game $game): View
+    public function show(Request $request, Game $game, TurnstileService $turnstileService): View
     {
         abort_unless($game->status === 'active', 404);
 
@@ -39,6 +40,11 @@ class TopupController extends Controller
         $user = $request->user();
         $walletBalance = (int) ($user?->wallet()->value('balance') ?? 0);
 
-        return view('client.topup.game', compact('game', 'walletBalance'));
+        return view('client.topup.game', [
+            'game' => $game,
+            'walletBalance' => $walletBalance,
+            'turnstileEnabled' => $turnstileService->isEnabled(),
+            'turnstileSiteKey' => $turnstileService->siteKey(),
+        ]);
     }
 }

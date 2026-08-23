@@ -69,6 +69,7 @@ class OrderService
                     quantity: $recipientData['quantity'],
                     lock: true,
                     quantityField: $recipientData['quantity_field'],
+                    recipientQuantities: array_column($recipientData['recipients'], 'quantity'),
                 );
                 $package = $quote['package'];
                 $package->loadMissing('provider');

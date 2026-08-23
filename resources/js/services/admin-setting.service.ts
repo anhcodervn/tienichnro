@@ -9,6 +9,7 @@ import type {
     HomepageNoticeSettingType,
     MonitoringSettingType,
     OptionSettingType,
+    SecuritySettingType,
     SeoSettingType,
     ServiceArticlesSettingType,
     SettingApiResponse,
@@ -92,6 +93,12 @@ export const adminSettingService = {
     },
     updateMonitoring(payload: MonitoringSettingType) {
         return updateTab<MonitoringSettingType>('monitoring', payload);
+    },
+    getSecurity() {
+        return getTab<SecuritySettingType>('security');
+    },
+    updateSecurity(payload: SecuritySettingType) {
+        return updateTab<SecuritySettingType>('security', payload);
     },
     getOptions() {
         return getTab<OptionSettingType>('options');

@@ -10,7 +10,7 @@ class OrderRecipientService
 {
     public const MAX_RECIPIENTS = 100;
 
-    public const MAX_QUANTITY_PER_RECIPIENT = 100;
+    public const MAX_QUANTITY_PER_RECIPIENT = 10;
 
     /**
      * @param  array<string, mixed>  $payload

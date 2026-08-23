@@ -4,6 +4,7 @@ import Editor from '@/components/shared/Editor/index.vue';
 import UploadImage from '@/components/shared/UpladImage/index.vue';
 import { useSystemSetting } from '@/composables/useSystemSetting';
 import CustomCodeSettings from '@/pages/admin/settings/CustomCodeSettings.vue';
+import SecuritySettings from '@/pages/admin/settings/SecuritySettings.vue';
 import { adminSettingService } from '@/services/admin-setting.service';
 import type {
     BrandingSettingType,
@@ -19,7 +20,7 @@ import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { Gamepad2, Plus, Trash2 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 
-type TabKey = 'general' | 'homepage' | 'service-articles' | 'branding' | 'contact' | 'seo' | 'custom-code' | 'monitoring';
+type TabKey = 'general' | 'homepage' | 'service-articles' | 'branding' | 'contact' | 'seo' | 'custom-code' | 'monitoring' | 'security';
 
 const tabs: Array<{ key: TabKey; label: string; description: string }> = [
     {
@@ -62,6 +63,11 @@ const tabs: Array<{ key: TabKey; label: string; description: string }> = [
         label: 'Webhook Discord',
         description: 'Bot cảnh báo vận hành cho đăng ký mới, nạp tiền và đơn nạp game lỗi.',
     },
+    {
+        key: 'security',
+        label: 'Captcha & bảo mật',
+        description: 'Cloudflare Turnstile bảo vệ thao tác tạo đơn của khách chưa đăng nhập.',
+    },
 ];
 
 const activeTab = ref<TabKey>('general');
@@ -76,6 +82,7 @@ const saving = ref<Record<TabKey, boolean>>({
     seo: false,
     'custom-code': false,
     monitoring: false,
+    security: false,
 });
 
 const generalForm = ref<GeneralSettingType>({
@@ -1004,6 +1011,8 @@ onMounted(async () => {
                 </div>
 
                 <CustomCodeSettings v-show="activeTab === 'custom-code'" />
+
+                <SecuritySettings v-show="activeTab === 'security'" />
 
                 <div v-show="activeTab === 'monitoring'" class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
                     <article class="rounded-[10px] border border-slate-200 bg-white p-4">

@@ -121,6 +121,13 @@ export interface MonitoringSettingType {
     [key: string]: unknown;
 }
 
+export interface SecuritySettingType {
+    turnstile_enabled: boolean;
+    turnstile_site_key: string;
+    turnstile_secret_key: string;
+    turnstile_secret_configured: boolean;
+}
+
 export interface SeoSettingType {
     meta_title: string;
     meta_description: string;

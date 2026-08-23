@@ -29,7 +29,7 @@ class StoreOrderRequest extends FormRequest
             ],
             'package_id' => ['required', 'integer', Rule::exists('topup_packages', 'id')],
             'purchase_mode' => ['required', Rule::in(['single', 'bulk'])],
-            'single_quantity' => ['exclude_unless:purchase_mode,single', 'required', 'integer', 'min:1', 'max:100'],
+            'single_quantity' => ['exclude_unless:purchase_mode,single', 'required', 'integer', 'min:1', 'max:10'],
             'recipient_fields' => ['exclude_unless:purchase_mode,single', 'required', 'array', 'min:1', 'max:6'],
             'recipient_fields.*' => ['nullable', 'string', 'max:191'],
             'bulk_recipients' => ['exclude_unless:purchase_mode,bulk', 'required', 'string', 'max:25000'],
@@ -40,6 +40,7 @@ class StoreOrderRequest extends FormRequest
                 'max:255',
             ],
             'payment_method' => ['required', Rule::enum(PaymentMethod::class)],
+            'cf-turnstile-response' => ['nullable', 'string', 'max:2048'],
         ];
     }
 }

@@ -38,7 +38,7 @@ class CreateTopupTaskRequest extends FormRequest
             'recipients.*' => ['required', 'array:data,quantity'],
             'recipients.*.data' => ['required', 'array', 'min:1', 'max:6'],
             'recipients.*.data.*' => ['nullable', 'string', 'max:191'],
-            'recipients.*.quantity' => ['required', 'integer', 'min:1', 'max:100'],
+            'recipients.*.quantity' => ['required', 'integer', 'min:1', 'max:10'],
         ];
     }
 

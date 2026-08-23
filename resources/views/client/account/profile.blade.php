@@ -10,6 +10,7 @@
         ['key' => 'profile', 'route' => 'account.index', 'icon' => 'bx-user-circle', 'title' => 'Thông tin user', 'description' => 'Hồ sơ và trạng thái tài khoản'],
         ['key' => 'password', 'route' => 'account.profile.password', 'icon' => 'bx-key', 'title' => 'Đổi mật khẩu', 'description' => 'Bảo mật phiên đăng nhập'],
         ['key' => 'api', 'route' => 'account.profile.api', 'icon' => 'bx-code-alt', 'title' => 'API key', 'description' => 'Khóa tích hợp cá nhân'],
+        ['key' => 'api-docs', 'route' => 'account.profile.api.docs', 'icon' => 'bx-book-open', 'title' => 'Tài liệu API', 'description' => 'Endpoint và mẫu tích hợp'],
         ['key' => 'logs', 'route' => 'account.profile.logs', 'icon' => 'bx-history', 'title' => 'Lịch sử người dùng', 'description' => 'Nhật ký thao tác tài khoản'],
         ['key' => 'wallet', 'route' => 'account.profile.wallet', 'icon' => 'bx-wallet-alt', 'title' => 'Lịch sử dòng tiền', 'description' => 'Biến động số dư ví'],
     ];
@@ -22,27 +23,34 @@
 
 <section class="client-container py-4 sm:py-6 lg:py-8">
     <div class="client-card min-w-0 overflow-hidden">
-        <nav class="overflow-x-auto border-b border-slate-200 p-3 sm:p-4" aria-label="Chức năng tài khoản">
-            <div class="flex min-w-max gap-2 lg:grid lg:min-w-0 lg:grid-cols-5">
-                @foreach ($tabs as $tab)
-                    <a
-                        @class([
-                            'flex min-h-[4.5rem] w-[13.5rem] items-center gap-3 rounded-[5px] border p-3 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 lg:w-auto',
-                            'border-slate-950 bg-slate-950 text-white shadow-sm' => $activeTab === $tab['key'],
-                            'border-slate-200 bg-slate-50 text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/50' => $activeTab !== $tab['key'],
-                        ])
-                        href="{{ route($tab['route']) }}"
-                        @if ($activeTab === $tab['key']) aria-current="page" @endif
-                    >
-                        <span @class(['grid h-10 w-10 shrink-0 place-items-center rounded-[5px] text-xl', 'bg-white/10 text-white' => $activeTab === $tab['key'], 'bg-slate-200/70 text-slate-500' => $activeTab !== $tab['key']])>
-                            <i class="bx {{ $tab['icon'] }}" aria-hidden="true"></i>
-                        </span>
-                        <span class="min-w-0">
-                            <strong class="block text-sm">{{ $tab['title'] }}</strong>
-                            <span @class(['mt-1 block text-xs leading-5', 'text-slate-300' => $activeTab === $tab['key'], 'text-slate-400' => $activeTab !== $tab['key']])>{{ $tab['description'] }}</span>
-                        </span>
-                    </a>
-                @endforeach
+        <nav class="border-b border-slate-200 bg-slate-50/70" aria-label="Chức năng tài khoản">
+            <div class="flex items-center justify-between gap-3 px-3 pb-2 pt-3 md:hidden">
+                <p class="text-xs font-bold uppercase tracking-[0.14em] text-slate-500">Chức năng tài khoản</p>
+                <span class="inline-flex items-center gap-1 text-xs font-semibold text-emerald-700"><i class="bx bx-left-arrow-alt text-base" aria-hidden="true"></i>Kéo ngang<i class="bx bx-right-arrow-alt text-base" aria-hidden="true"></i></span>
+            </div>
+
+            <div class="w-full overflow-x-auto overscroll-x-contain px-3 pb-3 md:overflow-visible md:p-4" data-account-tabs>
+                <div class="flex min-w-max snap-x snap-mandatory gap-2 md:grid md:min-w-0 md:grid-cols-2 lg:grid-cols-3">
+                    @foreach ($tabs as $tab)
+                        <a
+                            @class([
+                                'flex min-h-[4.75rem] w-[12.5rem] snap-start items-center gap-3 rounded-[5px] border p-3 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 md:w-auto',
+                                'border-slate-950 bg-slate-950 text-white shadow-sm ring-1 ring-slate-950/10' => $activeTab === $tab['key'],
+                                'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/60' => $activeTab !== $tab['key'],
+                            ])
+                            href="{{ route($tab['route']) }}"
+                            @if ($activeTab === $tab['key']) aria-current="page" data-account-tab-active @endif
+                        >
+                            <span @class(['grid h-10 w-10 shrink-0 place-items-center rounded-[5px] text-xl', 'bg-white/10 text-white' => $activeTab === $tab['key'], 'bg-slate-100 text-slate-500' => $activeTab !== $tab['key']])>
+                                <i class="bx {{ $tab['icon'] }}" aria-hidden="true"></i>
+                            </span>
+                            <span class="min-w-0">
+                                <strong class="block text-sm leading-5">{{ $tab['title'] }}</strong>
+                                <span @class(['mt-0.5 block text-xs leading-5', 'text-slate-300' => $activeTab === $tab['key'], 'text-slate-500' => $activeTab !== $tab['key']])>{{ $tab['description'] }}</span>
+                            </span>
+                        </a>
+                    @endforeach
+                </div>
             </div>
         </nav>
 
@@ -163,7 +171,9 @@
                 <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
                     <div class="grid content-start gap-3">
                         @if (session('new_api_credentials'))
-                            @php($newApiCredentials = session('new_api_credentials'))
+                            @php
+                                $newApiCredentials = session('new_api_credentials');
+                            @endphp
                             <section class="rounded-[5px] border border-emerald-300 bg-emerald-50 p-4">
                                 <h2 class="font-extrabold text-emerald-950">API key và API secret mới — chỉ hiển thị một lần</h2>
                                 <p class="mt-1 text-sm text-emerald-800">Sao chép cả hai giá trị ngay. API secret chỉ được lưu dạng hash nên không thể hiển thị lại.</p>
@@ -180,8 +190,13 @@
                         @endif
 
                         <section class="rounded-[5px] border border-slate-200 bg-white p-4 sm:p-6">
-                            <h2 class="text-xl font-extrabold text-slate-950">Quản lý API key</h2>
-                            <p class="mt-1 text-sm leading-6 text-slate-500">Mỗi request gửi cặp header <code>X-API-KEY</code> và <code>X-API-SECRET</code>. Không sử dụng Bearer token.</p>
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <h2 class="text-xl font-extrabold text-slate-950">Quản lý API key</h2>
+                                    <p class="mt-1 text-sm leading-6 text-slate-500">Mỗi request gửi cặp header <code>X-API-KEY</code> và <code>X-API-SECRET</code>. Không sử dụng Bearer token.</p>
+                                </div>
+                                <a class="client-button-secondary min-h-11 shrink-0 bg-white" href="{{ route('account.profile.api.docs') }}"><i class="bx bx-book-open text-lg" aria-hidden="true"></i>Xem tài liệu</a>
+                            </div>
                             <form class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end" method="POST" action="{{ route('account.profile.api.store') }}">
                                 @csrf
                                 <label class="client-label min-w-0 flex-1">Tên API key
@@ -224,6 +239,8 @@
                         </ul>
                     </aside>
                 </div>
+            @elseif ($activeTab === 'api-docs')
+                <x-client.api-documentation :documentation="$apiDocumentation" />
             @elseif ($activeTab === 'logs')
                 <section class="overflow-hidden rounded-[5px] border border-slate-200 bg-white">
                     <div class="flex flex-col gap-1 border-b border-slate-200 p-4 sm:p-5">
@@ -262,24 +279,71 @@
                             <h2 class="text-xl font-extrabold text-slate-950">Lịch sử dòng tiền</h2>
                             <p class="mt-1 text-sm text-slate-500">Toàn bộ biến động số dư được ghi theo sổ cái ví.</p>
                         </div>
-                        <div class="divide-y divide-slate-100">
-                            @forelse ($walletTransactions ?? [] as $transaction)
-                                @php($isCredit = in_array($transaction->type, ['credit', 'refund', 'release'], true))
-                                <article class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
-                                    <div class="flex min-w-0 items-start gap-3">
-                                        <span @class(['grid h-10 w-10 shrink-0 place-items-center rounded-[5px] text-xl', 'bg-emerald-50 text-emerald-600' => $isCredit, 'bg-rose-50 text-rose-600' => ! $isCredit])><i class="bx {{ $isCredit ? 'bx-down-arrow-alt' : 'bx-up-arrow-alt' }}" aria-hidden="true"></i></span>
-                                        <div class="min-w-0">
-                                            <h3 class="break-words font-extrabold text-slate-950">{{ $transaction->description ?: 'Giao dịch ví' }}</h3>
-                                            <p class="mt-1 text-xs text-slate-500">{{ $transaction->created_at?->format('d/m/Y H:i') }} · Số dư sau: {{ number_format((float) $transaction->balance_after, 0, ',', '.') }}đ</p>
-                                        </div>
-                                    </div>
-                                    <p @class(['shrink-0 text-lg font-extrabold tabular-nums', 'text-emerald-700' => $isCredit, 'text-rose-700' => ! $isCredit])>{{ $isCredit ? '+' : '-' }}{{ number_format((float) $transaction->amount, 0, ',', '.') }}đ</p>
-                                </article>
-                            @empty
-                                <div class="p-10 text-center text-sm text-slate-500">Chưa có giao dịch ví.</div>
-                            @endforelse
+                        <div class="w-full min-w-0 overflow-x-auto overscroll-x-contain" tabindex="0" role="region" aria-label="Bảng lịch sử dòng tiền" data-wallet-datatable>
+                            <table class="w-full min-w-[880px] table-auto text-left text-sm">
+                                <thead class="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500">
+                                    <tr>
+                                        <th class="w-14 px-4 py-3 text-center">STT</th>
+                                        <th class="px-4 py-3">Giao dịch<br><span class="normal-case tracking-normal text-slate-400">Thời gian tạo</span></th>
+                                        <th class="px-4 py-3">Loại</th>
+                                        <th class="px-4 py-3">Biến động số dư<br><span class="normal-case tracking-normal text-slate-400">Số dư trước ± Số tiền = Số dư sau</span></th>
+                                        <th class="px-4 py-3 text-right">Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100 bg-white">
+                                    @forelse ($walletTransactions ?? [] as $transaction)
+                                        @php
+                                            $balanceBefore = (float) $transaction->balance_before;
+                                            $balanceAfter = (float) $transaction->balance_after;
+                                            $balanceChange = $balanceAfter - $balanceBefore;
+                                            $isIncrease = $balanceChange >= 0;
+                                            $operation = $isIncrease ? '+' : '−';
+                                            $transactionLabel = match ($transaction->type) {
+                                                'credit' => 'Tiền vào',
+                                                'debit' => 'Tiền ra',
+                                                'refund' => 'Hoàn tiền',
+                                                'hold' => 'Tạm giữ',
+                                                'release' => 'Giải phóng',
+                                                'adjustment' => $isIncrease ? 'Điều chỉnh tăng' : 'Điều chỉnh giảm',
+                                                default => $isIncrease ? 'Cộng tiền' : 'Trừ tiền',
+                                            };
+                                            $status = match ($transaction->status) {
+                                                'success' => ['Thành công', 'border-emerald-200 bg-emerald-50 text-emerald-700'],
+                                                'failed' => ['Thất bại', 'border-rose-200 bg-rose-50 text-rose-700'],
+                                                'cancelled' => ['Đã hủy', 'border-slate-200 bg-slate-100 text-slate-600'],
+                                                default => ['Đang xử lý', 'border-amber-200 bg-amber-50 text-amber-700'],
+                                            };
+                                        @endphp
+                                        <tr class="transition hover:bg-slate-50/80">
+                                            <td class="px-4 py-4 text-center align-middle font-semibold text-slate-500">{{ ($walletTransactions?->firstItem() ?? 1) + $loop->index }}</td>
+                                            <td class="min-w-64 px-4 py-4 align-top">
+                                                <p class="break-words font-extrabold text-slate-950">{{ $transaction->description ?: 'Giao dịch ví' }}</p>
+                                                <time class="mt-1 block whitespace-nowrap text-xs text-slate-500" datetime="{{ $transaction->created_at?->toISOString() }}">{{ $transaction->created_at?->format('d/m/Y H:i') }}</time>
+                                            </td>
+                                            <td class="px-4 py-4 align-top">
+                                                <span @class(['inline-flex items-center gap-1.5 rounded-[5px] border px-2.5 py-1 text-xs font-bold', 'border-emerald-200 bg-emerald-50 text-emerald-700' => $isIncrease, 'border-rose-200 bg-rose-50 text-rose-700' => ! $isIncrease])>
+                                                    <i class="bx {{ $isIncrease ? 'bx-trending-up' : 'bx-trending-down' }} text-base" aria-hidden="true"></i>{{ $transactionLabel }}
+                                                </span>
+                                            </td>
+                                            <td class="whitespace-nowrap px-4 py-4 align-top font-bold tabular-nums" data-wallet-operation="{{ $isIncrease ? '+' : '-' }}" aria-label="{{ number_format($balanceBefore, 0, ',', '.') }} đồng {{ $isIncrease ? 'cộng' : 'trừ' }} {{ number_format(abs($balanceChange), 0, ',', '.') }} đồng bằng {{ number_format($balanceAfter, 0, ',', '.') }} đồng">
+                                                <span class="text-slate-700">{{ number_format($balanceBefore, 0, ',', '.') }}đ</span>
+                                                <span @class(['mx-1.5 text-base font-extrabold', 'text-emerald-700' => $isIncrease, 'text-rose-700' => ! $isIncrease])>{{ $operation }}</span>
+                                                <span @class(['font-extrabold', 'text-emerald-700' => $isIncrease, 'text-rose-700' => ! $isIncrease])>{{ number_format(abs($balanceChange), 0, ',', '.') }}đ</span>
+                                                <span class="mx-1.5 text-slate-400">=</span>
+                                                <span class="font-extrabold text-slate-950">{{ number_format($balanceAfter, 0, ',', '.') }}đ</span>
+                                            </td>
+                                            <td class="px-4 py-4 text-right align-top"><span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $status[1] }}">{{ $status[0] }}</span></td>
+                                        </tr>
+                                    @empty
+                                        <tr><td class="px-6 py-12 text-center text-slate-500" colspan="5">Chưa có giao dịch ví.</td></tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
                         </div>
-                        @if ($walletTransactions?->hasPages())<div class="border-t border-slate-200 p-4">{{ $walletTransactions->links() }}</div>@endif
+                        <footer class="flex flex-col gap-3 border-t border-slate-200 bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                            <p class="text-sm text-slate-500">Hiển thị <strong class="text-slate-900">{{ $walletTransactions?->firstItem() ?? 0 }}–{{ $walletTransactions?->lastItem() ?? 0 }}</strong> trong tổng số <strong class="text-slate-900">{{ number_format($walletTransactions?->total() ?? 0) }}</strong> giao dịch.</p>
+                            @if ($walletTransactions?->hasPages())<div class="min-w-0">{{ $walletTransactions->onEachSide(1)->links() }}</div>@endif
+                        </footer>
                     </section>
                 </div>
             @endif

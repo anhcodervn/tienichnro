@@ -42,3 +42,15 @@ test('setting store persists individual keys with correct types', function () {
         'terms_of_use' => [['type' => 'paragraph', 'children' => [['text' => 'Nội dung']]]],
     ]);
 });
+
+test('setting store encrypts sensitive strings at rest', function () {
+    $store = app(SettingStore::class);
+
+    $store->putEncryptedString('turnstile_secret_key', 'private-secret');
+
+    $setting = Setting::query()->where('key', 'turnstile_secret_key')->sole();
+
+    expect($setting->type)->toBe('encrypted')
+        ->and($setting->value)->not->toBe('private-secret')
+        ->and($store->getString('turnstile_secret_key'))->toBe('private-secret');
+});

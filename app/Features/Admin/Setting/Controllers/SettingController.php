@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Support\SettingStore;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Arr;
+use Illuminate\Validation\ValidationException;
 
 class SettingController extends Controller
 {
@@ -149,6 +150,12 @@ class SettingController extends Controller
             'monitoring' => [
                 'discord_webhooks' => [],
             ],
+            'security' => [
+                'turnstile_enabled' => false,
+                'turnstile_site_key' => '',
+                'turnstile_secret_key' => '',
+                'turnstile_secret_configured' => false,
+            ],
         ];
     }
 
@@ -234,6 +241,11 @@ class SettingController extends Controller
             'monitoring' => [
                 'discord_webhooks' => 'discord_webhooks',
             ],
+            'security' => [
+                'turnstile_enabled' => 'turnstile_enabled',
+                'turnstile_site_key' => 'turnstile_site_key',
+                'turnstile_secret_key' => 'turnstile_secret_key',
+            ],
         ];
     }
 
@@ -309,6 +321,16 @@ class SettingController extends Controller
 
         abort_if(! $this->tabExists($tab), 404);
 
+        if ($tab === 'security') {
+            return response()->json([
+                'status' => true,
+                'data' => [
+                    'tab' => $tab,
+                    'settings' => $this->securitySettings($settingStore),
+                ],
+            ]);
+        }
+
         $settings = $this->readTab($settingStore, $this->tabDefaults()[$tab], $this->tabStorageMap()[$tab]);
 
         return response()->json([
@@ -340,6 +362,34 @@ class SettingController extends Controller
                 'data' => [
                     'tab' => $tab,
                     'settings' => $settings,
+                ],
+            ]);
+        }
+
+        if ($tab === 'security') {
+            $secretKey = trim((string) ($validated['turnstile_secret_key'] ?? ''));
+
+            if ((bool) $validated['turnstile_enabled'] && $secretKey === '' && $settingStore->getString('turnstile_secret_key') === '') {
+                throw ValidationException::withMessages([
+                    'turnstile_secret_key' => 'Vui lòng nhập Secret Key trước khi bật Cloudflare Turnstile.',
+                ]);
+            }
+
+            $settingStore->putMany([
+                'turnstile_enabled' => (bool) $validated['turnstile_enabled'],
+                'turnstile_site_key' => trim((string) ($validated['turnstile_site_key'] ?? '')),
+            ]);
+
+            if ($secretKey !== '') {
+                $settingStore->putEncryptedString('turnstile_secret_key', $secretKey);
+            }
+
+            return response()->json([
+                'status' => true,
+                'message' => 'Cập nhật Cloudflare Turnstile thành công.',
+                'data' => [
+                    'tab' => $tab,
+                    'settings' => $this->securitySettings($settingStore),
                 ],
             ]);
         }
@@ -395,5 +445,20 @@ class SettingController extends Controller
                 'settings' => $payload,
             ],
         ]);
+    }
+
+    /**
+     * @return array{turnstile_enabled: bool, turnstile_site_key: string, turnstile_secret_key: string, turnstile_secret_configured: bool}
+     */
+    private function securitySettings(SettingStore $settingStore): array
+    {
+        $secretKey = $settingStore->getString('turnstile_secret_key');
+
+        return [
+            'turnstile_enabled' => (bool) $settingStore->get('turnstile_enabled', false),
+            'turnstile_site_key' => $settingStore->getString('turnstile_site_key'),
+            'turnstile_secret_key' => '',
+            'turnstile_secret_configured' => $secretKey !== '',
+        ];
     }
 }

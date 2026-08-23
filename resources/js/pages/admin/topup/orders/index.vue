@@ -38,15 +38,7 @@ type Pagination = {
 
 type AdminTopupOrderUpdatedEvent = Pick<
     OrderRow,
-    | 'id'
-    | 'code'
-    | 'payment_status'
-    | 'order_status'
-    | 'can_reorder'
-    | 'can_sync_provider'
-    | 'provider_reference'
-    | 'failure_reason'
-    | 'paid_at'
+    'id' | 'code' | 'payment_status' | 'order_status' | 'can_reorder' | 'can_sync_provider' | 'provider_reference' | 'failure_reason' | 'paid_at'
 > & { updated_at: string };
 
 const orders = ref<OrderRow[]>([]);
@@ -101,7 +93,7 @@ const summaries = computed<{ label: string; value: number; icon: Component; clas
         label: 'Đơn lỗi / trang',
         value: orders.value.filter((order) => order.order_status === 'failed').length,
         icon: TriangleAlert,
-        classes: 'border-rose-200/80 bg-gradient-to-br from-rose-50 to-white text-rose-700',
+        classes: 'border-rose-200/80 bg-gradient-to-br from-rose-50 to-white text-rose-700 ring-1 ring-rose-600/20',
         iconClasses: 'bg-rose-100 text-rose-700',
     },
 ]);
@@ -432,7 +424,7 @@ onBeforeUnmount(() => {
             </button>
         </header>
 
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Tổng quan đơn hàng">
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Tổng quan đơn hàng đang hiển thị">
             <article
                 v-for="summary in summaries"
                 :key="summary.label"

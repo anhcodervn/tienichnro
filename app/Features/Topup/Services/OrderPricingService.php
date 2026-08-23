@@ -9,6 +9,7 @@ use Illuminate\Validation\ValidationException;
 class OrderPricingService
 {
     /**
+     * @param  array<int, int>  $recipientQuantities
      * @return array{package:TopupPackage,server:GameServer,unit_price:int,subtotal:int,discount_amount:int,total_amount:int}
      */
     public function quote(
@@ -18,6 +19,7 @@ class OrderPricingService
         int $quantity,
         bool $lock = false,
         string $quantityField = 'quantity',
+        array $recipientQuantities = [],
     ): array {
         $query = TopupPackage::query()->with(['game:id,name,status', 'server:id,game_id,name,status']);
 
@@ -54,7 +56,13 @@ class OrderPricingService
             throw ValidationException::withMessages(['server_id' => 'Máy chủ không tồn tại hoặc đang tạm tắt.']);
         }
 
-        if ($quantity < $package->min_quantity || ($package->max_quantity !== null && $quantity > $package->max_quantity)) {
+        $quantitiesToValidate = $recipientQuantities !== [] ? $recipientQuantities : [$quantity];
+        $hasInvalidQuantity = collect($quantitiesToValidate)->contains(
+            fn (mixed $recipientQuantity): bool => (int) $recipientQuantity < $package->min_quantity
+                || ($package->max_quantity !== null && (int) $recipientQuantity > $package->max_quantity),
+        );
+
+        if ($hasInvalidQuantity) {
             throw ValidationException::withMessages([$quantityField => 'Số lượng không nằm trong giới hạn của gói nạp.']);
         }
 

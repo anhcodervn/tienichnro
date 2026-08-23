@@ -134,41 +134,46 @@
 
     <div class="client-card mt-5 overflow-hidden" data-order-datatable data-order-table>
         <div class="w-full min-w-0 overflow-x-auto overscroll-x-contain" tabindex="0" role="region" aria-label="Bảng lịch sử đơn hàng">
-            <table class="w-full min-w-[920px] table-auto text-left text-sm">
+            <table class="w-full min-w-[860px] table-auto text-left text-sm">
                 <thead class="border-b border-slate-200 bg-slate-50 text-xs font-extrabold uppercase tracking-wide text-slate-500">
                     <tr>
-                        <th class="px-4 py-3">Mã đơn / thời gian</th>
-                        <th class="px-4 py-3">Game / máy chủ</th>
-                        <th class="px-4 py-3">Gói nạp</th>
-                        <th class="px-4 py-3">Thanh toán</th>
-                        <th class="px-4 py-3">Xử lý</th>
+                        <th class="w-14 px-4 py-3 text-center">STT</th>
+                        <th class="px-4 py-3">Mã đơn<br><span class="normal-case tracking-normal text-slate-400">Thời gian tạo</span></th>
+                        <th class="px-4 py-3">Thông tin<br><span class="normal-case tracking-normal text-slate-400">Account · Server · Số lượng</span></th>
                         <th class="px-4 py-3 text-right">Tổng tiền</th>
-                        <th class="px-4 py-3 text-right">Thao tác</th>
+                        <th class="px-4 py-3">Trạng thái</th>
+                        <th class="px-4 py-3 text-right">Xem chi tiết</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($orders as $order)
+                        @php
+                            $paymentStatus = $order->payment_status->value;
+                            $orderStatus = $order->order_status->value;
+                            $displayStatusLabel = $paymentStatus === 'paid'
+                                ? ($orderLabels[$orderStatus] ?? $orderStatus)
+                                : ($paymentLabels[$paymentStatus] ?? $paymentStatus);
+                            $displayStatusClass = $paymentStatus === 'paid'
+                                ? ($orderClasses[$orderStatus] ?? 'border-slate-200 bg-slate-50 text-slate-600')
+                                : ($paymentClasses[$paymentStatus] ?? 'border-slate-200 bg-slate-50 text-slate-600');
+                        @endphp
                         <tr class="transition hover:bg-slate-50/80">
+                            <td class="px-4 py-4 text-center align-middle font-semibold text-slate-500">{{ ($orders->firstItem() ?? 1) + $loop->index }}</td>
                             <td class="px-4 py-4 align-top">
                                 <button class="font-extrabold text-indigo-700 hover:text-indigo-800" type="button" data-order-detail-trigger data-order-code="{{ $order->code }}" data-order-detail-url="{{ route('orders.details', $order) }}">{{ $order->code }}</button>
                                 <p class="mt-1 whitespace-nowrap text-xs text-slate-500">{{ $order->created_at?->format('d/m/Y H:i') }}</p>
                             </td>
-                            <td class="px-4 py-4 align-top">
-                                <p class="font-bold text-slate-900">{{ $order->game?->name ?? 'Game đã xóa' }}</p>
-                                <p class="mt-1 text-xs text-slate-500">{{ $order->server?->name ?? 'Không xác định' }}</p>
-                                <p class="mt-1 max-w-48 truncate text-xs text-slate-500" title="{{ $order->game_account }}">TK: {{ $order->game_account }}</p>
+                            <td class="min-w-64 px-4 py-4 align-top">
+                                <p class="max-w-72 break-all font-bold text-slate-900">{{ $order->game_account }}</p>
+                                <p class="mt-1 text-xs text-slate-500">SV: <strong class="text-slate-700">{{ $order->server?->name ?? 'Không xác định' }}</strong></p>
+                                <p class="mt-1 text-xs text-slate-500">Số lượng: <strong class="text-slate-700">{{ number_format($order->quantity) }}</strong></p>
                             </td>
-                            <td class="max-w-56 px-4 py-4 align-top">
-                                <p class="break-words font-semibold text-slate-900">{{ $order->package_name }}</p>
-                                <p class="mt-1 text-xs text-slate-500">SL: {{ number_format($order->quantity) }}</p>
-                            </td>
-                            <td class="px-4 py-4 align-top"><span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $paymentClasses[$order->payment_status->value] ?? 'border-slate-200 bg-slate-50 text-slate-600' }}">{{ $paymentLabels[$order->payment_status->value] ?? $order->payment_status->value }}</span></td>
-                            <td class="px-4 py-4 align-top"><span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $orderClasses[$order->order_status->value] ?? 'border-slate-200 bg-slate-50 text-slate-600' }}">{{ $orderLabels[$order->order_status->value] ?? $order->order_status->value }}</span></td>
                             <td class="whitespace-nowrap px-4 py-4 text-right align-top font-extrabold text-slate-950">{{ number_format((int) $order->total_amount, 0, ',', '.') }}đ</td>
+                            <td class="px-4 py-4 align-top"><span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $displayStatusClass }}">{{ $displayStatusLabel }}</span></td>
                             <td class="px-4 py-4 text-right align-top"><button class="inline-flex min-h-11 items-center gap-1 rounded-[5px] px-3 font-bold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" type="button" data-order-detail-trigger data-order-code="{{ $order->code }}" data-order-detail-url="{{ route('orders.details', $order) }}">Chi tiết<i class="bx bx-show text-lg" aria-hidden="true"></i></button></td>
                         </tr>
                     @empty
-                        <tr><td class="px-6 py-12 text-center text-slate-500" colspan="7">Không tìm thấy đơn hàng phù hợp.</td></tr>
+                        <tr><td class="px-6 py-12 text-center text-slate-500" colspan="6">Không tìm thấy đơn hàng phù hợp.</td></tr>
                     @endforelse
                 </tbody>
             </table>

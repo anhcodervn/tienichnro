@@ -91,6 +91,80 @@ const filterGuestOrderHistory = (history) => {
     if (filterEmpty) filterEmpty.classList.toggle('hidden', rows.length === 0 || visibleRows > 0);
 };
 
+const guestOrderStatusPresentation = (order) => {
+    const paymentStatuses = {
+        pending: ['Chờ thanh toán', 'border-amber-200 bg-amber-50 text-amber-700'],
+        expired: ['Hết hạn', 'border-slate-200 bg-slate-100 text-slate-600'],
+        cancelled: ['Đã hủy', 'border-slate-200 bg-slate-100 text-slate-600'],
+        refunded: ['Đã hoàn tiền', 'border-blue-200 bg-blue-50 text-blue-700'],
+    };
+    const orderStatuses = {
+        pending: ['Chờ xử lý', 'border-amber-200 bg-amber-50 text-amber-700'],
+        processing: ['Đang xử lý', 'border-blue-200 bg-blue-50 text-blue-700'],
+        completed: ['Hoàn thành', 'border-emerald-200 bg-emerald-50 text-emerald-700'],
+        failed: ['Thất bại', 'border-rose-200 bg-rose-50 text-rose-700'],
+        cancelled: ['Đã hủy', 'border-slate-200 bg-slate-100 text-slate-600'],
+    };
+
+    return order.payment_status === 'paid'
+        ? orderStatuses[order.order_status] || ['Không xác định', 'border-slate-200 bg-slate-50 text-slate-600']
+        : paymentStatuses[order.payment_status] || ['Chờ thanh toán', 'border-amber-200 bg-amber-50 text-amber-700'];
+};
+
+const hydrateGuestOrderHistory = async (history, orders) => {
+    const historyUrl = history?.dataset.guestOrderHistoryUrl;
+
+    if (!historyUrl || orders.length === 0) return;
+
+    try {
+        const response = await fetch(historyUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '',
+            },
+            body: JSON.stringify({ codes: orders.map((order) => order.code) }),
+        });
+
+        if (!response.ok) throw new Error('Không thể tải lịch sử đơn hàng.');
+
+        const payload = await response.json();
+        const details = new Map((payload.data?.orders || []).map((order) => [order.code, order]));
+
+        history.querySelectorAll('[data-guest-order-history-row]').forEach((row) => {
+            const detail = details.get(row.dataset.guestOrderHistoryCode);
+            const account = row.querySelector('[data-guest-order-history-account]');
+            const server = row.querySelector('[data-guest-order-history-server]');
+            const quantity = row.querySelector('[data-guest-order-history-quantity]');
+            const total = row.querySelector('[data-guest-order-history-total]');
+            const status = row.querySelector('[data-guest-order-history-status]');
+
+            if (!detail) {
+                if (account) account.textContent = 'Xác minh email để xem';
+                if (status) status.textContent = 'Cần xác minh';
+                return;
+            }
+
+            if (account) account.textContent = detail.account || 'Không xác định';
+            if (server) server.textContent = detail.server || 'Không xác định';
+            if (quantity) quantity.textContent = new Intl.NumberFormat('vi-VN').format(Number(detail.quantity || 0));
+            if (total) total.textContent = formatMoney(detail.total_amount);
+
+            if (status) {
+                const [label, classes] = guestOrderStatusPresentation(detail);
+                status.textContent = label;
+                status.className = `inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold ${classes}`;
+            }
+        });
+    } catch {
+        history.querySelectorAll('[data-guest-order-history-status]').forEach((status) => {
+            status.textContent = 'Không tải được';
+        });
+    }
+};
+
 const renderGuestOrderHistory = (orders) => {
     const history = document.querySelector('[data-guest-order-history]');
     const list = history?.querySelector('[data-guest-order-history-list]');
@@ -124,7 +198,6 @@ const renderGuestOrderHistory = (orders) => {
         const orderIndex = item.querySelector('[data-guest-order-history-index]');
         const orderCode = item.querySelector('[data-guest-order-history-code]');
         const orderTime = item.querySelector('[data-guest-order-history-time]');
-        const expiryTime = item.querySelector('[data-guest-order-history-expiry]');
         const detailTriggers = item.querySelectorAll('[data-guest-order-detail]');
 
         if (row) row.dataset.guestOrderHistoryCode = entry.code;
@@ -133,10 +206,6 @@ const renderGuestOrderHistory = (orders) => {
         if (orderTime) {
             orderTime.dateTime = entry.createdAt;
             orderTime.textContent = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(entry.createdAt));
-        }
-        if (expiryTime) {
-            expiryTime.dateTime = new Date(entry.expiresAt).toISOString();
-            expiryTime.textContent = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short' }).format(new Date(entry.expiresAt));
         }
         detailTriggers.forEach((detailTrigger) => {
             if (!detailUrlTemplate) return;
@@ -148,6 +217,7 @@ const renderGuestOrderHistory = (orders) => {
     });
 
     filterGuestOrderHistory(history);
+    void hydrateGuestOrderHistory(history, orders);
     history.hidden = false;
 };
 
@@ -225,6 +295,19 @@ const copyText = async (value) => {
     document.execCommand('copy');
     input.remove();
 };
+
+document.querySelectorAll('[data-account-tabs]').forEach((tabs) => {
+    const activeTab = tabs.querySelector('[data-account-tab-active]');
+
+    if (!activeTab) return;
+
+    requestAnimationFrame(() => {
+        const tabsBounds = tabs.getBoundingClientRect();
+        const activeTabBounds = activeTab.getBoundingClientRect();
+        const left = tabs.scrollLeft + activeTabBounds.left - tabsBounds.left - (tabs.clientWidth - activeTab.clientWidth) / 2;
+        tabs.scrollTo({ left: Math.max(0, left), behavior: 'auto' });
+    });
+});
 
 document.querySelectorAll('[data-client-alert]').forEach((alert) => {
     const type = alert.dataset.alertType === 'error' ? 'error' : 'success';
@@ -813,7 +896,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
     const updateQuantityLimits = () => {
         const option = topupPackage?.selectedOptions[0];
         const minimum = Number(option?.dataset.min || 1);
-        const maximum = Number(option?.dataset.max || 100);
+        const maximum = Number(option?.dataset.max || 10);
 
         if (singleQuantity) {
             singleQuantity.min = String(minimum);
@@ -830,6 +913,9 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         let validAccountCount = 0;
         let firstInvalidLine = 0;
         let firstInvalidAccount = '';
+        const option = topupPackage?.selectedOptions[0];
+        const minimumQuantity = Number(option?.dataset.min || 1);
+        const maximumQuantity = Number(option?.dataset.max || 10);
 
         lines.forEach((line, index) => {
             const values = line.split('|');
@@ -840,7 +926,8 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
                 line.includes('|') &&
                 account !== '' &&
                 /^[1-9]\d*$/.test(quantityValue) &&
-                parsedQuantity <= 100 &&
+                parsedQuantity >= minimumQuantity &&
+                parsedQuantity <= maximumQuantity &&
                 (maximumColumnCount === 0 || values.length <= maximumColumnCount);
 
             if (!hasValidFormat) {
@@ -907,9 +994,13 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         const hasPackage = Boolean(topupPackage?.value);
         const rewardLabel = option?.dataset.rewardLabel || 'Thực nhận';
         const minimum = Number(option?.dataset.min || 1);
-        const maximum = Number(option?.dataset.max || 100);
+        const maximum = Number(option?.dataset.max || 10);
         const hasServer = Boolean(server?.value);
-        const canSubmit = hasServer && hasPackage && !bulkResult.hasInvalidRows && count >= minimum && count <= maximum;
+        const canSubmit =
+            hasServer &&
+            hasPackage &&
+            !bulkResult.hasInvalidRows &&
+            (purchaseMode?.value === 'bulk' ? count > 0 : count >= minimum && count <= maximum);
         const packageLabel = option?.dataset.denomination ? formatMoney(Number(option.dataset.denomination)) : option?.dataset.name || 'Chưa chọn';
         const rewardAmount = Number(option?.dataset.reward || 0) * count;
         const rewardX2Amount = Number(option?.dataset.rewardX2 || 0) * count;
@@ -1136,7 +1227,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         if (!singleQuantity) return;
 
         const minimum = Number(singleQuantity.min || 1);
-        const maximum = Number(singleQuantity.max || 100);
+        const maximum = Number(singleQuantity.max || 10);
         const current = Number(singleQuantity.value || minimum);
         singleQuantity.value = String(Math.min(maximum, Math.max(minimum, current + step)));
         singleQuantity.dispatchEvent(new Event('input', { bubbles: true }));
