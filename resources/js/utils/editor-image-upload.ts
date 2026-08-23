@@ -129,6 +129,10 @@ export const uploadEditorImageFile = async (
 
     try {
         const response = await api.post('/api/uploads/image', formData, {
+            headers: {
+                Accept: 'application/json',
+                'Content-Type': 'multipart/form-data',
+            },
             onUploadProgress: (event) => {
                 if (progress && event.total) {
                     progress(Math.round((event.loaded / event.total) * 100));
@@ -136,7 +140,7 @@ export const uploadEditorImageFile = async (
             },
         });
 
-        const uploadedUrl = response.data?.data?.url;
+        const uploadedUrl = response.data?.data?.url ?? response.data?.url;
 
         if (typeof uploadedUrl !== 'string' || uploadedUrl === '') {
             throw new Error('Không nhận được URL ảnh sau khi tải lên.');

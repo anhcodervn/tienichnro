@@ -16,12 +16,16 @@ use Illuminate\Support\Str;
 
 class OrderController extends Controller
 {
-    public function lookup(): View
+    public function lookup(Request $request): View|RedirectResponse
     {
+        if ($request->user() instanceof User) {
+            return redirect()->route('account.orders.index');
+        }
+
         return view('client.orders.lookup');
     }
 
-    public function find(LookupOrderRequest $request): RedirectResponse
+    public function find(LookupOrderRequest $request): JsonResponse|RedirectResponse
     {
         $order = Order::query()
             ->where('code', Str::upper($request->string('code')->toString()))
@@ -29,12 +33,38 @@ class OrderController extends Controller
             ->first();
 
         if (! $order instanceof Order) {
+            if ($request->expectsJson()) {
+                return response()->json([
+                    'status' => false,
+                    'message' => 'Không tìm thấy đơn hàng khớp mã và email.',
+                ], 404);
+            }
+
             return back()->withErrors(['code' => 'Không tìm thấy đơn hàng khớp mã và email.'])->withInput();
         }
 
         $request->session()->put("orders.access.{$order->code}", true);
 
+        if ($request->expectsJson()) {
+            return response()->json([
+                'status' => true,
+                'data' => [
+                    'code' => $order->code,
+                    'created_at' => $order->created_at?->toISOString(),
+                    'detail_url' => route('orders.details', $order),
+                ],
+            ]);
+        }
+
         return redirect()->route('orders.show', $order);
+    }
+
+    public function details(Request $request, Order $order): View
+    {
+        $this->authorizeAccess($request, $order);
+        $order->load(['game:id,name,slug', 'server:id,name', 'recipients']);
+
+        return view('client.orders.partials.detail-modal-content', ['order' => $order]);
     }
 
     public function show(Request $request, Order $order): View

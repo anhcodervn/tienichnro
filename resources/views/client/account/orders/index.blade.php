@@ -150,7 +150,7 @@
                     @forelse ($orders as $order)
                         <tr class="transition hover:bg-slate-50/80">
                             <td class="px-4 py-4 align-top">
-                                <a class="font-extrabold text-indigo-700 hover:text-indigo-800" href="{{ route('account.orders.show', $order) }}">{{ $order->code }}</a>
+                                <button class="font-extrabold text-indigo-700 hover:text-indigo-800" type="button" data-order-detail-trigger data-order-code="{{ $order->code }}" data-order-detail-url="{{ route('orders.details', $order) }}">{{ $order->code }}</button>
                                 <p class="mt-1 whitespace-nowrap text-xs text-slate-500">{{ $order->created_at?->format('d/m/Y H:i') }}</p>
                             </td>
                             <td class="px-4 py-4 align-top">
@@ -165,7 +165,7 @@
                             <td class="px-4 py-4 align-top"><span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $paymentClasses[$order->payment_status->value] ?? 'border-slate-200 bg-slate-50 text-slate-600' }}">{{ $paymentLabels[$order->payment_status->value] ?? $order->payment_status->value }}</span></td>
                             <td class="px-4 py-4 align-top"><span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $orderClasses[$order->order_status->value] ?? 'border-slate-200 bg-slate-50 text-slate-600' }}">{{ $orderLabels[$order->order_status->value] ?? $order->order_status->value }}</span></td>
                             <td class="whitespace-nowrap px-4 py-4 text-right align-top font-extrabold text-slate-950">{{ number_format((int) $order->total_amount, 0, ',', '.') }}đ</td>
-                            <td class="px-4 py-4 text-right align-top"><a class="inline-flex min-h-11 items-center gap-1 rounded-[5px] px-3 font-bold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.orders.show', $order) }}">Chi tiết<i class="bx bx-chevron-right text-lg" aria-hidden="true"></i></a></td>
+                            <td class="px-4 py-4 text-right align-top"><button class="inline-flex min-h-11 items-center gap-1 rounded-[5px] px-3 font-bold text-emerald-700 transition hover:bg-emerald-50 hover:text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" type="button" data-order-detail-trigger data-order-code="{{ $order->code }}" data-order-detail-url="{{ route('orders.details', $order) }}">Chi tiết<i class="bx bx-show text-lg" aria-hidden="true"></i></button></td>
                         </tr>
                     @empty
                         <tr><td class="px-6 py-12 text-center text-slate-500" colspan="7">Không tìm thấy đơn hàng phù hợp.</td></tr>
@@ -180,7 +180,7 @@
             <article class="client-card min-w-0 p-4">
                 <div class="flex min-w-0 items-start justify-between gap-3">
                     <div class="min-w-0">
-                        <a class="break-all font-extrabold text-indigo-700" href="{{ route('account.orders.show', $order) }}">{{ $order->code }}</a>
+                        <button class="break-all text-left font-extrabold text-indigo-700" type="button" data-order-detail-trigger data-order-code="{{ $order->code }}" data-order-detail-url="{{ route('orders.details', $order) }}">{{ $order->code }}</button>
                         <p class="mt-1 text-xs text-slate-500">{{ $order->created_at?->format('d/m/Y H:i') }}</p>
                     </div>
                     <strong class="shrink-0 whitespace-nowrap text-right text-slate-950">{{ number_format((int) $order->total_amount, 0, ',', '.') }}đ</strong>
@@ -195,7 +195,7 @@
                     <span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $paymentClasses[$order->payment_status->value] ?? 'border-slate-200 bg-slate-50 text-slate-600' }}">{{ $paymentLabels[$order->payment_status->value] ?? $order->payment_status->value }}</span>
                     <span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $orderClasses[$order->order_status->value] ?? 'border-slate-200 bg-slate-50 text-slate-600' }}">{{ $orderLabels[$order->order_status->value] ?? $order->order_status->value }}</span>
                 </div>
-                <a class="client-button-secondary mt-4 w-full gap-2 bg-white" href="{{ route('account.orders.show', $order) }}">Xem chi tiết<i class="bx bx-right-arrow-alt text-lg" aria-hidden="true"></i></a>
+                <button class="client-button-secondary mt-4 w-full gap-2 bg-white" type="button" data-order-detail-trigger data-order-code="{{ $order->code }}" data-order-detail-url="{{ route('orders.details', $order) }}">Xem chi tiết<i class="bx bx-show text-lg" aria-hidden="true"></i></button>
             </article>
         @empty
             <div class="client-card p-8 text-center">
@@ -210,4 +210,6 @@
         <div class="mt-6">{{ $orders->onEachSide(1)->links() }}</div>
     @endif
 </section>
+
+<x-client.order-detail-modal />
 @endsection

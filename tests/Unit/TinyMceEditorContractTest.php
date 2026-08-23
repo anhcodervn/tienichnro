@@ -79,6 +79,9 @@ test('tinymce uploads pasted and dropped images as optimized webp files', functi
         ->toContain('automatic_uploads: true')
         ->toContain("images_file_types: 'jpg,jpeg,png,webp'")
         ->toContain('images_upload_handler: handleImageUpload')
+        ->toContain("file_picker_types: 'image'")
+        ->toContain('file_picker_callback: pickAndUploadImage')
+        ->toContain('syncUploadedImageContent')
         ->toContain('uploadEditorImageFile(blobInfo.blob(), blobInfo.filename(), progress)')
         ->toContain('hasPendingLocalImages(html)')
         ->toContain('(?:data:image\\/|blob:)');
@@ -90,5 +93,22 @@ test('tinymce uploads pasted and dropped images as optimized webp files', functi
         ->toContain('0.82')
         ->toContain('const maxDimension = 1800')
         ->toContain('formData.append')
+        ->toContain("'Content-Type': 'multipart/form-data'")
         ->toContain('onUploadProgress');
+});
+
+test('client blade pages apply article typography to rendered editor content', function (): void {
+    $projectRoot = dirname(__DIR__, 2);
+    $clientCss = file_get_contents($projectRoot.'/resources/css/client.css');
+    $seoPage = file_get_contents($projectRoot.'/resources/views/pages/seo/show.blade.php');
+    $contentPage = file_get_contents($projectRoot.'/resources/views/pages/content/show.blade.php');
+    $homePage = file_get_contents($projectRoot.'/resources/views/client/home/index.blade.php');
+
+    expect($clientCss)
+        ->toContain('.article-content h1')
+        ->toContain('.article-content img')
+        ->toContain('.article-content table')
+        ->and($seoPage)->toContain('article-content client-card')
+        ->and($contentPage)->toContain('class="article-content mt-8')
+        ->and($homePage)->toContain('article-content article-content--notice home-notice-content');
 });

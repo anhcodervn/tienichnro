@@ -55,35 +55,51 @@ const writeGuestOrderHistory = (orders) => {
     }
 };
 
-const initializeGuestOrderHistory = () => {
-    if (document.body.dataset.authenticated === 'true') return;
+const rememberGuestOrder = (code, createdAtValue = '') => {
+    const normalizedCode = String(code || '').trim().toUpperCase();
 
-    let orders = readGuestOrderHistory();
-    const orderMarker = document.querySelector('[data-guest-order-code]');
-    const code = orderMarker?.dataset.guestOrderCode?.trim().toUpperCase() || '';
+    if (!/^TOP[A-Z0-9]{6,32}$/.test(normalizedCode)) return readGuestOrderHistory();
 
-    if (/^TOP[A-Z0-9]{6,32}$/.test(code)) {
-        const existing = orders.find((entry) => entry.code === code);
-        const createdAtValue = orderMarker?.dataset.guestOrderCreatedAt || '';
-        const createdAt = Number.isFinite(Date.parse(createdAtValue)) ? createdAtValue : new Date().toISOString();
-        const entry = existing || { code, createdAt, expiresAt: Date.now() + guestOrderLifetime };
-        orders = [entry, ...orders.filter((item) => item.code !== code)];
-    }
+    const orders = readGuestOrderHistory();
+    const existing = orders.find((entry) => entry.code === normalizedCode);
+    const createdAt = Number.isFinite(Date.parse(createdAtValue)) ? createdAtValue : existing?.createdAt || new Date().toISOString();
+    const entry = existing || { code: normalizedCode, createdAt, expiresAt: Date.now() + guestOrderLifetime };
+    const nextOrders = [entry, ...orders.filter((item) => item.code !== normalizedCode)];
 
-    writeGuestOrderHistory(orders);
+    writeGuestOrderHistory(nextOrders);
 
+    return nextOrders;
+};
+
+const renderGuestOrderHistory = (orders) => {
     const history = document.querySelector('[data-guest-order-history]');
     const list = history?.querySelector('[data-guest-order-history-list]');
+    const empty = history?.querySelector('[data-guest-order-history-empty]');
     const template = history?.querySelector('[data-guest-order-history-item]');
     const lookupUrl = document.body.dataset.orderLookupUrl;
+    const detailUrlTemplate = document.body.dataset.orderDetailUrlTemplate;
 
-    if (!history || !list || !(template instanceof HTMLTemplateElement) || !lookupUrl || orders.length === 0) return;
+    if (!history || !list || !(template instanceof HTMLTemplateElement) || !lookupUrl) return;
+
+    list.replaceChildren();
+
+    if (orders.length === 0) {
+        if (empty) {
+            empty.hidden = false;
+            history.hidden = false;
+        }
+
+        return;
+    }
+
+    if (empty) empty.hidden = true;
 
     orders.forEach((entry) => {
         const item = template.content.cloneNode(true);
         const orderCode = item.querySelector('[data-guest-order-history-code]');
         const orderTime = item.querySelector('[data-guest-order-history-time]');
         const orderLink = item.querySelector('[data-guest-order-history-link]');
+        const detailTrigger = item.querySelector('[data-guest-order-detail]');
         const url = new URL(lookupUrl, window.location.origin);
         url.searchParams.set('code', entry.code);
 
@@ -93,10 +109,26 @@ const initializeGuestOrderHistory = () => {
             orderTime.textContent = new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(entry.createdAt));
         }
         if (orderLink) orderLink.href = url.toString();
+        if (detailTrigger && detailUrlTemplate) {
+            detailTrigger.dataset.orderCode = entry.code;
+            detailTrigger.dataset.orderDetailUrl = detailUrlTemplate.replace('__ORDER__', encodeURIComponent(entry.code));
+        }
         list.append(item);
     });
 
     history.hidden = false;
+};
+
+const initializeGuestOrderHistory = () => {
+    if (document.body.dataset.authenticated === 'true') return;
+
+    let orders = readGuestOrderHistory();
+    const orderMarker = document.querySelector('[data-guest-order-code]');
+    const code = orderMarker?.dataset.guestOrderCode?.trim().toUpperCase() || '';
+
+    if (/^TOP[A-Z0-9]{6,32}$/.test(code)) orders = rememberGuestOrder(code, orderMarker?.dataset.guestOrderCreatedAt || '');
+
+    renderGuestOrderHistory(orders);
 };
 
 initializeGuestOrderHistory();
@@ -432,26 +464,187 @@ document.querySelectorAll('[data-account-menu]').forEach((accountMenu) => {
     });
 });
 
-document.querySelectorAll('[data-copy]').forEach((button) => {
-    button.addEventListener('click', async () => {
-        const original = button.textContent;
+document.addEventListener('click', async (event) => {
+    const button = event.target.closest?.('[data-copy]');
+
+    if (!button) return;
+
+    const original = button.innerHTML;
+
+    try {
+        button.disabled = true;
+        await copyText(button.dataset.copy || '');
+        button.textContent = 'Đã sao chép';
+        playAnimation(button, [{ transform: 'scale(0.96)' }, { transform: 'scale(1)' }], { duration: 160 });
+        void notify('success', 'Đã sao chép vào bộ nhớ tạm');
+    } catch {
+        void notify('error', 'Không thể sao chép. Vui lòng thử lại.');
+    } finally {
+        window.setTimeout(() => {
+            button.innerHTML = original;
+            button.disabled = false;
+        }, 1400);
+    }
+});
+
+const orderDetailModal = document.querySelector('[data-order-detail-modal]');
+
+if (orderDetailModal) {
+    const panel = orderDetailModal.querySelector('[data-order-detail-panel]');
+    const title = orderDetailModal.querySelector('[data-order-detail-title]');
+    const loading = orderDetailModal.querySelector('[data-order-detail-loading]');
+    const content = orderDetailModal.querySelector('[data-order-detail-content]');
+    const errorBox = orderDetailModal.querySelector('[data-order-detail-error]');
+    const errorMessage = orderDetailModal.querySelector('[data-order-detail-error-message]');
+    const retryButton = orderDetailModal.querySelector('[data-order-detail-retry]');
+    const unlockForm = document.querySelector('[data-order-history-unlock]');
+    let activeTrigger = null;
+    let currentCode = '';
+    let currentDetailUrl = '';
+    let refreshTimer = null;
+
+    const stopRefresh = () => {
+        if (refreshTimer) window.clearTimeout(refreshTimer);
+        refreshTimer = null;
+    };
+
+    const closeOrderDetail = () => {
+        stopRefresh();
+        orderDetailModal.hidden = true;
+        orderDetailModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('overflow-hidden');
+        activeTrigger?.focus?.();
+    };
+
+    const scheduleRefresh = () => {
+        stopRefresh();
+
+        if (content.querySelector('[data-order-detail-state]')?.dataset.orderTerminal === 'true') return;
+
+        refreshTimer = window.setTimeout(() => void loadOrderDetail(currentDetailUrl, true), 10000);
+    };
+
+    const showOrderDetailError = (message, requiresVerification = false) => {
+        loading.hidden = true;
+        content.replaceChildren();
+        errorBox.classList.remove('hidden');
+        errorBox.dataset.requiresVerification = String(requiresVerification);
+        errorMessage.textContent = message;
+        retryButton.textContent = requiresVerification ? 'Xác minh email' : 'Thử lại';
+    };
+
+    const loadOrderDetail = async (detailUrl, silent = false) => {
+        if (!detailUrl) return;
+
+        currentDetailUrl = detailUrl;
+        stopRefresh();
+
+        if (!silent) {
+            loading.hidden = false;
+            content.replaceChildren();
+            errorBox.classList.add('hidden');
+        }
 
         try {
-            button.disabled = true;
-            await copyText(button.dataset.copy || '');
-            button.textContent = 'Đã sao chép';
-            playAnimation(button, [{ transform: 'scale(0.96)' }, { transform: 'scale(1)' }], { duration: 160 });
-            void notify('success', 'Đã sao chép vào bộ nhớ tạm');
-        } catch {
-            void notify('error', 'Không thể sao chép. Vui lòng thử lại.');
+            const response = await fetch(detailUrl, { credentials: 'same-origin', headers: { Accept: 'text/html' } });
+
+            if (response.status === 403) {
+                showOrderDetailError('Phiên xem đơn đã hết hạn. Vui lòng xác minh lại mã đơn và email.', true);
+                return;
+            }
+
+            if (!response.ok) throw new Error('Không thể tải thông tin đơn hàng.');
+
+            content.innerHTML = await response.text();
+            loading.hidden = true;
+            errorBox.classList.add('hidden');
+            scheduleRefresh();
+        } catch (error) {
+            if (silent) {
+                scheduleRefresh();
+                return;
+            }
+
+            showOrderDetailError(error.message || 'Không thể tải thông tin đơn hàng.');
+        }
+    };
+
+    const openOrderDetail = (detailUrl, code, trigger = null) => {
+        activeTrigger = trigger;
+        currentCode = code || '';
+        title.textContent = currentCode ? `Chi tiết ${currentCode}` : 'Chi tiết và tiến độ';
+        orderDetailModal.hidden = false;
+        orderDetailModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('overflow-hidden');
+        panel.focus({ preventScroll: true });
+        void loadOrderDetail(detailUrl);
+    };
+
+    document.addEventListener('click', (event) => {
+        const trigger = event.target.closest?.('[data-order-detail-trigger]');
+
+        if (!trigger || !trigger.dataset.orderDetailUrl) return;
+
+        openOrderDetail(trigger.dataset.orderDetailUrl, trigger.dataset.orderCode, trigger);
+    });
+
+    orderDetailModal.querySelectorAll('[data-order-detail-close]').forEach((button) => button.addEventListener('click', closeOrderDetail));
+    retryButton.addEventListener('click', () => {
+        if (errorBox.dataset.requiresVerification === 'true' && unlockForm) {
+            const codeInput = unlockForm.querySelector('[name="code"]');
+            const emailInput = unlockForm.querySelector('[name="email"]');
+            if (codeInput) codeInput.value = currentCode;
+            closeOrderDetail();
+            unlockForm.scrollIntoView({ behavior: prefersReducedMotion ? 'auto' : 'smooth', block: 'center' });
+            window.setTimeout(() => emailInput?.focus(), prefersReducedMotion ? 0 : 350);
+            return;
+        }
+
+        void loadOrderDetail(currentDetailUrl);
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (orderDetailModal.hidden || event.key !== 'Escape') return;
+        closeOrderDetail();
+    });
+
+    unlockForm?.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        const submitButton = unlockForm.querySelector('[type="submit"]');
+        const unlockError = unlockForm.querySelector('[data-order-history-unlock-error]');
+        const formData = new FormData(unlockForm);
+        submitButton.disabled = true;
+        unlockError.classList.add('hidden');
+
+        try {
+            const response = await fetch(unlockForm.action, {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { Accept: 'application/json', 'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]')?.content || '' },
+                body: formData,
+            });
+            const payload = await response.json().catch(() => ({}));
+
+            if (!response.ok || payload.status !== true) {
+                const validationMessage = Object.values(payload.errors || {}).flat()[0];
+                throw new Error(validationMessage || 'Không tìm thấy đơn hàng khớp mã và email.');
+            }
+
+            const order = payload.data;
+            const orders = rememberGuestOrder(order.code, order.created_at);
+            renderGuestOrderHistory(orders);
+            unlockForm.reset();
+            openOrderDetail(order.detail_url, order.code, submitButton);
+        } catch (error) {
+            unlockError.textContent = error.message || 'Không thể xác minh đơn hàng.';
+            unlockError.classList.remove('hidden');
         } finally {
-            window.setTimeout(() => {
-                button.textContent = original;
-                button.disabled = false;
-            }, 1400);
+            submitButton.disabled = false;
         }
     });
-});
+
+    window.addEventListener('pagehide', stopRefresh);
+}
 
 document.querySelectorAll('[data-topup-form]').forEach((form) => {
     const game = form.querySelector('[name="game_id"]');

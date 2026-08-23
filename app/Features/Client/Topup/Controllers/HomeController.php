@@ -36,16 +36,6 @@ class HomeController extends Controller
 
         /** @var User|null $user */
         $user = $request->user();
-        $userOrders = $user?->orders()
-            ->select([
-                'id', 'code', 'user_id', 'game_id', 'game_server_id', 'game_account',
-                'package_name', 'quantity', 'total_amount', 'payment_status', 'order_status',
-                'created_at',
-            ])
-            ->with(['game:id,name', 'server:id,name'])
-            ->latest()
-            ->limit(10)
-            ->get() ?? collect();
         $walletBalance = (int) ($user?->wallet()->value('balance') ?? 0);
 
         $systemSettings = $settingStore->getMany([
@@ -63,7 +53,6 @@ class HomeController extends Controller
 
         return view('client.home.index', [
             'games' => $games,
-            'userOrders' => $userOrders,
             'walletBalance' => $walletBalance,
             'systemSettings' => $systemSettings,
             'homeNoticeTitle' => (string) $systemSettings['home_notice_title'],

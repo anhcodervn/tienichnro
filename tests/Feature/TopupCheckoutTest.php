@@ -41,7 +41,7 @@ test('guest home renders the purchase layout reward table and seo content withou
     $this->get(route('home'))
         ->assertOk()
         ->assertSee('data-authenticated="false"', false)
-        ->assertSee('data-guest-order-history hidden', false)
+        ->assertDontSee('data-guest-order-history', false)
         ->assertSee('assets/icon/boxicons/fonts/basic/boxicons.min.css', false)
         ->assertSee('bx bx-joystick', false)
         ->assertSee('data-topup-form', false)
@@ -79,7 +79,7 @@ test('guest home renders the purchase layout reward table and seo content withou
         ->assertDontSee('id="app"', false);
 });
 
-test('authenticated home renders only the signed in users recent topup history', function (): void {
+test('authenticated home keeps order history on its dedicated page', function (): void {
     [$game, $server, $package] = topupCatalog();
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
@@ -104,12 +104,12 @@ test('authenticated home renders only the signed in users recent topup history',
         ->assertSee('data-authenticated="true"', false)
         ->assertDontSee('name="email"', false)
         ->assertSee('Theo dõi trực tiếp trong lịch sử đơn hàng')
-        ->assertDontSee('data-guest-order-history hidden', false)
-        ->assertSee('Lịch sử nạp game gần đây')
-        ->assertSee($order->code)
+        ->assertDontSee('data-guest-order-history', false)
+        ->assertDontSee('Lịch sử nạp game gần đây')
+        ->assertDontSee($order->code)
         ->assertDontSee($otherOrder->code)
         ->assertDontSee('Cách mua Carot trong 3 bước')
-        ->assertViewHas('userOrders', fn ($orders): bool => $orders->count() === 1 && $orders->first()->is($order));
+        ->assertViewMissing('userOrders');
 });
 
 test('home automatically selects wallet when its balance covers the current order', function (): void {

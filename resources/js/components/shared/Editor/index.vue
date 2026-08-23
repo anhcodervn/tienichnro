@@ -111,6 +111,7 @@ export default {
         let isApplyingExternalValue = false;
         let lastEmittedFingerprint: string | null = null;
         let saveTimer: ReturnType<typeof setTimeout> | null = null;
+        let uploadedImageSyncTimer: ReturnType<typeof setTimeout> | null = null;
 
         const getTinyMce = () =>
             typeof window !== 'undefined' && window.tinymce && typeof window.tinymce.init === 'function' ? window.tinymce : null;
@@ -165,6 +166,28 @@ export default {
             emitDebounced(htmlToValue(html));
         };
 
+        const syncUploadedImageContent = (attempt = 0): void => {
+            if (!editorInstance) {
+                return;
+            }
+
+            if (hasPendingLocalImages(editorInstance.getContent()) && attempt < 40) {
+                uploadedImageSyncTimer = window.setTimeout(() => syncUploadedImageContent(attempt + 1), 50);
+                return;
+            }
+
+            emitCurrentEditorContent();
+        };
+
+        const commitUploadedImage = (
+            uploadedUrl: string,
+            callback: (url: string, meta?: Record<string, string>) => void,
+            meta?: Record<string, string>,
+        ): void => {
+            callback(uploadedUrl, meta);
+            syncUploadedImageContent();
+        };
+
         const handleImageUpload = (
             blobInfo: TinyMceBlobInfo,
             success: (url: string) => void,
@@ -173,12 +196,37 @@ export default {
         ): void => {
             uploadEditorImageFile(blobInfo.blob(), blobInfo.filename(), progress)
                 .then((uploadedUrl) => {
-                    success(uploadedUrl);
-                    window.setTimeout(emitCurrentEditorContent, 0);
+                    commitUploadedImage(uploadedUrl, success);
                 })
                 .catch((error: unknown) => {
                     failure(error instanceof Error ? error.message : 'Không thể tải ảnh lên. Vui lòng thử lại.');
                 });
+        };
+
+        const pickAndUploadImage = (callback: (url: string, meta?: Record<string, string>) => void): void => {
+            const input = document.createElement('input');
+            input.type = 'file';
+            input.accept = 'image/jpeg,image/png,image/webp';
+
+            input.addEventListener('change', () => {
+                const file = input.files?.[0];
+
+                if (!file) {
+                    return;
+                }
+
+                uploadEditorImageFile(file, file.name)
+                    .then((uploadedUrl) => {
+                        commitUploadedImage(uploadedUrl, callback, {
+                            alt: file.name.replace(/\.[^.]+$/, ''),
+                        });
+                    })
+                    .catch((error: unknown) => {
+                        void Swal.fire('', error instanceof Error ? error.message : 'Không thể tải ảnh lên. Vui lòng thử lại.', 'error');
+                    });
+            });
+
+            input.click();
         };
 
         const normalizeValue = (value: unknown): EditorContentNode[] => (Array.isArray(value) ? (value as EditorContentNode[]) : []);
@@ -537,7 +585,10 @@ export default {
                           automatic_uploads: true,
                           images_file_types: 'jpg,jpeg,png,webp',
                           images_reuse_filename: false,
+                          images_upload_credentials: true,
                           images_upload_handler: handleImageUpload,
+                          file_picker_types: 'image',
+                          file_picker_callback: pickAndUploadImage,
                       }
                     : {}),
                 setup(editor: typeof editorInstance) {
@@ -559,6 +610,10 @@ export default {
         onBeforeUnmount(() => {
             if (saveTimer) {
                 clearTimeout(saveTimer);
+            }
+
+            if (uploadedImageSyncTimer) {
+                clearTimeout(uploadedImageSyncTimer);
             }
 
             const tinymce = getTinyMce();

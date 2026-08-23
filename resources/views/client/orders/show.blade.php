@@ -54,7 +54,7 @@
         <nav class="mb-4 flex min-w-0 items-center gap-2 text-xs font-semibold text-slate-500 sm:text-sm" aria-label="Điều hướng đơn hàng">
             <a class="shrink-0 transition hover:text-emerald-700" href="{{ route('home') }}">Trang chủ</a>
             <i class="bx bx-chevron-right text-base" aria-hidden="true"></i>
-            <a class="shrink-0 transition hover:text-emerald-700" href="{{ route('orders.lookup') }}">Tra cứu đơn</a>
+            <a class="shrink-0 transition hover:text-emerald-700" href="{{ $order->user_id !== null ? route('account.orders.index') : route('orders.lookup') }}">Lịch sử đơn hàng</a>
             <i class="bx bx-chevron-right text-base" aria-hidden="true"></i>
             <span class="truncate text-slate-800" aria-current="page">{{ $order->code }}</span>
         </nav>
@@ -348,7 +348,7 @@
                         @auth
                             <a class="client-button-secondary w-full gap-2 bg-white" href="{{ route('account.orders.index') }}"><i class="bx bx-history text-lg" aria-hidden="true"></i>Xem lịch sử đơn</a>
                         @else
-                            <a class="client-button-secondary w-full gap-2 bg-white" href="{{ route('orders.lookup') }}"><i class="bx bx-search text-lg" aria-hidden="true"></i>Tra cứu đơn khác</a>
+                            <a class="client-button-secondary w-full gap-2 bg-white" href="{{ route('orders.lookup') }}"><i class="bx bx-history text-lg" aria-hidden="true"></i>Lịch sử đơn hàng</a>
                         @endauth
                     </div>
                 </section>

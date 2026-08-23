@@ -19,7 +19,7 @@
                 <i class="bx bx-announcement shrink-0 text-xl text-cyan-700" aria-hidden="true"></i>
                 <p id="home-notice-title" class="min-w-0"><strong>Thông báo:</strong> {{ $homeNoticeTitle }}</p>
             </div>
-            <div class="home-notice-content">
+            <div class="article-content article-content--notice home-notice-content">
                 {{ $homeNoticeHtml }}
             </div>
         </div>
@@ -122,67 +122,7 @@
     @endif
 </section>
 
-@auth
-    @php
-        $paymentLabels = ['pending' => 'Chờ thanh toán', 'paid' => 'Đã thanh toán', 'expired' => 'Hết hạn', 'cancelled' => 'Đã hủy', 'refunded' => 'Đã hoàn tiền'];
-        $orderLabels = ['pending' => 'Đang chờ', 'processing' => 'Đang xử lý', 'completed' => 'Hoàn tất', 'failed' => 'Thất bại', 'cancelled' => 'Đã hủy'];
-    @endphp
-    <section class="bg-white">
-        <div class="client-container py-6 sm:py-8">
-            <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div><p class="inline-flex items-center gap-1.5 text-sm font-bold text-red-600"><i class="bx bx-history text-lg" aria-hidden="true"></i>Tài khoản của bạn</p><h2 class="mt-1 text-xl font-bold text-slate-950">Lịch sử nạp game gần đây</h2></div>
-                <a class="client-button-secondary gap-2" href="{{ route('account.orders.index') }}"><i class="bx bx-receipt text-lg" aria-hidden="true"></i>Xem toàn bộ lịch sử</a>
-            </div>
-
-            <div class="home-history-card mt-4">
-                <div class="home-table-scroll">
-                    <table class="home-history-table">
-                        <thead><tr><th scope="col">Mã đơn</th><th scope="col">Game / tài khoản</th><th scope="col">Gói nạp</th><th scope="col">Thanh toán</th><th scope="col">Trạng thái</th><th scope="col">Thời gian</th><th scope="col"><span class="sr-only">Thao tác</span></th></tr></thead>
-                        <tbody>
-                            @forelse ($userOrders as $order)
-                                <tr>
-                                    <td><strong class="font-extrabold text-slate-950">{{ $order->code }}</strong></td>
-                                    <td><strong class="block text-slate-800">{{ $order->game?->name }}</strong><small class="mt-1 block text-slate-500">{{ $order->game_account }}@if ($order->server) · {{ $order->server->name }}@endif</small></td>
-                                    <td><span class="font-semibold text-slate-800">{{ $order->package_name }}</span><small class="mt-1 block text-slate-500">Số lượng: {{ $order->quantity }}</small></td>
-                                    <td><strong class="whitespace-nowrap text-slate-950">{{ number_format((int) $order->total_amount, 0, ',', '.') }}đ</strong><small class="mt-1 block text-slate-500">{{ $paymentLabels[$order->payment_status->value] ?? $order->payment_status->value }}</small></td>
-                                    <td><span class="home-status home-status--{{ $order->order_status->value }}">{{ $orderLabels[$order->order_status->value] ?? $order->order_status->value }}</span></td>
-                                    <td class="whitespace-nowrap text-sm text-slate-500">{{ $order->created_at?->format('d/m/Y') }}<small class="block">{{ $order->created_at?->format('H:i') }}</small></td>
-                                    <td><a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ route('account.orders.show', $order) }}">Chi tiết</a></td>
-                                </tr>
-                            @empty
-                                <tr><td colspan="7" class="py-14 text-center"><strong class="block text-slate-800">Bạn chưa có đơn nạp game nào.</strong><a class="mt-3 inline-block text-sm font-bold text-emerald-700" href="#main-content">Tạo đơn đầu tiên ngay phía trên ↑</a></td></tr>
-                            @endforelse
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </section>
-@else
-    <section class="bg-white" data-guest-order-history hidden>
-        <div class="client-container py-6 sm:py-8">
-            <div class="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <p class="inline-flex items-center gap-1.5 text-sm font-bold text-emerald-700"><i class="bx bx-history text-lg" aria-hidden="true"></i>Thiết bị này</p>
-                    <h2 class="mt-1 text-xl font-bold text-slate-950">Đơn nạp game gần đây</h2>
-                    <p class="mt-2 text-sm text-slate-500">Mã đơn được lưu trên trình duyệt trong 1 năm. Bạn vẫn cần đúng email để tra cứu.</p>
-                </div>
-            </div>
-
-            <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3" data-guest-order-history-list></div>
-
-            <template data-guest-order-history-item>
-                <article class="client-card flex min-w-0 items-center justify-between gap-3 p-4">
-                    <div class="min-w-0">
-                        <strong class="block truncate text-slate-950" data-guest-order-history-code></strong>
-                        <time class="mt-1 block text-xs text-slate-500" data-guest-order-history-time></time>
-                    </div>
-                    <a class="client-button-secondary shrink-0" data-guest-order-history-link>Tra cứu</a>
-                </article>
-            </template>
-        </div>
-    </section>
-
+@guest
     <section class="bg-white">
         <div class="client-container py-6 sm:py-8">
             <article class="home-seo-article">
@@ -218,5 +158,5 @@
             </article>
         </div>
     </section>
-@endauth
+@endguest
 @endsection

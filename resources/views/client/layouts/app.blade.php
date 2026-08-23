@@ -18,6 +18,8 @@
             : $shareImage;
         $gameServiceItems = is_array($settings['game_service_items'] ?? null) ? $settings['game_service_items'] : [];
         $showGameServiceMenu = ($settings['game_service_enabled'] ?? false) === true && $gameServiceItems !== [];
+        $orderHistoryUrl = auth()->check() ? route('account.orders.index') : route('orders.lookup');
+        $orderHistoryActive = request()->routeIs(['orders.*', 'account.orders.*']);
     @endphp
     <title>{{ $title }}{{ $title !== $siteName ? ' | '.$siteName : '' }}</title>
     <meta name="description" content="{{ $description }}">
@@ -49,7 +51,7 @@
         <link rel="stylesheet" href="{{ route('site_custom.css') }}" data-site-custom-css>
     @endif
 </head>
-<body data-authenticated="{{ auth()->check() ? 'true' : 'false' }}" data-order-lookup-url="{{ route('orders.lookup') }}">
+<body data-authenticated="{{ auth()->check() ? 'true' : 'false' }}" data-order-lookup-url="{{ route('orders.lookup') }}" data-order-detail-url-template="{{ route('orders.details', ['order' => '__ORDER__']) }}">
     <a href="#main-content" class="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[5px] focus:bg-slate-950 focus:px-4 focus:py-3 focus:text-white">Bỏ qua điều hướng</a>
     <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div class="client-container flex min-h-[4.5rem] items-center justify-between gap-3 sm:min-h-20">
@@ -64,7 +66,7 @@
             <nav class="hidden items-center gap-3 text-xs font-semibold text-slate-700 lg:flex xl:gap-6 xl:text-sm" aria-label="Điều hướng chính">
                 <a @class(['inline-flex items-center gap-1.5', 'text-emerald-700' => request()->routeIs('home'), 'hover:text-emerald-700' => ! request()->routeIs('home')]) href="{{ route('home') }}" @if (request()->routeIs('home')) aria-current="page" @endif><i class="bx bx-home-alt-2 text-lg" aria-hidden="true"></i><span>Trang chủ</span></a>
                 <a @class(['inline-flex items-center gap-1.5', 'text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i><span>Nạp tiền</span></a>
-                <a @class(['inline-flex items-center gap-1.5', 'text-emerald-700' => request()->routeIs('orders.*'), 'hover:text-emerald-700' => ! request()->routeIs('orders.*')]) href="{{ route('orders.lookup') }}" @if (request()->routeIs('orders.*')) aria-current="page" @endif><i class="bx bx-search text-lg" aria-hidden="true"></i><span>Tra cứu đơn nạp</span></a>
+                <a @class(['inline-flex items-center gap-1.5', 'text-emerald-700' => $orderHistoryActive, 'hover:text-emerald-700' => ! $orderHistoryActive]) href="{{ $orderHistoryUrl }}" @if ($orderHistoryActive) aria-current="page" @endif><i class="bx bx-history text-lg" aria-hidden="true"></i><span>Lịch sử đơn hàng</span></a>
                 <a @class(['inline-flex items-center gap-1.5', 'text-emerald-700' => request()->routeIs('seo.*'), 'hover:text-emerald-700' => ! request()->routeIs('seo.*')]) href="{{ route('seo.index') }}" @if (request()->routeIs('seo.*')) aria-current="page" @endif><i class="bx bx-news text-lg" aria-hidden="true"></i><span>Bài viết</span></a>
                 @if ($showGameServiceMenu)
                     <details class="group relative" data-game-service-menu>
@@ -122,7 +124,7 @@
                             <nav class="grid gap-1 p-2" aria-label="Menu tài khoản">
                                 <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.index') }}"><i class="bx bx-user-circle text-lg" aria-hidden="true"></i>Tổng quan tài khoản</a>
                                 <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('wallet.deposit.index') }}"><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i>Nạp tiền</a>
-                                <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.orders.index') }}"><i class="bx bx-receipt text-lg" aria-hidden="true"></i>Lịch sử đơn nạp</a>
+                                <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.orders.index') }}"><i class="bx bx-receipt text-lg" aria-hidden="true"></i>Lịch sử đơn hàng</a>
                                 @if ($clientAccount['role'] === 'admin')
                                     <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="/admin"><i class="bx bx-shield text-lg" aria-hidden="true"></i>Trang quản trị</a>
                                 @endif
@@ -186,7 +188,7 @@
                 <div class="grid gap-1">
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('home'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('home')]) href="{{ route('home') }}" @if (request()->routeIs('home')) aria-current="page" @endif><i class="bx bx-home-alt-2 text-xl" aria-hidden="true"></i><span>Trang chủ</span></a>
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-xl" aria-hidden="true"></i><span>Nạp tiền</span></a>
-                    <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('orders.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('orders.*')]) href="{{ route('orders.lookup') }}" @if (request()->routeIs('orders.*')) aria-current="page" @endif><i class="bx bx-search text-xl" aria-hidden="true"></i><span>Tra cứu đơn nạp</span></a>
+                    <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => $orderHistoryActive, 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! $orderHistoryActive]) href="{{ $orderHistoryUrl }}" @if ($orderHistoryActive) aria-current="page" @endif><i class="bx bx-history text-xl" aria-hidden="true"></i><span>Lịch sử đơn hàng</span></a>
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('seo.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('seo.*')]) href="{{ route('seo.index') }}" @if (request()->routeIs('seo.*')) aria-current="page" @endif><i class="bx bx-news text-xl" aria-hidden="true"></i><span>Bài viết</span></a>
                     @if ($showGameServiceMenu)
                         <details class="group rounded-[8px] border border-slate-200 bg-slate-50" data-game-service-menu>
@@ -258,7 +260,7 @@
                 @endif
                 <p class="mt-3 max-w-md text-sm leading-6 text-slate-600">Dịch vụ nạp Carot game Teamobi với trạng thái đơn minh bạch và hỗ trợ rõ ràng.</p>
             </div>
-            <div><p class="font-bold">Dịch vụ</p><div class="mt-3 grid gap-2 text-sm text-slate-600"><a href="{{ route('home') }}">Nạp game</a><a href="{{ route('wallet.deposit.index') }}">Nạp tiền</a><a href="{{ route('orders.lookup') }}">Tra cứu đơn</a></div></div>
+            <div><p class="font-bold">Dịch vụ</p><div class="mt-3 grid gap-2 text-sm text-slate-600"><a href="{{ route('home') }}">Nạp game</a><a href="{{ route('wallet.deposit.index') }}">Nạp tiền</a><a href="{{ $orderHistoryUrl }}">Lịch sử đơn hàng</a></div></div>
             <div><p class="font-bold">Hỗ trợ</p><div class="mt-3 grid gap-2 text-sm text-slate-600"><a href="{{ route('content.guide') }}">Hướng dẫn</a><a href="{{ route('content.contact') }}">Liên hệ</a></div></div>
         </div>
     </footer>

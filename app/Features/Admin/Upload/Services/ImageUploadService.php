@@ -76,7 +76,10 @@ class ImageUploadService
 
     protected function supportsServerSideWebpConversion(): bool
     {
-        return function_exists('imagecreatetruecolor') && function_exists('imagewebp');
+        return function_exists('imagecreatetruecolor')
+            && function_exists('imagewebp')
+            && defined('IMG_WEBP')
+            && (imagetypes() & IMG_WEBP) === IMG_WEBP;
     }
 
     protected function publicUploadRelativePath(string $filename): string
