@@ -151,6 +151,8 @@ const recipientData = (recipient: RecipientRow): string =>
                                         <span>Trạng thái: {{ item.status || '—' }}</span>
                                         <span v-if="item.http_status">HTTP {{ item.http_status }}</span>
                                         <span v-if="item.provider_code">Mã provider: {{ item.provider_code }}</span>
+                                        <span v-if="item.provider_status">Nghiệp vụ: {{ item.provider_status }}</span>
+                                        <span v-if="item.envelope_status">API: {{ item.envelope_status }}</span>
                                         <span v-if="item.check_attempts">Kiểm tra: {{ item.check_attempts }} lần</span>
                                     </div>
                                     <p v-if="item.message" class="mt-1 font-semibold leading-5 text-rose-700">{{ item.message }}</p>

@@ -38,7 +38,15 @@ type Pagination = {
 
 type AdminTopupOrderUpdatedEvent = Pick<
     OrderRow,
-    'id' | 'code' | 'payment_status' | 'order_status' | 'can_reorder' | 'provider_reference' | 'failure_reason' | 'paid_at'
+    | 'id'
+    | 'code'
+    | 'payment_status'
+    | 'order_status'
+    | 'can_reorder'
+    | 'can_sync_provider'
+    | 'provider_reference'
+    | 'failure_reason'
+    | 'paid_at'
 > & { updated_at: string };
 
 const orders = ref<OrderRow[]>([]);
@@ -115,12 +123,14 @@ const primaryActionFor = (order: OrderRow): ActionOption => {
     }
     if (order.can_reorder) return { action: 'reorder', label: 'Đẩy lại thẻ lỗi', tone: 'primary' };
     if (order.payment_status === 'paid' && order.order_status === 'pending') return { action: 'process', label: 'Xử lý đơn', tone: 'primary' };
+    if (order.can_sync_provider) return { action: 'sync_provider', label: 'Đồng bộ provider', tone: 'primary' };
     if (order.order_status === 'processing') return { action: 'complete', label: 'Hoàn thành', tone: 'primary' };
     return { action: 'detail', label: 'Xem chi tiết', tone: 'neutral' };
 };
 
 const secondaryActionsFor = (order: OrderRow): ActionOption[] => {
     const actions: ActionOption[] = [{ action: 'detail', label: 'Xem chi tiết', tone: 'neutral' }];
+    if (order.can_sync_provider) actions.push({ action: 'complete', label: 'Hoàn thành thủ công', tone: 'neutral' });
     if (['pending', 'processing'].includes(order.order_status)) actions.push({ action: 'fail', label: 'Báo lỗi đơn', tone: 'danger' });
     if (!['completed', 'cancelled'].includes(order.order_status)) actions.push({ action: 'cancel', label: 'Hủy đơn', tone: 'danger' });
     return actions;
@@ -166,6 +176,7 @@ const applyRealtimeSnapshot = (event: AdminTopupOrderUpdatedEvent): void => {
         payment_status: event.payment_status,
         order_status: event.order_status,
         can_reorder: event.can_reorder,
+        can_sync_provider: event.can_sync_provider,
         provider_reference: event.provider_reference,
         failure_reason: event.failure_reason,
         paid_at: event.paid_at,
@@ -303,6 +314,11 @@ const confirmationFor = (order: OrderRow, action: Exclude<OrderAction, 'detail'>
             title: 'Đẩy lại thẻ lỗi?',
             text: `Chỉ các lượt provider đã xác nhận thất bại của đơn ${order.code} được gửi lại.`,
             confirm: 'Đẩy lại thẻ lỗi',
+        },
+        sync_provider: {
+            title: 'Đồng bộ trạng thái provider?',
+            text: `Hệ thống sẽ gọi The9p để kiểm tra ngay trạng thái thực tế của đơn ${order.code}.`,
+            confirm: 'Đồng bộ ngay',
         },
         complete: { title: 'Đánh dấu hoàn thành?', text: `Xác nhận toàn bộ đơn ${order.code} đã hoàn thành.`, confirm: 'Hoàn thành' },
         fail: { title: 'Báo lỗi đơn?', text: `Đơn ${order.code} sẽ chuyển sang trạng thái lỗi.`, confirm: 'Báo lỗi' },

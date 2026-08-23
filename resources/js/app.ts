@@ -4,12 +4,6 @@ import { createPinia } from 'pinia';
 import { createApp } from 'vue';
 import router from './router';
 
-try {
-    window.localStorage.removeItem('napcarot.guest-order-history.v1');
-} catch {
-    // Admin remains usable when browser storage is unavailable.
-}
-
 configureEcho({
     broadcaster: 'reverb',
     key: import.meta.env.VITE_REVERB_APP_KEY,

@@ -16,6 +16,7 @@ use App\Models\Order;
 use App\Models\OrderRecipient;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
+use App\Models\User;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
@@ -303,8 +304,48 @@ test('a successful response envelope without a transaction status is not treated
     app(RecipientFulfillmentService::class)->syncStatus($recipient->id, 1, 1);
 
     expect($recipient->refresh()->status)->toBe('processing')
-        ->and($recipient->provider_response['items'][1]['status'])->toBe('pending');
+        ->and($recipient->provider_response['items'][1]['status'])->toBe('pending')
+        ->and($recipient->provider_response['items'][1]['response']['provider_status'])->toBeNull()
+        ->and($recipient->provider_response['items'][1]['response']['envelope_status'])->toBe('success');
     Queue::assertPushed(SyncTopupRecipientStatus::class);
+});
+
+test('admin can immediately reconcile a processing order with the provider', function (): void {
+    [$order, $recipient] = the9pOrderFixture([
+        'quantity' => 1,
+        'provider_request_id' => 'TOP-SYNC-R001',
+        'provider_reference' => 'THE9P-SYNC',
+        'provider_status' => 'pending',
+        'status' => 'processing',
+        'provider_response' => [
+            'items' => [
+                1 => [
+                    'unit' => 1,
+                    'request_id' => 'TOP-SYNC-R001',
+                    'reference' => 'THE9P-SYNC',
+                    'status' => 'pending',
+                ],
+            ],
+        ],
+    ]);
+    $admin = User::factory()->create(['role' => 'admin']);
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::response([
+            'status' => 'success',
+            'message' => 'Thành công',
+            'data' => ['order_code' => 'THE9P-SYNC', 'status' => 'completed'],
+        ]),
+    ]);
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'sync_provider'])
+        ->assertSuccessful()
+        ->assertJsonPath('data.order_status', 'completed')
+        ->assertJsonPath('data.can_sync_provider', false);
+
+    expect($recipient->refresh()->status)->toBe('completed')
+        ->and($order->refresh()->order_status)->toBe(OrderStatus::Completed);
+    Queue::assertNotPushed(SyncTopupRecipientStatus::class);
 });
 
 test('paid multi recipient order is split into queue jobs without provider http in the request flow', function (): void {

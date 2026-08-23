@@ -218,7 +218,8 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             message: $message,
             response: [
                 'http_status' => $response->status(),
-                'provider_status' => $transactionStatus !== '' ? $transactionStatus : $envelopeStatus,
+                'provider_status' => $transactionStatus !== '' ? $transactionStatus : null,
+                'envelope_status' => $envelopeStatus !== '' ? $envelopeStatus : null,
                 'provider_code' => is_scalar($body['code'] ?? null) ? $body['code'] : null,
             ],
         );

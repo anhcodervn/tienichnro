@@ -11,6 +11,8 @@ export type RecipientRow = {
         message?: string | null;
         http_status?: number | null;
         provider_code?: string | number | null;
+        provider_status?: string | null;
+        envelope_status?: string | null;
         check_attempts?: number;
         last_checked_at?: string | null;
     }>;
@@ -34,6 +36,7 @@ export type OrderRow = {
     payment_status: string;
     order_status: string;
     can_reorder: boolean;
+    can_sync_provider: boolean;
     provider_reference?: string | null;
     failure_reason?: string | null;
     paid_at?: string | null;
@@ -41,7 +44,7 @@ export type OrderRow = {
     recipients?: RecipientRow[];
 };
 
-export type OrderAction = 'detail' | 'mark_paid' | 'process' | 'reorder' | 'complete' | 'fail' | 'cancel';
+export type OrderAction = 'detail' | 'mark_paid' | 'process' | 'reorder' | 'sync_provider' | 'complete' | 'fail' | 'cancel';
 
 export type ActionOption = {
     action: OrderAction;

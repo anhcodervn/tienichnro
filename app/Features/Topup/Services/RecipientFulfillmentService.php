@@ -38,7 +38,7 @@ class RecipientFulfillmentService
 
         if (filled($item['reference'] ?? null)) {
             if ($adapter->supportsStatusChecks()) {
-                SyncTopupRecipientStatus::dispatch($recipient->id, $unit, 1)->delay(now()->addSeconds(15));
+                SyncTopupRecipientStatus::dispatch($recipient->id, $unit, 1)->delay(now()->addSeconds(5));
             }
 
             return;
@@ -48,7 +48,7 @@ class RecipientFulfillmentService
         $this->storeUnitResult($recipient->id, $unit, $requestId, $result, true);
 
         if (! $result->status->isTerminal() && $adapter->supportsStatusChecks()) {
-            SyncTopupRecipientStatus::dispatch($recipient->id, $unit, 1)->delay(now()->addSeconds(15));
+            SyncTopupRecipientStatus::dispatch($recipient->id, $unit, 1)->delay(now()->addSeconds(5));
         }
 
         $this->aggregateOrder($order->id);
@@ -98,6 +98,41 @@ class RecipientFulfillmentService
             $delay = min(15 * (2 ** min($attempt - 1, 3)), 120);
             SyncTopupRecipientStatus::dispatch($recipient->id, $unit, $attempt + 1)->delay(now()->addSeconds($delay));
         }
+    }
+
+    public function syncOrder(int $orderId): int
+    {
+        $recipients = OrderRecipient::query()
+            ->where('order_id', $orderId)
+            ->whereNotIn('status', ['completed', 'failed', 'cancelled'])
+            ->get();
+        $checked = 0;
+
+        foreach ($recipients as $recipient) {
+            foreach (range(1, $recipient->quantity) as $unit) {
+                $item = $this->providerItem($recipient, $unit);
+
+                if (blank($item['reference'] ?? null)
+                    || in_array($item['status'] ?? null, ['completed', 'failed'], true)) {
+                    continue;
+                }
+
+                $attempt = max((int) ($item['check_attempts'] ?? 0), $recipient->status_check_attempts) + 1;
+
+                if ($checked < 20) {
+                    $this->syncStatus($recipient->id, $unit, $attempt);
+                    $checked++;
+
+                    continue;
+                }
+
+                SyncTopupRecipientStatus::dispatch($recipient->id, $unit, $attempt);
+            }
+        }
+
+        $this->aggregateOrder($orderId);
+
+        return $checked;
     }
 
     public function markForManualReview(int $recipientId, string $reason, ?int $unit = null): void

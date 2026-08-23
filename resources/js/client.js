@@ -56,10 +56,7 @@ const writeGuestOrderHistory = (orders) => {
 };
 
 const initializeGuestOrderHistory = () => {
-    if (document.body.dataset.authenticated === 'true') {
-        removeGuestOrderHistory();
-        return;
-    }
+    if (document.body.dataset.authenticated === 'true') return;
 
     let orders = readGuestOrderHistory();
     const orderMarker = document.querySelector('[data-guest-order-code]');

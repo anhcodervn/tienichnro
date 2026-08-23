@@ -1,6 +1,6 @@
 <?php
 
-test('guest order history is a one year local bookmark that clears after login', function (): void {
+test('guest order history remains available after visiting authenticated pages', function (): void {
     $projectRoot = dirname(__DIR__, 2);
     $layout = file_get_contents($projectRoot.'/resources/views/client/layouts/app.blade.php');
     $home = file_get_contents($projectRoot.'/resources/views/client/home/index.blade.php');
@@ -31,12 +31,11 @@ test('guest order history is a one year local bookmark that clears after login',
         ->toContain("const guestOrderHistoryKey = 'napcarot.guest-order-history.v1'")
         ->toContain('const guestOrderLifetime = 365 * 24 * 60 * 60 * 1000')
         ->toContain('const guestOrderLimit = 30')
-        ->toContain("if (document.body.dataset.authenticated === 'true')")
-        ->toContain('removeGuestOrderHistory()')
+        ->toContain("if (document.body.dataset.authenticated === 'true') return")
         ->toContain('entry.expiresAt > now')
         ->toContain('orders.filter((item) => item.code !== code)')
         ->toContain('orderCode.textContent = entry.code')
         ->toContain("url.searchParams.set('code', entry.code)")
         ->and($adminScript)
-        ->toContain("window.localStorage.removeItem('napcarot.guest-order-history.v1')");
+        ->not->toContain("window.localStorage.removeItem('napcarot.guest-order-history.v1')");
 });

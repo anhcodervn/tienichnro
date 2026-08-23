@@ -35,6 +35,8 @@ class OrderResource extends JsonResource
                             'message' => $item['message'] ?? null,
                             'http_status' => data_get($item, 'response.http_status'),
                             'provider_code' => data_get($item, 'response.provider_code'),
+                            'provider_status' => data_get($item, 'response.provider_status'),
+                            'envelope_status' => data_get($item, 'response.envelope_status'),
                             'check_attempts' => $item['check_attempts'] ?? 0,
                             'last_checked_at' => $item['last_checked_at'] ?? null,
                         ])->values()->all(),
@@ -43,6 +45,9 @@ class OrderResource extends JsonResource
             'payment_status' => $this->payment_status->value, 'order_status' => $this->order_status->value,
             'can_reorder' => $this->payment_status === PaymentStatus::Paid
                 && $this->order_status === OrderStatus::Failed
+                && $this->provider?->slug === 'the9p',
+            'can_sync_provider' => $this->payment_status === PaymentStatus::Paid
+                && $this->order_status === OrderStatus::Processing
                 && $this->provider?->slug === 'the9p',
             'provider_reference' => $this->provider_reference, 'failure_reason' => $this->failure_reason,
             'paid_at' => $this->paid_at?->toISOString(), 'created_at' => $this->created_at?->toISOString(),
