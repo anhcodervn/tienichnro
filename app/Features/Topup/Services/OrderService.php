@@ -4,6 +4,7 @@ namespace App\Features\Topup\Services;
 
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Exceptions\ApiException;
 use App\Features\Client\Wallet\Services\WalletService;
 use App\Features\Topup\Jobs\ProcessTopupOrder;
 use App\Features\Topup\Services\Payments\OrderBankPaymentService;
@@ -29,8 +30,13 @@ class OrderService
     ) {}
 
     /** @param array<string, mixed> $payload */
-    public function create(array $payload, ?User $authenticatedUser, ?string $ip, ?string $userAgent): Order
-    {
+    public function create(
+        array $payload,
+        ?User $authenticatedUser,
+        ?string $ip,
+        ?string $userAgent,
+        bool $allowWalletFallback = true,
+    ): Order {
         $idempotencyKey = (string) $payload['idempotency_key'];
         $email = $this->resolveCustomerEmail($payload, $authenticatedUser);
 
@@ -43,7 +49,7 @@ class OrderService
         $serverId = (int) $payload['server_id'];
 
         try {
-            $order = DB::transaction(function () use ($payload, $authenticatedUser, $idempotencyKey, $email, $normalizedEmail, $requestedPaymentMethod, $serverId, $ip, $userAgent): Order {
+            $order = DB::transaction(function () use ($payload, $authenticatedUser, $idempotencyKey, $email, $normalizedEmail, $requestedPaymentMethod, $serverId, $ip, $userAgent, $allowWalletFallback): Order {
                 $user = $authenticatedUser instanceof User
                     ? User::query()->lockForUpdate()->findOrFail($authenticatedUser->id)
                     : null;
@@ -75,6 +81,19 @@ class OrderService
                         ->value('balance')
                     : null;
                 $canPayWithWallet = $walletBalance !== null && (int) $walletBalance >= $quote['total_amount'];
+
+                if ($requestedPaymentMethod === PaymentMethod::Wallet && ! $canPayWithWallet && ! $allowWalletFallback) {
+                    throw new ApiException(
+                        'Số dư ví không đủ để tạo task.',
+                        422,
+                        ['data' => [
+                            'balance' => (int) ($walletBalance ?? 0),
+                            'required_amount' => $quote['total_amount'],
+                            'currency' => 'VND',
+                        ]],
+                    );
+                }
+
                 $paymentMethod = $requestedPaymentMethod === PaymentMethod::Wallet && $canPayWithWallet
                     ? PaymentMethod::Wallet
                     : PaymentMethod::BankTransfer;

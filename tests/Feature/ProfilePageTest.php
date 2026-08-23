@@ -1,12 +1,12 @@
 <?php
 
 use App\Jobs\SaveUserLogJob;
+use App\Models\ApiKey;
 use App\Models\User;
 use App\Models\UserLog;
 use App\Models\WalletTransaction;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Queue;
-use Laravel\Sanctum\PersonalAccessToken;
 
 test('profile tabs require authentication', function (string $routeName): void {
     $this->get(route($routeName))->assertRedirect(route('login'));
@@ -100,53 +100,66 @@ test('password change validates the current password and queues an audit log', f
     Queue::assertPushed(SaveUserLogJob::class, fn (SaveUserLogJob $job): bool => $job->action === 'password_changed');
 });
 
-test('api key is shown once and stored as a sanctum hash', function (): void {
+test('api key and secret are shown once while only the secret hash is stored', function (): void {
     $user = User::factory()->create();
     Queue::fake();
-    $plainTextToken = null;
+    $plainCredentials = null;
 
     $response = $this->actingAs($user)
         ->post(route('account.profile.api.store'), ['name' => 'Desktop integration'])
         ->assertRedirect(route('account.profile.api'))
         ->assertSessionHas('success');
 
-    $response->assertSessionHas('new_api_token', function (string $token) use (&$plainTextToken): bool {
-        $plainTextToken = $token;
+    $response->assertSessionHas('new_api_credentials', function (array $credentials) use (&$plainCredentials): bool {
+        $plainCredentials = $credentials;
 
-        return str_contains($token, '|');
+        return str_starts_with($credentials['api_key'], 'nck_')
+            && str_starts_with($credentials['api_secret'], 'ncs_');
     });
 
-    $storedToken = PersonalAccessToken::query()->sole();
+    $storedKey = ApiKey::query()->sole();
 
-    expect($storedToken->name)->toBe('Desktop integration')
-        ->and($storedToken->token)->not->toContain((string) $plainTextToken);
+    expect($storedKey->name)->toBe('Desktop integration')
+        ->and($storedKey->api_key)->toBe($plainCredentials['api_key'])
+        ->and(Hash::check($plainCredentials['api_secret'], $storedKey->api_secret_hash))->toBeTrue()
+        ->and($storedKey->getRawOriginal('api_secret_hash'))->not->toContain($plainCredentials['api_secret'])
+        ->and($storedKey->api_secret_encrypted)->toBeNull()
+        ->and($storedKey->permissions)->toBe([
+            'balance:read',
+            'tasks:create',
+            'tasks:read',
+        ]);
 
     $this->actingAs($user)
         ->get(route('account.profile.api'))
         ->assertSuccessful()
-        ->assertSee((string) $plainTextToken);
+        ->assertSee($plainCredentials['api_key'])
+        ->assertSee($plainCredentials['api_secret'])
+        ->assertSee('X-API-KEY')
+        ->assertSee('X-API-SECRET');
 
-    Queue::assertPushed(SaveUserLogJob::class, fn (SaveUserLogJob $job): bool => $job->action === 'api_token_created');
+    Queue::assertPushed(SaveUserLogJob::class, fn (SaveUserLogJob $job): bool => $job->action === 'api_key_created');
 });
 
 test('user can revoke only their own api key', function (): void {
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
-    $ownedToken = $user->createToken('Owned key')->accessToken;
-    $foreignToken = $otherUser->createToken('Foreign key')->accessToken;
+    $ownedKey = ApiKey::factory()->for($user)->create(['name' => 'Owned key']);
+    $foreignKey = ApiKey::factory()->for($otherUser)->create(['name' => 'Foreign key']);
     Queue::fake();
 
     $this->actingAs($user)
-        ->delete(route('account.profile.api.destroy', $ownedToken->id))
+        ->delete(route('account.profile.api.destroy', $ownedKey->id))
         ->assertRedirect(route('account.profile.api'));
 
-    expect(PersonalAccessToken::query()->find($ownedToken->id))->toBeNull();
+    expect($ownedKey->refresh()->status)->toBe('revoked');
 
     $this->actingAs($user)
-        ->delete(route('account.profile.api.destroy', $foreignToken->id))
+        ->delete(route('account.profile.api.destroy', $foreignKey->id))
         ->assertNotFound();
 
-    expect(PersonalAccessToken::query()->find($foreignToken->id))->not->toBeNull();
+    expect($foreignKey->refresh()->status)->toBe('active');
+    Queue::assertPushed(SaveUserLogJob::class, fn (SaveUserLogJob $job): bool => $job->action === 'api_key_revoked');
 });
 
 test('activity and wallet tabs show only records owned by the signed in user', function (): void {

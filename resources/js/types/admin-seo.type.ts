@@ -1,5 +1,5 @@
-export type SeoRobotsValue = "index,follow" | "noindex,follow";
-export type SeoPostStatus = "draft" | "published" | "scheduled";
+export type SeoRobotsValue = 'index,follow' | 'noindex,follow';
+export type SeoPostStatus = 'draft' | 'published' | 'scheduled';
 
 export interface AdminSeoOverviewSummary {
     total_categories: number;
@@ -37,6 +37,7 @@ export interface AdminSeoPostItem {
     slug: string;
     excerpt: string | null;
     content: unknown[];
+    cover_image: string | null;
     seo_title: string | null;
     seo_description: string | null;
     canonical_url: string | null;
@@ -71,9 +72,10 @@ export interface AdminSeoPostPayload {
     slug: string;
     excerpt?: string;
     content?: unknown[];
+    cover_image?: string | null;
     seo_title?: string;
     seo_description?: string;
-    canonical_url?: string;
+    canonical_url?: string | null;
     robots: SeoRobotsValue;
     focus_keyword?: string;
     cover_alt?: string;

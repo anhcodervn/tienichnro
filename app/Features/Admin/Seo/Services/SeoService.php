@@ -107,6 +107,7 @@ class SeoService
             'slug' => $payload['slug'],
             'excerpt' => $payload['excerpt'] ?? null,
             'content' => $payload['content'] ?? [],
+            'cover_image' => $payload['cover_image'] ?? null,
             'seo_title' => $payload['seo_title'] ?? null,
             'seo_description' => $payload['seo_description'] ?? null,
             'canonical_url' => $payload['canonical_url'] ?? null,

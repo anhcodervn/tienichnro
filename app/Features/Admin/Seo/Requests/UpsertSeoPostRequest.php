@@ -3,6 +3,10 @@
 namespace App\Features\Admin\Seo\Requests;
 
 use App\Exceptions\ApiException;
+use App\Models\User;
+use App\Rules\ValidSeoPostContent;
+use App\Support\SafeNavigationUrl;
+use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -12,7 +16,9 @@ class UpsertSeoPostRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return true;
+        $user = $this->user();
+
+        return $user instanceof User && $user->role === 'admin';
     }
 
     /**
@@ -33,18 +39,19 @@ class UpsertSeoPostRequest extends FormRequest
                 Rule::unique('seo_posts', 'slug')->ignore($postId),
             ],
             'excerpt' => ['nullable', 'string'],
-            'content' => ['nullable', 'array'],
+            'content' => ['nullable', 'array', new ValidSeoPostContent],
+            'cover_image' => ['nullable', 'string', 'max:2048', $this->safeCoverImageRule()],
             'seo_title' => ['nullable', 'string', 'max:255'],
             'seo_description' => ['nullable', 'string', 'max:320'],
-            'canonical_url' => ['nullable', 'url', 'max:2048'],
+            'canonical_url' => ['nullable', 'string', 'max:2048', $this->absoluteHttpUrlRule()],
             'robots' => ['required', Rule::in(['index,follow', 'noindex,follow'])],
             'focus_keyword' => ['nullable', 'string', 'max:255'],
-            'cover_alt' => ['nullable', 'string', 'max:255'],
+            'cover_alt' => [Rule::requiredIf($this->filled('cover_image')), 'nullable', 'string', 'max:255'],
             'article_schema' => ['sometimes', 'boolean'],
             'breadcrumb_schema' => ['sometimes', 'boolean'],
             'status' => ['required', Rule::in(['draft', 'published', 'scheduled'])],
             'published_at' => ['nullable', 'date'],
-            'scheduled_at' => ['nullable', 'date'],
+            'scheduled_at' => [Rule::requiredIf($this->input('status') === 'scheduled'), 'nullable', 'date', 'after:now'],
         ];
     }
 
@@ -63,6 +70,7 @@ class UpsertSeoPostRequest extends FormRequest
             'slug' => 'slug',
             'excerpt' => 'mô tả ngắn',
             'content' => 'nội dung chính',
+            'cover_image' => 'ảnh đại diện',
             'seo_title' => 'SEO title',
             'seo_description' => 'SEO description',
             'canonical_url' => 'canonical URL',
@@ -80,5 +88,48 @@ class UpsertSeoPostRequest extends FormRequest
     protected function failedValidation(Validator $validator): void
     {
         throw new ApiException($validator->errors()->first(), 422);
+    }
+
+    protected function prepareForValidation(): void
+    {
+        $normalized = [];
+
+        foreach (['title', 'slug', 'excerpt', 'cover_image', 'cover_alt', 'seo_title', 'seo_description', 'canonical_url', 'focus_keyword'] as $field) {
+            if (! $this->exists($field) || ! is_string($this->input($field))) {
+                continue;
+            }
+
+            $value = trim((string) $this->input($field));
+            $normalized[$field] = $value === '' ? null : $value;
+        }
+
+        $this->merge($normalized);
+    }
+
+    private function safeCoverImageRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value !== null && ! SafeNavigationUrl::passes($value)) {
+                $fail('Ảnh đại diện phải là URL http/https hoặc đường dẫn nội bộ hợp lệ.');
+            }
+        };
+    }
+
+    private function absoluteHttpUrlRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value === null) {
+                return;
+            }
+
+            $scheme = parse_url((string) $value, PHP_URL_SCHEME);
+            $isValid = filter_var($value, FILTER_VALIDATE_URL) !== false
+                && is_string($scheme)
+                && in_array(strtolower($scheme), ['http', 'https'], true);
+
+            if (! $isValid) {
+                $fail('Canonical URL phải là địa chỉ đầy đủ bắt đầu bằng http:// hoặc https://.');
+            }
+        };
     }
 }

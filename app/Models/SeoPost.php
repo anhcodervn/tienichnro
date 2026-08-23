@@ -13,6 +13,7 @@ class SeoPost extends Model
         'slug',
         'excerpt',
         'content',
+        'cover_image',
         'seo_title',
         'seo_description',
         'canonical_url',

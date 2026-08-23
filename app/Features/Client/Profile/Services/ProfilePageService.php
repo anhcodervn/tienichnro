@@ -20,8 +20,12 @@ class ProfilePageService
             'user' => $user,
             'activeTab' => $activeTab,
             'wallet' => $wallet,
-            'apiTokens' => $activeTab === 'api'
-                ? $user->tokens()->latest('id')->get(['id', 'name', 'abilities', 'last_used_at', 'expires_at', 'created_at'])
+            'apiKeys' => $activeTab === 'api'
+                ? $user->apiKeys()
+                    ->where('key_type', 'topup')
+                    ->where('status', 'active')
+                    ->latest('id')
+                    ->get(['id', 'name', 'api_key', 'permissions', 'last_used_at', 'expired_at', 'created_at'])
                 : collect(),
             'userLogs' => $activeTab === 'logs'
                 ? $user->userLogs()->latest('id')->paginate(12, ['id', 'action', 'description', 'ip', 'user_agent', 'created_at'], 'logs_page')->withQueryString()

@@ -26,7 +26,12 @@ class OrderRecipientService
         $fields = $game->checkoutFields();
         $mode = ($payload['purchase_mode'] ?? 'single') === 'bulk' ? 'bulk' : 'single';
 
-        if ($mode === 'bulk') {
+        if (array_key_exists('api_recipients', $payload)) {
+            $recipients = $this->parseApiRecipients($payload['api_recipients'], $fields);
+            $quantity = array_sum(array_column($recipients, 'quantity'));
+            $quantityField = 'recipients';
+            $mode = count($recipients) > 1 ? 'bulk' : 'single';
+        } elseif ($mode === 'bulk') {
             $recipients = $this->parseBulkRecipients((string) ($payload['bulk_recipients'] ?? ''), $fields);
             $quantity = array_sum(array_column($recipients, 'quantity'));
             $quantityField = 'bulk_recipients';
@@ -55,6 +60,51 @@ class OrderRecipientService
                 ? $firstRecipient['game_character']
                 : null,
         ];
+    }
+
+    /**
+     * @param  array<int, array{key:string,label:string,placeholder:string,required:bool}>  $fields
+     * @return array<int, array{data:array<string, string>,quantity:int}>
+     */
+    private function parseApiRecipients(mixed $input, array $fields): array
+    {
+        if (! is_array($input) || $input === []) {
+            throw ValidationException::withMessages(['recipients' => 'Cần ít nhất một tài khoản nhận.']);
+        }
+
+        if (count($input) > self::MAX_RECIPIENTS) {
+            throw ValidationException::withMessages([
+                'recipients' => 'Mỗi task chỉ được có tối đa '.self::MAX_RECIPIENTS.' tài khoản nhận.',
+            ]);
+        }
+
+        return collect($input)
+            ->values()
+            ->map(function (mixed $item, int $index) use ($fields): array {
+                if (! is_array($item)) {
+                    throw ValidationException::withMessages([
+                        "recipients.{$index}" => 'Thông tin tài khoản nhận không hợp lệ.',
+                    ]);
+                }
+
+                $quantity = (int) ($item['quantity'] ?? 0);
+                if ($quantity < 1 || $quantity > self::MAX_QUANTITY_PER_RECIPIENT) {
+                    throw ValidationException::withMessages([
+                        "recipients.{$index}.quantity" => 'Số lượng phải từ 1 đến '.self::MAX_QUANTITY_PER_RECIPIENT.'.',
+                    ]);
+                }
+
+                return [
+                    'data' => $this->normalizeRecipient(
+                        $item['data'] ?? null,
+                        $fields,
+                        "recipients.{$index}.data",
+                        $index + 1,
+                    ),
+                    'quantity' => $quantity,
+                ];
+            })
+            ->all();
     }
 
     /**

@@ -126,6 +126,11 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         return $this->hasMany(Order::class);
     }
 
+    public function apiKeys(): HasMany
+    {
+        return $this->hasMany(ApiKey::class);
+    }
+
     public function adminAuditLogs(): HasMany
     {
         return $this->hasMany(AdminAuditLog::class, 'admin_id');

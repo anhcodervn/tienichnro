@@ -162,20 +162,26 @@
             @elseif ($activeTab === 'api')
                 <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
                     <div class="grid content-start gap-3">
-                        @if (session('new_api_token'))
+                        @if (session('new_api_credentials'))
+                            @php($newApiCredentials = session('new_api_credentials'))
                             <section class="rounded-[5px] border border-emerald-300 bg-emerald-50 p-4">
-                                <h2 class="font-extrabold text-emerald-950">API key mới — chỉ hiển thị một lần</h2>
-                                <p class="mt-1 text-sm text-emerald-800">Sao chép khóa ngay. Hệ thống không thể hiển thị lại sau khi bạn rời trang.</p>
-                                <div class="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row">
-                                    <code class="min-w-0 flex-1 break-all rounded-[5px] border border-emerald-200 bg-white p-3 text-xs text-slate-800">{{ session('new_api_token') }}</code>
-                                    <button class="client-button-secondary min-h-11 shrink-0 bg-white" type="button" data-copy="{{ session('new_api_token') }}"><i class="bx bx-copy text-lg" aria-hidden="true"></i>Sao chép</button>
+                                <h2 class="font-extrabold text-emerald-950">API key và API secret mới — chỉ hiển thị một lần</h2>
+                                <p class="mt-1 text-sm text-emerald-800">Sao chép cả hai giá trị ngay. API secret chỉ được lưu dạng hash nên không thể hiển thị lại.</p>
+                                <div class="mt-3 grid gap-3">
+                                    @foreach (['API key' => $newApiCredentials['api_key'], 'API secret' => $newApiCredentials['api_secret']] as $credentialLabel => $credentialValue)
+                                        <div class="grid min-w-0 gap-2 sm:grid-cols-[7rem_minmax(0,1fr)_auto] sm:items-center">
+                                            <strong class="text-sm text-emerald-950">{{ $credentialLabel }}</strong>
+                                            <code class="min-w-0 break-all rounded-[5px] border border-emerald-200 bg-white p-3 text-xs text-slate-800">{{ $credentialValue }}</code>
+                                            <button class="client-button-secondary min-h-11 shrink-0 bg-white" type="button" data-copy="{{ $credentialValue }}"><i class="bx bx-copy text-lg" aria-hidden="true"></i>Sao chép</button>
+                                        </div>
+                                    @endforeach
                                 </div>
                             </section>
                         @endif
 
                         <section class="rounded-[5px] border border-slate-200 bg-white p-4 sm:p-6">
                             <h2 class="text-xl font-extrabold text-slate-950">Quản lý API key</h2>
-                            <p class="mt-1 text-sm leading-6 text-slate-500">Tạo khóa Sanctum để xác thực các request API của tài khoản.</p>
+                            <p class="mt-1 text-sm leading-6 text-slate-500">Mỗi request gửi cặp header <code>X-API-KEY</code> và <code>X-API-SECRET</code>. Không sử dụng Bearer token.</p>
                             <form class="mt-5 flex flex-col gap-3 sm:flex-row sm:items-end" method="POST" action="{{ route('account.profile.api.store') }}">
                                 @csrf
                                 <label class="client-label min-w-0 flex-1">Tên API key
@@ -189,13 +195,14 @@
                         <section class="overflow-hidden rounded-[5px] border border-slate-200 bg-white">
                             <div class="border-b border-slate-200 p-4"><h2 class="font-extrabold text-slate-950">API key đang hoạt động</h2></div>
                             <div class="divide-y divide-slate-100">
-                                @forelse ($apiTokens as $token)
+                                @forelse ($apiKeys as $apiKey)
                                     <div class="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                                         <div class="min-w-0">
-                                            <p class="truncate font-extrabold text-slate-950">{{ $token->name }}</p>
-                                            <p class="mt-1 text-xs leading-5 text-slate-500">Tạo {{ $token->created_at?->format('d/m/Y H:i') }} · Dùng gần nhất {{ $token->last_used_at?->format('d/m/Y H:i') ?? 'chưa dùng' }} · Hết hạn {{ $token->expires_at?->format('d/m/Y') ?? 'không giới hạn' }}</p>
+                                            <p class="truncate font-extrabold text-slate-950">{{ $apiKey->name }}</p>
+                                            <code class="mt-1 block break-all text-xs text-indigo-700">{{ $apiKey->api_key }}</code>
+                                            <p class="mt-1 text-xs leading-5 text-slate-500">Tạo {{ $apiKey->created_at?->format('d/m/Y H:i') }} · Dùng gần nhất {{ $apiKey->last_used_at?->format('d/m/Y H:i') ?? 'chưa dùng' }} · Hết hạn {{ $apiKey->expired_at?->format('d/m/Y') ?? 'không giới hạn' }}</p>
                                         </div>
-                                        <form method="POST" action="{{ route('account.profile.api.destroy', $token->id) }}">
+                                        <form method="POST" action="{{ route('account.profile.api.destroy', $apiKey->id) }}">
                                             @csrf
                                             @method('DELETE')
                                             <button class="client-button-secondary min-h-11 w-full border-rose-200 bg-white text-rose-700 hover:bg-rose-50 sm:w-auto" type="submit"><i class="bx bx-trash text-lg" aria-hidden="true"></i>Thu hồi</button>
@@ -211,9 +218,9 @@
                     <aside class="rounded-[5px] border border-rose-200 bg-rose-50 p-4">
                         <h2 class="flex items-center gap-2 font-extrabold text-rose-950"><i class="bx bx-error-circle text-lg" aria-hidden="true"></i>Bảo vệ API key</h2>
                         <ul class="mt-3 grid gap-2 text-sm leading-6 text-rose-900">
-                            <li>• API key có quyền truy cập API dưới danh nghĩa của bạn.</li>
-                            <li>• Không lưu khóa trong mã nguồn hoặc gửi qua tin nhắn.</li>
-                            <li>• Thu hồi ngay khi nghi ngờ khóa bị lộ.</li>
+                            <li>• API key dùng để định danh; API secret dùng để xác thực và chỉ hiển thị một lần.</li>
+                            <li>• Không lưu API secret trong mã nguồn hoặc gửi qua tin nhắn.</li>
+                            <li>• Gửi request qua HTTPS và thu hồi key ngay khi nghi ngờ bị lộ.</li>
                         </ul>
                     </aside>
                 </div>

@@ -129,7 +129,7 @@ class PublicSeoPageController extends Controller
         $systemSettings = $this->systemSettings($settingStore);
         $content = is_array($post->content) ? $post->content : [];
         $contentHtml = $this->contentRenderer->renderNodes($content);
-        $coverImage = $this->contentRenderer->firstImage($content);
+        $coverImage = $post->cover_image ?: $this->contentRenderer->firstImage($content);
         $headingIndex = $this->contentRenderer->headingIndex($content);
 
         return view('pages.seo.show', [
@@ -182,7 +182,7 @@ class PublicSeoPageController extends Controller
             'title' => $post->title,
             'slug' => $post->slug,
             'excerpt' => $post->excerpt ?: $this->contentRenderer->extractText($content),
-            'cover_image' => $this->contentRenderer->firstImage($content),
+            'cover_image' => $post->cover_image ?: $this->contentRenderer->firstImage($content),
             'focus_keyword' => $post->focus_keyword,
             'category_name' => $post->category?->name,
             'category_slug' => $post->category?->slug,
