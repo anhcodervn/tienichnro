@@ -75,7 +75,7 @@ test('user can register login and logout through clean client routes', function 
     $this->post(route('auth.login.submit'), [
         'login' => $user->email,
         'password' => 'password',
-    ])->assertRedirect(route('account.index'));
+    ])->assertRedirect(route('home'));
     $this->assertAuthenticatedAs($user);
 
     $this->post(route('logout'))->assertRedirect(route('login'));

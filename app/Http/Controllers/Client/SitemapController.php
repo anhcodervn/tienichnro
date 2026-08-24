@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Client;
 
 use App\Http\Controllers\Controller;
 use App\Models\Game;
+use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Response;
@@ -19,6 +20,14 @@ class SitemapController extends Controller
             ['loc' => route('content.guide'), 'lastmod' => now()],
         ])->concat(
             Game::query()->active()->get(['slug', 'updated_at'])->map(fn (Game $game): array => ['loc' => route('topup.game', $game), 'lastmod' => $game->updated_at]),
+        )->concat(
+            SeoCategory::query()
+                ->where('is_active', true)
+                ->get(['slug', 'updated_at'])
+                ->map(fn (SeoCategory $category): array => [
+                    'loc' => route('seo.category', $category->slug),
+                    'lastmod' => $category->updated_at,
+                ]),
         )->concat(
             SeoPost::query()
                 ->with('category:id,slug,is_active')

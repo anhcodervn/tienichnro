@@ -3,6 +3,7 @@
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use App\Models\User;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 test('only admins can manage seo posts', function (): void {
     $this->postJson('/api/admin-api/seo/posts', [])->assertUnauthorized();
@@ -176,8 +177,76 @@ test('seo category page lists its posts with the categorized url', function (): 
 
     $this->get(route('seo.category', $category->slug))
         ->assertOk()
+        ->assertViewIs('pages.seo.category')
+        ->assertViewHas('posts', fn (LengthAwarePaginator $posts): bool => $posts->total() === 1)
         ->assertSee('Mẹo nạp game an toàn')
         ->assertSee('href="'.$newUrl.'"', false);
+});
+
+test('seo category page paginates and filters only published posts from its category', function (): void {
+    $category = SeoCategory::query()->create([
+        'name' => 'Hướng dẫn chuyên sâu',
+        'slug' => 'huong-dan-chuyen-sau',
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
+    $otherCategory = SeoCategory::query()->create([
+        'name' => 'Danh mục khác',
+        'slug' => 'danh-muc-khac',
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
+
+    foreach (range(1, 13) as $index) {
+        SeoPost::query()->create([
+            'seo_category_id' => $category->id,
+            'title' => $index === 1 ? 'Hướng dẫn tìm kiếm đặc biệt' : "Bài hướng dẫn {$index}",
+            'slug' => "bai-huong-dan-{$index}",
+            'content' => [],
+            'robots' => 'index,follow',
+            'status' => 'published',
+            'published_at' => now()->subMinutes($index),
+        ]);
+    }
+
+    SeoPost::query()->create([
+        'seo_category_id' => $category->id,
+        'title' => 'Bản nháp không công khai',
+        'slug' => 'ban-nhap-khong-cong-khai',
+        'content' => [],
+        'robots' => 'noindex,nofollow',
+        'status' => 'draft',
+    ]);
+    SeoPost::query()->create([
+        'seo_category_id' => $otherCategory->id,
+        'title' => 'Bài thuộc danh mục khác',
+        'slug' => 'bai-thuoc-danh-muc-khac',
+        'content' => [],
+        'robots' => 'index,follow',
+        'status' => 'published',
+        'published_at' => now(),
+    ]);
+
+    $this->get(route('seo.category', $category->slug))
+        ->assertOk()
+        ->assertViewHas('posts', fn (LengthAwarePaginator $posts): bool => $posts->total() === 13 && $posts->count() === 12)
+        ->assertDontSee('Bản nháp không công khai')
+        ->assertDontSee('Bài thuộc danh mục khác');
+
+    $this->get(route('seo.category', [$category->slug, 'page' => 2]))
+        ->assertOk()
+        ->assertViewHas('posts', fn (LengthAwarePaginator $posts): bool => $posts->currentPage() === 2 && $posts->count() === 1)
+        ->assertSee('<link rel="canonical" href="'.route('seo.category', $category->slug).'?page=2">', false);
+
+    $this->get(route('seo.category', [$category->slug, 'q' => 'đặc biệt']))
+        ->assertOk()
+        ->assertViewHas('posts', fn (LengthAwarePaginator $posts): bool => $posts->total() === 1)
+        ->assertSee('Hướng dẫn tìm kiếm đặc biệt')
+        ->assertSee('<meta name="robots" content="noindex,follow">', false);
+
+    $this->get(route('sitemap'))
+        ->assertOk()
+        ->assertSee(route('seo.category', $category->slug));
 });
 
 test('seo post url rejects a mismatched or inactive category', function (): void {

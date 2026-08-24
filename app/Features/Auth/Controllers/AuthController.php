@@ -57,7 +57,7 @@ class AuthController extends Controller
         $this->recordUserLogAction->handle($user, 'login', 'Đăng nhập hệ thống', $request);
 
         if (! $request->expectsJson()) {
-            return redirect()->intended(route('account.index'));
+            return redirect()->intended(route('home'));
         }
 
         return response()->json([

@@ -39,32 +39,39 @@ return Application::configure(basePath: dirname(__DIR__))
                 return null;
             }
 
-            $statusCode = $throwable instanceof HttpExceptionInterface
-                ? $throwable->getStatusCode()
-                : 500;
-
-            if (! in_array($statusCode, [404, 520, 524], true)) {
+            if (! $throwable instanceof HttpExceptionInterface) {
                 return null;
             }
 
-            /** @var SettingStore $settingStore */
-            $settingStore = app(SettingStore::class);
+            $statusCode = $throwable->getStatusCode();
 
-            $systemSettings = $settingStore->getMany([
-                'site_name' => config('app.name', 'Nạp Tiền Tự Động'),
+            if (! in_array($statusCode, [401, 403, 404, 419, 429, 500, 503, 520, 524], true)) {
+                return null;
+            }
+
+            $settingDefaults = [
+                'site_name' => config('app.name', 'Nạp Carot'),
                 'site_description' => '',
                 'support_email' => '',
                 'hotline' => '',
                 'light_logo' => '',
                 'dark_logo' => '',
                 'favicon' => '',
-            ]);
+            ];
+
+            try {
+                /** @var SettingStore $settingStore */
+                $settingStore = app(SettingStore::class);
+                $systemSettings = $settingStore->getMany($settingDefaults);
+            } catch (Throwable) {
+                $systemSettings = $settingDefaults;
+            }
 
             $context = 'landing';
 
             if ($request->is('admin*')) {
                 $context = 'admin';
-            } elseif ($request->user() !== null) {
+            } elseif ($request->is('tai-khoan*', 'nap-tien*', 'don-hang*')) {
                 $context = 'client';
             }
 

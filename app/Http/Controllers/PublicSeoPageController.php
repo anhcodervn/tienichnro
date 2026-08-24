@@ -32,10 +32,66 @@ class PublicSeoPageController extends Controller
             ->first();
 
         if ($category instanceof SeoCategory) {
-            return $this->renderIndex($request, $settingStore, $category);
+            return $this->renderCategory($category, $request, $settingStore);
         }
 
         return $this->legacyShow($slug, $request, $settingStore);
+    }
+
+    protected function renderCategory(SeoCategory $category, Request $request, SettingStore $settingStore): View
+    {
+        $search = trim($request->string('q')->toString());
+        $posts = $this->publishedPosts()
+            ->with('category:id,name,slug,is_active')
+            ->where('seo_category_id', $category->id)
+            ->when($search !== '', function (Builder $builder) use ($search): void {
+                $builder->where(function (Builder $query) use ($search): void {
+                    $query
+                        ->where('title', 'like', "%{$search}%")
+                        ->orWhere('excerpt', 'like', "%{$search}%")
+                        ->orWhere('focus_keyword', 'like', "%{$search}%");
+                });
+            })
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->paginate(12)
+            ->withQueryString()
+            ->through(fn (SeoPost $post): array => $this->transformPost($post));
+
+        $categories = SeoCategory::query()
+            ->where('is_active', true)
+            ->withCount([
+                'posts' => fn (Builder $query) => $query
+                    ->where('status', 'published')
+                    ->whereNotNull('published_at')
+                    ->where('published_at', '<=', now()),
+            ])
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->get();
+
+        $systemSettings = $this->systemSettings($settingStore);
+        $siteName = $systemSettings['site_name'] ?: config('app.name', 'Nạp Carot');
+        $pageTitle = $category->seo_title ?: $category->name;
+        $pageDescription = $category->seo_description ?: "Tổng hợp bài viết mới nhất trong danh mục {$category->name}.";
+        $categoryUrl = route('seo.category', $category->slug);
+        $canonicalUrl = $posts->currentPage() > 1
+            ? $categoryUrl.'?page='.$posts->currentPage()
+            : $categoryUrl;
+
+        return view('pages.seo.category', [
+            'systemSettings' => $systemSettings,
+            'category' => $category,
+            'categories' => $categories,
+            'posts' => $posts,
+            'search' => $search,
+            'pageTitle' => $pageTitle,
+            'pageDescription' => $pageDescription,
+            'pageMetaTitle' => $search !== '' ? "Tìm kiếm: {$search} | {$pageTitle}" : $pageTitle.' | '.$siteName,
+            'pageMetaDescription' => $pageDescription,
+            'pageMetaCanonical' => $search !== '' ? $categoryUrl : $canonicalUrl,
+            'pageMetaRobots' => $search !== '' ? 'noindex,follow' : ($category->robots ?: 'index,follow'),
+        ]);
     }
 
     public function legacyShow(string $slug, Request $request, SettingStore $settingStore): View|RedirectResponse
