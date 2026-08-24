@@ -2,6 +2,7 @@
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Exceptions\ApiException;
 use App\Features\Topup\Jobs\ProcessTopupOrder;
 use App\Features\Topup\Services\Payments\BankPaymentService;
 use App\Features\Topup\Services\TopupService;
@@ -11,22 +12,33 @@ use App\Models\Order;
 use App\Models\PaymentTransaction;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Str;
 
 beforeEach(function (): void {
     Mail::fake();
     Queue::fake();
 });
 
-test('bank payment marks exact order paid and duplicate provider transaction is idempotent', function (): void {
+test('bank payment uppercases callback content and duplicate provider transaction is idempotent', function (): void {
     $game = Game::factory()->create();
     $order = Order::factory()->create([
         'game_id' => $game->id,
         'topup_package_id' => null,
         'total_amount' => 450000,
     ]);
+    $expectedContent = 'NAPABC12345';
+    PaymentTransaction::query()->create([
+        'user_id' => $order->user_id,
+        'order_id' => $order->id,
+        'transaction_code' => $order->code,
+        'amount' => 450000,
+        'content' => $expectedContent,
+        'transfer_reference' => $expectedContent,
+        'status' => 'pending',
+    ]);
     $payload = [
         'transaction_id' => 'BANK-UNIQUE-001',
-        'transfer_content' => 'NAP '.$order->code,
+        'transfer_content' => Str::lower($expectedContent),
         'amount' => '450000.00',
         'bank_name' => 'VCB',
     ];
@@ -36,13 +48,76 @@ test('bank payment marks exact order paid and duplicate provider transaction is 
     $service->match($payload, $payload);
 
     expect($order->refresh()->payment_status)->toBe(PaymentStatus::Paid)
-        ->and(PaymentTransaction::query()->count())->toBe(1);
+        ->and(PaymentTransaction::query()->count())->toBe(1)
+        ->and(PaymentTransaction::query()->sole()->content)->toBe($expectedContent);
     Mail::assertQueued(PaymentReceivedMail::class, function (PaymentReceivedMail $mail) use ($order): bool {
         return $mail->order->is($order)
             && $mail->queue === 'mails'
             && $mail->afterCommit === true;
     });
     Queue::assertPushed(ProcessTopupOrder::class, 1);
+});
+
+test('bank callback cannot bypass a wrong transfer reference with the client order code', function (): void {
+    $order = Order::factory()->create([
+        'game_id' => Game::factory(),
+        'topup_package_id' => null,
+        'total_amount' => 450000,
+    ]);
+    $preparedTransaction = PaymentTransaction::query()->create([
+        'user_id' => $order->user_id,
+        'order_id' => $order->id,
+        'transaction_code' => $order->code,
+        'amount' => 450000,
+        'content' => 'NAPRIGHT123',
+        'transfer_reference' => 'NAPRIGHT123',
+        'status' => 'pending',
+    ]);
+    $payload = [
+        'transaction_id' => 'BANK-WRONG-CONTENT',
+        'client_order_code' => $order->code,
+        'transfer_content' => 'napwrong123',
+        'amount' => '450000.00',
+    ];
+
+    $matchedTransaction = app(BankPaymentService::class)->match($payload, $payload);
+
+    expect($matchedTransaction)->toBeNull()
+        ->and($preparedTransaction->refresh()->status)->toBe('pending')
+        ->and($preparedTransaction->provider_transaction_id)->toBeNull()
+        ->and($order->refresh()->payment_status)->toBe(PaymentStatus::Pending);
+    Mail::assertNothingQueued();
+    Queue::assertNotPushed(ProcessTopupOrder::class);
+});
+
+test('bank callback rejects the correct transfer reference with a wrong amount', function (): void {
+    $order = Order::factory()->create([
+        'game_id' => Game::factory(),
+        'topup_package_id' => null,
+        'total_amount' => 450000,
+    ]);
+    $preparedTransaction = PaymentTransaction::query()->create([
+        'user_id' => $order->user_id,
+        'order_id' => $order->id,
+        'transaction_code' => $order->code,
+        'amount' => 450000,
+        'content' => 'NAPAMOUNT01',
+        'transfer_reference' => 'NAPAMOUNT01',
+        'status' => 'pending',
+    ]);
+    $payload = [
+        'transaction_id' => 'BANK-WRONG-AMOUNT',
+        'transfer_content' => 'napamount01',
+        'amount' => '449999.00',
+    ];
+
+    expect(fn () => app(BankPaymentService::class)->match($payload, $payload))
+        ->toThrow(ApiException::class);
+    expect($preparedTransaction->refresh()->status)->toBe('pending')
+        ->and($preparedTransaction->provider_transaction_id)->toBeNull()
+        ->and($order->refresh()->payment_status)->toBe(PaymentStatus::Pending);
+    Mail::assertNothingQueued();
+    Queue::assertNotPushed(ProcessTopupOrder::class);
 });
 
 test('bank callback completes the prepared order transaction instead of creating a duplicate', function (): void {

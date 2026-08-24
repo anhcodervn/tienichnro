@@ -19,7 +19,9 @@ class BankPaymentService
     /** @param array<string, mixed> $payload */
     public function match(array $payload, array $rawPayload = []): ?PaymentTransaction
     {
-        $content = trim((string) ($payload['transfer_content'] ?? $payload['transaction_description'] ?? ''));
+        $transferContent = trim((string) ($payload['transfer_content'] ?? ''));
+        $transactionDescription = trim((string) ($payload['transaction_description'] ?? ''));
+        $content = Str::upper($transferContent !== '' ? $transferContent : $transactionDescription);
         $clientOrderCode = trim((string) ($payload['client_order_code'] ?? ''));
         $amount = (int) str((string) ($payload['amount'] ?? 0))->before('.')->toString();
         $orderCode = $this->resolveOrderCode($content, $clientOrderCode, $amount);
@@ -36,7 +38,7 @@ class BankPaymentService
 
         $shouldDispatch = false;
 
-        $transaction = DB::transaction(function () use ($payload, $rawPayload, $orderCode, $providerReference, $amount, &$shouldDispatch): PaymentTransaction {
+        $transaction = DB::transaction(function () use ($payload, $rawPayload, $orderCode, $providerReference, $amount, $content, &$shouldDispatch): PaymentTransaction {
             $existing = PaymentTransaction::query()
                 ->where('provider_transaction_id', $providerReference)
                 ->lockForUpdate()
@@ -70,7 +72,7 @@ class BankPaymentService
                     'bank_code' => $payload['bank_name'] ?? $transaction->bank_code,
                     'account_number' => $payload['account_number'] ?? $transaction->account_number,
                     'provider_transaction_id' => $providerReference,
-                    'content' => $transaction->content ?: ($payload['transfer_content'] ?? $payload['transaction_description'] ?? null),
+                    'content' => $transaction->content ?: ($content !== '' ? $content : null),
                     'raw_data' => $rawData,
                     'status' => 'success',
                 ])->save();
@@ -83,7 +85,7 @@ class BankPaymentService
                     'transaction_code' => $providerReference,
                     'provider_transaction_id' => $providerReference,
                     'amount' => $amount,
-                    'content' => $payload['transfer_content'] ?? $payload['transaction_description'] ?? null,
+                    'content' => $content !== '' ? $content : null,
                     'raw_data' => ['provider' => 'apibankvn_api', 'callback_payload' => $this->sanitize($rawPayload)],
                     'status' => 'success',
                 ]);
@@ -108,51 +110,49 @@ class BankPaymentService
 
     private function resolveOrderCode(string $content, string $clientOrderCode, int $amount): ?string
     {
-        $clientOrderReference = $this->extractOrderCode($clientOrderCode);
-
-        if ($clientOrderReference !== null) {
-            return $clientOrderReference;
-        }
-
         $normalizedContent = Str::upper(trim($content));
 
-        if ($normalizedContent !== '') {
-            $transaction = PaymentTransaction::query()
-                ->with('order:id,code')
-                ->whereNotNull('order_id')
-                ->where(function (Builder $query) use ($normalizedContent): void {
-                    $query->where('transfer_reference', $normalizedContent)
-                        ->orWhere('content', $normalizedContent);
-                })
-                ->latest('id')
-                ->first();
-
-            if ($transaction?->order instanceof Order) {
-                return $transaction->order->code;
-            }
-
-            /** @var Collection<int, PaymentTransaction> $candidates */
-            $candidates = PaymentTransaction::query()
-                ->with('order:id,code')
-                ->whereNotNull('order_id')
-                ->whereIn('status', ['pending', 'matched'])
-                ->when($amount > 0, fn (Builder $query) => $query->where('amount', $amount))
-                ->latest('id')
-                ->limit(100)
-                ->get();
-
-            $transaction = $candidates->first(function (PaymentTransaction $candidate) use ($normalizedContent): bool {
-                $reference = Str::upper(trim((string) ($candidate->transfer_reference ?: $candidate->content)));
-
-                return $reference !== '' && str_contains($normalizedContent, $reference);
-            });
-
-            if ($transaction?->order instanceof Order) {
-                return $transaction->order->code;
-            }
+        if ($normalizedContent === '') {
+            return $this->extractOrderCode($clientOrderCode);
         }
 
-        return $this->extractOrderCode($content.' '.$clientOrderCode);
+        $transaction = PaymentTransaction::query()
+            ->with('order:id,code')
+            ->whereNotNull('order_id')
+            ->where(function (Builder $query) use ($normalizedContent): void {
+                $query->where('transfer_reference', $normalizedContent)
+                    ->orWhere('content', $normalizedContent);
+            })
+            ->latest('id')
+            ->first();
+
+        if ($transaction?->order instanceof Order) {
+            return $transaction->order->code;
+        }
+
+        /** @var Collection<int, PaymentTransaction> $candidates */
+        $candidates = PaymentTransaction::query()
+            ->with('order:id,code')
+            ->whereNotNull('order_id')
+            ->whereIn('status', ['pending', 'matched'])
+            ->when($amount > 0, fn (Builder $query) => $query->where('amount', $amount))
+            ->latest('id')
+            ->limit(100)
+            ->get();
+
+        $matches = $candidates->filter(function (PaymentTransaction $candidate) use ($normalizedContent): bool {
+            $reference = Str::upper(trim((string) ($candidate->transfer_reference ?: $candidate->content)));
+
+            return $reference !== '' && str_contains($normalizedContent, $reference);
+        });
+
+        if ($matches->count() !== 1) {
+            return null;
+        }
+
+        $transaction = $matches->first();
+
+        return $transaction?->order instanceof Order ? $transaction->order->code : null;
     }
 
     private function extractOrderCode(string $content): ?string

@@ -16,6 +16,7 @@ use App\Models\User;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
 
 function sharedTransferContentConfig(array $overrides = []): ConfigRecharge
 {
@@ -57,7 +58,7 @@ test('guest orders and wallet deposits use the same compact transfer content for
         ->and($walletDeposit->content)->not->toContain(' ');
 });
 
-test('bank callback matches a compact order reference embedded in the description', function (): void {
+test('bank callback uppercases a compact order reference embedded in the description', function (): void {
     sharedTransferContentConfig();
     $order = Order::factory()->create([
         'user_id' => null,
@@ -68,7 +69,8 @@ test('bank callback matches a compact order reference embedded in the descriptio
     $expectedContent = $preparedTransaction->content;
     $payload = [
         'transaction_id' => 'BANK-COMPACT-REFERENCE-001',
-        'transaction_description' => 'MBVCB.'.$expectedContent.'.THANH TOAN',
+        'transfer_content' => '',
+        'transaction_description' => 'mbvcb.'.Str::lower($expectedContent).'.thanh toan',
         'amount' => '450000.00',
         'bank_name' => 'MBBank',
     ];

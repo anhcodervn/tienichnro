@@ -219,6 +219,22 @@ test('guest can create a bank transfer order and backend recalculates price', fu
     });
 });
 
+test('guest order stays unclaimed when its email belongs to an existing user', function (): void {
+    [$game, $server, $package] = topupCatalog();
+    $existingUser = User::factory()->create(['email' => 'Existing@Example.com']);
+
+    $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+        'email' => 'existing@example.com',
+    ]))->assertRedirect();
+
+    $order = Order::query()->sole();
+
+    expect($order->user_id)->toBeNull()
+        ->and($order->normalized_email)->toBe('existing@example.com')
+        ->and(User::query()->count())->toBe(1)
+        ->and(User::query()->sole()->is($existingUser))->toBeTrue();
+});
+
 test('bank transfer order creates one shared payment request through the configured gateway', function (): void {
     [$game, $server, $package] = topupCatalog();
     $config = ConfigRecharge::query()->create([
