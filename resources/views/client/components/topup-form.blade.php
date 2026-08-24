@@ -287,16 +287,6 @@
                     @error('email')<p class="home-field-error">{{ $message }}</p>@enderror
                 </div>
 
-                @if ($turnstileEnabled && $turnstileSiteKey !== '')
-                    <div class="home-field" data-turnstile-checkout>
-                        <div class="cf-turnstile" data-sitekey="{{ $turnstileSiteKey }}" data-action="guest_checkout" data-theme="light"></div>
-                        <p class="home-field-help">Xác minh bạn không phải bot trước khi tạo đơn.</p>
-                        @error('cf-turnstile-response')<p class="home-field-error">{{ $message }}</p>@enderror
-                    </div>
-                    @once
-                        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer data-turnstile-script></script>
-                    @endonce
-                @endif
             @endguest
         </div>
 
@@ -338,6 +328,19 @@
                 </p>
                 @error('payment_method')<p class="home-field-error">{{ $message }}</p>@enderror
             </div>
+
+            @guest
+                @if ($turnstileEnabled && $turnstileSiteKey !== '')
+                    <div class="home-field" data-turnstile-checkout>
+                        <div class="cf-turnstile" data-sitekey="{{ $turnstileSiteKey }}" data-action="guest_checkout" data-theme="light"></div>
+                        <p class="home-field-help">Xác minh bạn không phải bot trước khi tạo đơn.</p>
+                        @error('cf-turnstile-response')<p class="home-field-error">{{ $message }}</p>@enderror
+                    </div>
+                    @once
+                        <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer data-turnstile-script></script>
+                    @endonce
+                @endif
+            @endguest
 
             <button class="home-checkout-submit" type="submit" data-submit-button @disabled(! $initialCanSubmit)>
                 <i class="bx bx-bolt text-xl" aria-hidden="true"></i>

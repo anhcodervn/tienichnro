@@ -114,7 +114,7 @@ test('admin cannot enable turnstile without complete keys', function (): void {
         ->assertJsonValidationErrors('turnstile_secret_key');
 });
 
-test('guest checkout renders turnstile only when enabled', function (): void {
+test('guest checkout renders turnstile above the submit button only when enabled', function (): void {
     turnstileCatalog();
     enableTurnstile();
 
@@ -122,6 +122,7 @@ test('guest checkout renders turnstile only when enabled', function (): void {
         ->assertOk()
         ->assertSee('data-turnstile-checkout', false)
         ->assertSee('data-sitekey="site-key-test"', false)
+        ->assertSeeInOrder(['data-payment-method', 'data-turnstile-checkout', 'data-submit-button'], false)
         ->assertSee('https://challenges.cloudflare.com/turnstile/v0/api.js', false);
 
     $user = User::factory()->create();
