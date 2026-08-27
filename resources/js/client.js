@@ -805,7 +805,8 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
     const rewardTabs = Array.from(document.querySelectorAll('[data-game-reward-tab]'));
 
     const syncGameName = () => {
-        const gameName = game?.selectedOptions[0]?.textContent?.trim() || 'Chọn game';
+        const selectedGame = game?.selectedOptions[0];
+        const gameName = selectedGame?.dataset.name || selectedGame?.textContent?.trim() || 'Chọn game';
 
         document.querySelectorAll('[data-selected-game-name]').forEach((element) => {
             element.textContent = gameName;

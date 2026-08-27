@@ -335,6 +335,13 @@ test('game checkout field schema rejects unsafe and ambiguous definitions', func
             ['key' => 'email', 'label' => 'Ghi đè email', 'placeholder' => '', 'required' => true],
         ],
     ])->assertUnprocessable()->assertJsonValidationErrors('checkout_fields.0.key');
+
+    $this->actingAs($admin)->postJson('/api/admin-api/games', [
+        ...$basePayload,
+        'checkout_fields' => [
+            ['key' => 'amount', 'label' => 'Ghi đè số lượng API', 'placeholder' => '', 'required' => true],
+        ],
+    ])->assertUnprocessable()->assertJsonValidationErrors('checkout_fields.0.key');
 });
 
 test('admin stores provider field names directly in the game checkout schema', function (): void {

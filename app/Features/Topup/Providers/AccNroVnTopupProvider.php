@@ -33,12 +33,9 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
     {
         $config = $this->configuration($provider);
         $game = trim((string) $package->provider_service_code);
-        $configuredGame = $package->game()->first();
-        $checkoutFieldKeys = collect($configuredGame?->checkoutFields() ?? [])->pluck('key');
         $hasInvalidConfiguration = $config['partner_id'] === ''
             || $config['secret_key'] === ''
             || $game === ''
-            || ! $checkoutFieldKeys->contains('account')
             || filter_var($config['base_url'], FILTER_VALIDATE_URL) === false
             || parse_url($config['base_url'], PHP_URL_SCHEME) !== 'https';
 
@@ -65,8 +62,8 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
         $game = trim((string) data_get($order->metadata, 'provider.service_code'));
         $providerFields = $this->providerFields($recipient);
         $server = $this->serverCode($order);
-        $account = $providerFields['account'] ?? '';
-        unset($providerFields['account']);
+        [$account, $primaryKey] = $this->primaryRecipientField($order, $providerFields, 'account');
+        unset($providerFields['account'], $providerFields[$primaryKey]);
 
         if ($game === '' || $account === '') {
             throw ValidationException::withMessages([
@@ -377,5 +374,28 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
             ->mapWithKeys(fn (mixed $value, mixed $key): array => [(string) $key => trim((string) $value)])
             ->filter(fn (string $value): bool => $value !== '')
             ->all();
+    }
+
+    /**
+     * @param  array<string, string>  $providerFields
+     * @return array{0:string,1:string}
+     */
+    private function primaryRecipientField(Order $order, array $providerFields, string $providerKey): array
+    {
+        if (filled($providerFields[$providerKey] ?? null)) {
+            return [$providerFields[$providerKey], $providerKey];
+        }
+
+        foreach ($order->checkout_fields_snapshot ?? [] as $field) {
+            $key = is_array($field) ? (string) ($field['key'] ?? '') : '';
+
+            if ($key !== '' && filled($providerFields[$key] ?? null)) {
+                return [$providerFields[$key], $key];
+            }
+        }
+
+        $key = (string) collect($providerFields)->search(fn (string $value): bool => $value !== '');
+
+        return [$key !== '' ? $providerFields[$key] : '', $key];
     }
 }

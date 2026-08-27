@@ -13,8 +13,13 @@ class OrderRecipientObserver
 
     public function updated(OrderRecipient $recipient): void
     {
-        if (($recipient->wasChanged('status') && $recipient->status === 'failed')
-            || ($recipient->wasChanged('failure_reason') && filled($recipient->failure_reason))) {
+        $isProviderBalanceFallback = data_get(
+            $recipient->provider_response,
+            'manual_review.code',
+        ) === 'provider_balance_insufficient';
+
+        if (! $isProviderBalanceFallback && (($recipient->wasChanged('status') && $recipient->status === 'failed')
+            || ($recipient->wasChanged('failure_reason') && filled($recipient->failure_reason)))) {
             $this->discordReporter->recipientNeedsAttention($recipient);
         }
 

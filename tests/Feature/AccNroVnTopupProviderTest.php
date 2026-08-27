@@ -18,7 +18,6 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Validation\ValidationException;
 
 beforeEach(function (): void {
     Http::preventStrayRequests();
@@ -243,18 +242,29 @@ test('accnrovn maps each game checkout setting to account and extra fields', fun
     });
 });
 
-test('accnrovn rejects missing required mapped fields before sending the request', function (): void {
+test('accnrovn maps an arbitrary canonical game field to provider account', function (): void {
     [$order, $recipient, $provider] = accNroVnOrderFixture();
-    $recipient->forceFill(['recipient_data' => ['username' => 'wrong-field']])->save();
+    $order->forceFill(['checkout_fields_snapshot' => [
+        ['key' => 'taikhoan', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
+    ]])->save();
+    $recipient->forceFill(['recipient_data' => ['taikhoan' => 'player-one']])->save();
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::response([
+            'success' => true,
+            'message' => 'OK',
+            'data' => ['order_id' => 'ACC-MAPPED-1', 'status' => 'pending'],
+        ]),
+    ]);
 
-    expect(fn () => app(AccNroVnTopupProvider::class)->submit(
+    app(AccNroVnTopupProvider::class)->submit(
         $order,
         $recipient,
         $provider,
         $order->code.'-R001',
-    ))->toThrow(ValidationException::class);
+    );
 
-    Http::assertNothingSent();
+    Http::assertSent(fn (Request $request): bool => ($request->data()['account'] ?? null) === 'player-one'
+        && ! array_key_exists('taikhoan', $request->data()['extra'] ?? []));
 });
 
 test('accnrovn reloads and sends the server code when the order relation omitted that column', function (): void {

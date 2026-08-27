@@ -26,7 +26,7 @@ class ApiKeyFactory extends Factory
             'name' => fake()->words(2, true),
             'api_key' => 'nck_'.Str::lower(Str::random(40)),
             'api_secret_hash' => Hash::make(Str::random(68)),
-            'permissions' => ['balance:read', 'tasks:create', 'tasks:read'],
+            'permissions' => ['balance:read', 'catalog:read', 'orders:create', 'orders:read'],
             'ip_whitelist' => null,
             'status' => 'active',
             'expired_at' => now()->addYear(),

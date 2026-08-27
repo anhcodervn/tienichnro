@@ -46,13 +46,6 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             $errors[] = 'mã dịch vụ của gói';
         }
 
-        $configuredGame = $package->game()->first();
-        $checkoutFieldKeys = collect($configuredGame?->checkoutFields() ?? [])->pluck('key');
-
-        if (! $checkoutFieldKeys->contains('username')) {
-            $errors[] = 'trường username của game';
-        }
-
         if (blank($server->code)) {
             $errors[] = 'mã máy chủ';
         }
@@ -79,8 +72,10 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
         $serverCode = (string) $order->server?->code;
         $providerFields = $this->providerFields($recipient);
         unset($providerFields['server']);
+        [$username, $primaryKey] = $this->primaryRecipientField($order, $providerFields, 'username');
+        unset($providerFields['username'], $providerFields[$primaryKey]);
 
-        if ($serverCode === '' || blank($providerFields['username'] ?? null)) {
+        if ($serverCode === '' || $username === '') {
             throw ValidationException::withMessages([
                 'package_id' => 'Thông tin tài khoản hoặc máy chủ chưa phù hợp với gói nạp.',
             ]);
@@ -94,6 +89,7 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             'amount' => (int) ($order->denomination ?? 0),
             'account_info' => [
                 'server' => is_numeric($serverCode) ? (int) $serverCode : $serverCode,
+                'username' => $username,
                 ...$providerFields,
             ],
             'sign' => $this->signature($config['partner_key'], $config['partner_id'], 'topup', $requestId),
@@ -334,5 +330,28 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             ->mapWithKeys(fn (mixed $value, mixed $key): array => [(string) $key => trim((string) $value)])
             ->filter(fn (string $value): bool => $value !== '')
             ->all();
+    }
+
+    /**
+     * @param  array<string, string>  $providerFields
+     * @return array{0:string,1:string}
+     */
+    private function primaryRecipientField(Order $order, array $providerFields, string $providerKey): array
+    {
+        if (filled($providerFields[$providerKey] ?? null)) {
+            return [$providerFields[$providerKey], $providerKey];
+        }
+
+        foreach ($order->checkout_fields_snapshot ?? [] as $field) {
+            $key = is_array($field) ? (string) ($field['key'] ?? '') : '';
+
+            if ($key !== '' && filled($providerFields[$key] ?? null)) {
+                return [$providerFields[$key], $key];
+            }
+        }
+
+        $key = (string) collect($providerFields)->search(fn (string $value): bool => $value !== '');
+
+        return [$key !== '' ? $providerFields[$key] : '', $key];
     }
 }

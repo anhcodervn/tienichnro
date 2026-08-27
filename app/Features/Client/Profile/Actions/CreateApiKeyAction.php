@@ -35,7 +35,7 @@ class CreateApiKeyAction
                 'name' => $name,
                 'api_key' => $apiKey,
                 'api_secret_hash' => Hash::make($apiSecret),
-                'permissions' => ['balance:read', 'tasks:create', 'tasks:read'],
+                'permissions' => ['balance:read', 'catalog:read', 'orders:create', 'orders:read'],
                 'status' => 'active',
                 'expired_at' => now()->addYear(),
             ]);

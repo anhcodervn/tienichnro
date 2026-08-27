@@ -1,7 +1,8 @@
 <?php
 
 use App\Features\Client\Api\Controllers\BalanceController;
-use App\Features\Client\Api\Controllers\TopupTaskController;
+use App\Features\Client\Api\Controllers\CatalogController;
+use App\Features\Client\Api\Controllers\TopupOrderController;
 use App\Http\Middleware\AuthenticateApiCredentials;
 use Illuminate\Support\Facades\Route;
 
@@ -12,11 +13,15 @@ Route::prefix('v1')
             ->middleware([AuthenticateApiCredentials::class.':balance:read', 'site.active', 'throttle:60,1'])
             ->name('balance');
 
-        Route::post('/tasks', [TopupTaskController::class, 'store'])
-            ->middleware([AuthenticateApiCredentials::class.':tasks:create', 'site.active', 'throttle:10,1'])
-            ->name('tasks.store');
-        Route::get('/tasks/{task}', [TopupTaskController::class, 'show'])
-            ->whereAlphaNumeric('task')
-            ->middleware([AuthenticateApiCredentials::class.':tasks:read', 'site.active', 'throttle:60,1'])
-            ->name('tasks.show');
+        Route::get('/catalog', CatalogController::class)
+            ->middleware([AuthenticateApiCredentials::class.':catalog:read', 'site.active', 'throttle:60,1'])
+            ->name('catalog');
+
+        Route::post('/orders', [TopupOrderController::class, 'store'])
+            ->middleware([AuthenticateApiCredentials::class.':orders:create', 'site.active', 'throttle:10,1'])
+            ->name('orders.store');
+        Route::get('/orders/{order}', [TopupOrderController::class, 'show'])
+            ->whereAlphaNumeric('order')
+            ->middleware([AuthenticateApiCredentials::class.':orders:read', 'site.active', 'throttle:60,1'])
+            ->name('orders.show');
     });

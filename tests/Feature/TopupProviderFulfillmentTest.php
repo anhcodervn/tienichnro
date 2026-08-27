@@ -3,6 +3,7 @@
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Features\Reporting\Jobs\SendDiscordReport;
 use App\Features\Topup\Events\OrderStatusUpdated;
 use App\Features\Topup\Jobs\ProcessTopupRecipient;
 use App\Features\Topup\Jobs\SyncTopupRecipientStatus;
@@ -375,13 +376,21 @@ test('admin can immediately reconcile a processing order with the provider', fun
     Queue::assertNotPushed(SyncTopupRecipientStatus::class);
 });
 
-test('paid multi recipient order is split into queue jobs without provider http in the request flow', function (): void {
+test('paid multi recipient order is split into queue jobs without provider create http in the request flow', function (): void {
     [$order] = the9pOrderFixture();
+    $order->package()->update(['provider_price' => 10000]);
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::response([
+            'status' => 'success',
+            'data' => ['balance' => 1000000, 'currency' => 'VND'],
+        ]),
+    ]);
     $order->recipients()->create([
         'position' => 2,
         'recipient_data' => ['username' => 'player-two'],
         'quantity' => 3,
     ]);
+    Queue::fake();
 
     app(TopupService::class)->process($order->id);
 
@@ -389,7 +398,90 @@ test('paid multi recipient order is split into queue jobs without provider http 
     Queue::assertPushed(ProcessTopupRecipient::class, 5);
     Queue::assertPushed(ProcessTopupRecipient::class, fn (ProcessTopupRecipient $job): bool => $job->recipientId === $order->recipients()->first()->id
         && $job->unit === 2);
-    Http::assertNothingSent();
+    Http::assertSentCount(1);
+    Http::assertSent(fn (Request $request): bool => $request['command'] === 'getbalance');
+});
+
+test('insufficient provider balance diverts the whole order to manual handling without submitting cards', function (): void {
+    config()->set('services.discord.channels.provider', 'https://discord.test/provider');
+    [$order, $recipient, $provider] = the9pOrderFixture();
+    $order->package()->update(['provider_price' => 10000]);
+    $provider->update([
+        'balance' => 15000,
+        'balance_currency' => 'vnd',
+        'balance_status' => 'success',
+        'balance_checked_at' => now(),
+    ]);
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::response([
+            'status' => 'success',
+            'data' => ['balance' => 15000, 'currency' => 'VND'],
+        ]),
+    ]);
+    Queue::fake();
+
+    app(TopupService::class)->process($order->id);
+
+    $recipient->refresh();
+    expect($order->refresh()->order_status)->toBe(OrderStatus::Processing)
+        ->and($order->failure_reason)->toContain('Provider không đủ số dư')
+        ->and($recipient->status)->toBe('processing')
+        ->and($recipient->provider_status)->toBe('processing')
+        ->and($recipient->failure_reason)->toContain('chưa gửi sang provider')
+        ->and(data_get($recipient->provider_response, 'manual_review'))->toMatchArray([
+            'code' => 'provider_balance_insufficient',
+            'provider_balance' => 15000,
+            'required_balance' => 20000,
+            'currency' => 'VND',
+        ])
+        ->and(data_get($recipient->provider_response, 'items.1.message'))
+        ->toBe('Chờ admin xử lý thủ công; chưa gửi yêu cầu sang provider.')
+        ->and(data_get($recipient->provider_response, 'items.2.failure_reason'))
+        ->toContain('Provider không đủ số dư');
+    Queue::assertNotPushed(ProcessTopupRecipient::class);
+    Queue::assertPushed(SendDiscordReport::class, 1);
+    Queue::assertPushed(SendDiscordReport::class, function (SendDiscordReport $job) use ($order, $provider): bool {
+        return $job->channel === 'provider'
+            && $job->dedupeKey === "topup-order:{$order->id}:provider-balance-insufficient"
+            && $job->details['Mã đơn'] === $order->code
+            && $job->details['Nhà cung cấp'] === $provider->name
+            && $job->details['Số dư hiện tại'] === '15.000 VND'
+            && $job->details['Chi phí cần thiết'] === '20.000 VND';
+    });
+    Http::assertSentCount(1);
+    Http::assertSent(fn (Request $request): bool => $request['command'] === 'getbalance');
+
+    app(TopupService::class)->process($order->id);
+    app(RecipientFulfillmentService::class)->submit($recipient->id, 1);
+
+    Queue::assertNotPushed(ProcessTopupRecipient::class);
+    Queue::assertPushed(SendDiscordReport::class, 1);
+    Http::assertSentCount(1);
+});
+
+test('sufficient provider balance keeps automatic recipient dispatch enabled', function (): void {
+    [$order, , $provider] = the9pOrderFixture();
+    $order->package()->update(['provider_price' => 10000]);
+    $provider->update([
+        'balance' => 20000,
+        'balance_currency' => 'vnd',
+        'balance_status' => 'success',
+        'balance_checked_at' => now(),
+    ]);
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::response([
+            'status' => 'success',
+            'data' => ['balance' => 20000, 'currency' => 'VND'],
+        ]),
+    ]);
+    Queue::fake();
+
+    app(TopupService::class)->process($order->id);
+
+    Queue::assertPushed(ProcessTopupRecipient::class, 2);
+    Queue::assertNotPushed(SendDiscordReport::class);
+    Http::assertSentCount(1);
+    Http::assertSent(fn (Request $request): bool => $request['command'] === 'getbalance');
 });
 
 test('checkout rejects an incomplete automatic provider before creating an order', function (): void {
@@ -425,7 +517,7 @@ test('checkout rejects an incomplete automatic provider before creating an order
 test('checkout accepts a configured provider and stores only an internal routing snapshot', function (): void {
     $game = Game::factory()->create([
         'checkout_fields' => [
-            ['key' => 'username', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
+            ['key' => 'account', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
         ],
     ]);
     $server = GameServer::factory()->for($game)->create(['code' => '3']);
@@ -450,7 +542,7 @@ test('checkout accepts a configured provider and stores only an internal routing
         'package_id' => $package->id,
         'purchase_mode' => 'single',
         'single_quantity' => 1,
-        'recipient_fields' => ['username' => 'player-one'],
+        'recipient_fields' => ['account' => 'player-one'],
         'email' => 'guest@example.com',
         'payment_method' => PaymentMethod::BankTransfer->value,
     ])->assertRedirect();
@@ -549,7 +641,7 @@ function the9pOrderFixture(array $recipientOverrides = []): array
     ]);
     $recipient = $order->recipients()->create([
         'position' => 1,
-        'recipient_data' => ['username' => 'player-one'],
+        'recipient_data' => ['account' => 'player-one'],
         'quantity' => 2,
         ...$recipientOverrides,
     ]);

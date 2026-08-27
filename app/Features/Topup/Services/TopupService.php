@@ -14,6 +14,7 @@ class TopupService
 {
     public function __construct(
         private readonly OrderStatusService $statusService,
+        private readonly ProviderBalanceFallbackService $providerBalanceFallbackService,
     ) {}
 
     public function process(int $orderId): void
@@ -39,15 +40,17 @@ class TopupService
             return;
         }
 
-        $order->recipients()
-            ->whereNotIn('status', ['completed', 'cancelled'])
-            ->orderBy('position')
-            ->get(['id', 'quantity'])
-            ->each(function ($recipient): void {
-                foreach (range(1, $recipient->quantity) as $unit) {
-                    ProcessTopupRecipient::dispatch($recipient->id, $unit)->afterCommit();
-                }
-            });
+        if (! $this->providerBalanceFallbackService->divertIfInsufficient($order->id)) {
+            $order->recipients()
+                ->whereNotIn('status', ['completed', 'cancelled'])
+                ->orderBy('position')
+                ->get(['id', 'quantity'])
+                ->each(function ($recipient): void {
+                    foreach (range(1, $recipient->quantity) as $unit) {
+                        ProcessTopupRecipient::dispatch($recipient->id, $unit)->afterCommit();
+                    }
+                });
+        }
 
         if ($shouldSendProcessingMail) {
             Mail::to($order->email)->queue(new OrderProcessingMail($order->refresh()));

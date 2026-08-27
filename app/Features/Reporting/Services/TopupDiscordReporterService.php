@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\OrderRecipient;
+use App\Models\TopupProvider;
 use Carbon\CarbonImmutable;
 use Carbon\CarbonInterface;
 
@@ -90,6 +91,28 @@ class TopupDiscordReporterService
                 'Yêu cầu xử lý' => 'Đối soát thủ công trong trang quản trị',
             ],
             dedupeKey: "topup-recipient:{$recipient->id}:attention:{$recipient->status}:{$recipient->status_check_attempts}",
+        );
+    }
+
+    public function providerBalanceInsufficient(
+        Order $order,
+        TopupProvider $provider,
+        int $providerBalance,
+        int $requiredBalance,
+        string $currency,
+    ): bool {
+        return $this->discordReportService->queue(
+            channel: 'provider',
+            title: 'Provider không đủ số dư - đơn chờ xử lý thủ công',
+            details: [
+                'Mã đơn' => $order->code,
+                'Nhà cung cấp' => $provider->name,
+                'Số dư hiện tại' => $this->formatProviderBalance($providerBalance, $currency),
+                'Chi phí cần thiết' => $this->formatProviderBalance($requiredBalance, $currency),
+                'Số tiền còn thiếu' => $this->formatProviderBalance($requiredBalance - $providerBalance, $currency),
+                'Trạng thái xử lý' => 'Không gửi API provider; chờ admin xử lý thủ công',
+            ],
+            dedupeKey: "topup-order:{$order->id}:provider-balance-insufficient",
         );
     }
 

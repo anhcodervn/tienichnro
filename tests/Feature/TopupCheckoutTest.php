@@ -29,7 +29,7 @@ beforeEach(function (): void {
 });
 
 test('guest home renders the purchase layout reward table and seo content without mounting vue', function (): void {
-    [$game, , $package] = topupCatalog([
+    [$game, $server, $package] = topupCatalog([
         'denomination' => 100000,
         'carot_amount' => 195,
         'reward_x2_amount' => 345,
@@ -41,6 +41,8 @@ test('guest home renders the purchase layout reward table and seo content withou
 
     $this->get(route('home'))
         ->assertOk()
+        ->assertSee($game->name.' - ID: '.$game->id)
+        ->assertSee($server->name.' - ID: '.$server->id)
         ->assertSee('data-authenticated="false"', false)
         ->assertDontSee('data-guest-order-history', false)
         ->assertSee('assets/icon/boxicons/fonts/basic/boxicons.min.css', false)

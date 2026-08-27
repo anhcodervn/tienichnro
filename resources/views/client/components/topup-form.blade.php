@@ -86,7 +86,7 @@
                 <select id="topup-game" name="game_id" class="client-input" required>
                     <option value="">Chọn game</option>
                     @foreach ($games as $game)
-                        <option value="{{ $game->id }}" @selected((string) $initialGame === (string) $game->id)>{{ $game->name }}</option>
+                        <option value="{{ $game->id }}" data-name="{{ $game->name }}" @selected((string) $initialGame === (string) $game->id)>{{ $game->name }} - ID: {{ $game->id }}</option>
                     @endforeach
                 </select>
                 @error('game_id')<p class="home-field-error">{{ $message }}</p>@enderror
@@ -150,7 +150,7 @@
                 <option value="">Chọn máy chủ</option>
                 @foreach ($games as $game)
                     @foreach ($game->servers as $server)
-                        <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }}</option>
+                        <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }} - ID: {{ $server->id }}</option>
                     @endforeach
                 @endforeach
             </select>
@@ -184,7 +184,7 @@
                         <option value="">Chọn máy chủ</option>
                         @foreach ($games as $game)
                             @foreach ($game->servers as $server)
-                                <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }}</option>
+                                <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }} - ID: {{ $server->id }}</option>
                             @endforeach
                         @endforeach
                     </select>
@@ -238,7 +238,7 @@
                         <option value="">Chọn máy chủ</option>
                         @foreach ($games as $game)
                             @foreach ($game->servers as $server)
-                                <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }}</option>
+                                <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }} - ID: {{ $server->id }}</option>
                             @endforeach
                         @endforeach
                     </select>

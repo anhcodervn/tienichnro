@@ -85,7 +85,7 @@ class OrderService
 
                 if ($requestedPaymentMethod === PaymentMethod::Wallet && ! $canPayWithWallet && ! $allowWalletFallback) {
                     throw new ApiException(
-                        'Số dư ví không đủ để tạo task.',
+                        'Số dư ví không đủ để tạo đơn nạp.',
                         422,
                         ['data' => [
                             'balance' => (int) ($walletBalance ?? 0),

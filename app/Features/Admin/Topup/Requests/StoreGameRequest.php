@@ -31,7 +31,7 @@ class StoreGameRequest extends FormRequest
             'checkout_fields.*.key' => [
                 'required', 'string', 'max:40', 'regex:/^[a-z][a-z0-9_]*$/', 'distinct',
                 Rule::notIn([
-                    'game_id', 'server_id', 'package_id', 'quantity', 'single_quantity',
+                    'game_id', 'server_id', 'package_id', 'quantity', 'single_quantity', 'amount',
                     'recipient_fields', 'bulk_recipients', 'email', 'payment_method', 'purchase_mode',
                 ]),
             ],

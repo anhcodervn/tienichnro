@@ -32,8 +32,9 @@ class ProfilePageService
                 ? [
                     'base_url' => url('/api/v1'),
                     'balance_endpoint' => route('api.v1.balance'),
-                    'create_task_endpoint' => route('api.v1.tasks.store'),
-                    'task_status_endpoint' => route('api.v1.tasks.show', ['task' => 'TASK_ID']),
+                    'catalog_endpoint' => route('api.v1.catalog'),
+                    'create_order_endpoint' => route('api.v1.orders.store'),
+                    'order_status_endpoint' => route('api.v1.orders.show', ['order' => 'ORDER_ID']),
                     'max_recipients' => OrderRecipientService::MAX_RECIPIENTS,
                     'max_quantity_per_recipient' => OrderRecipientService::MAX_QUANTITY_PER_RECIPIENT,
                 ]

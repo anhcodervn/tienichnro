@@ -207,6 +207,10 @@ class RecipientFulfillmentService
                 return null;
             }
 
+            if (data_get($recipient->provider_response, 'manual_review.code') === ProviderBalanceFallbackService::REASON_CODE) {
+                return null;
+            }
+
             $order = Order::query()->lockForUpdate()->find($recipient->order_id);
             if (! $order instanceof Order || $order->payment_status !== PaymentStatus::Paid || $order->order_status === OrderStatus::Cancelled) {
                 return null;

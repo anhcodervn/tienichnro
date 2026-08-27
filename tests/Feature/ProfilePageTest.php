@@ -47,7 +47,7 @@ test('authenticated user can navigate every profile tab', function (): void {
     }
 });
 
-test('api documentation describes every endpoint and multi recipient limit without exposing credentials', function (): void {
+test('api documentation describes the unified v1 endpoints without exposing credentials', function (): void {
     $user = User::factory()->create();
     $privateSecret = 'ncs_private_secret_must_not_be_rendered';
 
@@ -61,15 +61,16 @@ test('api documentation describes every endpoint and multi recipient limit witho
         ->assertSuccessful()
         ->assertSee('GET')
         ->assertSee('/api/v1/balance')
+        ->assertSee('/api/v1/catalog')
         ->assertSee('POST')
-        ->assertSee('/api/v1/tasks')
-        ->assertSee('/api/v1/tasks/TASK_ID')
+        ->assertSee('/api/v1/orders')
+        ->assertSee('/api/v1/orders/ORDER_ID')
         ->assertSee('X-API-KEY')
         ->assertSee('X-API-SECRET')
         ->assertSee('request_id')
-        ->assertSee('tài khoản tối đa trong một task')
-        ->assertSee('thẻ tối đa cho mỗi tài khoản')
-        ->assertSee('6 + 5 = 11 thẻ vẫn hợp lệ.')
+        ->assertSee('payload_fields')
+        ->assertSee('price')
+        ->assertSee('amount')
         ->assertSee('YOUR_API_KEY')
         ->assertSee('YOUR_API_SECRET')
         ->assertDontSee($privateSecret)
@@ -158,8 +159,9 @@ test('api key and secret are shown once while only the secret hash is stored', f
         ->and($storedKey->api_secret_encrypted)->toBeNull()
         ->and($storedKey->permissions)->toBe([
             'balance:read',
-            'tasks:create',
-            'tasks:read',
+            'catalog:read',
+            'orders:create',
+            'orders:read',
         ]);
 
     $this->actingAs($user)

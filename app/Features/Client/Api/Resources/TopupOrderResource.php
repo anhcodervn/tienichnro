@@ -6,7 +6,7 @@ use App\Models\OrderRecipient;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
-class TopupTaskResource extends JsonResource
+class TopupOrderResource extends JsonResource
 {
     /**
      * @return array<string, mixed>
@@ -14,7 +14,7 @@ class TopupTaskResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'task_id' => $this->code,
+            'order_id' => $this->code,
             'request_id' => $this->idempotency_key,
             'status' => $this->order_status->value,
             'payment_status' => $this->payment_status->value,
@@ -29,19 +29,17 @@ class TopupTaskResource extends JsonResource
             'package' => [
                 'id' => $this->topup_package_id,
                 'name' => $this->package_name,
+                'price' => $this->denomination !== null ? (int) $this->denomination : null,
+                'sale_price' => intdiv((int) $this->total_amount, max((int) $this->quantity, 1)),
             ],
-            'quantity' => $this->quantity,
-            'amount' => (int) $this->total_amount,
+            'total' => (int) $this->total_amount,
             'currency' => 'VND',
-            'recipients' => $this->whenLoaded('recipients', fn (): array => $this->recipients
+            'payload' => $this->whenLoaded('recipients', fn (): array => $this->recipients
                 ->map(fn (OrderRecipient $recipient): array => [
-                    'position' => $recipient->position,
-                    'data' => $recipient->recipient_data,
-                    'quantity' => $recipient->quantity,
+                    ...$recipient->recipient_data,
+                    'amount' => $recipient->quantity,
                     'status' => $recipient->status,
                     'failure_reason' => $recipient->failure_reason,
-                    'completed_at' => $recipient->completed_at?->toISOString(),
-                    'failed_at' => $recipient->failed_at?->toISOString(),
                 ])->all()),
             'failure_reason' => $this->failure_reason,
             'created_at' => $this->created_at?->toISOString(),

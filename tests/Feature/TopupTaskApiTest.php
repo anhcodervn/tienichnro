@@ -23,7 +23,7 @@ beforeEach(function (): void {
     Queue::fake();
 });
 
-function topupApiCredentials(User $user, array $permissions = ['balance:read', 'tasks:create', 'tasks:read'], array $overrides = []): array
+function topupApiCredentials(User $user, array $permissions = ['balance:read', 'catalog:read', 'orders:create', 'orders:read'], array $overrides = []): array
 {
     $secret = 'ncs_'.Str::random(64);
     $apiKey = ApiKey::factory()->for($user)->create([
@@ -44,6 +44,7 @@ function topupApiCatalog(array $packageAttributes = []): array
     $server = GameServer::factory()->for($game)->create();
     $package = TopupPackage::factory()->for($game)->create([
         'game_server_id' => $server->id,
+        'denomination' => 100000,
         'price' => 90000,
         'original_price' => 100000,
         'min_quantity' => 1,
@@ -58,22 +59,21 @@ function topupApiPayload(Game $game, GameServer $server, TopupPackage $package, 
 {
     return [
         'request_id' => (string) Str::uuid(),
-        'game_id' => $game->id,
-        'server_id' => $server->id,
-        'package_id' => $package->id,
-        'recipients' => [[
-            'data' => ['game_account' => 'player-one'],
-            'quantity' => 2,
-        ]],
+        'game' => $game->id,
+        'server' => $server->id,
+        'price' => (int) $package->denomination,
+        'payload' => [
+            ['game_account' => 'player-one', 'amount' => 2],
+        ],
         ...$overrides,
     ];
 }
 
-test('public task api requires api key and secret with the correct permission', function (): void {
+test('public topup api requires api key and secret with the correct permission', function (): void {
     $this->getJson('/api/v1/balance')->assertUnauthorized();
 
     $user = User::factory()->create();
-    $credentials = topupApiCredentials($user, ['tasks:read']);
+    $credentials = topupApiCredentials($user, ['orders:read']);
 
     $this->withHeaders($credentials)->getJson('/api/v1/balance')->assertForbidden();
 });
@@ -124,29 +124,57 @@ test('balance endpoint returns only the useful wallet fields', function (): void
         ]);
 });
 
-test('api creates a wallet task for one or many recipients with server-side pricing', function (): void {
+test('catalog returns active games servers packages sale prices and game payload fields', function (): void {
+    [$game, $server, $package] = topupApiCatalog();
+    $game->update(['checkout_fields' => [
+        ['key' => 'account', 'label' => 'Tài khoản', 'placeholder' => 'Nhập tài khoản', 'required' => true],
+    ]]);
+    Game::factory()->inactive()->create();
+    GameServer::factory()->for($game)->create(['status' => 'inactive']);
+    TopupPackage::factory()->for($game)->inactive()->create(['game_server_id' => $server->id]);
+    $user = User::factory()->create();
+
+    $this->withHeaders(topupApiCredentials($user))
+        ->getJson('/api/v1/catalog')
+        ->assertOk()
+        ->assertJsonPath('status', true)
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $game->id)
+        ->assertJsonPath('data.0.servers.0.id', $server->id)
+        ->assertJsonPath('data.0.payload_fields.0.key', 'account')
+        ->assertJsonPath('data.0.packages.0.id', $package->id)
+        ->assertJsonPath('data.0.packages.0.price', 100000)
+        ->assertJsonPath('data.0.packages.0.sale_price', 90000)
+        ->assertJsonMissingPath('data.0.packages.0.provider_id')
+        ->assertJsonMissingPath('data.0.packages.0.provider_price');
+});
+
+test('api creates a multi recipient wallet order with per-recipient amounts and server-side pricing', function (): void {
     [$game, $server, $package] = topupApiCatalog();
     $user = User::factory()->create();
     $user->wallet()->update(['balance' => 500000]);
     $payload = topupApiPayload($game, $server, $package, [
-        'price' => 1,
-        'recipients' => [
-            ['data' => ['game_account' => 'player-one'], 'quantity' => 2],
-            ['data' => ['game_account' => 'player-two'], 'quantity' => 1],
+        'payload' => [
+            ['game_account' => 'player-one', 'amount' => 2],
+            ['game_account' => 'player-two', 'amount' => 1],
         ],
     ]);
 
     $response = $this->withHeaders(topupApiCredentials($user))
-        ->postJson('/api/v1/tasks', $payload)
+        ->postJson('/api/v1/orders', $payload)
         ->assertCreated()
         ->assertJsonPath('status', true)
         ->assertJsonPath('data.request_id', $payload['request_id'])
         ->assertJsonPath('data.status', 'pending')
         ->assertJsonPath('data.payment_status', 'paid')
-        ->assertJsonPath('data.quantity', 3)
-        ->assertJsonPath('data.amount', 270000)
+        ->assertJsonPath('data.total', 270000)
         ->assertJsonPath('data.currency', 'VND')
-        ->assertJsonCount(2, 'data.recipients')
+        ->assertJsonCount(2, 'data.payload')
+        ->assertJsonPath('data.payload.0.game_account', 'player-one')
+        ->assertJsonPath('data.payload.0.amount', 2)
+        ->assertJsonPath('data.payload.1.game_account', 'player-two')
+        ->assertJsonPath('data.payload.1.amount', 1)
+        ->assertJsonMissingPath('data.amount')
         ->assertJsonMissingPath('data.email')
         ->assertJsonMissingPath('data.user_id')
         ->assertJsonMissingPath('data.provider')
@@ -154,7 +182,7 @@ test('api creates a wallet task for one or many recipients with server-side pric
         ->assertJsonMissingPath('data.metadata');
 
     $order = Order::query()->sole();
-    expect($response->json('data.task_id'))->toBe($order->code)
+    expect($response->json('data.order_id'))->toBe($order->code)
         ->and($order->user_id)->toBe($user->id)
         ->and($order->purchase_mode)->toBe('bulk')
         ->and($order->payment_method)->toBe(PaymentMethod::Wallet)
@@ -167,23 +195,20 @@ test('api creates a wallet task for one or many recipients with server-side pric
     Mail::assertQueued(OrderCreatedMail::class, 1);
 });
 
-test('api allows more than ten cards in total when each recipient has at most ten', function (): void {
+test('api accepts the maximum amount for one recipient', function (): void {
     [$game, $server, $package] = topupApiCatalog();
     $user = User::factory()->create();
     $user->wallet()->update(['balance' => 2000000]);
 
     $this->withHeaders(topupApiCredentials($user))
-        ->postJson('/api/v1/tasks', topupApiPayload($game, $server, $package, [
-            'recipients' => [
-                ['data' => ['game_account' => 'player-one'], 'quantity' => 6],
-                ['data' => ['game_account' => 'player-two'], 'quantity' => 5],
-            ],
+        ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package, [
+            'payload' => [['game_account' => 'player-one', 'amount' => 10]],
         ]))
         ->assertCreated()
-        ->assertJsonPath('data.quantity', 11)
-        ->assertJsonPath('data.amount', 990000);
+        ->assertJsonPath('data.payload.0.amount', 10)
+        ->assertJsonPath('data.total', 900000);
 
-    expect(Order::query()->sole()->recipients()->orderBy('position')->pluck('quantity')->all())->toBe([6, 5]);
+    expect(Order::query()->sole()->recipients()->sole()->quantity)->toBe(10);
 });
 
 test('api rejects more than ten cards for a single recipient', function (): void {
@@ -192,32 +217,71 @@ test('api rejects more than ten cards for a single recipient', function (): void
     $user->wallet()->update(['balance' => 2000000]);
 
     $this->withHeaders(topupApiCredentials($user))
-        ->postJson('/api/v1/tasks', topupApiPayload($game, $server, $package, [
-            'recipients' => [
-                ['data' => ['game_account' => 'player-one'], 'quantity' => 11],
-            ],
+        ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package, [
+            'payload' => [['game_account' => 'player-one', 'amount' => 11]],
         ]))
         ->assertUnprocessable();
 
     expect(Order::query()->count())->toBe(0);
 });
 
-test('repeating request id returns the same task without a second debit or job', function (): void {
+test('api rejects the removed top-level amount field', function (): void {
+    [$game, $server, $package] = topupApiCatalog();
+    $user = User::factory()->create();
+    $user->wallet()->update(['balance' => 500000]);
+
+    $this->withHeaders(topupApiCredentials($user))
+        ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package, ['amount' => 1]))
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Không gửi amount ở cấp ngoài; hãy đặt amount trong từng phần tử payload.');
+
+    expect(Order::query()->count())->toBe(0);
+});
+
+test('api requires an amount in every payload item and limits the recipient list', function (): void {
+    [$game, $server, $package] = topupApiCatalog();
+    $user = User::factory()->create();
+    $user->wallet()->update(['balance' => 500000]);
+    $credentials = topupApiCredentials($user);
+
+    $this->withHeaders($credentials)
+        ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package, [
+            'payload' => [['game_account' => 'player-one']],
+        ]))
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Mỗi tài khoản trong payload phải có amount.');
+
+    $this->app['auth']->forgetGuards();
+
+    $this->withHeaders($credentials)
+        ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package, [
+            'payload' => collect(range(1, 101))
+                ->map(fn (int $index): array => ['game_account' => "player-{$index}", 'amount' => 1])
+                ->all(),
+        ]))
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Mỗi đơn chỉ được có tối đa 100 tài khoản nhận.');
+
+    expect(Order::query()->count())->toBe(0);
+});
+
+test('repeating request id returns the same order without a second debit or job', function (): void {
     [$game, $server, $package] = topupApiCatalog();
     $user = User::factory()->create();
     $user->wallet()->update(['balance' => 500000]);
     $credentials = topupApiCredentials($user);
     $payload = topupApiPayload($game, $server, $package);
 
-    $firstTaskId = $this->withHeaders($credentials)
-        ->postJson('/api/v1/tasks', $payload)
+    $firstOrderId = $this->withHeaders($credentials)
+        ->postJson('/api/v1/orders', $payload)
         ->assertCreated()
-        ->json('data.task_id');
+        ->json('data.order_id');
+    $package->update(['status' => 'inactive']);
 
     $this->withHeaders($credentials)
-        ->postJson('/api/v1/tasks', $payload)
+        ->postJson('/api/v1/orders', $payload)
         ->assertOk()
-        ->assertJsonPath('data.task_id', $firstTaskId);
+        ->assertJsonPath('data.order_id', $firstOrderId);
 
     expect(Order::query()->count())->toBe(1)
         ->and(WalletTransaction::query()->count())->toBe(1)
@@ -232,11 +296,11 @@ test('insufficient balance returns useful amounts and creates nothing', function
     $user->wallet()->update(['balance' => 100000]);
 
     $this->withHeaders(topupApiCredentials($user))
-        ->postJson('/api/v1/tasks', topupApiPayload($game, $server, $package))
+        ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package))
         ->assertUnprocessable()
         ->assertExactJson([
             'status' => false,
-            'message' => 'Số dư ví không đủ để tạo task.',
+            'message' => 'Số dư ví không đủ để tạo đơn nạp.',
             'data' => [
                 'balance' => 100000,
                 'required_amount' => 180000,
@@ -251,7 +315,7 @@ test('insufficient balance returns useful amounts and creates nothing', function
     Mail::assertNothingQueued();
 });
 
-test('task status is owner scoped and does not expose provider internals', function (): void {
+test('order status is owner scoped and does not expose provider internals', function (): void {
     [$game, $server, $package] = topupApiCatalog();
     $owner = User::factory()->create();
     $otherUser = User::factory()->create();
@@ -277,28 +341,29 @@ test('task status is owner scoped and does not expose provider internals', funct
     ]);
 
     $this->withHeaders(topupApiCredentials($otherUser))
-        ->getJson("/api/v1/tasks/{$order->code}")
+        ->getJson("/api/v1/orders/{$order->code}")
         ->assertNotFound()
         ->assertExactJson([
             'status' => false,
-            'message' => 'Không tìm thấy task.',
+            'message' => 'Không tìm thấy đơn nạp.',
         ]);
 
     $this->app['auth']->forgetGuards();
 
     $this->withHeaders(topupApiCredentials($owner))
-        ->getJson("/api/v1/tasks/{$order->code}")
+        ->getJson("/api/v1/orders/{$order->code}")
         ->assertOk()
-        ->assertJsonPath('data.task_id', $order->code)
+        ->assertJsonPath('data.order_id', $order->code)
         ->assertJsonPath('data.status', 'processing')
-        ->assertJsonPath('data.recipients.0.data.game_account', 'player-one')
+        ->assertJsonPath('data.payload.0.game_account', 'player-one')
+        ->assertJsonPath('data.payload.0.amount', 2)
         ->assertJsonMissing(['PRIVATE-PROVIDER-REF'])
         ->assertJsonMissing(['PRIVATE-RECIPIENT-REF'])
         ->assertJsonMissing(['PRIVATE-SECRET'])
         ->assertJsonMissing(['PRIVATE-RESPONSE']);
 });
 
-test('task api rejects inactive users and request id collisions without leaking an order', function (): void {
+test('order api rejects inactive users and request id collisions without leaking an order', function (): void {
     [$game, $server, $package] = topupApiCatalog();
     $owner = User::factory()->create();
     $otherUser = User::factory()->create();
@@ -306,7 +371,7 @@ test('task api rejects inactive users and request id collisions without leaking 
     Order::factory()->for($owner)->create(['idempotency_key' => $requestId]);
 
     $this->withHeaders(topupApiCredentials($otherUser))
-        ->postJson('/api/v1/tasks', topupApiPayload($game, $server, $package, [
+        ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package, [
             'request_id' => $requestId,
         ]))
         ->assertConflict()
@@ -326,7 +391,7 @@ test('task api rejects inactive users and request id collisions without leaking 
         ]);
 });
 
-test('create task validates request id and configured recipient fields', function (): void {
+test('create order validates request id and configured payload fields', function (): void {
     [$game, $server, $package] = topupApiCatalog();
     $game->update(['checkout_fields' => [
         ['key' => 'username', 'label' => 'Tên tài khoản', 'placeholder' => '', 'required' => true],
@@ -336,7 +401,7 @@ test('create task validates request id and configured recipient fields', functio
     $user->wallet()->update(['balance' => 500000]);
 
     $this->withHeaders(topupApiCredentials($user))
-        ->postJson('/api/v1/tasks', topupApiPayload($game, $server, $package, [
+        ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package, [
             'request_id' => 'not-a-uuid',
         ]))
         ->assertUnprocessable()
@@ -346,14 +411,29 @@ test('create task validates request id and configured recipient fields', functio
         ]);
 
     $this->withHeaders(topupApiCredentials($user))
-        ->postJson('/api/v1/tasks', topupApiPayload($game, $server, $package, [
-            'recipients' => [[
-                'data' => ['username' => 'player-one'],
-                'quantity' => 1,
-            ]],
+        ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package, [
+            'payload' => [['username' => 'player-one', 'amount' => 1]],
         ]))
         ->assertUnprocessable()
         ->assertJsonPath('message', 'Nhân vật ở dòng 1 không được để trống.');
+
+    expect(Order::query()->count())->toBe(0);
+});
+
+test('create order rejects an ambiguous denomination instead of choosing a provider silently', function (): void {
+    [$game, $server, $package] = topupApiCatalog();
+    TopupPackage::factory()->for($game)->create([
+        'game_server_id' => $server->id,
+        'denomination' => $package->denomination,
+        'price' => 85000,
+    ]);
+    $user = User::factory()->create();
+    $user->wallet()->update(['balance' => 500000]);
+
+    $this->withHeaders(topupApiCredentials($user))
+        ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package))
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Có nhiều gói nạp trùng game, server và mệnh giá. Vui lòng liên hệ quản trị viên.');
 
     expect(Order::query()->count())->toBe(0);
 });
