@@ -274,17 +274,15 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
      */
     private function signedPayload(array $payload, string $secretKey): array
     {
-        $signablePayload = array_filter(
-            $payload,
-            fn (mixed $value, string $key): bool => $key !== 'sign' && is_scalar($value) && $value !== '',
-            ARRAY_FILTER_USE_BOTH,
-        );
-        ksort($signablePayload);
-
         return [
             ...$payload,
-            'sign' => hash_hmac('sha256', http_build_query($signablePayload, '', '&'), $secretKey),
+            'sign' => $this->signature((string) ($payload['partner_id'] ?? ''), $secretKey),
         ];
+    }
+
+    private function signature(string $partnerId, string $secretKey): string
+    {
+        return hash_hmac('sha256', http_build_query(['partner_id' => $partnerId], '', '&'), $secretKey);
     }
 
     /** @param array{base_url:string,partner_id:string,secret_key:string,connect_timeout:int,timeout:int,max_status_checks:int} $config */

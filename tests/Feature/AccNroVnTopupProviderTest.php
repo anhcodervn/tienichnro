@@ -134,14 +134,7 @@ test('accnrovn creates an idempotent order with an hmac signature', function ():
         ]);
     expect(json_encode($recipient->provider_response, JSON_THROW_ON_ERROR))
         ->not->toContain('sk_secret_key')
-        ->not->toContain(accNroVnSignature([
-            'partner_id' => 'pk_partner_123',
-            'request_id' => $order->code.'-R001',
-            'game' => 'nro',
-            'account' => 'player-one',
-            'price' => 50_000,
-            'amount' => 1,
-        ], 'sk_secret_key'));
+        ->not->toContain('19f8708708fe6415c5db61752bc5296eb40d84a2b37f1f05482366e4c4951782');
 
     Http::assertSent(function (Request $request) use ($order): bool {
         $unsignedPayload = [
@@ -156,7 +149,7 @@ test('accnrovn creates an idempotent order with an hmac signature', function ():
         return $request->url() === 'https://accnro.vn/api/v1/partner/recharge/create'
             && $request->data() === [
                 ...$unsignedPayload,
-                'sign' => accNroVnSignature($unsignedPayload, 'sk_secret_key'),
+                'sign' => '19f8708708fe6415c5db61752bc5296eb40d84a2b37f1f05482366e4c4951782',
             ]
             && ! array_key_exists('secret_key', $request->data());
     });
@@ -228,7 +221,7 @@ test('accnrovn queries an order by request id and completes fulfillment', functi
         return $request->url() === 'https://accnro.vn/api/v1/partner/recharge/query'
             && $request->data() === [
                 ...$unsignedPayload,
-                'sign' => accNroVnSignature($unsignedPayload, 'sk_secret_key'),
+                'sign' => '19f8708708fe6415c5db61752bc5296eb40d84a2b37f1f05482366e4c4951782',
             ];
     });
 });
@@ -308,7 +301,7 @@ test('admin refreshes accnrovn balance without sending the secret key', function
         return $request->url() === 'https://accnro.vn/api/v1/partner/recharge/balance'
             && $request->data() === [
                 ...$unsignedPayload,
-                'sign' => accNroVnSignature($unsignedPayload, 'sk_secret_key'),
+                'sign' => '19f8708708fe6415c5db61752bc5296eb40d84a2b37f1f05482366e4c4951782',
             ]
             && ! array_key_exists('secret_key', $request->data());
     });
@@ -367,12 +360,4 @@ function accNroVnConnectionConfig(): array
         'timeout' => 20,
         'max_status_checks' => 5,
     ];
-}
-
-/** @param array<string, bool|int|string> $payload */
-function accNroVnSignature(array $payload, string $secretKey): string
-{
-    ksort($payload);
-
-    return hash_hmac('sha256', http_build_query($payload, '', '&'), $secretKey);
 }
