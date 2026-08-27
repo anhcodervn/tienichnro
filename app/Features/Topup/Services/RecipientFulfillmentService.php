@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Features\Topup\DTOs\TopupProviderResultDto;
 use App\Features\Topup\Enums\TopupProviderStatus;
+use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Jobs\ReportReorderedOrderSuccess;
 use App\Features\Topup\Jobs\SyncTopupRecipientStatus;
 use App\Mail\Orders\OrderCompletedMail;
@@ -44,7 +45,14 @@ class RecipientFulfillmentService
             return;
         }
 
-        $result = $adapter->submit($order, $recipient, $order->provider, $requestId);
+        try {
+            $result = $adapter->submit($order, $recipient, $order->provider, $requestId);
+        } catch (TopupProviderConnectionException $exception) {
+            $this->storeProviderException($recipient->id, $unit, $requestId, $exception, true);
+
+            throw $exception;
+        }
+
         $this->storeUnitResult($recipient->id, $unit, $requestId, $result, true);
 
         if (! $result->status->isTerminal() && $adapter->supportsStatusChecks()) {
@@ -84,7 +92,14 @@ class RecipientFulfillmentService
             return;
         }
 
-        $result = $adapter->status($order, $recipient, $provider, $requestId, $reference);
+        try {
+            $result = $adapter->status($order, $recipient, $provider, $requestId, $reference);
+        } catch (TopupProviderConnectionException $exception) {
+            $this->storeProviderException($recipient->id, $unit, $requestId, $exception, false, $attempt);
+
+            throw $exception;
+        }
+
         $this->storeUnitResult($recipient->id, $unit, $requestId, $result, false, $attempt);
         $this->aggregateOrder($order->id);
 
@@ -226,18 +241,16 @@ class RecipientFulfillmentService
             $providerResponse = $recipient->provider_response ?? [];
             $items = is_array($providerResponse['items'] ?? null) ? $providerResponse['items'] : [];
             $previousItem = is_array($items[(string) $unit] ?? null) ? $items[(string) $unit] : [];
-            $safeResponse = $this->safeProviderData($result->response);
-            $safeRequest = $this->safeProviderData($result->request);
-            $safeProviderResponse = $this->safeProviderData($result->providerResponse);
-            $safeResponse = is_array($safeResponse) ? $safeResponse : [];
-            $safeRequest = is_array($safeRequest) ? $safeRequest : [];
-            $safeProviderResponse = is_array($safeProviderResponse) ? $safeProviderResponse : [];
             $recordedAt = now()->toISOString();
             $exchange = [
-                'request' => $safeRequest,
+                'request' => $result->request,
                 'response' => [
-                    'http_status' => $safeResponse['http_status'] ?? null,
-                    'body' => $safeProviderResponse,
+                    'http_status' => $result->response['http_status'] ?? null,
+                    'reason' => $result->response['reason'] ?? null,
+                    'effective_uri' => $result->response['effective_uri'] ?? null,
+                    'headers' => $result->response['headers'] ?? [],
+                    'body' => $result->providerResponse,
+                    'raw_body' => $result->response['raw_body'] ?? null,
                 ],
                 'status' => $result->status->value,
                 'message' => $result->message,
@@ -250,13 +263,14 @@ class RecipientFulfillmentService
                 'reference' => $result->reference ?: ($previousItem['reference'] ?? null),
                 'status' => $result->status->value,
                 'message' => $result->message,
-                'response' => $safeResponse,
+                'response' => $result->response,
                 'submission' => $submitted
                     ? $exchange
                     : ($previousItem['submission'] ?? null),
                 'last_status_check' => $submitted
                     ? ($previousItem['last_status_check'] ?? null)
                     : $exchange,
+                'last_error' => $previousItem['last_error'] ?? null,
                 'submitted_at' => $submitted
                     ? ($previousItem['submitted_at'] ?? $recordedAt)
                     : ($previousItem['submitted_at'] ?? null),
@@ -290,6 +304,73 @@ class RecipientFulfillmentService
                     ->whereNull('provider_reference')
                     ->update(['provider_reference' => $result->reference]);
             }
+        }, 3);
+    }
+
+    private function storeProviderException(
+        int $recipientId,
+        int $unit,
+        string $requestId,
+        TopupProviderConnectionException $exception,
+        bool $submitted,
+        int $attempt = 0,
+    ): void {
+        if ($exception->debugContext === []) {
+            return;
+        }
+
+        DB::transaction(function () use ($recipientId, $unit, $requestId, $exception, $submitted, $attempt): void {
+            $recipient = OrderRecipient::query()->lockForUpdate()->find($recipientId);
+
+            if (! $recipient instanceof OrderRecipient || in_array($recipient->status, ['completed', 'cancelled'], true)) {
+                return;
+            }
+
+            $providerResponse = $recipient->provider_response ?? [];
+            $items = is_array($providerResponse['items'] ?? null) ? $providerResponse['items'] : [];
+            $previousItem = is_array($items[(string) $unit] ?? null) ? $items[(string) $unit] : [];
+            $recordedAt = now()->toISOString();
+            $message = '['.$exception->errorCode.'] '.$exception->getMessage();
+            $exchange = [
+                'request' => is_array($exception->debugContext['request'] ?? null)
+                    ? $exception->debugContext['request']
+                    : [],
+                'response' => is_array($exception->debugContext['response'] ?? null)
+                    ? $exception->debugContext['response']
+                    : [],
+                'status' => TopupProviderStatus::Processing->value,
+                'message' => $message,
+                'attempt' => $submitted ? 0 : $attempt,
+                'recorded_at' => $recordedAt,
+            ];
+
+            $items[(string) $unit] = [
+                ...$previousItem,
+                'unit' => $unit,
+                'request_id' => $requestId,
+                'status' => TopupProviderStatus::Processing->value,
+                'message' => $message,
+                'submission' => $submitted ? $exchange : ($previousItem['submission'] ?? null),
+                'last_status_check' => $submitted ? ($previousItem['last_status_check'] ?? null) : $exchange,
+                'last_error' => $exchange,
+                'submitted_at' => $submitted
+                    ? ($previousItem['submitted_at'] ?? $recordedAt)
+                    : ($previousItem['submitted_at'] ?? null),
+                'last_checked_at' => $submitted ? ($previousItem['last_checked_at'] ?? null) : $recordedAt,
+                'check_attempts' => max((int) ($previousItem['check_attempts'] ?? 0), $attempt),
+            ];
+            $providerResponse['schema_version'] = 2;
+            $providerResponse['items'] = $items;
+
+            $recipient->forceFill([
+                'status' => 'processing',
+                'provider_status' => TopupProviderStatus::Processing->value,
+                'provider_response' => $providerResponse,
+                'status_check_attempts' => max($recipient->status_check_attempts, $attempt),
+                'failure_reason' => $message,
+                'submitted_at' => $submitted ? ($recipient->submitted_at ?? now()) : $recipient->submitted_at,
+                'last_checked_at' => $submitted ? $recipient->last_checked_at : now(),
+            ])->save();
         }, 3);
     }
 
@@ -388,29 +469,6 @@ class RecipientFulfillmentService
             && data_get($order->metadata, 'reorder.status') === 'queued') {
             ReportReorderedOrderSuccess::dispatch($order->id, $reorderAttempt)->afterCommit();
         }
-    }
-
-    private function safeProviderData(mixed $value, int $depth = 0): mixed
-    {
-        if ($depth >= 5) {
-            return '[truncated]';
-        }
-
-        if (! is_array($value)) {
-            return is_string($value) ? mb_substr($value, 0, 2000) : $value;
-        }
-
-        $safe = [];
-
-        foreach (array_slice($value, 0, 50, true) as $key => $item) {
-            if (is_string($key) && preg_match('/sign|secret|serect|token|password|partner[_-]?key|api[_-]?secret|authorization/i', $key) === 1) {
-                continue;
-            }
-
-            $safe[$key] = $this->safeProviderData($item, $depth + 1);
-        }
-
-        return $safe;
     }
 
     /** @param array<int|string, mixed> $items */

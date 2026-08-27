@@ -20,12 +20,12 @@ class OrderController extends Controller
         return response()->json(['status' => true, 'data' => OrderResource::collection($this->service->orders($request))->response()->getData(true)]);
     }
 
-    public function show(Order $order): OrderResource
+    public function show(Order $order): JsonResponse
     {
-        return OrderResource::make($order->load(['game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients']));
+        return $this->sensitiveOrderResponse($order);
     }
 
-    public function update(UpdateOrderStatusRequest $request, Order $order): OrderResource
+    public function update(UpdateOrderStatusRequest $request, Order $order): JsonResponse
     {
         /** @var User $admin */
         $admin = $request->user();
@@ -37,6 +37,13 @@ class OrderController extends Controller
             $request,
         );
 
-        return OrderResource::make($order->load(['game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients']));
+        return $this->sensitiveOrderResponse($order);
+    }
+
+    private function sensitiveOrderResponse(Order $order): JsonResponse
+    {
+        return OrderResource::make(
+            $order->load(['game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients']),
+        )->response()->header('Cache-Control', 'private, no-store');
     }
 }

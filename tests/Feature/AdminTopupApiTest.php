@@ -337,6 +337,41 @@ test('game checkout field schema rejects unsafe and ambiguous definitions', func
     ])->assertUnprocessable()->assertJsonValidationErrors('checkout_fields.0.key');
 });
 
+test('admin stores provider field names directly in the game checkout schema', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $payload = [
+        'name' => 'Game direct provider fields',
+        'slug' => 'game-direct-provider-fields',
+        'reward_label' => 'Xu',
+        'status' => 'active',
+        'sort_order' => 1,
+        'checkout_fields' => [
+            ['key' => 'account', 'label' => 'Email', 'placeholder' => '', 'required' => true],
+            ['key' => 'character', 'label' => 'Nhân vật', 'placeholder' => '', 'required' => false],
+        ],
+        'metadata' => [],
+    ];
+
+    $created = $this->actingAs($admin)
+        ->postJson('/api/admin-api/games', $payload)
+        ->assertCreated()
+        ->assertJsonPath('data.checkout_fields.0.key', 'account')
+        ->assertJsonPath('data.checkout_fields.1.key', 'character');
+    $game = Game::query()->findOrFail($created->json('data.id'));
+
+    $this->actingAs($admin)->postJson('/api/admin-api/game-servers', [
+        'game_id' => $game->id,
+        'name' => 'Server 16',
+        'code' => '16',
+        'status' => 'active',
+        'sort_order' => 1,
+    ])->assertCreated()
+        ->assertJsonPath('data.code', '16');
+
+    expect($game->metadata)->toBe([])
+        ->and($game->checkout_fields[0]['key'])->toBe('account');
+});
+
 test('catalog deletion requires child records to be removed first', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $game = Game::factory()->create();

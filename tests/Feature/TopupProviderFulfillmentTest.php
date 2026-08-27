@@ -38,7 +38,7 @@ test('the9p submission uses a stable request id and queues status synchronizatio
                 'status' => 'success',
                 'message' => 'accepted',
                 'data' => ['order_code' => 'THE9P-1001', 'status' => 'pending'],
-            ])
+            ], 200, ['X-Provider-Trace' => 'the9p-create-1'])
             ->push([
                 'status' => 'success',
                 'message' => 'accepted',
@@ -62,8 +62,19 @@ test('the9p submission uses a stable request id and queues status synchronizatio
             'service_code' => 'nr',
             'amount' => 10000,
             'account_info' => ['server' => 3, 'username' => 'player-one'],
+            'sign' => md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001-U001'),
         ])
+        ->and($recipient->provider_response['items'][1]['submission']['request']['headers'])->toMatchArray([
+            'Accept' => ['application/json'],
+            'Content-Type' => ['application/json'],
+        ])
+        ->and($recipient->provider_response['items'][1]['submission']['request']['raw_body'])
+        ->toContain('"sign":"'.md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001-U001').'"')
         ->and($recipient->provider_response['items'][1]['submission']['response']['http_status'])->toBe(200)
+        ->and($recipient->provider_response['items'][1]['submission']['response']['headers'])
+        ->toMatchArray(['X-Provider-Trace' => ['the9p-create-1']])
+        ->and($recipient->provider_response['items'][1]['submission']['response']['raw_body'])
+        ->toContain('"order_code":"THE9P-1001"')
         ->and($recipient->provider_response['items'][1]['submission']['response']['body'])->toMatchArray([
             'status' => 'success',
             'message' => 'accepted',
@@ -71,7 +82,7 @@ test('the9p submission uses a stable request id and queues status synchronizatio
         ->and($order->refresh()->provider_reference)->toBeNull();
     expect(json_encode($recipient->provider_response, JSON_THROW_ON_ERROR))
         ->not->toContain('secret-key')
-        ->not->toContain(md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001-U001'));
+        ->toContain(md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001-U001'));
 
     Http::assertSent(function (Request $request) use ($order, $provider): bool {
         $payload = $request->data();
@@ -103,7 +114,7 @@ test('multiple recipients submit once each with the same selected denomination',
     [$order, $firstRecipient] = the9pOrderFixture(['quantity' => 1]);
     $secondRecipient = $order->recipients()->create([
         'position' => 2,
-        'recipient_data' => ['game_account' => 'player-two'],
+        'recipient_data' => ['username' => 'player-two'],
         'quantity' => 1,
     ]);
     Http::fake([
@@ -368,7 +379,7 @@ test('paid multi recipient order is split into queue jobs without provider http 
     [$order] = the9pOrderFixture();
     $order->recipients()->create([
         'position' => 2,
-        'recipient_data' => ['game_account' => 'player-two'],
+        'recipient_data' => ['username' => 'player-two'],
         'quantity' => 3,
     ]);
 
@@ -412,7 +423,11 @@ test('checkout rejects an incomplete automatic provider before creating an order
 });
 
 test('checkout accepts a configured provider and stores only an internal routing snapshot', function (): void {
-    $game = Game::factory()->create();
+    $game = Game::factory()->create([
+        'checkout_fields' => [
+            ['key' => 'username', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
+        ],
+    ]);
     $server = GameServer::factory()->for($game)->create(['code' => '3']);
     $provider = TopupProvider::factory()->create([
         'slug' => 'the9p',
@@ -435,7 +450,7 @@ test('checkout accepts a configured provider and stores only an internal routing
         'package_id' => $package->id,
         'purchase_mode' => 'single',
         'single_quantity' => 1,
-        'recipient_fields' => ['game_account' => 'player-one', 'game_character' => ''],
+        'recipient_fields' => ['username' => 'player-one'],
         'email' => 'guest@example.com',
         'payment_method' => PaymentMethod::BankTransfer->value,
     ])->assertRedirect();
@@ -496,7 +511,11 @@ test('client model serialization hides every provider implementation detail', fu
  */
 function the9pOrderFixture(array $recipientOverrides = []): array
 {
-    $game = Game::factory()->create();
+    $game = Game::factory()->create([
+        'checkout_fields' => [
+            ['key' => 'username', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
+        ],
+    ]);
     $server = GameServer::factory()->for($game)->create(['code' => '3']);
     $provider = TopupProvider::factory()->create([
         'slug' => 'the9p',
@@ -530,7 +549,7 @@ function the9pOrderFixture(array $recipientOverrides = []): array
     ]);
     $recipient = $order->recipients()->create([
         'position' => 1,
-        'recipient_data' => ['game_account' => 'player-one'],
+        'recipient_data' => ['username' => 'player-one'],
         'quantity' => 2,
         ...$recipientOverrides,
     ]);

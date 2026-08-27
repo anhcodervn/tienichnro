@@ -14,6 +14,7 @@ use App\Models\Order;
 use App\Models\OrderRecipient;
 use App\Models\PaymentTransaction;
 use App\Models\TopupPackage;
+use App\Models\TopupProvider;
 use App\Models\User;
 use App\Models\WalletTransaction;
 use Illuminate\Http\Client\Request;
@@ -217,6 +218,42 @@ test('guest can create a bank transfer order and backend recalculates price', fu
             && $mail->queue === 'mails'
             && $mail->afterCommit === true;
     });
+});
+
+test('checkout snapshots direct provider field names without provider-specific mapping', function (): void {
+    [$game, $server, $package] = topupCatalog();
+    $provider = TopupProvider::factory()->create([
+        'slug' => 'accnrovn',
+        'connection_config' => [
+            'base_url' => 'https://accnro.vn/api/v1/partner/recharge',
+            'partner_id' => 'pk_test',
+            'secret_key' => 'sk_test',
+        ],
+    ]);
+    $game->update([
+        'checkout_fields' => [
+            ['key' => 'account', 'label' => 'Email/Số điện thoại', 'placeholder' => '', 'required' => true],
+        ],
+    ]);
+    $server->update(['code' => '16']);
+    $package->update([
+        'provider_id' => $provider->id,
+        'provider_service_code' => 'nr',
+    ]);
+
+    $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+        'recipient_fields' => ['account' => 'user@example.com'],
+    ]))
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
+
+    $order = Order::query()->sole();
+    expect($order->checkout_fields_snapshot[0]['key'])->toBe('account')
+        ->and($order->recipients()->firstOrFail()->recipient_data)->toBe(['account' => 'user@example.com'])
+        ->and(data_get($order->metadata, 'provider'))->toBe([
+            'slug' => 'accnrovn',
+            'service_code' => 'nr',
+        ]);
 });
 
 test('guest order stays unclaimed when its email belongs to an existing user', function (): void {

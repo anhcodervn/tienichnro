@@ -639,7 +639,9 @@ watch(() => props.catalogType, load, { immediate: true });
                                 <div>
                                     <legend class="text-sm font-bold text-slate-800">Trường dữ liệu nhận hàng</legend>
                                     <p class="mt-1 text-xs leading-5 text-slate-500">
-                                        Thứ tự ở đây cũng là thứ tự cột khi mua nhiều, ngăn cách bằng dấu <strong>|</strong>.
+                                        Thứ tự ở đây cũng là thứ tự cột khi mua nhiều, ngăn cách bằng dấu <strong>|</strong>. Mã trường được giữ
+                                        nguyên khi adapter tạo payload provider, ví dụ <code>username</code>, <code>account</code> hoặc
+                                        <code>taikhoan</code>.
                                     </p>
                                 </div>
                                 <button
@@ -720,7 +722,7 @@ watch(() => props.catalogType, load, { immediate: true });
                                 placeholder="Ví dụ: 3"
                                 class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal"
                             /><small class="mt-1.5 block font-normal text-slate-500"
-                                >Giá trị gửi vào account_info.server khi gọi provider.</small
+                                >Giá trị server dùng chung và được adapter đặt vào đúng cấu trúc payload của provider.</small
                             ></label
                         >
                     </template>

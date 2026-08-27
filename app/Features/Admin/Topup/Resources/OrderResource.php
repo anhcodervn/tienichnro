@@ -52,6 +52,7 @@ class OrderResource extends JsonResource
                             'last_checked_at' => $item['last_checked_at'] ?? null,
                             'submission' => is_array($item['submission'] ?? null) ? $item['submission'] : null,
                             'last_status_check' => is_array($item['last_status_check'] ?? null) ? $item['last_status_check'] : null,
+                            'last_error' => is_array($item['last_error'] ?? null) ? $item['last_error'] : null,
                         ])->values()->all(),
                 ])->all()),
             'total_amount' => $this->total_amount, 'payment_method' => $this->payment_method->value,

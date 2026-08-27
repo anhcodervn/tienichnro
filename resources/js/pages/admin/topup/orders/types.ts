@@ -1,12 +1,22 @@
 export type ProviderRequestSnapshot = {
     method?: string;
     url?: string;
+    headers?: Record<string, string | string[]>;
     payload?: Record<string, unknown>;
+    raw_body?: string | null;
 };
 
 export type ProviderResponseSnapshot = {
     http_status?: number | null;
-    body?: Record<string, unknown>;
+    reason?: string | null;
+    effective_uri?: string | null;
+    headers?: Record<string, string | string[]>;
+    body?: unknown;
+    raw_body?: string | null;
+    transport_error?: {
+        class?: string | null;
+        message?: string | null;
+    } | null;
 };
 
 export type ProviderExchange = {
@@ -35,6 +45,7 @@ export type ProviderItemRow = {
     last_checked_at?: string | null;
     submission?: ProviderExchange | null;
     last_status_check?: ProviderExchange | null;
+    last_error?: ProviderExchange | null;
 };
 
 export type RecipientRow = {

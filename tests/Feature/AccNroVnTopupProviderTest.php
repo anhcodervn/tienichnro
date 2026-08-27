@@ -3,6 +3,7 @@
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Jobs\SyncTopupRecipientStatus;
 use App\Features\Topup\Providers\AccNroVnTopupProvider;
 use App\Features\Topup\Services\RecipientFulfillmentService;
@@ -17,6 +18,7 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Validation\ValidationException;
 
 beforeEach(function (): void {
     Http::preventStrayRequests();
@@ -53,6 +55,7 @@ test('accnrovn normalizes configured operation endpoints to the api base url', f
     'create endpoint' => ['https://accnro.vn/api/v1/partner/recharge/create'],
     'query endpoint' => ['https://accnro.vn/api/v1/partner/recharge/query/'],
     'balance endpoint' => ['https://accnro.vn/api/v1/partner/recharge/balance'],
+    'catalog endpoint' => ['https://accnro.vn/api/v1/partner/recharge/catalog'],
 ]);
 
 test('admin masks accnrovn stored credential aliases', function (): void {
@@ -86,7 +89,7 @@ test('admin masks accnrovn stored credential aliases', function (): void {
     ]);
 });
 
-test('accnrovn creates an idempotent order with an hmac signature', function (): void {
+test('accnrovn creates an idempotent order with simple credentials and no signature', function (): void {
     [$order, $recipient] = accNroVnOrderFixture();
     Http::fake([
         'https://accnro.vn/api/v1/partner/recharge/create' => Http::response([
@@ -99,7 +102,7 @@ test('accnrovn creates an idempotent order with an hmac signature', function ():
                 'status_code' => 'QUEUED',
                 'balance' => 9_950_000,
             ],
-        ]),
+        ], 200, ['X-Provider-Trace' => 'acc-create-1']),
     ]);
 
     app(RecipientFulfillmentService::class)->submit($recipient->id);
@@ -115,48 +118,312 @@ test('accnrovn creates an idempotent order with an hmac signature', function ():
             'envelope_status' => 'success',
         ])
         ->and($recipient->provider_response['items'][1]['submission']['status'])->toBe('pending')
-        ->and($recipient->provider_response['items'][1]['submission']['request'])->toBe([
-            'method' => 'POST',
-            'url' => 'https://accnro.vn/api/v1/partner/recharge/create',
-            'payload' => [
-                'partner_id' => 'pk_partner_123',
-                'request_id' => $order->code.'-R001',
-                'game' => 'nro',
-                'account' => 'player-one',
-                'price' => 50_000,
-                'amount' => 1,
-            ],
+        ->and($recipient->provider_response['items'][1]['submission']['request']['method'])->toBe('POST')
+        ->and($recipient->provider_response['items'][1]['submission']['request']['url'])
+        ->toBe('https://accnro.vn/api/v1/partner/recharge/create')
+        ->and($recipient->provider_response['items'][1]['submission']['request']['headers'])->toMatchArray([
+            'Accept' => ['application/json'],
+            'Content-Type' => ['application/json'],
         ])
+        ->and($recipient->provider_response['items'][1]['submission']['request']['payload'])->toBe([
+            'partner_id' => 'pk_partner_123',
+            'secret_key' => 'sk_secret_key',
+            'request_id' => $order->code.'-R001',
+            'game' => 'nr',
+            'server' => '3',
+            'account' => 'user01@gmail.com',
+            'price' => 50_000,
+            'amount' => 1,
+        ])
+        ->and($recipient->provider_response['items'][1]['submission']['request']['raw_body'])
+        ->toContain('"secret_key":"sk_secret_key"')
+        ->and($recipient->provider_response['items'][1]['submission']['response']['headers'])
+        ->toMatchArray(['X-Provider-Trace' => ['acc-create-1']])
+        ->and($recipient->provider_response['items'][1]['submission']['response']['raw_body'])
+        ->toContain('"order_id":"ACC-NRO-1001"')
         ->and($recipient->provider_response['items'][1]['submission']['response']['http_status'])->toBe(200)
         ->and($recipient->provider_response['items'][1]['submission']['response']['body'])->toMatchArray([
             'success' => true,
             'message' => 'OK',
         ]);
     expect(json_encode($recipient->provider_response, JSON_THROW_ON_ERROR))
-        ->not->toContain('sk_secret_key')
-        ->not->toContain('19f8708708fe6415c5db61752bc5296eb40d84a2b37f1f05482366e4c4951782');
+        ->toContain('sk_secret_key')
+        ->not->toContain('"sign"');
 
     Http::assertSent(function (Request $request) use ($order): bool {
-        $unsignedPayload = [
+        $payload = [
             'partner_id' => 'pk_partner_123',
+            'secret_key' => 'sk_secret_key',
             'request_id' => $order->code.'-R001',
-            'game' => 'nro',
-            'account' => 'player-one',
+            'game' => 'nr',
+            'server' => '3',
+            'account' => 'user01@gmail.com',
             'price' => 50_000,
             'amount' => 1,
         ];
 
         return $request->url() === 'https://accnro.vn/api/v1/partner/recharge/create'
-            && $request->data() === [
-                ...$unsignedPayload,
-                'sign' => '19f8708708fe6415c5db61752bc5296eb40d84a2b37f1f05482366e4c4951782',
-            ]
-            && ! array_key_exists('secret_key', $request->data());
+            && $request->data() === $payload
+            && ! array_key_exists('sign', $request->data());
     });
     Queue::assertPushed(SyncTopupRecipientStatus::class, 1);
 
     app(RecipientFulfillmentService::class)->submit($recipient->id);
     Http::assertSentCount(1);
+});
+
+test('accnrovn omits server when the game server has no provider code', function (): void {
+    [$order, $recipient, $provider] = accNroVnOrderFixture();
+    $order->server()->update(['code' => '']);
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::response([
+            'success' => true,
+            'message' => 'OK',
+            'data' => [
+                'order_id' => 'ACC-NO-SERVER-1',
+                'status' => 'pending',
+                'status_code' => 'QUEUED',
+            ],
+        ]),
+    ]);
+
+    app(AccNroVnTopupProvider::class)->submit(
+        $order->fresh('server'),
+        $recipient,
+        $provider,
+        $order->code.'-R001',
+    );
+
+    Http::assertSent(fn (Request $request): bool => ($request->data()['game'] ?? null) === 'nr'
+        && ! array_key_exists('server', $request->data()));
+});
+
+test('accnrovn maps each game checkout setting to account and extra fields', function (): void {
+    [$order, $recipient, $provider] = accNroVnOrderFixture();
+    $order->server()->update(['code' => '']);
+    $order->forceFill([
+        'checkout_fields_snapshot' => [
+            ['key' => 'account', 'label' => 'Tên nhân vật', 'placeholder' => '', 'required' => true],
+            ['key' => 'zone', 'label' => 'Khu', 'placeholder' => '', 'required' => true],
+            ['key' => 'note', 'label' => 'Ghi chú', 'placeholder' => '', 'required' => false],
+        ],
+        'metadata' => ['provider' => ['slug' => 'accnrovn', 'service_code' => 'custom_game']],
+    ])->save();
+    $recipient->forceFill([
+        'recipient_data' => [
+            'account' => 'Songoku',
+            'zone' => '7',
+            'note' => '',
+        ],
+    ])->save();
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::response([
+            'success' => true,
+            'message' => 'OK',
+            'data' => [
+                'order_id' => 'ACC-CUSTOM-1',
+                'status' => 'pending',
+                'status_code' => 'QUEUED',
+            ],
+        ]),
+    ]);
+
+    app(AccNroVnTopupProvider::class)->submit(
+        $order->fresh('server'),
+        $recipient->fresh(),
+        $provider,
+        $order->code.'-R001',
+    );
+
+    Http::assertSent(function (Request $request): bool {
+        return ($request->data()['game'] ?? null) === 'custom_game'
+            && ($request->data()['account'] ?? null) === 'Songoku'
+            && ($request->data()['extra'] ?? null) === ['zone' => '7']
+            && ! array_key_exists('server', $request->data());
+    });
+});
+
+test('accnrovn rejects missing required mapped fields before sending the request', function (): void {
+    [$order, $recipient, $provider] = accNroVnOrderFixture();
+    $recipient->forceFill(['recipient_data' => ['username' => 'wrong-field']])->save();
+
+    expect(fn () => app(AccNroVnTopupProvider::class)->submit(
+        $order,
+        $recipient,
+        $provider,
+        $order->code.'-R001',
+    ))->toThrow(ValidationException::class);
+
+    Http::assertNothingSent();
+});
+
+test('accnrovn reloads and sends the server code when the order relation omitted that column', function (): void {
+    [$order, $recipient, $provider] = accNroVnOrderFixture();
+    $order->load('server:id,name');
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::response([
+            'success' => true,
+            'message' => 'OK',
+            'data' => [
+                'order_id' => 'ACC-NRO-SERVER-1',
+                'request_id' => $order->code.'-R001',
+                'status' => 'pending',
+                'status_code' => 'QUEUED',
+                'server' => '3',
+            ],
+        ]),
+    ]);
+
+    expect($order->server?->code)->toBeNull();
+
+    app(AccNroVnTopupProvider::class)->submit(
+        $order,
+        $recipient,
+        $provider,
+        $order->code.'-R001',
+    );
+
+    Http::assertSent(fn (Request $request): bool => $request->url() === 'https://accnro.vn/api/v1/partner/recharge/create'
+        && ($request->data()['game'] ?? null) === 'nr'
+        && ($request->data()['server'] ?? null) === '3');
+});
+
+test('admin can inspect an unmasked accnrovn error exchange with headers and raw bodies', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $user = User::factory()->create(['role' => 'user']);
+    [$order, $recipient] = accNroVnOrderFixture();
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::response([
+            'success' => false,
+            'message' => 'Invalid credentials',
+            'debug' => [
+                'authorization' => 'Bearer provider-debug-token',
+                'received_secret_key' => 'sk_secret_key',
+            ],
+        ], 401, [
+            'X-Provider-Trace' => 'acc-error-401',
+            'Set-Cookie' => 'provider_session=debug',
+        ]),
+    ]);
+
+    app(RecipientFulfillmentService::class)->submit($recipient->id);
+
+    $this->actingAs($user)
+        ->getJson("/api/admin-api/orders/{$order->code}")
+        ->assertForbidden();
+
+    $this->actingAs($admin)
+        ->getJson("/api/admin-api/orders/{$order->code}")
+        ->assertSuccessful()
+        ->assertHeader('Cache-Control', 'no-store, private')
+        ->assertJsonPath(
+            'data.recipients.0.provider_items.0.submission.request.payload.secret_key',
+            'sk_secret_key',
+        )
+        ->assertJsonMissingPath('data.recipients.0.provider_items.0.submission.request.payload.sign')
+        ->assertJsonPath('data.recipients.0.provider_items.0.submission.request.payload.request_id', $order->code.'-R001')
+        ->assertJsonPath('data.recipients.0.provider_items.0.submission.request.payload.game', 'nr')
+        ->assertJsonPath('data.recipients.0.provider_items.0.submission.request.payload.server', '3')
+        ->assertJsonPath('data.recipients.0.provider_items.0.submission.request.payload.account', 'user01@gmail.com')
+        ->assertJsonPath('data.recipients.0.provider_items.0.submission.request.headers.Content-Type.0', 'application/json')
+        ->assertJsonPath('data.recipients.0.provider_items.0.submission.response.http_status', 401)
+        ->assertJsonPath('data.recipients.0.provider_items.0.submission.response.headers.X-Provider-Trace.0', 'acc-error-401')
+        ->assertJsonPath('data.recipients.0.provider_items.0.submission.response.headers.Set-Cookie.0', 'provider_session=debug')
+        ->assertJsonPath(
+            'data.recipients.0.provider_items.0.submission.response.body.debug.authorization',
+            'Bearer provider-debug-token',
+        )
+        ->assertJsonPath(
+            'data.recipients.0.provider_items.0.submission.response.body.debug.received_secret_key',
+            'sk_secret_key',
+        );
+});
+
+test('admin does not invent a server field for a historical request that never sent it', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    [$order] = accNroVnOrderFixture([
+        'status' => 'failed',
+        'provider_response' => [
+            'schema_version' => 2,
+            'items' => [
+                1 => [
+                    'unit' => 1,
+                    'request_id' => 'LEGACY-NO-SERVER',
+                    'status' => 'failed',
+                    'submission' => [
+                        'request' => [
+                            'method' => 'POST',
+                            'url' => 'https://accnro.vn/api/v1/partner/recharge/create',
+                            'headers' => ['Content-Type' => ['application/json']],
+                            'payload' => [
+                                'partner_id' => 'pk_legacy',
+                                'request_id' => 'LEGACY-NO-SERVER',
+                                'game' => 'nr',
+                                'account' => 'legacy@example.com',
+                                'price' => 50_000,
+                                'amount' => 1,
+                            ],
+                            'raw_body' => '{"partner_id":"pk_legacy","request_id":"LEGACY-NO-SERVER","game":"nr"}',
+                        ],
+                        'response' => ['http_status' => 400],
+                        'status' => 'failed',
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson("/api/admin-api/orders/{$order->code}")
+        ->assertSuccessful()
+        ->assertJsonPath('data.server', $order->server()->value('name'))
+        ->assertJsonPath('data.recipients.0.provider_items.0.submission.request.payload.request_id', 'LEGACY-NO-SERVER')
+        ->assertJsonPath('data.recipients.0.provider_items.0.submission.request.payload.game', 'nr')
+        ->assertJsonMissingPath('data.recipients.0.provider_items.0.submission.request.payload.server');
+});
+
+test('accnrovn stores a full retryable provider error before rethrowing it', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    [$order, $recipient] = accNroVnOrderFixture();
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::response(
+            '<html>provider maintenance</html>',
+            503,
+            [
+                'Retry-After' => '30',
+                'X-Provider-Trace' => 'acc-error-503',
+            ],
+        ),
+    ]);
+
+    expect(fn () => app(RecipientFulfillmentService::class)->submit($recipient->id))
+        ->toThrow(TopupProviderConnectionException::class);
+
+    $item = $recipient->refresh()->provider_response['items'][1];
+
+    expect($recipient->status)->toBe('processing')
+        ->and($item['last_error']['request']['url'])->toBe('https://accnro.vn/api/v1/partner/recharge/create')
+        ->and($item['last_error']['request']['headers']['Content-Type'])->toBe(['application/json'])
+        ->and($item['last_error']['request']['payload']['secret_key'])
+        ->toBe('sk_secret_key')
+        ->and($item['last_error']['request']['raw_body'])
+        ->toContain('"secret_key":"sk_secret_key"')
+        ->and($item['last_error']['response']['http_status'])->toBe(503)
+        ->and($item['last_error']['response']['headers']['Retry-After'])->toBe(['30'])
+        ->and($item['last_error']['response']['headers']['X-Provider-Trace'])->toBe(['acc-error-503'])
+        ->and($item['last_error']['response']['body'])->toBe('<html>provider maintenance</html>')
+        ->and($item['last_error']['response']['raw_body'])->toBe('<html>provider maintenance</html>')
+        ->and($item['last_error']['message'])->toContain('[provider_unavailable]');
+
+    $this->actingAs($admin)
+        ->getJson("/api/admin-api/orders/{$order->code}")
+        ->assertSuccessful()
+        ->assertHeader('Cache-Control', 'no-store, private')
+        ->assertJsonPath('data.recipients.0.provider_items.0.last_error.request.payload.secret_key', 'sk_secret_key')
+        ->assertJsonMissingPath('data.recipients.0.provider_items.0.last_error.request.payload.sign')
+        ->assertJsonPath('data.recipients.0.provider_items.0.last_error.response.http_status', 503)
+        ->assertJsonPath('data.recipients.0.provider_items.0.last_error.response.headers.Retry-After.0', '30')
+        ->assertJsonPath('data.recipients.0.provider_items.0.last_error.response.raw_body', '<html>provider maintenance</html>');
 });
 
 test('accnrovn queries an order by request id and completes fulfillment', function (): void {
@@ -189,12 +456,13 @@ test('accnrovn queries an order by request id and completes fulfillment', functi
                 'topup_id' => '1148567',
                 'message' => '',
             ],
-        ]),
+        ], 200, ['X-Provider-Trace' => 'acc-query-1']),
     ]);
 
     $this->actingAs($admin)
         ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'sync_provider'])
         ->assertSuccessful()
+        ->assertHeader('Cache-Control', 'no-store, private')
         ->assertJsonPath('data.provider.name', 'AccNRO')
         ->assertJsonPath('data.provider.slug', 'accnrovn')
         ->assertJsonPath('data.order_status', 'completed')
@@ -202,8 +470,11 @@ test('accnrovn queries an order by request id and completes fulfillment', functi
         ->assertJsonPath('data.recipients.0.provider_items.0.provider_topup_id', '1148567')
         ->assertJsonPath('data.recipients.0.provider_items.0.current_step', 'completed')
         ->assertJsonPath('data.recipients.0.provider_items.0.last_status_check.request.payload.request_id', 'LOCAL-ORDER-1002')
+        ->assertJsonPath('data.recipients.0.provider_items.0.last_status_check.request.payload.secret_key', 'sk_secret_key')
         ->assertJsonMissingPath('data.recipients.0.provider_items.0.last_status_check.request.payload.sign')
+        ->assertJsonPath('data.recipients.0.provider_items.0.last_status_check.request.headers.Content-Type.0', 'application/json')
         ->assertJsonPath('data.recipients.0.provider_items.0.last_status_check.response.http_status', 200)
+        ->assertJsonPath('data.recipients.0.provider_items.0.last_status_check.response.headers.X-Provider-Trace.0', 'acc-query-1')
         ->assertJsonPath('data.recipients.0.provider_items.0.last_status_check.response.body.data.status', 'success');
 
     expect($recipient->refresh()->status)->toBe('completed')
@@ -213,16 +484,15 @@ test('accnrovn queries an order by request id and completes fulfillment', functi
     Queue::assertNotPushed(SyncTopupRecipientStatus::class);
 
     Http::assertSent(function (Request $request): bool {
-        $unsignedPayload = [
+        $payload = [
             'partner_id' => 'pk_partner_123',
+            'secret_key' => 'sk_secret_key',
             'request_id' => 'LOCAL-ORDER-1002',
         ];
 
         return $request->url() === 'https://accnro.vn/api/v1/partner/recharge/query'
-            && $request->data() === [
-                ...$unsignedPayload,
-                'sign' => '19f8708708fe6415c5db61752bc5296eb40d84a2b37f1f05482366e4c4951782',
-            ];
+            && $request->data() === $payload
+            && ! array_key_exists('sign', $request->data());
     });
 });
 
@@ -263,7 +533,7 @@ test('accnrovn keeps ambiguous provider results pending for reconciliation', fun
     Queue::assertPushed(SyncTopupRecipientStatus::class, fn (SyncTopupRecipientStatus $job): bool => $job->checkAttempt === 2);
 });
 
-test('admin refreshes accnrovn balance without sending the secret key', function (): void {
+test('admin refreshes accnrovn balance with simple credentials and no signature', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $provider = TopupProvider::factory()->create([
         'name' => 'AccNRO',
@@ -296,14 +566,14 @@ test('admin refreshes accnrovn balance without sending the secret key', function
         ->and($provider->balance_checked_at)->not->toBeNull();
 
     Http::assertSent(function (Request $request): bool {
-        $unsignedPayload = ['partner_id' => 'pk_partner_123'];
+        $payload = [
+            'partner_id' => 'pk_partner_123',
+            'secret_key' => 'sk_secret_key',
+        ];
 
         return $request->url() === 'https://accnro.vn/api/v1/partner/recharge/balance'
-            && $request->data() === [
-                ...$unsignedPayload,
-                'sign' => '19f8708708fe6415c5db61752bc5296eb40d84a2b37f1f05482366e4c4951782',
-            ]
-            && ! array_key_exists('secret_key', $request->data());
+            && $request->data() === $payload
+            && ! array_key_exists('sign', $request->data());
     });
 });
 
@@ -313,7 +583,11 @@ test('admin refreshes accnrovn balance without sending the secret key', function
  */
 function accNroVnOrderFixture(array $recipientOverrides = []): array
 {
-    $game = Game::factory()->create();
+    $game = Game::factory()->create([
+        'checkout_fields' => [
+            ['key' => 'account', 'label' => 'Email/Số điện thoại', 'placeholder' => '', 'required' => true],
+        ],
+    ]);
     $server = GameServer::factory()->for($game)->create(['code' => '3']);
     $provider = TopupProvider::factory()->create([
         'name' => 'AccNRO',
@@ -323,10 +597,11 @@ function accNroVnOrderFixture(array $recipientOverrides = []): array
     $package = TopupPackage::factory()->for($game)->create([
         'game_server_id' => $server->id,
         'provider_id' => $provider->id,
-        'provider_service_code' => 'nro',
+        'provider_service_code' => 'nr',
         'denomination' => 50_000,
     ]);
     $order = Order::factory()->create([
+        'code' => 'OD-ACC-1001',
         'game_id' => $game->id,
         'game_server_id' => $server->id,
         'topup_package_id' => $package->id,
@@ -337,11 +612,11 @@ function accNroVnOrderFixture(array $recipientOverrides = []): array
         'order_status' => OrderStatus::Processing,
         'paid_at' => now(),
         'processing_at' => now(),
-        'metadata' => ['provider' => ['slug' => 'accnrovn', 'service_code' => 'nro']],
+        'metadata' => ['provider' => ['slug' => 'accnrovn', 'service_code' => 'nr']],
     ]);
     $recipient = $order->recipients()->create([
         'position' => 1,
-        'recipient_data' => ['game_account' => 'player-one'],
+        'recipient_data' => ['account' => 'user01@gmail.com'],
         'quantity' => 1,
         ...$recipientOverrides,
     ]);

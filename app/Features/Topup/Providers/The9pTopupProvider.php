@@ -13,14 +13,21 @@ use App\Models\Order;
 use App\Models\OrderRecipient;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
+use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
+use JsonException;
 use Throwable;
 
 class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProviderInterface
 {
     private const DEFAULT_ENDPOINT = 'https://the9p.com/api/rechargews';
+
+    private const REQUEST_HEADERS = [
+        'Accept' => 'application/json',
+        'Content-Type' => 'application/json',
+    ];
 
     public function assertConfigured(TopupProvider $provider, TopupPackage $package, GameServer $server): void
     {
@@ -37,6 +44,13 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
 
         if (blank($package->provider_service_code)) {
             $errors[] = 'mã dịch vụ của gói';
+        }
+
+        $configuredGame = $package->game()->first();
+        $checkoutFieldKeys = collect($configuredGame?->checkoutFields() ?? [])->pluck('key');
+
+        if (! $checkoutFieldKeys->contains('username')) {
+            $errors[] = 'trường username của game';
         }
 
         if (blank($server->code)) {
@@ -63,9 +77,10 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
         $config = $this->configuration($provider);
         $serviceCode = (string) data_get($order->metadata, 'provider.service_code');
         $serverCode = (string) $order->server?->code;
-        $username = trim((string) ($recipient->recipient_data['username'] ?? $recipient->recipient_data['game_account'] ?? ''));
+        $providerFields = $this->providerFields($recipient);
+        unset($providerFields['server']);
 
-        if ($serverCode === '' || $username === '') {
+        if ($serverCode === '' || blank($providerFields['username'] ?? null)) {
             throw ValidationException::withMessages([
                 'package_id' => 'Thông tin tài khoản hoặc máy chủ chưa phù hợp với gói nạp.',
             ]);
@@ -79,7 +94,7 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             'amount' => (int) ($order->denomination ?? 0),
             'account_info' => [
                 'server' => is_numeric($serverCode) ? (int) $serverCode : $serverCode,
-                'username' => $username,
+                ...$providerFields,
             ],
             'sign' => $this->signature($config['partner_key'], $config['partner_id'], 'topup', $requestId),
         ];
@@ -162,32 +177,66 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
     /** @param array{base_url:string,partner_id:string,partner_key:string,connect_timeout:int,timeout:int,max_status_checks:int} $config */
     private function request(array $config, array $payload, ?string $fallbackReference): TopupProviderResultDto
     {
+        $requestSnapshot = [
+            'method' => 'POST',
+            'url' => $config['base_url'],
+            'headers' => self::REQUEST_HEADERS,
+            'payload' => $payload,
+            'raw_body' => json_encode($payload, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE),
+        ];
+
         try {
             $response = Http::acceptJson()
                 ->asJson()
                 ->connectTimeout($config['connect_timeout'])
                 ->timeout($config['timeout'])
+                ->beforeSending(function (ClientRequest $request) use (&$requestSnapshot): void {
+                    $requestSnapshot = [
+                        'method' => $request->method(),
+                        'url' => $request->url(),
+                        'headers' => $request->headers(),
+                        'payload' => $request->data(),
+                        'raw_body' => $request->body(),
+                    ];
+                })
                 ->post($config['base_url'], $payload);
 
             if ($response->status() === 429 || $response->serverError()) {
                 $response->throw();
             }
         } catch (Throwable $exception) {
-            throw TopupProviderConnectionException::fromThrowable($exception);
+            $responseSnapshot = isset($response) && $response instanceof Response
+                ? $this->httpResponseSnapshot($response)
+                : [
+                    'http_status' => null,
+                    'reason' => null,
+                    'effective_uri' => $requestSnapshot['url'],
+                    'headers' => [],
+                    'body' => null,
+                    'raw_body' => null,
+                    'transport_error' => [
+                        'class' => $exception::class,
+                        'message' => $exception->getMessage(),
+                    ],
+                ];
+
+            throw TopupProviderConnectionException::fromThrowable($exception, [
+                'request' => $requestSnapshot,
+                'response' => $responseSnapshot,
+            ]);
         }
 
-        return $this->resultFromResponse($response, $fallbackReference, $config['base_url'], $payload);
+        return $this->resultFromResponse($response, $fallbackReference, $requestSnapshot);
     }
 
-    /** @param array<string, mixed> $requestPayload */
+    /** @param array<string, mixed> $requestSnapshot */
     private function resultFromResponse(
         Response $response,
         ?string $fallbackReference,
-        string $requestUrl,
-        array $requestPayload,
+        array $requestSnapshot,
     ): TopupProviderResultDto {
-        $body = $response->json();
-        $body = is_array($body) ? $body : [];
+        $providerResponse = $this->responseBody($response);
+        $body = is_array($providerResponse) ? $providerResponse : [];
         $data = is_array($body['data'] ?? null) ? $body['data'] : [];
         $transactionStatus = strtolower(trim((string) ($data['status'] ?? '')));
         $envelopeStatus = strtolower(trim((string) ($body['status'] ?? '')));
@@ -224,63 +273,35 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             reference: $reference,
             message: $safeMessage,
             response: [
-                'http_status' => $response->status(),
+                ...$this->httpResponseSnapshot($response),
                 'provider_status' => $transactionStatus !== '' ? $transactionStatus : null,
                 'envelope_status' => $envelopeStatus !== '' ? $envelopeStatus : null,
                 'provider_code' => is_scalar($body['code'] ?? null) ? $body['code'] : null,
             ],
-            request: [
-                'method' => 'POST',
-                'url' => $requestUrl,
-                'payload' => $this->safeRequestPayload($requestPayload),
-            ],
-            providerResponse: $this->providerResponseSummary($body),
+            request: $requestSnapshot,
+            providerResponse: $providerResponse,
         );
     }
 
-    /**
-     * @param  array<string, mixed>  $payload
-     * @return array<string, mixed>
-     */
-    private function safeRequestPayload(array $payload): array
+    private function responseBody(Response $response): mixed
     {
-        return array_filter([
-            'command' => $payload['command'] ?? null,
-            'partner_id' => $payload['partner_id'] ?? null,
-            'request_id' => $payload['request_id'] ?? null,
-            'service_code' => $payload['service_code'] ?? null,
-            'amount' => $payload['amount'] ?? null,
-            'account_info' => is_array($payload['account_info'] ?? null)
-                ? array_intersect_key($payload['account_info'], array_flip(['server', 'username']))
-                : null,
-            'order_code' => $payload['order_code'] ?? null,
-        ], fn (mixed $value): bool => $value !== null);
+        try {
+            return json_decode($response->body(), true, 512, JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return $response->body();
+        }
     }
 
-    /**
-     * @param  array<string, mixed>  $body
-     * @return array<string, mixed>
-     */
-    private function providerResponseSummary(array $body): array
+    /** @return array<string, mixed> */
+    private function httpResponseSnapshot(Response $response): array
     {
-        $data = is_array($body['data'] ?? null) ? $body['data'] : [];
-        $allowedData = [];
-
-        foreach (['order_code', 'request_id', 'status', 'message', 'balance', 'currency'] as $key) {
-            if (array_key_exists($key, $data) && (is_scalar($data[$key]) || $data[$key] === null)) {
-                $allowedData[$key] = is_string($data[$key])
-                    ? mb_substr(strip_tags($data[$key]), 0, 500)
-                    : $data[$key];
-            }
-        }
-
         return [
-            'status' => is_scalar($body['status'] ?? null) ? (string) $body['status'] : null,
-            'code' => is_scalar($body['code'] ?? null) ? $body['code'] : null,
-            'message' => is_scalar($body['message'] ?? null)
-                ? mb_substr(strip_tags((string) $body['message']), 0, 500)
-                : null,
-            'data' => $allowedData,
+            'http_status' => $response->status(),
+            'reason' => $response->reason(),
+            'effective_uri' => (string) $response->effectiveUri(),
+            'headers' => $response->headers(),
+            'body' => $this->responseBody($response),
+            'raw_body' => $response->body(),
         ];
     }
 
@@ -302,5 +323,16 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
     private function signature(string $partnerKey, string $partnerId, string $command, string $requestId): string
     {
         return md5($partnerKey.$partnerId.$command.$requestId);
+    }
+
+    /** @return array<string, string> */
+    private function providerFields(OrderRecipient $recipient): array
+    {
+        $recipientData = is_array($recipient->recipient_data) ? $recipient->recipient_data : [];
+
+        return collect($recipientData)
+            ->mapWithKeys(fn (mixed $value, mixed $key): array => [(string) $key => trim((string) $value)])
+            ->filter(fn (string $value): bool => $value !== '')
+            ->all();
     }
 }

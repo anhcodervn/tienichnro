@@ -7,9 +7,8 @@ use App\Features\Topup\Enums\TopupProviderStatus;
 final readonly class TopupProviderResultDto
 {
     /**
-     * @param  array<string, scalar|null>  $response
+     * @param  array<string, mixed>  $response
      * @param  array<string, mixed>  $request
-     * @param  array<string, mixed>  $providerResponse
      */
     public function __construct(
         public TopupProviderStatus $status,
@@ -17,6 +16,6 @@ final readonly class TopupProviderResultDto
         public ?string $message = null,
         public array $response = [],
         public array $request = [],
-        public array $providerResponse = [],
+        public mixed $providerResponse = [],
     ) {}
 }

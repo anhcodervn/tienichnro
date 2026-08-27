@@ -66,10 +66,64 @@ const providerEvents = (item: ProviderItemRow): ProviderEventView[] => {
         });
     }
 
+    const errorWasAlreadyAdded = events.some((event) => event.recorded_at && event.recorded_at === item.last_error?.recorded_at);
+
+    if (item.last_error && !errorWasAlreadyAdded) {
+        events.push({
+            ...item.last_error,
+            key: 'last-error',
+            title: 'Lỗi provider gần nhất',
+            description: 'Request/response tại lần provider lỗi trước khi queue thử lại.',
+        });
+    }
+
     return events;
 };
 
-const formatJson = (value: unknown): string => JSON.stringify(value ?? {}, null, 2);
+const sensitiveKeys = new Set([
+    'api-key',
+    'api_key',
+    'authorization',
+    'cookie',
+    'partner_id',
+    'partner_key',
+    'secret',
+    'secret_key',
+    'serect_key',
+    'set-cookie',
+    'sign',
+    'token',
+    'x-api-key',
+]);
+
+const maskSensitive = (value: unknown): unknown => {
+    if (value === null || typeof value !== 'object') {
+        return value;
+    }
+
+    if (Array.isArray(value)) {
+        return value.map(maskSensitive);
+    }
+
+    return Object.fromEntries(
+        Object.entries(value as Record<string, unknown>).map(([key, nestedValue]) => [
+            key,
+            sensitiveKeys.has(key.toLowerCase()) ? '********' : maskSensitive(nestedValue),
+        ]),
+    );
+};
+
+const formatDebug = (value: unknown): string => {
+    if (typeof value === 'string') {
+        try {
+            return JSON.stringify(maskSensitive(JSON.parse(value)), null, 2);
+        } catch {
+            return value;
+        }
+    }
+
+    return JSON.stringify(maskSensitive(value ?? {}), null, 2);
+};
 </script>
 
 <template>
@@ -259,13 +313,13 @@ const formatJson = (value: unknown): string => JSON.stringify(value ?? {}, null,
                                                     >
                                                         {{ event.request?.url || '—' }}
                                                     </p>
+                                                    <h6 class="px-3 pt-2 text-[10px] font-black uppercase tracking-wide text-sky-800">
+                                                        Payload đã gửi
+                                                    </h6>
                                                     <pre
-                                                        class="max-h-64 overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-[10px] leading-4 text-slate-700"
-                                                        >{{ formatJson(event.request?.payload) }}</pre
+                                                        class="max-h-[32rem] overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-[10px] leading-4 text-slate-700"
+                                                        >{{ formatDebug(event.request?.payload) }}</pre
                                                     >
-                                                    <p class="border-t border-sky-100 px-3 py-1.5 text-[10px] font-medium text-sky-700">
-                                                        Chữ ký và credential nhạy cảm đã được ẩn.
-                                                    </p>
                                                 </section>
 
                                                 <section class="min-w-0 overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50/60">
@@ -276,12 +330,20 @@ const formatJson = (value: unknown): string => JSON.stringify(value ?? {}, null,
                                                             <ArrowDownToLine class="h-3.5 w-3.5" />Response trả về
                                                         </span>
                                                         <span class="font-mono text-[10px] font-bold text-emerald-700">
-                                                            HTTP {{ event.response?.http_status || '—' }}
+                                                            HTTP {{ event.response?.http_status || '—' }} {{ event.response?.reason || '' }}
                                                         </span>
                                                     </header>
+                                                    <p
+                                                        class="break-all border-b border-emerald-100 px-3 py-2 font-mono text-[10px] leading-4 text-emerald-900"
+                                                    >
+                                                        {{ event.response?.effective_uri || event.request?.url || '—' }}
+                                                    </p>
+                                                    <h6 class="px-3 pt-2 text-[10px] font-black uppercase tracking-wide text-emerald-800">
+                                                        Response
+                                                    </h6>
                                                     <pre
-                                                        class="max-h-64 overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-[10px] leading-4 text-slate-700"
-                                                        >{{ formatJson(event.response?.body) }}</pre
+                                                        class="max-h-[32rem] overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-[10px] leading-4 text-slate-700"
+                                                        >{{ formatDebug(event.response?.body) }}</pre
                                                     >
                                                 </section>
                                             </div>
