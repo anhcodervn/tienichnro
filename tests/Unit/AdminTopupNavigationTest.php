@@ -48,6 +48,8 @@ test('provider editor is separated from catalog while package provider lookup re
         ->toContain('JSON cấu hình kết nối')
         ->toContain('adminTopupService.saveProvider')
         ->toContain('adminTopupService.deleteProvider')
+        ->toContain("slug.trim().toLowerCase() === 'accnrovn'")
+        ->toContain('https://accnro.vn/api/v1/partner/recharge')
         ->toContain('filters.search')
         ->toContain('pagination.current_page');
 });

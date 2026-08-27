@@ -9,6 +9,7 @@ use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Jobs\ProcessTopupOrder;
 use App\Features\Topup\Services\OrderStatusService;
 use App\Features\Topup\Services\RecipientFulfillmentService;
+use App\Features\Topup\Services\TopupProviderResolver;
 use App\Mail\Orders\OrderCompletedMail;
 use App\Mail\Orders\OrderFailedMail;
 use App\Mail\Orders\PaymentReceivedMail;
@@ -245,9 +246,9 @@ class TopupAdminService
 
         if ($order->payment_status !== PaymentStatus::Paid
             || $order->order_status !== OrderStatus::Processing
-            || $order->provider?->slug !== 'the9p') {
+            || ! TopupProviderResolver::supportsStatusChecks($order->provider?->slug)) {
             throw ValidationException::withMessages([
-                'sync_provider' => 'Chỉ có thể đồng bộ đơn The9p đã thanh toán và đang xử lý.',
+                'sync_provider' => 'Chỉ có thể đồng bộ đơn provider tự động đã thanh toán và đang xử lý.',
             ]);
         }
 

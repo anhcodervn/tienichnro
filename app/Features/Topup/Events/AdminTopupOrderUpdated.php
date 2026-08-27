@@ -4,6 +4,7 @@ namespace App\Features\Topup\Events;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Features\Topup\Services\TopupProviderResolver;
 use App\Models\Order;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
@@ -47,10 +48,10 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
         $this->orderStatus = $order->order_status->value;
         $this->canReorder = $order->payment_status === PaymentStatus::Paid
             && $order->order_status === OrderStatus::Failed
-            && $order->provider?->slug === 'the9p';
+            && TopupProviderResolver::supportsBalance($order->provider?->slug);
         $this->canSyncProvider = $order->payment_status === PaymentStatus::Paid
             && $order->order_status === OrderStatus::Processing
-            && $order->provider?->slug === 'the9p';
+            && TopupProviderResolver::supportsStatusChecks($order->provider?->slug);
         $this->providerReference = $order->provider_reference;
         $this->failureReason = $order->failure_reason;
         $this->paidAt = $order->paid_at?->toISOString();

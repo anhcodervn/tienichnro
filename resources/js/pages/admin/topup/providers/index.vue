@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { adminTopupService } from '@/services/admin-topup.service';
-import { onMounted, reactive, ref } from 'vue';
+import { onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 type ProviderRow = {
@@ -34,15 +34,20 @@ const filters = reactive({
 const pagination = reactive({ current_page: 1, last_page: 1, total: 0, from: null as number | null, to: null as number | null });
 const form = reactive({ name: '', slug: '', balance_warning_threshold: 1000000, connection_config_text: '' });
 
-const emptyConnectionConfig = (): string =>
-    '{\n  "base_url": "https://the9p.com/api/rechargews",\n  "partner_id": "",\n  "partner_key": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
+const connectionConfigTemplate = (slug: string): string => {
+    if (slug.trim().toLowerCase() === 'accnrovn') {
+        return '{\n  "base_url": "https://accnro.vn/api/v1/partner/recharge",\n  "partner_id": "",\n  "secret_key": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
+    }
+
+    return '{\n  "base_url": "https://the9p.com/api/rechargews",\n  "partner_id": "",\n  "partner_key": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
+};
 const reset = (): void => {
     editingId.value = null;
     connectionJsonError.value = '';
     form.name = '';
     form.slug = '';
     form.balance_warning_threshold = 1000000;
-    form.connection_config_text = emptyConnectionConfig();
+    form.connection_config_text = connectionConfigTemplate(form.slug);
 };
 
 const load = async (): Promise<void> => {
@@ -171,6 +176,16 @@ const remove = async (row: ProviderRow): Promise<void> => {
     await load();
 };
 
+watch(
+    () => form.slug,
+    (slug, previousSlug) => {
+        if (editingId.value !== null) return;
+        if (form.connection_config_text === connectionConfigTemplate(previousSlug)) {
+            form.connection_config_text = connectionConfigTemplate(slug);
+        }
+    },
+);
+
 reset();
 onMounted(load);
 </script>
@@ -264,11 +279,16 @@ onMounted(load);
                                                               : 'bg-slate-100 text-slate-500'
                                                     "
                                                     aria-hidden="true"
-                                                >₫</span>
+                                                    >₫</span
+                                                >
                                                 <div>
                                                     <p class="font-bold text-slate-950">{{ formatBalance(provider) }}</p>
                                                     <p class="mt-0.5 text-xs text-slate-500">
-                                                        {{ refreshingBalances && provider.supports_balance ? 'Đang cập nhật...' : formatCheckedAt(provider.balance_checked_at) }}
+                                                        {{
+                                                            refreshingBalances && provider.supports_balance
+                                                                ? 'Đang cập nhật...'
+                                                                : formatCheckedAt(provider.balance_checked_at)
+                                                        }}
                                                     </p>
                                                 </div>
                                             </div>
@@ -280,7 +300,10 @@ onMounted(load);
                                                 <p>{{ provider.balance_error_message }}</p>
                                                 <p v-if="provider.balance !== null" class="mt-1 font-semibold">Đang hiển thị số dư gần nhất.</p>
                                             </div>
-                                            <span v-else-if="provider.balance_status === 'success'" class="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">
+                                            <span
+                                                v-else-if="provider.balance_status === 'success'"
+                                                class="mt-2 inline-flex rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700"
+                                            >
                                                 Kết nối tốt
                                             </span>
                                         </div>
@@ -347,7 +370,9 @@ onMounted(load);
                                 step="1000"
                                 class="min-h-11 w-full rounded-md border border-slate-300 px-3 pr-12"
                             />
-                            <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-slate-500">đ</span>
+                            <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-slate-500"
+                                >đ</span
+                            >
                         </div>
                         <small class="mt-1.5 block font-normal text-slate-500">Mặc định 1.000.000đ. Nhập 0 để tắt cảnh báo Discord.</small>
                     </label>

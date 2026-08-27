@@ -101,6 +101,6 @@ class TopupProvider extends Model
 
     private function isSensitiveKey(string $key): bool
     {
-        return preg_match('/secret|token|password|api[_-]?key|partner[_-]?key|authorization|private[_-]?key/i', $key) === 1;
+        return preg_match('/secret|serect|token|password|api[_-]?key|partner[_-]?key|authorization|private[_-]?key/i', $key) === 1;
     }
 }

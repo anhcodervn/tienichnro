@@ -750,7 +750,7 @@ watch(() => props.catalogType, load, { immediate: true });
                                 placeholder="Ví dụ: nro"
                                 class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal"
                             /><small class="mt-1.5 block font-normal text-slate-500"
-                                >Lấy từ danh sách sản phẩm của provider. Gói The9p bắt buộc có mã này trước khi nhận đơn.</small
+                                >Lấy từ danh sách sản phẩm của provider. Gói nạp tự động bắt buộc có mã này trước khi nhận đơn.</small
                             ></label
                         >
                         <div class="grid grid-cols-2 gap-3">

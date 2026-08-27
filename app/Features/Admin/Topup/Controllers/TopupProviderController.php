@@ -9,6 +9,7 @@ use App\Features\Admin\Topup\Resources\TopupProviderResource;
 use App\Features\Admin\Topup\Services\TopupAdminService;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Services\TopupProviderBalanceService;
+use App\Features\Topup\Services\TopupProviderResolver;
 use App\Http\Controllers\Controller;
 use App\Models\TopupProvider;
 use App\Models\User;
@@ -75,7 +76,7 @@ class TopupProviderController extends Controller
 
         $providers = TopupProvider::query()
             ->whereIn('id', $providerIds)
-            ->where('slug', 'the9p')
+            ->whereIn('slug', TopupProviderResolver::BALANCE_PROVIDER_SLUGS)
             ->get();
 
         foreach ($providers as $provider) {

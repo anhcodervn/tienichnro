@@ -309,7 +309,7 @@ const confirmationFor = (order: OrderRow, action: Exclude<OrderAction, 'detail'>
         },
         sync_provider: {
             title: 'Đồng bộ trạng thái provider?',
-            text: `Hệ thống sẽ gọi The9p để kiểm tra ngay trạng thái thực tế của đơn ${order.code}.`,
+            text: `Hệ thống sẽ gọi provider để kiểm tra ngay trạng thái thực tế của đơn ${order.code}.`,
             confirm: 'Đồng bộ ngay',
         },
         complete: { title: 'Đánh dấu hoàn thành?', text: `Xác nhận toàn bộ đơn ${order.code} đã hoàn thành.`, confirm: 'Hoàn thành' },

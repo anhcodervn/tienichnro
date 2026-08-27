@@ -16,6 +16,7 @@ test('topup domain and client delivery are owned by feature modules', function (
         'app/Features/Topup/Observers/OrderObserver.php',
         'app/Features/Topup/Observers/OrderRecipientObserver.php',
         'app/Features/Topup/Providers/ManualTopupProvider.php',
+        'app/Features/Topup/Providers/AccNroVnTopupProvider.php',
         'app/Features/Topup/Providers/The9pTopupProvider.php',
         'app/Features/Topup/Services/RecipientFulfillmentService.php',
         'app/Features/Topup/Services/TopupProviderResolver.php',

@@ -3,6 +3,7 @@
 namespace App\Features\Topup\Services;
 
 use App\Features\Topup\Contracts\TopupProviderInterface;
+use App\Features\Topup\Providers\AccNroVnTopupProvider;
 use App\Features\Topup\Providers\ManualTopupProvider;
 use App\Features\Topup\Providers\The9pTopupProvider;
 use App\Models\GameServer;
@@ -13,9 +14,16 @@ use Illuminate\Validation\ValidationException;
 
 class TopupProviderResolver
 {
+    /** @var array<int, string> */
+    public const BALANCE_PROVIDER_SLUGS = ['the9p', 'accnrovn'];
+
+    /** @var array<int, string> */
+    public const STATUS_CHECK_PROVIDER_SLUGS = ['the9p', 'accnrovn'];
+
     public function __construct(
         private readonly ManualTopupProvider $manualProvider,
         private readonly The9pTopupProvider $the9pProvider,
+        private readonly AccNroVnTopupProvider $accNroVnProvider,
     ) {}
 
     public function resolve(?TopupProvider $provider): TopupProviderInterface
@@ -40,9 +48,23 @@ class TopupProviderResolver
             return $this->the9pProvider;
         }
 
+        if ($slug === 'accnrovn') {
+            return $this->accNroVnProvider;
+        }
+
         throw ValidationException::withMessages([
             'package_id' => 'Gói nạp này chưa hỗ trợ xử lý tự động. Vui lòng chọn gói khác hoặc liên hệ hỗ trợ.',
         ]);
+    }
+
+    public static function supportsBalance(?string $slug): bool
+    {
+        return in_array($slug, self::BALANCE_PROVIDER_SLUGS, true);
+    }
+
+    public static function supportsStatusChecks(?string $slug): bool
+    {
+        return in_array($slug, self::STATUS_CHECK_PROVIDER_SLUGS, true);
     }
 
     public function assertAvailable(TopupPackage $package, GameServer $server): void

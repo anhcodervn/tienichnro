@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import Modal from '@/components/shared/Modal/index.vue';
-import { Copy, LoaderCircle, PackageOpen } from 'lucide-vue-next';
+import { ArrowDownToLine, Copy, LoaderCircle, PackageOpen, Send } from 'lucide-vue-next';
 import { computed } from 'vue';
-import type { ActionOption, OrderAction, OrderRow, RecipientRow } from '../types';
+import type { ActionOption, OrderAction, OrderRow, ProviderExchange, ProviderItemRow, RecipientRow } from '../types';
 import OrderStatusBadge from './OrderStatusBadge.vue';
 
 const props = defineProps<{
@@ -32,10 +32,48 @@ const recipientData = (recipient: RecipientRow): string =>
         .filter(([, value]) => value !== null && value !== '')
         .map(([key, value]) => `${key}: ${String(value)}`)
         .join(' · ') || 'Không có dữ liệu người nhận';
+
+const providerStep = (step?: string | null): { label: string; className: string } =>
+    ({
+        queued: { label: 'Chờ gửi provider', className: 'border-slate-200 bg-slate-100 text-slate-700' },
+        awaiting_status: { label: 'Provider đang xử lý', className: 'border-amber-200 bg-amber-50 text-amber-800' },
+        checking_status: { label: 'Đang tra cứu provider', className: 'border-sky-200 bg-sky-50 text-sky-800' },
+        completed: { label: 'Provider đã hoàn thành', className: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
+        failed: { label: 'Provider báo thất bại', className: 'border-rose-200 bg-rose-50 text-rose-800' },
+        manual_review: { label: 'Cần đối soát thủ công', className: 'border-violet-200 bg-violet-50 text-violet-800' },
+    })[step || 'queued'] || { label: 'Chưa xác định', className: 'border-slate-200 bg-slate-100 text-slate-700' };
+
+type ProviderEventView = ProviderExchange & { key: string; title: string; description: string };
+
+const providerEvents = (item: ProviderItemRow): ProviderEventView[] => {
+    const events: ProviderEventView[] = [];
+
+    if (item.submission) {
+        events.push({
+            ...item.submission,
+            key: 'submission',
+            title: 'Tạo đơn provider',
+            description: 'Request nạp ban đầu và response provider trả về.',
+        });
+    }
+
+    if (item.last_status_check) {
+        events.push({
+            ...item.last_status_check,
+            key: 'last-status-check',
+            title: 'Tra cứu trạng thái gần nhất',
+            description: `Lần kiểm tra #${item.last_status_check.attempt || item.check_attempts || 1}.`,
+        });
+    }
+
+    return events;
+};
+
+const formatJson = (value: unknown): string => JSON.stringify(value ?? {}, null, 2);
 </script>
 
 <template>
-    <Modal :model-value="open" panel-class="max-w-[920px]" @update:model-value="!$event && emit('close')">
+    <Modal :model-value="open" panel-class="max-w-[1180px]" @update:model-value="!$event && emit('close')">
         <template #header>
             <header class="flex min-h-20 items-center border-b border-slate-100 px-5 pr-16 sm:px-6 sm:pr-16">
                 <div class="min-w-0">
@@ -69,7 +107,7 @@ const recipientData = (recipient: RecipientRow): string =>
                     Thử lại
                 </button>
             </div>
-            <div v-else-if="displayOrder" class="grid gap-5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div v-else-if="displayOrder" class="grid gap-5 lg:grid-cols-[minmax(280px,0.7fr)_minmax(0,1.3fr)]">
                 <div class="space-y-5">
                     <section class="grid grid-cols-2 gap-3 rounded-2xl bg-slate-50 p-4">
                         <div>
@@ -77,8 +115,18 @@ const recipientData = (recipient: RecipientRow): string =>
                             <OrderStatusBadge class="mt-2" kind="payment" :status="displayOrder.payment_status" />
                         </div>
                         <div>
-                            <p class="text-xs font-medium text-slate-500">Provider</p>
+                            <p class="text-xs font-medium text-slate-500">Trạng thái đơn</p>
                             <OrderStatusBadge class="mt-2" kind="order" :status="displayOrder.order_status" />
+                        </div>
+                        <div class="col-span-2 rounded-xl border border-indigo-100 bg-white px-3 py-2.5">
+                            <p class="text-xs font-medium text-slate-500">Nhà cung cấp</p>
+                            <div v-if="displayOrder.provider" class="mt-1 flex flex-wrap items-center gap-2">
+                                <span class="font-bold text-slate-900">{{ displayOrder.provider.name }}</span>
+                                <span class="rounded-md bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700">
+                                    {{ displayOrder.provider.slug }}
+                                </span>
+                            </div>
+                            <p v-else class="mt-1 text-sm text-slate-500">Xử lý thủ công / chưa gán provider</p>
                         </div>
                         <div class="col-span-2 border-t border-slate-200 pt-3">
                             <p class="text-xs font-medium text-slate-500">Tổng thanh toán</p>
@@ -140,24 +188,126 @@ const recipientData = (recipient: RecipientRow): string =>
                                 Ref: {{ recipient.provider_reference }}
                             </p>
                             <p v-if="recipient.failure_reason" class="mt-2 text-sm text-rose-700">{{ recipient.failure_reason }}</p>
-                            <div v-if="recipient.provider_items?.length" class="mt-3 space-y-2 border-t border-slate-200 pt-3">
-                                <div
+                            <div v-if="recipient.provider_items?.length" class="mt-3 space-y-3 border-t border-slate-200 pt-3">
+                                <section
                                     v-for="item in recipient.provider_items"
                                     :key="item.unit || 0"
-                                    class="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600"
+                                    class="overflow-hidden rounded-xl border border-slate-200 bg-white"
                                 >
-                                    <div class="flex flex-wrap items-center gap-x-3 gap-y-1">
-                                        <span class="font-bold text-slate-800">Thẻ #{{ item.unit || 1 }}</span>
-                                        <span>Trạng thái: {{ item.status || '—' }}</span>
-                                        <span v-if="item.http_status">HTTP {{ item.http_status }}</span>
-                                        <span v-if="item.provider_code">Mã provider: {{ item.provider_code }}</span>
-                                        <span v-if="item.provider_status">Nghiệp vụ: {{ item.provider_status }}</span>
-                                        <span v-if="item.envelope_status">API: {{ item.envelope_status }}</span>
-                                        <span v-if="item.check_attempts">Kiểm tra: {{ item.check_attempts }} lần</span>
+                                    <div class="border-b border-slate-200 bg-slate-50 px-3 py-3">
+                                        <div class="flex flex-wrap items-start justify-between gap-2">
+                                            <div>
+                                                <p class="text-sm font-black text-slate-900">Thẻ #{{ item.unit || 1 }}</p>
+                                                <p class="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Bước hiện tại</p>
+                                            </div>
+                                            <span
+                                                class="rounded-full border px-2.5 py-1 text-[11px] font-bold"
+                                                :class="providerStep(item.current_step).className"
+                                            >
+                                                {{ providerStep(item.current_step).label }}
+                                            </span>
+                                        </div>
+                                        <dl class="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                                            <div class="min-w-0">
+                                                <dt class="text-slate-500">Request ID</dt>
+                                                <dd class="mt-0.5 break-all font-mono font-semibold text-slate-800">{{ item.request_id || '—' }}</dd>
+                                            </div>
+                                            <div class="min-w-0">
+                                                <dt class="text-slate-500">Provider reference</dt>
+                                                <dd class="mt-0.5 break-all font-mono font-semibold text-slate-800">{{ item.reference || '—' }}</dd>
+                                            </div>
+                                            <div>
+                                                <dt class="text-slate-500">Trạng thái chuẩn hóa</dt>
+                                                <dd class="mt-0.5 font-semibold text-slate-800">{{ item.status || '—' }}</dd>
+                                            </div>
+                                            <div>
+                                                <dt class="text-slate-500">Lần tra cứu</dt>
+                                                <dd class="mt-0.5 font-semibold text-slate-800">{{ item.check_attempts || 0 }}</dd>
+                                            </div>
+                                        </dl>
                                     </div>
-                                    <p v-if="item.message" class="mt-1 font-semibold leading-5 text-rose-700">{{ item.message }}</p>
-                                    <p v-if="item.last_checked_at" class="mt-1 text-slate-500">Cập nhật: {{ formatDateTime(item.last_checked_at) }}</p>
-                                </div>
+
+                                    <div class="space-y-4 p-3">
+                                        <article
+                                            v-for="event in providerEvents(item)"
+                                            :key="event.key"
+                                            class="relative border-l-2 border-indigo-200 pl-4"
+                                        >
+                                            <span class="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-indigo-500 ring-4 ring-white"></span>
+                                            <div class="flex flex-wrap items-start justify-between gap-2">
+                                                <div>
+                                                    <h5 class="text-xs font-black text-slate-900">{{ event.title }}</h5>
+                                                    <p class="mt-0.5 text-[11px] leading-5 text-slate-500">{{ event.description }}</p>
+                                                </div>
+                                                <time class="text-[11px] font-medium text-slate-500">{{ formatDateTime(event.recorded_at) }}</time>
+                                            </div>
+
+                                            <div class="mt-2 grid gap-2 xl:grid-cols-2">
+                                                <section class="min-w-0 overflow-hidden rounded-lg border border-sky-200 bg-sky-50/60">
+                                                    <header class="flex items-center justify-between gap-2 border-b border-sky-200 px-3 py-2">
+                                                        <span
+                                                            class="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-sky-800"
+                                                        >
+                                                            <Send class="h-3.5 w-3.5" />Request gửi đi
+                                                        </span>
+                                                        <span class="font-mono text-[10px] font-bold text-sky-700">{{
+                                                            event.request?.method || 'POST'
+                                                        }}</span>
+                                                    </header>
+                                                    <p
+                                                        class="break-all border-b border-sky-100 px-3 py-2 font-mono text-[10px] leading-4 text-sky-900"
+                                                    >
+                                                        {{ event.request?.url || '—' }}
+                                                    </p>
+                                                    <pre
+                                                        class="max-h-64 overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-[10px] leading-4 text-slate-700"
+                                                        >{{ formatJson(event.request?.payload) }}</pre
+                                                    >
+                                                    <p class="border-t border-sky-100 px-3 py-1.5 text-[10px] font-medium text-sky-700">
+                                                        Chữ ký và credential nhạy cảm đã được ẩn.
+                                                    </p>
+                                                </section>
+
+                                                <section class="min-w-0 overflow-hidden rounded-lg border border-emerald-200 bg-emerald-50/60">
+                                                    <header class="flex items-center justify-between gap-2 border-b border-emerald-200 px-3 py-2">
+                                                        <span
+                                                            class="inline-flex items-center gap-1.5 text-[11px] font-black uppercase tracking-wide text-emerald-800"
+                                                        >
+                                                            <ArrowDownToLine class="h-3.5 w-3.5" />Response trả về
+                                                        </span>
+                                                        <span class="font-mono text-[10px] font-bold text-emerald-700">
+                                                            HTTP {{ event.response?.http_status || '—' }}
+                                                        </span>
+                                                    </header>
+                                                    <pre
+                                                        class="max-h-64 overflow-auto whitespace-pre-wrap break-all px-3 py-2 font-mono text-[10px] leading-4 text-slate-700"
+                                                        >{{ formatJson(event.response?.body) }}</pre
+                                                    >
+                                                </section>
+                                            </div>
+                                            <p
+                                                v-if="event.message"
+                                                class="mt-2 rounded-md bg-rose-50 px-2 py-1.5 text-xs font-semibold text-rose-700"
+                                            >
+                                                {{ event.message }}
+                                            </p>
+                                        </article>
+
+                                        <div
+                                            v-if="providerEvents(item).length === 0"
+                                            class="rounded-lg border border-dashed border-slate-300 px-3 py-4 text-center text-xs text-slate-500"
+                                        >
+                                            Dữ liệu cũ chưa lưu snapshot request/response. Trạng thái chuẩn hóa vẫn hiển thị phía trên.
+                                        </div>
+
+                                        <p v-if="item.message" class="rounded-md bg-rose-50 px-2 py-1.5 text-xs font-semibold text-rose-700">
+                                            {{ item.message }}
+                                        </p>
+                                        <p v-if="item.last_checked_at" class="text-[11px] text-slate-500">
+                                            Cập nhật gần nhất: {{ formatDateTime(item.last_checked_at) }}
+                                        </p>
+                                    </div>
+                                </section>
                             </div>
                         </article>
                         <div

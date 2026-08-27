@@ -2,6 +2,7 @@
 
 namespace App\Features\Admin\Topup\Resources;
 
+use App\Features\Topup\Services\TopupProviderResolver;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -22,7 +23,7 @@ class TopupProviderResource extends JsonResource
                 fn (): array => $this->maskedConnectionConfig(),
             ),
             'packages_count' => $this->whenCounted('packages'),
-            'supports_balance' => $this->slug === 'the9p',
+            'supports_balance' => TopupProviderResolver::supportsBalance($this->slug),
             'balance' => $this->balance,
             'balance_currency' => $this->balance_currency,
             'balance_status' => $this->balance_status,

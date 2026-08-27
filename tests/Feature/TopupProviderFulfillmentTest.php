@@ -55,7 +55,23 @@ test('the9p submission uses a stable request id and queues status synchronizatio
         ->and($recipient->status)->toBe('processing')
         ->and($recipient->submitted_at)->not->toBeNull()
         ->and($recipient->provider_response['items'][1]['request_id'])->toBe($order->code.'-R001-U001')
+        ->and($recipient->provider_response['items'][1]['submission']['request']['payload'])->toBe([
+            'command' => 'topup',
+            'partner_id' => 'partner-123',
+            'request_id' => $order->code.'-R001-U001',
+            'service_code' => 'nr',
+            'amount' => 10000,
+            'account_info' => ['server' => 3, 'username' => 'player-one'],
+        ])
+        ->and($recipient->provider_response['items'][1]['submission']['response']['http_status'])->toBe(200)
+        ->and($recipient->provider_response['items'][1]['submission']['response']['body'])->toMatchArray([
+            'status' => 'success',
+            'message' => 'accepted',
+        ])
         ->and($order->refresh()->provider_reference)->toBeNull();
+    expect(json_encode($recipient->provider_response, JSON_THROW_ON_ERROR))
+        ->not->toContain('secret-key')
+        ->not->toContain(md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001-U001'));
 
     Http::assertSent(function (Request $request) use ($order, $provider): bool {
         $payload = $request->data();

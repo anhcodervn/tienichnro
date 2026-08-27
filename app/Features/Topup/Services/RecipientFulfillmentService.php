@@ -226,19 +226,44 @@ class RecipientFulfillmentService
             $providerResponse = $recipient->provider_response ?? [];
             $items = is_array($providerResponse['items'] ?? null) ? $providerResponse['items'] : [];
             $previousItem = is_array($items[(string) $unit] ?? null) ? $items[(string) $unit] : [];
+            $safeResponse = $this->safeProviderData($result->response);
+            $safeRequest = $this->safeProviderData($result->request);
+            $safeProviderResponse = $this->safeProviderData($result->providerResponse);
+            $safeResponse = is_array($safeResponse) ? $safeResponse : [];
+            $safeRequest = is_array($safeRequest) ? $safeRequest : [];
+            $safeProviderResponse = is_array($safeProviderResponse) ? $safeProviderResponse : [];
+            $recordedAt = now()->toISOString();
+            $exchange = [
+                'request' => $safeRequest,
+                'response' => [
+                    'http_status' => $safeResponse['http_status'] ?? null,
+                    'body' => $safeProviderResponse,
+                ],
+                'status' => $result->status->value,
+                'message' => $result->message,
+                'attempt' => $submitted ? 0 : $attempt,
+                'recorded_at' => $recordedAt,
+            ];
             $items[(string) $unit] = [
                 'unit' => $unit,
                 'request_id' => $requestId,
                 'reference' => $result->reference ?: ($previousItem['reference'] ?? null),
                 'status' => $result->status->value,
                 'message' => $result->message,
-                'response' => $result->response,
+                'response' => $safeResponse,
+                'submission' => $submitted
+                    ? $exchange
+                    : ($previousItem['submission'] ?? null),
+                'last_status_check' => $submitted
+                    ? ($previousItem['last_status_check'] ?? null)
+                    : $exchange,
                 'submitted_at' => $submitted
-                    ? ($previousItem['submitted_at'] ?? now()->toISOString())
+                    ? ($previousItem['submitted_at'] ?? $recordedAt)
                     : ($previousItem['submitted_at'] ?? null),
-                'last_checked_at' => $submitted ? ($previousItem['last_checked_at'] ?? null) : now()->toISOString(),
+                'last_checked_at' => $submitted ? ($previousItem['last_checked_at'] ?? null) : $recordedAt,
                 'check_attempts' => max((int) ($previousItem['check_attempts'] ?? 0), $attempt),
             ];
+            $providerResponse['schema_version'] = 2;
             $providerResponse['items'] = $items;
 
             $recipientStatus = $this->recipientStatus($recipient->quantity, $items);
@@ -363,6 +388,29 @@ class RecipientFulfillmentService
             && data_get($order->metadata, 'reorder.status') === 'queued') {
             ReportReorderedOrderSuccess::dispatch($order->id, $reorderAttempt)->afterCommit();
         }
+    }
+
+    private function safeProviderData(mixed $value, int $depth = 0): mixed
+    {
+        if ($depth >= 5) {
+            return '[truncated]';
+        }
+
+        if (! is_array($value)) {
+            return is_string($value) ? mb_substr($value, 0, 2000) : $value;
+        }
+
+        $safe = [];
+
+        foreach (array_slice($value, 0, 50, true) as $key => $item) {
+            if (is_string($key) && preg_match('/sign|secret|serect|token|password|partner[_-]?key|api[_-]?secret|authorization/i', $key) === 1) {
+                continue;
+            }
+
+            $safe[$key] = $this->safeProviderData($item, $depth + 1);
+        }
+
+        return $safe;
     }
 
     /** @param array<int|string, mixed> $items */

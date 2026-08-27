@@ -176,11 +176,16 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             throw TopupProviderConnectionException::fromThrowable($exception);
         }
 
-        return $this->resultFromResponse($response, $fallbackReference);
+        return $this->resultFromResponse($response, $fallbackReference, $config['base_url'], $payload);
     }
 
-    private function resultFromResponse(Response $response, ?string $fallbackReference): TopupProviderResultDto
-    {
+    /** @param array<string, mixed> $requestPayload */
+    private function resultFromResponse(
+        Response $response,
+        ?string $fallbackReference,
+        string $requestUrl,
+        array $requestPayload,
+    ): TopupProviderResultDto {
         $body = $response->json();
         $body = is_array($body) ? $body : [];
         $data = is_array($body['data'] ?? null) ? $body['data'] : [];
@@ -212,17 +217,71 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             };
         }
 
+        $safeMessage = $message !== null ? mb_substr(strip_tags($message), 0, 500) : null;
+
         return new TopupProviderResultDto(
             status: $status,
             reference: $reference,
-            message: $message,
+            message: $safeMessage,
             response: [
                 'http_status' => $response->status(),
                 'provider_status' => $transactionStatus !== '' ? $transactionStatus : null,
                 'envelope_status' => $envelopeStatus !== '' ? $envelopeStatus : null,
                 'provider_code' => is_scalar($body['code'] ?? null) ? $body['code'] : null,
             ],
+            request: [
+                'method' => 'POST',
+                'url' => $requestUrl,
+                'payload' => $this->safeRequestPayload($requestPayload),
+            ],
+            providerResponse: $this->providerResponseSummary($body),
         );
+    }
+
+    /**
+     * @param  array<string, mixed>  $payload
+     * @return array<string, mixed>
+     */
+    private function safeRequestPayload(array $payload): array
+    {
+        return array_filter([
+            'command' => $payload['command'] ?? null,
+            'partner_id' => $payload['partner_id'] ?? null,
+            'request_id' => $payload['request_id'] ?? null,
+            'service_code' => $payload['service_code'] ?? null,
+            'amount' => $payload['amount'] ?? null,
+            'account_info' => is_array($payload['account_info'] ?? null)
+                ? array_intersect_key($payload['account_info'], array_flip(['server', 'username']))
+                : null,
+            'order_code' => $payload['order_code'] ?? null,
+        ], fn (mixed $value): bool => $value !== null);
+    }
+
+    /**
+     * @param  array<string, mixed>  $body
+     * @return array<string, mixed>
+     */
+    private function providerResponseSummary(array $body): array
+    {
+        $data = is_array($body['data'] ?? null) ? $body['data'] : [];
+        $allowedData = [];
+
+        foreach (['order_code', 'request_id', 'status', 'message', 'balance', 'currency'] as $key) {
+            if (array_key_exists($key, $data) && (is_scalar($data[$key]) || $data[$key] === null)) {
+                $allowedData[$key] = is_string($data[$key])
+                    ? mb_substr(strip_tags($data[$key]), 0, 500)
+                    : $data[$key];
+            }
+        }
+
+        return [
+            'status' => is_scalar($body['status'] ?? null) ? (string) $body['status'] : null,
+            'code' => is_scalar($body['code'] ?? null) ? $body['code'] : null,
+            'message' => is_scalar($body['message'] ?? null)
+                ? mb_substr(strip_tags((string) $body['message']), 0, 500)
+                : null,
+            'data' => $allowedData,
+        ];
     }
 
     /** @return array{base_url:string,partner_id:string,partner_key:string,connect_timeout:int,timeout:int,max_status_checks:int} */

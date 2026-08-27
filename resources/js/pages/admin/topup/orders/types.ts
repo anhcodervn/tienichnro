@@ -1,3 +1,42 @@
+export type ProviderRequestSnapshot = {
+    method?: string;
+    url?: string;
+    payload?: Record<string, unknown>;
+};
+
+export type ProviderResponseSnapshot = {
+    http_status?: number | null;
+    body?: Record<string, unknown>;
+};
+
+export type ProviderExchange = {
+    request?: ProviderRequestSnapshot;
+    response?: ProviderResponseSnapshot;
+    status?: string | null;
+    message?: string | null;
+    attempt?: number;
+    recorded_at?: string | null;
+};
+
+export type ProviderItemRow = {
+    unit?: number | null;
+    request_id?: string | null;
+    reference?: string | null;
+    status?: string | null;
+    current_step?: string | null;
+    message?: string | null;
+    http_status?: number | null;
+    provider_code?: string | number | null;
+    provider_status?: string | null;
+    provider_topup_id?: string | null;
+    envelope_status?: string | null;
+    check_attempts?: number;
+    submitted_at?: string | null;
+    last_checked_at?: string | null;
+    submission?: ProviderExchange | null;
+    last_status_check?: ProviderExchange | null;
+};
+
 export type RecipientRow = {
     position: number;
     data: Record<string, unknown>;
@@ -5,17 +44,7 @@ export type RecipientRow = {
     status: string;
     provider_reference?: string | null;
     failure_reason?: string | null;
-    provider_items?: Array<{
-        unit?: number | null;
-        status?: string | null;
-        message?: string | null;
-        http_status?: number | null;
-        provider_code?: string | number | null;
-        provider_status?: string | null;
-        envelope_status?: string | null;
-        check_attempts?: number;
-        last_checked_at?: string | null;
-    }>;
+    provider_items?: ProviderItemRow[];
 };
 
 export type OrderRow = {
@@ -30,6 +59,11 @@ export type OrderRow = {
     package_name: string;
     quantity: number;
     purchase_mode?: string | null;
+    provider?: {
+        id: number;
+        name: string;
+        slug: string;
+    } | null;
     checkout_fields?: Record<string, unknown>;
     total_amount: number | string;
     payment_method?: string | null;
