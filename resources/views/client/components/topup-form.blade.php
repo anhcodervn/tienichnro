@@ -207,6 +207,8 @@
                                     value="{{ old('recipient_fields.'.$field['key']) }}"
                                     placeholder="{{ $field['placeholder'] }}"
                                     autocomplete="off"
+                                    autocapitalize="none"
+                                    spellcheck="false"
                                     data-recipient-input
                                     data-required="{{ $field['required'] ? 'true' : 'false' }}"
                                     @disabled((string) $initialGame !== (string) $game->id || $initialPurchaseMode !== 'single')
@@ -267,6 +269,8 @@
                     rows="6"
                     maxlength="25000"
                     placeholder="{{ $initialBulkPlaceholder }}"
+                    autocapitalize="none"
+                    spellcheck="false"
                     data-bulk-recipients
                     @disabled($initialPurchaseMode !== 'bulk')
                     @if ($initialPurchaseMode === 'bulk') required @endif

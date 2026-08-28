@@ -202,7 +202,7 @@ class OrderRecipientService
 
         $recipient = [];
         foreach ($fields as $field) {
-            $value = trim((string) ($input[$field['key']] ?? ''));
+            $value = Str::lower(trim((string) ($input[$field['key']] ?? '')));
             $location = $lineNumber === null ? '' : ' ở dòng '.$lineNumber;
 
             if ($field['required'] && $value === '') {

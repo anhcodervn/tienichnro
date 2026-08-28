@@ -253,14 +253,14 @@ test('checkout snapshots direct provider field names without provider-specific m
     ]);
 
     $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
-        'recipient_fields' => ['account' => 'user@example.com'],
+        'recipient_fields' => ['account' => 'Anh200@Gmail.COM'],
     ]))
         ->assertSessionHasNoErrors()
         ->assertRedirect();
 
     $order = Order::query()->sole();
     expect($order->checkout_fields_snapshot[0]['key'])->toBe('account')
-        ->and($order->recipients()->firstOrFail()->recipient_data)->toBe(['account' => 'user@example.com'])
+        ->and($order->recipients()->firstOrFail()->recipient_data)->toBe(['account' => 'anh200@gmail.com'])
         ->and(data_get($order->metadata, 'provider'))->toBe([
             'slug' => 'accnrovn',
             'service_code' => 'nr',
@@ -473,7 +473,7 @@ test('bulk checkout derives quantity and total from recipient card quantities', 
 
     $response = $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
         'purchase_mode' => 'bulk',
-        'bulk_recipients' => "account-1|hero-1|2\r\n\r\naccount-2|hero-2|3\naccount-3|1",
+        'bulk_recipients' => "Account-1|Hero-1|2\r\n\r\nACCOUNT-2|HERO-2|3\nAccount-3|1",
         'quantity' => 1,
         'single_quantity' => 1,
         'recipient_fields' => ['game_account' => 'forged-account'],
@@ -591,7 +591,7 @@ test('single checkout validates and stores the selected games custom schema', fu
     expect($order->game_account)->toBe('123456')
         ->and($order->recipients()->sole()->recipient_data)->toBe([
             'player_id' => '123456',
-            'zone' => 'Asia',
+            'zone' => 'asia',
         ]);
 });
 

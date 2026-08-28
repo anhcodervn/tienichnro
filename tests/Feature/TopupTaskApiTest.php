@@ -155,8 +155,8 @@ test('api creates a multi recipient wallet order with per-recipient amounts and 
     $user->wallet()->update(['balance' => 500000]);
     $payload = topupApiPayload($game, $server, $package, [
         'payload' => [
-            ['game_account' => 'player-one', 'amount' => 2],
-            ['game_account' => 'player-two', 'amount' => 1],
+            ['game_account' => 'Player-One', 'amount' => 2],
+            ['game_account' => 'PLAYER-TWO', 'amount' => 1],
         ],
     ]);
 
@@ -188,6 +188,11 @@ test('api creates a multi recipient wallet order with per-recipient amounts and 
         ->and($order->payment_method)->toBe(PaymentMethod::Wallet)
         ->and($order->payment_status)->toBe(PaymentStatus::Paid)
         ->and($order->recipients()->count())->toBe(2)
+        ->and($order->game_account)->toBe('player-one')
+        ->and($order->recipients()->orderBy('position')->get()->pluck('recipient_data')->all())->toBe([
+            ['game_account' => 'player-one', 'game_character' => ''],
+            ['game_account' => 'player-two', 'game_character' => ''],
+        ])
         ->and((int) $user->wallet()->value('balance'))->toBe(230000)
         ->and(WalletTransaction::query()->count())->toBe(1);
 

@@ -773,6 +773,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
     const purchaseTabs = Array.from(form.querySelectorAll('[data-purchase-tab]'));
     const purchasePanels = Array.from(form.querySelectorAll('[data-purchase-panel]'));
     const recipientFieldGroups = Array.from(form.querySelectorAll('[data-recipient-fields]'));
+    const recipientInputs = Array.from(form.querySelectorAll('[data-recipient-input]'));
     const bulkSchemas = Array.from(form.querySelectorAll('[data-bulk-schema]'));
     const bulkRecipients = form.querySelector('[data-bulk-recipients]');
     const bulkAccountCount = form.querySelector('[data-bulk-account-count]');
@@ -1188,7 +1189,37 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         updateQuantityLimits();
         updateTotal();
     });
-    bulkRecipients?.addEventListener('input', updateTotal);
+    const lowercaseRecipientInput = (input) => {
+        const normalizedValue = input.value.toLowerCase();
+        if (normalizedValue === input.value) return;
+
+        const selectionStart = input.selectionStart;
+        const selectionEnd = input.selectionEnd;
+        input.value = normalizedValue;
+
+        if (document.activeElement === input && selectionStart !== null && selectionEnd !== null) {
+            input.setSelectionRange(selectionStart, selectionEnd);
+        }
+    };
+
+    recipientInputs.forEach((input) => {
+        lowercaseRecipientInput(input);
+        input.addEventListener('input', (event) => {
+            if (!event.isComposing) lowercaseRecipientInput(input);
+        });
+        input.addEventListener('compositionend', () => lowercaseRecipientInput(input));
+        input.addEventListener('blur', () => lowercaseRecipientInput(input));
+    });
+    if (bulkRecipients) lowercaseRecipientInput(bulkRecipients);
+    bulkRecipients?.addEventListener('input', (event) => {
+        if (event.isComposing) return;
+        lowercaseRecipientInput(bulkRecipients);
+        updateTotal();
+    });
+    bulkRecipients?.addEventListener('compositionend', () => {
+        lowercaseRecipientInput(bulkRecipients);
+        updateTotal();
+    });
     paymentMethod?.addEventListener('change', () => {
         preferredPaymentMethod = paymentMethod.value;
         paymentChoiceTouched = true;
@@ -1262,6 +1293,9 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
     });
 
     form.addEventListener('submit', (event) => {
+        recipientInputs.forEach(lowercaseRecipientInput);
+        if (bulkRecipients) lowercaseRecipientInput(bulkRecipients);
+
         if (!form.checkValidity()) return;
 
         if (!topupPackage?.value) {
