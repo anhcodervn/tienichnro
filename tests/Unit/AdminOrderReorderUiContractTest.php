@@ -26,7 +26,7 @@ test('admin order page provides responsive table actions dropdown and detail mod
         ->toContain('Đẩy lại thẻ lỗi')
         ->toContain('Chỉ các lượt provider đã xác nhận thất bại')
         ->toContain('Kiểm tra lại trạng thái')
-        ->toContain("action: 'sync_provider'")
+        ->not->toContain("if (order.can_sync_provider) return { action: 'sync_provider'")
         ->toContain('Hoàn thành thủ công')
         ->not->toContain('window.confirm')
         ->not->toContain('window.prompt')

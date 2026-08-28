@@ -127,7 +127,6 @@ const primaryActionFor = (order: OrderRow): ActionOption => {
         return { action: 'retry_provider_submission', label: 'Đẩy lại qua provider', tone: 'primary' };
     }
     if (order.payment_status === 'paid' && order.order_status === 'pending') return { action: 'process', label: 'Xử lý đơn', tone: 'primary' };
-    if (order.can_sync_provider) return { action: 'sync_provider', label: 'Kiểm tra lại trạng thái', tone: 'primary' };
     if (order.order_status === 'processing') return { action: 'complete', label: 'Hoàn thành', tone: 'primary' };
     return { action: 'detail', label: 'Xem chi tiết', tone: 'neutral' };
 };
