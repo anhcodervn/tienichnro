@@ -58,3 +58,7 @@ if (file_exists(base_path('app/Features/Support/routes.php'))) {
 if (file_exists(base_path('app/Features/Client/Api/routes.php'))) {
     require base_path('app/Features/Client/Api/routes.php');
 }
+
+if (file_exists(base_path('app/Features/Admin/Reporting/routes.php'))) {
+    require base_path('app/Features/Admin/Reporting/routes.php');
+}

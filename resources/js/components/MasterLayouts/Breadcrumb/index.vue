@@ -62,6 +62,7 @@ const props = withDefaults(
 
 const routeLabelMap: Record<string, string> = {
     'admin.dashboard': 'Dashboard',
+    'admin.reports.index': 'Báo cáo doanh thu',
     'admin.users.index': 'Người dùng',
     'admin.users.show': 'Chi tiết người dùng',
     'admin.users.wallet-transaction': 'Lịch sử dòng tiền',

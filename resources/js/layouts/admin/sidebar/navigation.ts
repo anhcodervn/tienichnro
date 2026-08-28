@@ -1,6 +1,7 @@
 import {
     BellRing,
     BookMarked,
+    ChartNoAxesCombined,
     Gamepad2,
     LayoutDashboard,
     ListChecks,
@@ -33,6 +34,12 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         label: 'Dashboard',
         icon: LayoutDashboard,
         href: '/admin',
+    },
+    {
+        key: 'reports',
+        label: 'Báo cáo doanh thu',
+        icon: ChartNoAxesCombined,
+        href: '/admin/reports',
     },
     {
         key: 'support',
@@ -173,7 +180,7 @@ export const adminMenuGroups: AdminMenuGroup[] = [
 
 export const resolveAdminPageTitle = (path: string): string => {
     for (const group of adminMenuGroups) {
-        if (group.href && (path === group.href || path.startsWith(`${group.href}/`))) {
+        if (group.href && (path === group.href || (group.href !== '/admin' && path.startsWith(`${group.href}/`)))) {
             return group.label;
         }
 

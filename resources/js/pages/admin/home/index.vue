@@ -11,7 +11,9 @@ const realtimeChannelName = 'admin.topup.orders';
 const realtimeEventName = '.admin.topup.order.updated';
 let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 const paidRevenue = computed(() =>
-    orders.value.filter((order) => order.payment_status === 'paid').reduce((sum, order) => sum + Number(order.total_amount), 0),
+    orders.value
+        .filter((order) => order.payment_status === 'paid' && order.order_status === 'completed')
+        .reduce((sum, order) => sum + Number(order.total_amount), 0),
 );
 const processing = computed(() => orders.value.filter((order) => order.order_status === 'processing').length);
 const needsAttention = computed(() => orders.value.filter((order) => order.payment_status === 'pending' || order.order_status === 'failed').length);
@@ -38,7 +40,7 @@ const metricCards = computed(() => [
         valueClass: processing.value > 0 ? 'text-amber-600' : 'text-slate-950',
     },
     {
-        label: 'Doanh thu đã ghi nhận',
+        label: 'Doanh thu hoàn thành gần đây',
         value: `${paidRevenue.value.toLocaleString('vi-VN')}đ`,
         icon: CircleDollarSign,
         iconClass: 'bg-emerald-50 text-emerald-600',
@@ -66,9 +68,7 @@ const loadOrders = async (): Promise<void> => {
 
 const handleRealtimeOrderUpdated = (event: { code: string; payment_status: string; order_status: string }): void => {
     orders.value = orders.value.map((order) =>
-        order.code === event.code
-            ? { ...order, payment_status: event.payment_status, order_status: event.order_status }
-            : order,
+        order.code === event.code ? { ...order, payment_status: event.payment_status, order_status: event.order_status } : order,
     );
 
     if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
@@ -110,6 +110,9 @@ onBeforeUnmount(() => {
                     >Xem đơn hàng</RouterLink
                 ><RouterLink class="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700" to="/admin/topup/games"
                     >Quản lý catalog</RouterLink
+                >
+                <RouterLink class="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700" to="/admin/reports"
+                    >Xem báo cáo doanh thu</RouterLink
                 >
                 <span
                     class="inline-flex items-center gap-1.5 rounded-full px-3 py-2 text-xs font-bold ring-1 ring-inset"

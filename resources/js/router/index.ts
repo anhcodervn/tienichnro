@@ -6,6 +6,7 @@ const routes: RouteRecordRaw[] = [adminRouter];
 
 const routeTitles: Record<string, string> = {
     'admin.dashboard': 'Tổng quan quản trị',
+    'admin.reports.index': 'Báo cáo tăng trưởng và doanh thu',
     'admin.support.index': 'Tin nhắn hỗ trợ',
     'admin.topup.catalog': 'Danh mục nạp game',
     'admin.topup.games': 'Danh sách game',

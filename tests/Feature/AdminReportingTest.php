@@ -1,0 +1,131 @@
+<?php
+
+use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
+use App\Models\Game;
+use App\Models\Order;
+use App\Models\TopupProvider;
+use App\Models\User;
+
+test('topup report is restricted to administrators', function (): void {
+    $this->getJson('/api/admin-api/reports/topup')->assertUnauthorized();
+
+    $this->actingAs(User::factory()->create())
+        ->getJson('/api/admin-api/reports/topup')
+        ->assertForbidden();
+});
+
+test('admin report counts only paid completed orders by completion date and compares growth', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $game = Game::factory()->create(['name' => 'Ngọc Rồng Online']);
+    $provider = TopupProvider::factory()->create(['name' => 'ACCNROVN']);
+
+    createReportingOrder($game, $provider, [
+        'created_at' => '2026-08-20 23:00:00',
+        'completed_at' => '2026-08-21 08:00:00',
+        'total_amount' => 10000,
+        'quantity' => 2,
+        'package_name' => 'Gói 10.000đ',
+    ]);
+    createReportingOrder($game, $provider, [
+        'created_at' => '2026-08-22 09:00:00',
+        'completed_at' => '2026-08-22 09:10:00',
+        'total_amount' => 20000,
+        'quantity' => 1,
+        'package_name' => 'Gói 20.000đ',
+    ]);
+    createReportingOrder($game, $provider, [
+        'created_at' => '2026-08-22 10:00:00',
+        'completed_at' => null,
+        'order_status' => OrderStatus::Processing,
+        'total_amount' => 90000,
+    ]);
+    createReportingOrder($game, $provider, [
+        'created_at' => '2026-08-22 11:00:00',
+        'completed_at' => null,
+        'order_status' => OrderStatus::Failed,
+        'total_amount' => 80000,
+    ]);
+    createReportingOrder($game, $provider, [
+        'created_at' => '2026-08-22 12:00:00',
+        'completed_at' => '2026-08-22 12:10:00',
+        'payment_status' => PaymentStatus::Refunded,
+        'total_amount' => 70000,
+    ]);
+    createReportingOrder($game, $provider, [
+        'created_at' => '2026-08-22 13:00:00',
+        'completed_at' => '2026-08-23 08:00:00',
+        'total_amount' => 60000,
+    ]);
+    createReportingOrder($game, $provider, [
+        'created_at' => '2026-08-20 08:00:00',
+        'completed_at' => '2026-08-20 08:10:00',
+        'total_amount' => 10000,
+        'quantity' => 1,
+    ]);
+
+    $response = $this->actingAs($admin)
+        ->getJson('/api/admin-api/reports/topup?from=2026-08-21&to=2026-08-22')
+        ->assertSuccessful()
+        ->assertJsonPath('data.period.days', 2)
+        ->assertJsonPath('data.period.previous_from', '2026-08-19')
+        ->assertJsonPath('data.period.previous_to', '2026-08-20')
+        ->assertJsonPath('data.summary.successful_orders', 2)
+        ->assertJsonPath('data.summary.successful_units', 3)
+        ->assertJsonPath('data.summary.revenue', 30000)
+        ->assertJsonPath('data.summary.average_order_value', 15000)
+        ->assertJsonPath('data.summary.completion_rate', 60)
+        ->assertJsonPath('data.growth.revenue.previous', 10000)
+        ->assertJsonPath('data.growth.revenue.percentage_change', 200)
+        ->assertJsonPath('data.growth.successful_orders.percentage_change', 100)
+        ->assertJsonPath('data.growth.successful_units.percentage_change', 200)
+        ->assertJsonPath('data.status_overview.created_orders', 5)
+        ->assertJsonPath('data.status_overview.completed_orders', 3)
+        ->assertJsonPath('data.status_overview.processing_orders', 1)
+        ->assertJsonPath('data.status_overview.failed_orders', 1)
+        ->assertJsonPath('data.trend.0.date', '2026-08-21')
+        ->assertJsonPath('data.trend.0.revenue', 10000)
+        ->assertJsonPath('data.trend.1.revenue', 20000)
+        ->assertJsonPath('data.breakdowns.games.0.name', 'Ngọc Rồng Online')
+        ->assertJsonPath('data.breakdowns.games.0.revenue', 30000)
+        ->assertJsonPath('data.breakdowns.providers.0.name', 'ACCNROVN')
+        ->assertJsonCount(2, 'data.recent_successful_orders');
+
+    expect(json_encode($response->json('data'), JSON_THROW_ON_ERROR))
+        ->not->toContain('90000')
+        ->not->toContain('80000')
+        ->not->toContain('70000')
+        ->not->toContain('60000');
+});
+
+test('admin report validates complete and bounded date ranges', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/reports/topup?from=2026-08-22')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('to');
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/reports/topup?from=2026-08-22&to=2026-08-21')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('to');
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/reports/topup?from=2025-01-01&to=2026-08-22')
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('to');
+});
+
+/** @param array<string, mixed> $overrides */
+function createReportingOrder(Game $game, TopupProvider $provider, array $overrides = []): Order
+{
+    return Order::factory()->create([
+        'game_id' => $game->id,
+        'topup_provider_id' => $provider->id,
+        'payment_status' => PaymentStatus::Paid,
+        'order_status' => OrderStatus::Completed,
+        'completed_at' => '2026-08-22 08:00:00',
+        'quantity' => 1,
+        'total_amount' => 10000,
+        ...$overrides,
+    ]);
+}

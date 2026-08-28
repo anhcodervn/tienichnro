@@ -67,7 +67,7 @@ test('payment and terminal order changes queue the correct discord bot reports',
         && $job->title === 'Đơn nạp game xử lý thất bại');
 });
 
-test('a refunded order queues one sales report and is included in the daily summary', function (): void {
+test('a refunded order queues one sales report and is excluded from successful daily revenue', function (): void {
     $order = Order::factory()->create([
         'created_at' => '2026-08-22 10:00:00',
         'payment_status' => PaymentStatus::Paid,
@@ -87,8 +87,9 @@ test('a refunded order queues one sales report and is included in the daily summ
     $this->artisan('report:discord-daily-topup', ['--date' => '2026-08-22'])->assertSuccessful();
 
     Queue::assertPushed(SendDiscordReport::class, fn (SendDiscordReport $job): bool => $job->dedupeKey === 'topup-daily:2026-08-22'
-        && $job->details['Đã hoàn tiền'] === 1
-        && $job->details['Tổng tiền đã hoàn'] === '8.500đ');
+        && $job->details['Đơn thành công'] === 0
+        && $job->details['Lượt nạp thành công'] === 0
+        && $job->details['Doanh thu thành công'] === '0đ');
 });
 
 test('a new member registration queues an activity report without contact details', function (): void {
@@ -213,17 +214,19 @@ test('discord report job posts with mentions disabled and retries transport fail
         ->and($job->queue)->toBe('default');
 });
 
-test('daily topup report contains order counts and paid revenue', function (): void {
+test('daily topup report contains only paid completed orders by completion date', function (): void {
     Order::factory()->create([
-        'created_at' => '2026-08-22 08:00:00',
+        'created_at' => '2026-08-21 23:00:00',
         'payment_status' => PaymentStatus::Paid,
         'order_status' => OrderStatus::Completed,
+        'completed_at' => '2026-08-22 08:00:00',
         'total_amount' => 8500,
+        'quantity' => 2,
     ]);
     Order::factory()->create([
         'created_at' => '2026-08-22 09:00:00',
-        'payment_status' => PaymentStatus::Pending,
-        'order_status' => OrderStatus::Pending,
+        'payment_status' => PaymentStatus::Paid,
+        'order_status' => OrderStatus::Failed,
         'total_amount' => 17000,
     ]);
     config(['services.discord.channels.sales' => 'https://discord.test/sales']);
@@ -234,11 +237,12 @@ test('daily topup report contains order counts and paid revenue', function (): v
         ->assertSuccessful();
 
     Queue::assertPushed(SendDiscordReport::class, fn (SendDiscordReport $job): bool => $job->dedupeKey === 'topup-daily:2026-08-22'
-        && $job->details['Tổng đơn'] === 2
-        && $job->details['Đã thanh toán'] === 1
-        && $job->details['Hoàn thành'] === 1
-        && $job->details['Đang chờ/xử lý'] === 1
-        && $job->details['Doanh thu đã thanh toán'] === '8.500đ');
+        && $job->title === 'Báo cáo topup thành công ngày 22/08/2026'
+        && $job->details['Đơn thành công'] === 1
+        && $job->details['Lượt nạp thành công'] === 2
+        && $job->details['Doanh thu thành công'] === '8.500đ'
+        && $job->details['Giá trị trung bình'] === '8.500đ'
+        && ! str_contains(serialize($job), '17.000đ'));
 });
 
 test('daily report rejects an invalid date', function (): void {

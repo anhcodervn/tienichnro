@@ -4,13 +4,14 @@ use App\Support\SettingStore;
 use Illuminate\Support\Facades\Route;
 
 test('missing client routes render the branded responsive 404 page', function (): void {
-    $this->get('/duong-dan-khong-ton-tai-'.uniqid())
+    $response = $this->get('/duong-dan-khong-ton-tai-'.uniqid())
         ->assertNotFound()
         ->assertSee('data-error-page="404"', false)
         ->assertSee('Không tìm thấy trang bạn đang truy cập')
         ->assertSee('meta name="robots" content="noindex,nofollow"', false)
-        ->assertSee('resources/css/client.css', false)
         ->assertDontSee('resources/css/app.css', false);
+
+    expect($response->getContent())->toMatch('/(?:resources\/css\/client\.css|build\/assets\/client-[^"\s]+\.css)/');
 });
 
 test('error page still renders when database backed settings are unavailable', function (): void {

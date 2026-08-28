@@ -3,7 +3,6 @@
 namespace App\Features\Reporting\Services;
 
 use App\Enums\OrderStatus;
-use App\Enums\PaymentStatus;
 use App\Models\Order;
 use App\Models\OrderRecipient;
 use App\Models\TopupProvider;
@@ -12,7 +11,10 @@ use Carbon\CarbonInterface;
 
 class TopupDiscordReporterService
 {
-    public function __construct(private readonly DiscordReportService $discordReportService) {}
+    public function __construct(
+        private readonly DiscordReportService $discordReportService,
+        private readonly TopupReportService $topupReportService,
+    ) {}
 
     public function orderCreated(Order $order): bool
     {
@@ -163,30 +165,16 @@ class TopupDiscordReporterService
         $day = CarbonImmutable::instance($date);
         $from = $day->startOfDay();
         $to = $day->endOfDay();
-        $summary = Order::query()
-            ->whereBetween('created_at', [$from, $to])
-            ->selectRaw('COUNT(*) as total_orders')
-            ->selectRaw('SUM(CASE WHEN payment_status = ? THEN 1 ELSE 0 END) as paid_orders', [PaymentStatus::Paid->value])
-            ->selectRaw('SUM(CASE WHEN order_status = ? THEN 1 ELSE 0 END) as completed_orders', [OrderStatus::Completed->value])
-            ->selectRaw('SUM(CASE WHEN order_status = ? THEN 1 ELSE 0 END) as failed_orders', [OrderStatus::Failed->value])
-            ->selectRaw('SUM(CASE WHEN payment_status = ? THEN 1 ELSE 0 END) as refunded_orders', [PaymentStatus::Refunded->value])
-            ->selectRaw('SUM(CASE WHEN order_status IN (?, ?) THEN 1 ELSE 0 END) as waiting_orders', [OrderStatus::Pending->value, OrderStatus::Processing->value])
-            ->selectRaw('SUM(CASE WHEN payment_status = ? THEN total_amount ELSE 0 END) as paid_revenue', [PaymentStatus::Paid->value])
-            ->selectRaw('SUM(CASE WHEN payment_status = ? THEN total_amount ELSE 0 END) as refunded_amount', [PaymentStatus::Refunded->value])
-            ->first();
+        $summary = $this->topupReportService->successfulSummary($from, $to);
 
         return $this->discordReportService->queue(
             channel: 'sales',
-            title: 'Tổng hợp nạp game ngày '.$day->format('d/m/Y'),
+            title: 'Báo cáo topup thành công ngày '.$day->format('d/m/Y'),
             details: [
-                'Tổng đơn' => (int) ($summary?->total_orders ?? 0),
-                'Đã thanh toán' => (int) ($summary?->paid_orders ?? 0),
-                'Hoàn thành' => (int) ($summary?->completed_orders ?? 0),
-                'Thất bại' => (int) ($summary?->failed_orders ?? 0),
-                'Đã hoàn tiền' => (int) ($summary?->refunded_orders ?? 0),
-                'Đang chờ/xử lý' => (int) ($summary?->waiting_orders ?? 0),
-                'Doanh thu đã thanh toán' => $this->formatMoney((int) ($summary?->paid_revenue ?? 0)),
-                'Tổng tiền đã hoàn' => $this->formatMoney((int) ($summary?->refunded_amount ?? 0)),
+                'Đơn thành công' => $summary['successful_orders'],
+                'Lượt nạp thành công' => $summary['successful_units'],
+                'Doanh thu thành công' => $this->formatMoney($summary['revenue']),
+                'Giá trị trung bình' => $this->formatMoney($summary['average_order_value']),
                 'Khoảng báo cáo' => $from->format('d/m/Y H:i').' - '.$to->format('d/m/Y H:i'),
             ],
             dedupeKey: 'topup-daily:'.$day->format('Y-m-d'),

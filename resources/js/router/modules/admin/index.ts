@@ -8,6 +8,11 @@ export default {
             component: () => import('@/pages/admin/home/index.vue'),
         },
         {
+            path: 'reports',
+            name: 'admin.reports.index',
+            component: () => import('@/pages/admin/reports/index.vue'),
+        },
+        {
             path: 'support',
             name: 'admin.support.index',
             component: () => import('@/pages/admin/support/index.vue'),
