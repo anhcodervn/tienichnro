@@ -21,7 +21,8 @@ class BankPaymentService
     {
         $transferContent = trim((string) ($payload['transfer_content'] ?? ''));
         $transactionDescription = trim((string) ($payload['transaction_description'] ?? ''));
-        $content = Str::upper($transferContent !== '' ? $transferContent : $transactionDescription);
+        $receivedContent = $transferContent !== '' ? $transferContent : $transactionDescription;
+        $content = Str::upper($receivedContent);
         $clientOrderCode = trim((string) ($payload['client_order_code'] ?? ''));
         $amount = (int) str((string) ($payload['amount'] ?? 0))->before('.')->toString();
         $orderCode = $this->resolveOrderCode($content, $clientOrderCode, $amount);
@@ -38,7 +39,7 @@ class BankPaymentService
 
         $shouldDispatch = false;
 
-        $transaction = DB::transaction(function () use ($payload, $rawPayload, $orderCode, $providerReference, $amount, $content, &$shouldDispatch): PaymentTransaction {
+        $transaction = DB::transaction(function () use ($payload, $rawPayload, $orderCode, $providerReference, $amount, $content, $receivedContent, &$shouldDispatch): PaymentTransaction {
             $existing = PaymentTransaction::query()
                 ->where('provider_transaction_id', $providerReference)
                 ->lockForUpdate()
@@ -67,6 +68,7 @@ class BankPaymentService
             if ($transaction instanceof PaymentTransaction) {
                 $rawData = is_array($transaction->raw_data) ? $transaction->raw_data : [];
                 $rawData['callback_payload'] = $this->sanitize($rawPayload);
+                $rawData['received_content'] = $receivedContent !== '' ? $receivedContent : null;
 
                 $transaction->forceFill([
                     'bank_code' => $payload['bank_name'] ?? $transaction->bank_code,
@@ -86,7 +88,11 @@ class BankPaymentService
                     'provider_transaction_id' => $providerReference,
                     'amount' => $amount,
                     'content' => $content !== '' ? $content : null,
-                    'raw_data' => ['provider' => 'apibankvn_api', 'callback_payload' => $this->sanitize($rawPayload)],
+                    'raw_data' => [
+                        'provider' => 'apibankvn_api',
+                        'callback_payload' => $this->sanitize($rawPayload),
+                        'received_content' => $receivedContent !== '' ? $receivedContent : null,
+                    ],
                     'status' => 'success',
                 ]);
             }

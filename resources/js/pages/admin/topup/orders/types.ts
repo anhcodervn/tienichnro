@@ -77,11 +77,31 @@ export type OrderRow = {
     } | null;
     checkout_fields?: Record<string, unknown>;
     total_amount: number | string;
+    pricing?: {
+        sale_unit_price: number;
+        sale_total: number;
+        provider_unit_cost: number | null;
+        provider_total_cost: number | null;
+        gross_profit: number | null;
+        gross_margin_percent: number | null;
+    };
+    payment_transaction?: {
+        status: string;
+        bank_code?: string | null;
+        account_number?: string | null;
+        amount: number;
+        expected_content?: string | null;
+        received_content?: string | null;
+        provider_transaction_id?: string | null;
+        matched_at?: string | null;
+    } | null;
     payment_method?: string | null;
+    payment_transfer_content?: string | null;
     payment_status: string;
     order_status: string;
     can_reorder: boolean;
     can_sync_provider: boolean;
+    can_retry_provider_submission: boolean;
     provider_reference?: string | null;
     failure_reason?: string | null;
     paid_at?: string | null;
@@ -89,7 +109,16 @@ export type OrderRow = {
     recipients?: RecipientRow[];
 };
 
-export type OrderAction = 'detail' | 'mark_paid' | 'process' | 'reorder' | 'sync_provider' | 'complete' | 'fail' | 'cancel';
+export type OrderAction =
+    | 'detail'
+    | 'mark_paid'
+    | 'process'
+    | 'reorder'
+    | 'retry_provider_submission'
+    | 'sync_provider'
+    | 'complete'
+    | 'fail'
+    | 'cancel';
 
 export type ActionOption = {
     action: OrderAction;

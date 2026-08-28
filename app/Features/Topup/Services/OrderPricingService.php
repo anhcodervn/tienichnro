@@ -10,7 +10,7 @@ class OrderPricingService
 {
     /**
      * @param  array<int, int>  $recipientQuantities
-     * @return array{package:TopupPackage,server:GameServer,unit_price:int,subtotal:int,discount_amount:int,total_amount:int}
+     * @return array{package:TopupPackage,server:GameServer,unit_price:int,sale_unit_price:int,subtotal:int,discount_amount:int,total_amount:int,provider_unit_cost:int|null,provider_total_cost:int|null,gross_profit:int|null}
      */
     public function quote(
         int $gameId,
@@ -70,14 +70,20 @@ class OrderPricingService
         $unitPrice = max($sellingPrice, (int) ($package->original_price ?? $sellingPrice));
         $subtotal = $unitPrice * $quantity;
         $totalAmount = $sellingPrice * $quantity;
+        $providerUnitCost = $package->provider_price === null ? null : (int) $package->provider_price;
+        $providerTotalCost = $providerUnitCost === null ? null : $providerUnitCost * $quantity;
 
         return [
             'package' => $package,
             'server' => $server,
             'unit_price' => $unitPrice,
+            'sale_unit_price' => $sellingPrice,
             'subtotal' => $subtotal,
             'discount_amount' => $subtotal - $totalAmount,
             'total_amount' => $totalAmount,
+            'provider_unit_cost' => $providerUnitCost,
+            'provider_total_cost' => $providerTotalCost,
+            'gross_profit' => $providerTotalCost === null ? null : $totalAmount - $providerTotalCost,
         ];
     }
 }

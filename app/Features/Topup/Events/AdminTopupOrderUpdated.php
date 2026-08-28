@@ -30,6 +30,8 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
 
     public readonly bool $canSyncProvider;
 
+    public readonly bool $canRetryProviderSubmission;
+
     public readonly ?string $providerReference;
 
     public readonly ?string $failureReason;
@@ -50,8 +52,12 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
             && $order->order_status === OrderStatus::Failed
             && TopupProviderResolver::supportsBalance($order->provider?->slug);
         $this->canSyncProvider = $order->payment_status === PaymentStatus::Paid
-            && $order->order_status === OrderStatus::Processing
+            && in_array($order->order_status, [OrderStatus::Processing, OrderStatus::Completed], true)
             && TopupProviderResolver::supportsStatusChecks($order->provider?->slug);
+        $this->canRetryProviderSubmission = $order->payment_status === PaymentStatus::Paid
+            && $order->order_status === OrderStatus::Processing
+            && TopupProviderResolver::supportsBalance($order->provider?->slug)
+            && data_get($order->metadata, 'provider_manual_review.code') === 'provider_balance_insufficient';
         $this->providerReference = $order->provider_reference;
         $this->failureReason = $order->failure_reason;
         $this->paidAt = $order->paid_at?->toISOString();
@@ -78,6 +84,7 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
             'order_status' => $this->orderStatus,
             'can_reorder' => $this->canReorder,
             'can_sync_provider' => $this->canSyncProvider,
+            'can_retry_provider_submission' => $this->canRetryProviderSubmission,
             'provider_reference' => $this->providerReference,
             'failure_reason' => $this->failureReason,
             'paid_at' => $this->paidAt,

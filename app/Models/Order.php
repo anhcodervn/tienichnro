@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Str;
 
 class Order extends Model
@@ -23,14 +24,18 @@ class Order extends Model
         'normalized_email',
         'customer_ip',
         'user_agent',
+        'provider_unit_cost',
+        'provider_total_cost',
+        'gross_profit',
     ];
 
     protected $fillable = [
         'code', 'idempotency_key', 'user_id', 'email', 'normalized_email', 'game_id',
         'game_server_id', 'topup_package_id', 'topup_provider_id', 'purchase_mode', 'checkout_fields_snapshot',
         'game_account', 'game_character', 'quantity',
-        'package_name', 'denomination', 'carot_amount', 'unit_price', 'subtotal',
-        'discount_amount', 'total_amount', 'payment_method', 'payment_status', 'order_status',
+        'package_name', 'denomination', 'carot_amount', 'unit_price', 'sale_unit_price', 'subtotal',
+        'discount_amount', 'total_amount', 'provider_unit_cost', 'provider_total_cost', 'gross_profit',
+        'payment_method', 'payment_status', 'order_status',
         'provider_reference', 'paid_at', 'processing_at', 'completed_at', 'failed_at',
         'cancelled_at', 'failure_reason', 'customer_ip', 'user_agent', 'metadata',
     ];
@@ -48,8 +53,9 @@ class Order extends Model
             'order_status' => OrderStatus::class,
             'quantity' => 'integer', 'denomination' => 'integer', 'carot_amount' => 'integer',
             'checkout_fields_snapshot' => 'array',
-            'unit_price' => 'decimal:2', 'subtotal' => 'decimal:2',
+            'unit_price' => 'decimal:2', 'sale_unit_price' => 'decimal:2', 'subtotal' => 'decimal:2',
             'discount_amount' => 'decimal:2', 'total_amount' => 'decimal:2',
+            'provider_unit_cost' => 'decimal:2', 'provider_total_cost' => 'decimal:2', 'gross_profit' => 'decimal:2',
             'paid_at' => 'datetime', 'processing_at' => 'datetime', 'completed_at' => 'datetime',
             'failed_at' => 'datetime', 'cancelled_at' => 'datetime', 'metadata' => 'array',
         ];
@@ -105,6 +111,11 @@ class Order extends Model
     public function paymentTransactions(): HasMany
     {
         return $this->hasMany(PaymentTransaction::class);
+    }
+
+    public function latestPaymentTransaction(): HasOne
+    {
+        return $this->hasOne(PaymentTransaction::class)->latestOfMany();
     }
 
     public function recipients(): HasMany

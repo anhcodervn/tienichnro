@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Modal from '@/components/shared/Modal/index.vue';
-import { ArrowDownToLine, Copy, LoaderCircle, PackageOpen, Send } from 'lucide-vue-next';
+import { ArrowDownToLine, Copy, LoaderCircle, PackageOpen, RefreshCcw, Send } from 'lucide-vue-next';
 import { computed } from 'vue';
 import type { ActionOption, OrderAction, OrderRow, ProviderExchange, ProviderItemRow, RecipientRow } from '../types';
 import OrderStatusBadge from './OrderStatusBadge.vue';
@@ -205,8 +205,75 @@ const formatDebug = (value: unknown): string => {
                             <dd class="font-medium text-slate-800">{{ formatDateTime(displayOrder.created_at) }}</dd>
                             <dt class="text-slate-500">Thanh toán lúc</dt>
                             <dd class="font-medium text-slate-800">{{ formatDateTime(displayOrder.paid_at) }}</dd>
+                            <template v-if="displayOrder.payment_method === 'bank_transfer'">
+                                <dt class="text-slate-500">Nội dung chuyển khoản</dt>
+                                <dd
+                                    class="break-all rounded-lg border border-indigo-200 bg-indigo-50 px-2.5 py-2 font-mono font-black text-indigo-700"
+                                >
+                                    {{ displayOrder.payment_transfer_content || 'Đơn cũ chưa lưu nội dung chuyển khoản' }}
+                                </dd>
+                            </template>
                             <dt class="text-slate-500">Mã provider</dt>
                             <dd class="break-all font-mono text-xs font-semibold text-slate-800">{{ displayOrder.provider_reference || '—' }}</dd>
+                        </dl>
+                    </section>
+
+                    <section v-if="displayOrder.pricing" class="rounded-xl border border-slate-200 bg-white p-4">
+                        <h3 class="text-sm font-bold text-slate-950">Doanh thu và lợi nhuận</h3>
+                        <dl class="mt-3 grid grid-cols-[1fr_auto] gap-x-3 gap-y-2 text-sm">
+                            <dt class="text-slate-500">Giá bán / gói</dt>
+                            <dd class="font-semibold text-slate-800">{{ formatMoney(displayOrder.pricing.sale_unit_price) }}</dd>
+                            <dt class="text-slate-500">Tổng giá bán</dt>
+                            <dd class="font-bold text-slate-900">{{ formatMoney(displayOrder.pricing.sale_total) }}</dd>
+                            <dt class="text-slate-500">Cost provider / gói</dt>
+                            <dd class="font-semibold text-slate-800">
+                                {{
+                                    displayOrder.pricing.provider_unit_cost === null
+                                        ? 'Chưa có snapshot'
+                                        : formatMoney(displayOrder.pricing.provider_unit_cost)
+                                }}
+                            </dd>
+                            <dt class="text-slate-500">Tổng cost provider</dt>
+                            <dd class="font-semibold text-slate-800">
+                                {{
+                                    displayOrder.pricing.provider_total_cost === null
+                                        ? 'Chưa có snapshot'
+                                        : formatMoney(displayOrder.pricing.provider_total_cost)
+                                }}
+                            </dd>
+                            <dt class="border-t border-slate-100 pt-2 text-slate-500">Lợi nhuận gộp</dt>
+                            <dd class="border-t border-slate-100 pt-2 font-black text-emerald-700">
+                                {{ displayOrder.pricing.gross_profit === null ? 'Chưa xác định' : formatMoney(displayOrder.pricing.gross_profit) }}
+                                <span v-if="displayOrder.pricing.gross_margin_percent !== null" class="ml-1 text-xs">
+                                    ({{ displayOrder.pricing.gross_margin_percent }}%)
+                                </span>
+                            </dd>
+                        </dl>
+                    </section>
+
+                    <section v-if="displayOrder.payment_transaction" class="rounded-xl border border-sky-200 bg-sky-50/60 p-4">
+                        <h3 class="text-sm font-bold text-sky-950">Đối soát chuyển khoản QR</h3>
+                        <dl class="mt-3 grid grid-cols-[120px_1fr] gap-x-3 gap-y-3 text-sm">
+                            <dt class="text-sky-700">Ngân hàng</dt>
+                            <dd class="font-semibold text-slate-900">
+                                {{ displayOrder.payment_transaction.bank_code || '—' }} · {{ displayOrder.payment_transaction.account_number || '—' }}
+                            </dd>
+                            <dt class="text-sky-700">Số tiền</dt>
+                            <dd class="font-bold text-slate-900">{{ formatMoney(displayOrder.payment_transaction.amount) }}</dd>
+                            <dt class="text-sky-700">Nội dung yêu cầu</dt>
+                            <dd class="break-all rounded-lg bg-white px-2 py-1.5 font-mono font-black text-indigo-700">
+                                {{ displayOrder.payment_transaction.expected_content || '—' }}
+                            </dd>
+                            <dt class="text-sky-700">Nội dung đã nhận</dt>
+                            <dd class="break-all rounded-lg bg-white px-2 py-1.5 font-mono font-black text-emerald-700">
+                                {{ displayOrder.payment_transaction.received_content || 'Chưa nhận callback giao dịch' }}
+                            </dd>
+                            <dt class="text-sky-700">Mã giao dịch</dt>
+                            <dd class="break-all font-mono text-xs font-semibold text-slate-800">
+                                {{ displayOrder.payment_transaction.provider_transaction_id || '—' }}
+                            </dd>
+                            <dt class="text-sky-700">Đối soát lúc</dt>
+                            <dd class="font-medium text-slate-800">{{ formatDateTime(displayOrder.payment_transaction.matched_at) }}</dd>
                         </dl>
                     </section>
 
@@ -396,7 +463,18 @@ const formatDebug = (value: unknown): string => {
                     Đóng
                 </button>
                 <button
-                    v-if="primaryAction && primaryAction.action !== 'detail'"
+                    v-if="displayOrder.can_sync_provider"
+                    type="button"
+                    class="inline-flex min-h-11 items-center justify-center rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="acting"
+                    @click="emit('action', 'sync_provider')"
+                >
+                    <LoaderCircle v-if="acting" class="mr-2 h-4 w-4 animate-spin" />
+                    <RefreshCcw v-else class="mr-2 h-4 w-4" />
+                    Kiểm tra lại trạng thái
+                </button>
+                <button
+                    v-if="primaryAction && !['detail', 'sync_provider'].includes(primaryAction.action)"
                     type="button"
                     class="inline-flex min-h-11 items-center justify-center rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="acting"

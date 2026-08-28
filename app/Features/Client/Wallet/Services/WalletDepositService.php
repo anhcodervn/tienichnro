@@ -358,6 +358,7 @@ class WalletDepositService
             $lockedTransaction->forceFill([
                 'bank_code' => (string) ($partnerOrder['bank_name'] ?? $lockedTransaction->bank_code),
                 'account_number' => (string) ($partnerOrder['account_number'] ?? $lockedTransaction->account_number),
+                'provider_transaction_id' => data_get($partnerOrder, 'metadata.transaction_id') ?: $lockedTransaction->provider_transaction_id,
                 'content' => (string) ($raw['requested_transfer_content'] ?? $raw['transfer_content'] ?? $lockedTransaction->content),
                 'status' => 'success',
                 'raw_data' => $raw,

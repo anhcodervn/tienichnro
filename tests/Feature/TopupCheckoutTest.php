@@ -188,7 +188,7 @@ function checkoutPayload(Game $game, GameServer $server, TopupPackage $package, 
 }
 
 test('guest can create a bank transfer order and backend recalculates price', function (): void {
-    [$game, $server, $package] = topupCatalog();
+    [$game, $server, $package] = topupCatalog(['provider_price' => 75000]);
 
     $response = $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
         'price' => 1,
@@ -214,7 +214,16 @@ test('guest can create a bank transfer order and backend recalculates price', fu
         ->and((int) $order->subtotal)->toBe(200000)
         ->and((int) $order->discount_amount)->toBe(20000)
         ->and((int) $order->total_amount)->toBe(180000)
+        ->and((int) $order->sale_unit_price)->toBe(90000)
+        ->and((int) $order->provider_unit_cost)->toBe(75000)
+        ->and((int) $order->provider_total_cost)->toBe(150000)
+        ->and((int) $order->gross_profit)->toBe(30000)
         ->and($order->metadata['package'])->not->toHaveKey('provider_price');
+
+    $package->update(['provider_price' => 88000, 'price' => 99000]);
+    expect((int) $order->refresh()->sale_unit_price)->toBe(90000)
+        ->and((int) $order->provider_unit_cost)->toBe(75000)
+        ->and((int) $order->gross_profit)->toBe(30000);
     Mail::assertQueued(OrderCreatedMail::class, function (OrderCreatedMail $mail) use ($order): bool {
         return $mail->order->is($order)
             && $mail->queue === 'mails'

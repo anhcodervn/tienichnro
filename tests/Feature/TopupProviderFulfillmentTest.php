@@ -11,6 +11,7 @@ use App\Features\Topup\Services\RecipientFulfillmentService;
 use App\Features\Topup\Services\TopupService;
 use App\Mail\Orders\OrderCompletedMail;
 use App\Mail\Orders\OrderFailedMail;
+use App\Models\AdminAuditLog;
 use App\Models\Game;
 use App\Models\GameServer;
 use App\Models\Order;
@@ -366,14 +367,95 @@ test('admin can immediately reconcile a processing order with the provider', fun
     ]);
 
     $this->actingAs($admin)
+        ->getJson("/api/admin-api/orders/{$order->code}")
+        ->assertSuccessful()
+        ->assertJsonPath('data.can_sync_provider', true);
+
+    $this->actingAs($admin)
         ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'sync_provider'])
         ->assertSuccessful()
         ->assertJsonPath('data.order_status', 'completed')
-        ->assertJsonPath('data.can_sync_provider', false);
+        ->assertJsonPath('data.can_sync_provider', true);
 
     expect($recipient->refresh()->status)->toBe('completed')
         ->and($order->refresh()->order_status)->toBe(OrderStatus::Completed);
     Queue::assertNotPushed(SyncTopupRecipientStatus::class);
+});
+
+test('admin can refresh provider data for a completed order without reopening it', function (): void {
+    [$order, $recipient] = the9pOrderFixture([
+        'quantity' => 1,
+        'provider_request_id' => 'TOP-COMPLETED-R001',
+        'provider_reference' => 'THE9P-COMPLETED',
+        'provider_status' => 'completed',
+        'status' => 'completed',
+        'completed_at' => now()->subHour(),
+        'provider_response' => [
+            'items' => [
+                1 => [
+                    'unit' => 1,
+                    'request_id' => 'TOP-COMPLETED-R001',
+                    'reference' => 'THE9P-COMPLETED',
+                    'status' => 'completed',
+                    'check_attempts' => 2,
+                ],
+            ],
+        ],
+    ]);
+    $completedAt = now()->subMinutes(30)->startOfSecond();
+    $recipientCompletedAt = $recipient->completed_at;
+    $order->forceFill([
+        'order_status' => OrderStatus::Completed,
+        'completed_at' => $completedAt,
+    ])->save();
+    Queue::fake();
+    Mail::fake();
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::response([
+            'status' => 'success',
+            'message' => 'Provider data refreshed',
+            'data' => [
+                'order_code' => 'THE9P-COMPLETED',
+                'status' => 'processing',
+                'topup_id' => 'TOPUP-LATE-001',
+            ],
+        ]),
+    ]);
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $this->actingAs($admin)
+        ->getJson("/api/admin-api/orders/{$order->code}")
+        ->assertSuccessful()
+        ->assertJsonPath('data.can_sync_provider', true);
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'sync_provider'])
+        ->assertSuccessful()
+        ->assertJsonPath('data.order_status', 'completed')
+        ->assertJsonPath('data.can_sync_provider', true)
+        ->assertJsonPath('data.recipients.0.provider_items.0.status', 'completed')
+        ->assertJsonPath('data.recipients.0.provider_items.0.check_attempts', 3)
+        ->assertJsonPath('data.recipients.0.provider_items.0.last_status_check.response.body.data.topup_id', 'TOPUP-LATE-001');
+
+    $order->refresh();
+    $recipient->refresh();
+
+    expect($order->order_status)->toBe(OrderStatus::Completed)
+        ->and($order->completed_at->equalTo($completedAt))->toBeTrue()
+        ->and($recipient->status)->toBe('completed')
+        ->and($recipient->provider_status)->toBe('completed')
+        ->and($recipient->completed_at->equalTo($recipientCompletedAt))->toBeTrue()
+        ->and(data_get($recipient->provider_response, 'items.1.status'))->toBe('completed')
+        ->and(data_get($recipient->provider_response, 'items.1.last_status_check.status'))->toBe('processing')
+        ->and(AdminAuditLog::query()->where([
+            'admin_id' => $admin->id,
+            'action' => 'order_sync_provider',
+            'subject_type' => Order::class,
+            'subject_id' => $order->id,
+        ])->exists())->toBeTrue();
+    Queue::assertNotPushed(SyncTopupRecipientStatus::class);
+    Mail::assertNothingQueued();
+    Http::assertSentCount(1);
 });
 
 test('paid multi recipient order is split into queue jobs without provider create http in the request flow', function (): void {

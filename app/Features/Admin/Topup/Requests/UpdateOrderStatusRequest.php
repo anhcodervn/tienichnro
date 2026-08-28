@@ -15,7 +15,7 @@ class UpdateOrderStatusRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'action' => ['required', Rule::in(['mark_paid', 'process', 'reorder', 'sync_provider', 'complete', 'fail', 'cancel'])],
+            'action' => ['required', Rule::in(['mark_paid', 'process', 'reorder', 'retry_provider_submission', 'sync_provider', 'complete', 'fail', 'cancel'])],
             'reason' => ['nullable', 'string', 'max:1000'],
         ];
     }

@@ -4,6 +4,7 @@ use App\Models\AdminAuditLog;
 use App\Models\Game;
 use App\Models\GameServer;
 use App\Models\Order;
+use App\Models\PaymentTransaction;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
 use App\Models\User;
@@ -22,6 +23,67 @@ test('topup admin api rejects guests and ordinary users', function (): void {
     $this->actingAs(User::factory()->create())
         ->getJson('/api/admin-api/topup-providers')
         ->assertForbidden();
+});
+
+test('admin order detail exposes QR reconciliation fields without raw callback payload', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $order = Order::factory()->create([
+        'sale_unit_price' => 90000,
+        'provider_unit_cost' => 75000,
+        'provider_total_cost' => 75000,
+        'gross_profit' => 15000,
+    ]);
+    PaymentTransaction::query()->create([
+        'order_id' => $order->id,
+        'bank_code' => 'MBBank',
+        'account_number' => '0123456789',
+        'transaction_code' => 'ADMINQR001',
+        'provider_transaction_id' => 'BANK-REF-001',
+        'amount' => 90000,
+        'content' => 'NAPADMIN001',
+        'transfer_reference' => 'NAPADMIN001',
+        'status' => 'success',
+        'raw_data' => [
+            'received_content' => 'napadmin001 thanh toan',
+            'callback_payload' => ['api_secret' => 'must-not-leak'],
+        ],
+    ]);
+
+    $response = $this->actingAs($admin)
+        ->getJson("/api/admin-api/orders/{$order->code}")
+        ->assertOk()
+        ->assertJsonPath('data.pricing.sale_unit_price', 90000)
+        ->assertJsonPath('data.pricing.provider_total_cost', 75000)
+        ->assertJsonPath('data.pricing.gross_profit', 15000)
+        ->assertJsonPath('data.payment_method', 'bank_transfer')
+        ->assertJsonPath('data.payment_transfer_content', 'NAPADMIN001')
+        ->assertJsonPath('data.payment_transaction.expected_content', 'NAPADMIN001')
+        ->assertJsonPath('data.payment_transaction.received_content', 'napadmin001 thanh toan')
+        ->assertJsonPath('data.payment_transaction.provider_transaction_id', 'BANK-REF-001');
+
+    expect($response->json('data.payment_transaction'))->not->toHaveKey('raw_data')
+        ->and($response->getContent())->not->toContain('must-not-leak');
+});
+
+test('admin order detail finds transfer content from a legacy unlinked bank transaction', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $order = Order::factory()->create();
+    PaymentTransaction::query()->create([
+        'order_id' => null,
+        'transaction_code' => $order->code,
+        'amount' => $order->total_amount,
+        'content' => 'NAPLEGACY001',
+        'transfer_reference' => null,
+        'status' => 'pending',
+        'raw_data' => ['transfer_content' => 'NAPLEGACY001'],
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson("/api/admin-api/orders/{$order->code}")
+        ->assertSuccessful()
+        ->assertJsonPath('data.payment_method', 'bank_transfer')
+        ->assertJsonPath('data.payment_transfer_content', 'NAPLEGACY001')
+        ->assertJsonPath('data.payment_transaction.expected_content', 'NAPLEGACY001');
 });
 
 test('admin provider page refreshes and stores a valid low balance response', function (): void {

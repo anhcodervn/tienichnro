@@ -3,9 +3,8 @@
 namespace App\Features\Recharge\Controllers;
 
 use App\Features\Client\Wallet\Resources\DepositRequestResource;
-use App\Features\Client\Wallet\Services\WalletDepositService;
 use App\Features\Recharge\Requests\ApiBankVnCallbackRequest;
-use App\Features\Topup\Services\Payments\BankPaymentService;
+use App\Features\Recharge\Services\ApiBankVnTransactionProcessorService;
 use App\Http\Controllers\Controller;
 use App\Models\ConfigRecharge;
 use App\Utils\ApiResponse;
@@ -14,8 +13,7 @@ use Illuminate\Http\JsonResponse;
 class RechargeCallbackController extends Controller
 {
     public function __construct(
-        private readonly WalletDepositService $walletDepositService,
-        private readonly BankPaymentService $bankPaymentService,
+        private readonly ApiBankVnTransactionProcessorService $transactionProcessor,
     ) {}
 
     public function apibankvn(ApiBankVnCallbackRequest $request): JsonResponse
@@ -24,8 +22,7 @@ class RechargeCallbackController extends Controller
             return $response;
         }
 
-        $paymentTransaction = $this->bankPaymentService->match($request->callbackPayload(), $request->all())
-            ?? $this->walletDepositService->handleApiBankVnCallback($request->callbackPayload(), $request->all());
+        $paymentTransaction = $this->transactionProcessor->process($request->callbackPayload(), $request->all());
 
         if ($paymentTransaction === null) {
             return response()->json(ApiResponse::error('Khong tim thay giao dich nap tien phu hop.'), 404);

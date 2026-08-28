@@ -2,11 +2,13 @@
 
 namespace App\Features\Admin\Topup\Controllers;
 
+use App\Enums\PaymentMethod;
 use App\Features\Admin\Topup\Requests\UpdateOrderStatusRequest;
 use App\Features\Admin\Topup\Resources\OrderResource;
 use App\Features\Admin\Topup\Services\TopupAdminService;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
+use App\Models\PaymentTransaction;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -42,8 +44,18 @@ class OrderController extends Controller
 
     private function sensitiveOrderResponse(Order $order): JsonResponse
     {
-        return OrderResource::make(
-            $order->load(['game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients']),
-        )->response()->header('Cache-Control', 'private, no-store');
+        $order->load(['game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients', 'latestPaymentTransaction']);
+
+        if ($order->payment_method === PaymentMethod::BankTransfer && $order->latestPaymentTransaction === null) {
+            $legacyTransaction = PaymentTransaction::query()
+                ->whereNull('order_id')
+                ->where('transaction_code', $order->code)
+                ->latest('id')
+                ->first();
+
+            $order->setRelation('latestPaymentTransaction', $legacyTransaction);
+        }
+
+        return OrderResource::make($order)->response()->header('Cache-Control', 'private, no-store');
     }
 }

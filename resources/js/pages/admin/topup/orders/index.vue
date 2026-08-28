@@ -38,7 +38,16 @@ type Pagination = {
 
 type AdminTopupOrderUpdatedEvent = Pick<
     OrderRow,
-    'id' | 'code' | 'payment_status' | 'order_status' | 'can_reorder' | 'can_sync_provider' | 'provider_reference' | 'failure_reason' | 'paid_at'
+    | 'id'
+    | 'code'
+    | 'payment_status'
+    | 'order_status'
+    | 'can_reorder'
+    | 'can_sync_provider'
+    | 'can_retry_provider_submission'
+    | 'provider_reference'
+    | 'failure_reason'
+    | 'paid_at'
 > & { updated_at: string };
 
 const orders = ref<OrderRow[]>([]);
@@ -114,8 +123,11 @@ const primaryActionFor = (order: OrderRow): ActionOption => {
         return { action: 'mark_paid', label: 'Đã nhận tiền', tone: 'primary' };
     }
     if (order.can_reorder) return { action: 'reorder', label: 'Đẩy lại thẻ lỗi', tone: 'primary' };
+    if (order.can_retry_provider_submission) {
+        return { action: 'retry_provider_submission', label: 'Đẩy lại qua provider', tone: 'primary' };
+    }
     if (order.payment_status === 'paid' && order.order_status === 'pending') return { action: 'process', label: 'Xử lý đơn', tone: 'primary' };
-    if (order.can_sync_provider) return { action: 'sync_provider', label: 'Đồng bộ provider', tone: 'primary' };
+    if (order.can_sync_provider) return { action: 'sync_provider', label: 'Kiểm tra lại trạng thái', tone: 'primary' };
     if (order.order_status === 'processing') return { action: 'complete', label: 'Hoàn thành', tone: 'primary' };
     return { action: 'detail', label: 'Xem chi tiết', tone: 'neutral' };
 };
@@ -169,6 +181,7 @@ const applyRealtimeSnapshot = (event: AdminTopupOrderUpdatedEvent): void => {
         order_status: event.order_status,
         can_reorder: event.can_reorder,
         can_sync_provider: event.can_sync_provider,
+        can_retry_provider_submission: event.can_retry_provider_submission,
         provider_reference: event.provider_reference,
         failure_reason: event.failure_reason,
         paid_at: event.paid_at,
@@ -307,10 +320,15 @@ const confirmationFor = (order: OrderRow, action: Exclude<OrderAction, 'detail'>
             text: `Chỉ các lượt provider đã xác nhận thất bại của đơn ${order.code} được gửi lại.`,
             confirm: 'Đẩy lại thẻ lỗi',
         },
+        retry_provider_submission: {
+            title: 'Đẩy lại đơn qua provider?',
+            text: `Hệ thống sẽ kiểm tra lại số dư provider và tự động gửi đơn ${order.code} qua API nếu số dư đã đủ.`,
+            confirm: 'Đẩy lại qua provider',
+        },
         sync_provider: {
-            title: 'Đồng bộ trạng thái provider?',
+            title: 'Kiểm tra lại trạng thái provider?',
             text: `Hệ thống sẽ gọi provider để kiểm tra ngay trạng thái thực tế của đơn ${order.code}.`,
-            confirm: 'Đồng bộ ngay',
+            confirm: 'Kiểm tra ngay',
         },
         complete: { title: 'Đánh dấu hoàn thành?', text: `Xác nhận toàn bộ đơn ${order.code} đã hoàn thành.`, confirm: 'Hoàn thành' },
         fail: { title: 'Báo lỗi đơn?', text: `Đơn ${order.code} sẽ chuyển sang trạng thái lỗi.`, confirm: 'Báo lỗi' },

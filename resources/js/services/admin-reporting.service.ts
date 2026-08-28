@@ -13,6 +13,9 @@ export type ReportBreakdown = {
     successful_orders: number;
     successful_units: number;
     revenue: number;
+    provider_cost: number;
+    gross_profit: number;
+    unpriced_orders: number;
 };
 
 export type AdminTopupReport = {
@@ -30,9 +33,18 @@ export type AdminTopupReport = {
         revenue: number;
         average_order_value: number;
         completion_rate: number;
+        provider_cost: number;
+        gross_profit: number;
+        gross_margin_percent: number;
+        priced_orders: number;
+        unpriced_orders: number;
+        unpriced_revenue: number;
     };
     growth: {
         revenue: GrowthMetric;
+        provider_cost: GrowthMetric;
+        gross_profit: GrowthMetric;
+        gross_margin_percent: GrowthMetric;
         successful_orders: GrowthMetric;
         successful_units: GrowthMetric;
         average_order_value: GrowthMetric;
@@ -48,6 +60,8 @@ export type AdminTopupReport = {
     trend: Array<{
         date: string;
         revenue: number;
+        provider_cost: number;
+        gross_profit: number;
         successful_orders: number;
         successful_units: number;
     }>;
@@ -63,6 +77,8 @@ export type AdminTopupReport = {
         package: string;
         successful_units: number;
         revenue: number;
+        provider_cost: number | null;
+        gross_profit: number | null;
         completed_at: string | null;
     }>;
     criteria: string;

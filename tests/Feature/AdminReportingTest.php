@@ -24,6 +24,10 @@ test('admin report counts only paid completed orders by completion date and comp
         'created_at' => '2026-08-20 23:00:00',
         'completed_at' => '2026-08-21 08:00:00',
         'total_amount' => 10000,
+        'sale_unit_price' => 5000,
+        'provider_unit_cost' => 4000,
+        'provider_total_cost' => 8000,
+        'gross_profit' => 2000,
         'quantity' => 2,
         'package_name' => 'Gói 10.000đ',
     ]);
@@ -31,6 +35,10 @@ test('admin report counts only paid completed orders by completion date and comp
         'created_at' => '2026-08-22 09:00:00',
         'completed_at' => '2026-08-22 09:10:00',
         'total_amount' => 20000,
+        'sale_unit_price' => 20000,
+        'provider_unit_cost' => 15000,
+        'provider_total_cost' => 15000,
+        'gross_profit' => 5000,
         'quantity' => 1,
         'package_name' => 'Gói 20.000đ',
     ]);
@@ -62,6 +70,10 @@ test('admin report counts only paid completed orders by completion date and comp
         'completed_at' => '2026-08-20 08:10:00',
         'total_amount' => 10000,
         'quantity' => 1,
+        'sale_unit_price' => 10000,
+        'provider_unit_cost' => 9000,
+        'provider_total_cost' => 9000,
+        'gross_profit' => 1000,
     ]);
 
     $response = $this->actingAs($admin)
@@ -74,9 +86,15 @@ test('admin report counts only paid completed orders by completion date and comp
         ->assertJsonPath('data.summary.successful_units', 3)
         ->assertJsonPath('data.summary.revenue', 30000)
         ->assertJsonPath('data.summary.average_order_value', 15000)
+        ->assertJsonPath('data.summary.provider_cost', 23000)
+        ->assertJsonPath('data.summary.gross_profit', 7000)
+        ->assertJsonPath('data.summary.gross_margin_percent', 23.3)
+        ->assertJsonPath('data.summary.unpriced_orders', 0)
         ->assertJsonPath('data.summary.completion_rate', 60)
         ->assertJsonPath('data.growth.revenue.previous', 10000)
         ->assertJsonPath('data.growth.revenue.percentage_change', 200)
+        ->assertJsonPath('data.growth.gross_profit.previous', 1000)
+        ->assertJsonPath('data.growth.gross_profit.percentage_change', 600)
         ->assertJsonPath('data.growth.successful_orders.percentage_change', 100)
         ->assertJsonPath('data.growth.successful_units.percentage_change', 200)
         ->assertJsonPath('data.status_overview.created_orders', 5)
@@ -85,9 +103,13 @@ test('admin report counts only paid completed orders by completion date and comp
         ->assertJsonPath('data.status_overview.failed_orders', 1)
         ->assertJsonPath('data.trend.0.date', '2026-08-21')
         ->assertJsonPath('data.trend.0.revenue', 10000)
+        ->assertJsonPath('data.trend.0.provider_cost', 8000)
+        ->assertJsonPath('data.trend.0.gross_profit', 2000)
         ->assertJsonPath('data.trend.1.revenue', 20000)
         ->assertJsonPath('data.breakdowns.games.0.name', 'Ngọc Rồng Online')
         ->assertJsonPath('data.breakdowns.games.0.revenue', 30000)
+        ->assertJsonPath('data.breakdowns.games.0.provider_cost', 23000)
+        ->assertJsonPath('data.breakdowns.games.0.gross_profit', 7000)
         ->assertJsonPath('data.breakdowns.providers.0.name', 'ACCNROVN')
         ->assertJsonCount(2, 'data.recent_successful_orders');
 
@@ -129,3 +151,28 @@ function createReportingOrder(Game $game, TopupProvider $provider, array $overri
         ...$overrides,
     ]);
 }
+
+test('admin report separates legacy successful orders without provider cost snapshot', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $game = Game::factory()->create();
+    $provider = TopupProvider::factory()->create();
+
+    createReportingOrder($game, $provider, [
+        'completed_at' => '2026-08-28 10:00:00',
+        'total_amount' => 25000,
+        'sale_unit_price' => null,
+        'provider_unit_cost' => null,
+        'provider_total_cost' => null,
+        'gross_profit' => null,
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/reports/topup?from=2026-08-28&to=2026-08-28')
+        ->assertSuccessful()
+        ->assertJsonPath('data.summary.revenue', 25000)
+        ->assertJsonPath('data.summary.provider_cost', 0)
+        ->assertJsonPath('data.summary.gross_profit', 0)
+        ->assertJsonPath('data.summary.priced_orders', 0)
+        ->assertJsonPath('data.summary.unpriced_orders', 1)
+        ->assertJsonPath('data.summary.unpriced_revenue', 25000);
+});

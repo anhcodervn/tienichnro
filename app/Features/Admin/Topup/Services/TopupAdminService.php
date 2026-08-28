@@ -5,6 +5,7 @@ namespace App\Features\Admin\Topup\Services;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Features\Admin\Topup\Actions\ReorderFailedTopupOrderAction;
+use App\Features\Admin\Topup\Actions\RetryProviderBalanceOrderAction;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Jobs\ProcessTopupOrder;
 use App\Features\Topup\Services\OrderStatusService;
@@ -33,6 +34,7 @@ class TopupAdminService
     public function __construct(
         private readonly OrderStatusService $orderStatusService,
         private readonly ReorderFailedTopupOrderAction $reorderFailedTopupOrder,
+        private readonly RetryProviderBalanceOrderAction $retryProviderBalanceOrder,
         private readonly RecipientFulfillmentService $recipientFulfillmentService,
     ) {}
 
@@ -205,6 +207,15 @@ class TopupAdminService
             return $this->syncProviderStatus($order, $admin, $request);
         }
 
+        if ($action === 'retry_provider_submission') {
+            $old = $order->getAttributes();
+            $order = $this->retryProviderBalanceOrder->handle($order);
+            $this->audit($admin, 'order_retry_provider_submission', $order, $old, $order->getAttributes(), $request);
+            ProcessTopupOrder::dispatch($order->id)->afterCommit();
+
+            return $order;
+        }
+
         $dispatchTopup = false;
 
         $order = DB::transaction(function () use ($order, $action, $reason, $admin, $request, &$dispatchTopup): Order {
@@ -245,17 +256,18 @@ class TopupAdminService
         $order->loadMissing('provider');
 
         if ($order->payment_status !== PaymentStatus::Paid
-            || $order->order_status !== OrderStatus::Processing
+            || ! in_array($order->order_status, [OrderStatus::Processing, OrderStatus::Completed], true)
             || ! TopupProviderResolver::supportsStatusChecks($order->provider?->slug)) {
             throw ValidationException::withMessages([
-                'sync_provider' => 'Chỉ có thể đồng bộ đơn provider tự động đã thanh toán và đang xử lý.',
+                'sync_provider' => 'Chỉ có thể kiểm tra đơn provider tự động đã thanh toán, đang xử lý hoặc đã hoàn thành.',
             ]);
         }
 
         $old = $order->getAttributes();
+        $includeCompleted = $order->order_status === OrderStatus::Completed;
 
         try {
-            $checked = $this->recipientFulfillmentService->syncOrder($order->id);
+            $checked = $this->recipientFulfillmentService->syncOrder($order->id, $includeCompleted);
         } catch (TopupProviderConnectionException $exception) {
             report($exception);
 
@@ -266,7 +278,7 @@ class TopupAdminService
 
         $order = $order->refresh();
 
-        if ($checked === 0 && $order->order_status === OrderStatus::Processing) {
+        if ($checked === 0) {
             throw ValidationException::withMessages([
                 'sync_provider' => 'Đơn chưa có giao dịch provider đủ điều kiện để kiểm tra trạng thái.',
             ]);

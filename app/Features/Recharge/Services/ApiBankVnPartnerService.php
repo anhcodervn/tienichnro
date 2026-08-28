@@ -4,6 +4,7 @@ namespace App\Features\Recharge\Services;
 
 use App\Exceptions\ApiException;
 use App\Models\ConfigRecharge;
+use Carbon\CarbonInterface;
 use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -50,6 +51,61 @@ class ApiBankVnPartnerService
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function fetchTransactions(
+        ConfigRecharge $config,
+        CarbonInterface $startDate,
+        CarbonInterface $endDate,
+        int $limit = 20,
+        bool $forceRefresh = true,
+    ): array {
+        try {
+            $payload = $this->request($config)
+                ->post('/transactions', [
+                    'bank_id' => (int) $config->api_bank_id,
+                    'limit' => max(1, min($limit, 100)),
+                    'force_refresh' => $forceRefresh,
+                    'start_date' => $startDate->toDateString(),
+                    'end_date' => $endDate->toDateString(),
+                ])
+                ->throw()
+                ->json();
+        } catch (RequestException $exception) {
+            $responsePayload = $exception->response?->json();
+            $message = is_array($responsePayload) ? trim((string) ($responsePayload['message'] ?? '')) : '';
+
+            throw new ApiException(
+                $message !== '' ? $message : 'Khong the lay giao dich tu apibankvn.com.',
+                $exception->response?->status() ?? 502,
+            );
+        }
+
+        if (! is_array($payload)) {
+            throw new ApiException('API apibankvn.com tra ve danh sach giao dich khong hop le.', 502);
+        }
+
+        if (array_key_exists('status', $payload) && ! (bool) $payload['status']) {
+            throw new ApiException((string) ($payload['message'] ?? 'Khong the lay giao dich tu apibankvn.com.'), 422);
+        }
+
+        $transactions = data_get($payload, 'data.transactions')
+            ?? data_get($payload, 'data.items')
+            ?? ($payload['transactions'] ?? null)
+            ?? ($payload['items'] ?? null)
+            ?? ($payload['data'] ?? null);
+
+        if (! is_array($transactions)) {
+            throw new ApiException('API apibankvn.com tra ve danh sach giao dich khong hop le.', 502);
+        }
+
+        return array_values(array_filter(
+            $transactions,
+            static fn (mixed $transaction): bool => is_array($transaction),
+        ));
+    }
+
+    /**
      * @return array{
      *     user: array<string, mixed>,
      *     permissions: array<int, mixed>,
@@ -86,10 +142,24 @@ class ApiBankVnPartnerService
                 is_array($profilePayload['data']['endpoints'] ?? null) ? $profilePayload['data']['endpoints'] : [],
                 static fn (mixed $endpoint): bool => is_string($endpoint)
             )),
-            'bank_accounts' => array_values(array_filter(
+            'bank_accounts' => array_values(array_filter(array_map(
+                static function (mixed $bankAccount): ?array {
+                    if (! is_array($bankAccount)) {
+                        return null;
+                    }
+
+                    $bankId = filter_var($bankAccount['bank_id'] ?? $bankAccount['id'] ?? null, FILTER_VALIDATE_INT);
+
+                    if ($bankId === false || $bankId < 1) {
+                        return null;
+                    }
+
+                    $bankAccount['bank_id'] = $bankId;
+
+                    return $bankAccount;
+                },
                 is_array($banksPayload['data']['bank_accounts'] ?? null) ? $banksPayload['data']['bank_accounts'] : [],
-                static fn (mixed $bankAccount): bool => is_array($bankAccount)
-            )),
+            ))),
         ];
     }
 

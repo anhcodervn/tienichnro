@@ -39,6 +39,9 @@ class TopupReportService
             ],
             'growth' => [
                 'revenue' => $this->growth($current['revenue'], $previous['revenue']),
+                'provider_cost' => $this->growth($current['provider_cost'], $previous['provider_cost']),
+                'gross_profit' => $this->growth($current['gross_profit'], $previous['gross_profit']),
+                'gross_margin_percent' => $this->growth($current['gross_margin_percent'], $previous['gross_margin_percent']),
                 'successful_orders' => $this->growth($current['successful_orders'], $previous['successful_orders']),
                 'successful_units' => $this->growth($current['successful_units'], $previous['successful_units']),
                 'average_order_value' => $this->growth($current['average_order_value'], $previous['average_order_value']),
@@ -51,26 +54,40 @@ class TopupReportService
                 'packages' => $this->packageBreakdown($from, $to),
             ],
             'recent_successful_orders' => $this->recentSuccessfulOrders($from, $to),
-            'criteria' => 'Chỉ ghi nhận doanh thu và lượt nạp của đơn đã thanh toán, hoàn thành thành công trong kỳ.',
+            'criteria' => 'Doanh thu chỉ tính đơn đã thanh toán và hoàn thành. Lợi nhuận chỉ tính các đơn có snapshot cost provider tại lúc tạo đơn.',
         ];
     }
 
-    /** @return array{successful_orders:int,successful_units:int,revenue:int,average_order_value:int} */
+    /** @return array{successful_orders:int,successful_units:int,revenue:int,average_order_value:int,provider_cost:int,gross_profit:int,gross_margin_percent:float,priced_orders:int,unpriced_orders:int,unpriced_revenue:int} */
     public function successfulSummary(CarbonImmutable $from, CarbonImmutable $to): array
     {
         $summary = $this->successfulOrders($from, $to)
             ->selectRaw('COUNT(*) as successful_orders')
             ->selectRaw('COALESCE(SUM(quantity), 0) as successful_units')
             ->selectRaw('COALESCE(SUM(total_amount), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(CASE WHEN provider_total_cost IS NOT NULL THEN provider_total_cost ELSE 0 END), 0) as provider_cost')
+            ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NOT NULL THEN gross_profit ELSE 0 END), 0) as gross_profit')
+            ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NOT NULL THEN total_amount ELSE 0 END), 0) as priced_revenue')
+            ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NOT NULL THEN 1 ELSE 0 END), 0) as priced_orders')
+            ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NULL THEN 1 ELSE 0 END), 0) as unpriced_orders')
+            ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NULL THEN total_amount ELSE 0 END), 0) as unpriced_revenue')
             ->first();
         $successfulOrders = (int) ($summary?->successful_orders ?? 0);
         $revenue = (int) ($summary?->revenue ?? 0);
+        $pricedRevenue = (int) ($summary?->priced_revenue ?? 0);
+        $grossProfit = (int) ($summary?->gross_profit ?? 0);
 
         return [
             'successful_orders' => $successfulOrders,
             'successful_units' => (int) ($summary?->successful_units ?? 0),
             'revenue' => $revenue,
             'average_order_value' => $successfulOrders > 0 ? (int) round($revenue / $successfulOrders) : 0,
+            'provider_cost' => (int) ($summary?->provider_cost ?? 0),
+            'gross_profit' => $grossProfit,
+            'gross_margin_percent' => $pricedRevenue > 0 ? round(($grossProfit / $pricedRevenue) * 100, 1) : 0.0,
+            'priced_orders' => (int) ($summary?->priced_orders ?? 0),
+            'unpriced_orders' => (int) ($summary?->unpriced_orders ?? 0),
+            'unpriced_revenue' => (int) ($summary?->unpriced_revenue ?? 0),
         ];
     }
 
@@ -119,7 +136,7 @@ class TopupReportService
         ];
     }
 
-    /** @return array<int, array{date:string,revenue:int,successful_orders:int,successful_units:int}> */
+    /** @return array<int, array{date:string,revenue:int,provider_cost:int,gross_profit:int,successful_orders:int,successful_units:int}> */
     private function dailyTrend(CarbonImmutable $from, CarbonImmutable $to): array
     {
         $dateExpression = DB::getDriverName() === 'pgsql'
@@ -130,6 +147,8 @@ class TopupReportService
             ->selectRaw('COUNT(*) as successful_orders')
             ->selectRaw('COALESCE(SUM(quantity), 0) as successful_units')
             ->selectRaw('COALESCE(SUM(total_amount), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(CASE WHEN provider_total_cost IS NOT NULL THEN provider_total_cost ELSE 0 END), 0) as provider_cost')
+            ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NOT NULL THEN gross_profit ELSE 0 END), 0) as gross_profit')
             ->groupByRaw($dateExpression)
             ->orderBy('report_date')
             ->get()
@@ -142,6 +161,8 @@ class TopupReportService
             $trend[] = [
                 'date' => $key,
                 'revenue' => (int) ($row?->revenue ?? 0),
+                'provider_cost' => (int) ($row?->provider_cost ?? 0),
+                'gross_profit' => (int) ($row?->gross_profit ?? 0),
                 'successful_orders' => (int) ($row?->successful_orders ?? 0),
                 'successful_units' => (int) ($row?->successful_units ?? 0),
             ];
@@ -157,6 +178,8 @@ class TopupReportService
             ->join('games', 'games.id', '=', 'orders.game_id')
             ->select(['games.id', 'games.name'])
             ->selectRaw('COUNT(*) as successful_orders, COALESCE(SUM(orders.quantity), 0) as successful_units, COALESCE(SUM(orders.total_amount), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(CASE WHEN orders.provider_total_cost IS NOT NULL THEN orders.provider_total_cost ELSE 0 END), 0) as provider_cost, COALESCE(SUM(CASE WHEN orders.gross_profit IS NOT NULL THEN orders.gross_profit ELSE 0 END), 0) as gross_profit')
+            ->selectRaw('COALESCE(SUM(CASE WHEN orders.gross_profit IS NULL THEN 1 ELSE 0 END), 0) as unpriced_orders')
             ->groupBy('games.id', 'games.name')
             ->orderByDesc('revenue')
             ->limit(10)
@@ -172,6 +195,8 @@ class TopupReportService
             ->leftJoin('topup_providers', 'topup_providers.id', '=', 'orders.topup_provider_id')
             ->select(['topup_providers.id', 'topup_providers.name'])
             ->selectRaw('COUNT(*) as successful_orders, COALESCE(SUM(orders.quantity), 0) as successful_units, COALESCE(SUM(orders.total_amount), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(CASE WHEN orders.provider_total_cost IS NOT NULL THEN orders.provider_total_cost ELSE 0 END), 0) as provider_cost, COALESCE(SUM(CASE WHEN orders.gross_profit IS NOT NULL THEN orders.gross_profit ELSE 0 END), 0) as gross_profit')
+            ->selectRaw('COALESCE(SUM(CASE WHEN orders.gross_profit IS NULL THEN 1 ELSE 0 END), 0) as unpriced_orders')
             ->groupBy('topup_providers.id', 'topup_providers.name')
             ->orderByDesc('revenue')
             ->limit(10)
@@ -186,6 +211,8 @@ class TopupReportService
         return $this->successfulOrders($from, $to)
             ->select('package_name')
             ->selectRaw('COUNT(*) as successful_orders, COALESCE(SUM(quantity), 0) as successful_units, COALESCE(SUM(total_amount), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(CASE WHEN provider_total_cost IS NOT NULL THEN provider_total_cost ELSE 0 END), 0) as provider_cost, COALESCE(SUM(CASE WHEN gross_profit IS NOT NULL THEN gross_profit ELSE 0 END), 0) as gross_profit')
+            ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NULL THEN 1 ELSE 0 END), 0) as unpriced_orders')
             ->groupBy('package_name')
             ->orderByDesc('revenue')
             ->limit(10)
@@ -201,7 +228,7 @@ class TopupReportService
             ->with(['game:id,name', 'provider:id,name'])
             ->latest('completed_at')
             ->limit(10)
-            ->get(['id', 'code', 'game_id', 'topup_provider_id', 'package_name', 'quantity', 'total_amount', 'completed_at'])
+            ->get(['id', 'code', 'game_id', 'topup_provider_id', 'package_name', 'quantity', 'total_amount', 'provider_total_cost', 'gross_profit', 'completed_at'])
             ->map(fn (Order $order): array => [
                 'code' => $order->code,
                 'game' => $order->game?->name,
@@ -209,11 +236,13 @@ class TopupReportService
                 'package' => $order->package_name,
                 'successful_units' => $order->quantity,
                 'revenue' => (int) $order->total_amount,
+                'provider_cost' => $order->provider_total_cost === null ? null : (int) $order->provider_total_cost,
+                'gross_profit' => $order->gross_profit === null ? null : (int) $order->gross_profit,
                 'completed_at' => $order->completed_at?->toISOString(),
             ])->all();
     }
 
-    /** @return array{id:int|null,name:string,successful_orders:int,successful_units:int,revenue:int} */
+    /** @return array{id:int|null,name:string,successful_orders:int,successful_units:int,revenue:int,provider_cost:int,gross_profit:int,unpriced_orders:int} */
     private function breakdownRow(mixed $id, string $name, Order $row): array
     {
         return [
@@ -222,11 +251,14 @@ class TopupReportService
             'successful_orders' => (int) $row->successful_orders,
             'successful_units' => (int) $row->successful_units,
             'revenue' => (int) $row->revenue,
+            'provider_cost' => (int) $row->provider_cost,
+            'gross_profit' => (int) $row->gross_profit,
+            'unpriced_orders' => (int) $row->unpriced_orders,
         ];
     }
 
-    /** @return array{current:int,previous:int,absolute_change:int,percentage_change:float|null} */
-    private function growth(int $current, int $previous): array
+    /** @return array{current:int|float,previous:int|float,absolute_change:int|float,percentage_change:float|null} */
+    private function growth(int|float $current, int|float $previous): array
     {
         return [
             'current' => $current,

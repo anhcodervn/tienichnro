@@ -16,17 +16,20 @@ import {
     ServerCog,
     ShieldCheck,
     TriangleAlert,
+    WalletCards,
 } from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 type BreakdownKey = 'games' | 'providers' | 'packages';
+type TrendMetric = 'revenue' | 'gross_profit';
 
 const route = useRoute();
 const router = useRouter();
 const loading = ref(true);
 const report = ref<AdminTopupReport | null>(null);
 const activeBreakdown = ref<BreakdownKey>('games');
+const trendMetric = ref<TrendMetric>('revenue');
 
 const toDateInput = (date: Date): string => {
     const year = date.getFullYear();
@@ -56,7 +59,7 @@ const dateTime = (value: string | null): string =>
           )
         : '--';
 
-const maxTrendRevenue = computed(() => Math.max(...(report.value?.trend.map((item) => item.revenue) ?? [0]), 1));
+const maxTrendValue = computed(() => Math.max(...(report.value?.trend.map((item) => item[trendMetric.value]) ?? [0]), 1));
 const breakdownRows = computed<ReportBreakdown[]>(() => report.value?.breakdowns[activeBreakdown.value] ?? []);
 const breakdownTabs: Array<{ key: BreakdownKey; label: string; icon: typeof Gamepad2 }> = [
     { key: 'games', label: 'Theo game', icon: Gamepad2 },
@@ -76,6 +79,20 @@ const metricCards = computed(() => {
             tone: 'emerald',
         },
         {
+            label: 'Tổng cost provider',
+            value: money(report.value.summary.provider_cost),
+            growth: report.value.growth.provider_cost,
+            icon: WalletCards,
+            tone: 'amber',
+        },
+        {
+            label: 'Lợi nhuận gộp',
+            value: money(report.value.summary.gross_profit),
+            growth: report.value.growth.gross_profit,
+            icon: ChartNoAxesCombined,
+            tone: 'emerald',
+        },
+        {
             label: 'Đơn thành công',
             value: number(report.value.summary.successful_orders),
             growth: report.value.growth.successful_orders,
@@ -90,10 +107,10 @@ const metricCards = computed(() => {
             tone: 'indigo',
         },
         {
-            label: 'Giá trị đơn trung bình',
-            value: money(report.value.summary.average_order_value),
-            growth: report.value.growth.average_order_value,
-            icon: ChartNoAxesCombined,
+            label: 'Biên lợi nhuận gộp',
+            value: `${report.value.summary.gross_margin_percent.toLocaleString('vi-VN')}%`,
+            growth: report.value.growth.gross_margin_percent,
+            icon: CircleDollarSign,
             tone: 'violet',
         },
     ];
@@ -104,6 +121,7 @@ const toneClasses: Record<string, string> = {
     sky: 'bg-sky-50 text-sky-700',
     indigo: 'bg-indigo-50 text-indigo-700',
     violet: 'bg-violet-50 text-violet-700',
+    amber: 'bg-amber-50 text-amber-700',
 };
 
 const growthLabel = (percentage: number | null): string => {
@@ -132,6 +150,19 @@ async function applyPreset(days: number): Promise<void> {
     const start = new Date(end);
     start.setDate(start.getDate() - (days - 1));
     filters.from = toDateInput(start);
+    filters.to = toDateInput(end);
+    await loadReport();
+}
+
+async function applyToday(): Promise<void> {
+    filters.from = toDateInput(new Date());
+    filters.to = filters.from;
+    await loadReport();
+}
+
+async function applyThisMonth(): Promise<void> {
+    const end = new Date();
+    filters.from = toDateInput(new Date(end.getFullYear(), end.getMonth(), 1));
     filters.to = toDateInput(end);
     await loadReport();
 }
@@ -186,6 +217,18 @@ onMounted(loadReport);
                     </div>
                     <div class="mt-3 flex flex-wrap gap-2">
                         <button
+                            class="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+                            @click="applyToday"
+                        >
+                            Hôm nay
+                        </button>
+                        <button
+                            class="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
+                            @click="applyThisMonth"
+                        >
+                            Tháng này
+                        </button>
+                        <button
                             v-for="preset in [7, 30, 90]"
                             :key="preset"
                             class="rounded-lg bg-white/10 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-white/20"
@@ -206,7 +249,7 @@ onMounted(loadReport);
         </div>
 
         <template v-else-if="report">
-            <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <article v-for="metric in metricCards" :key="metric.label" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="flex items-start justify-between gap-3">
                         <div>
@@ -238,10 +281,27 @@ onMounted(loadReport);
                 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                            <h2 class="text-lg font-black text-slate-950">Doanh thu theo ngày</h2>
+                            <h2 class="text-lg font-black text-slate-950">
+                                {{ trendMetric === 'revenue' ? 'Doanh thu theo ngày' : 'Lợi nhuận theo ngày' }}
+                            </h2>
                             <p class="mt-1 text-sm text-slate-500">{{ report.period.from }} — {{ report.period.to }}</p>
                         </div>
-                        <span class="rounded-full bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700">{{ report.period.days }} ngày</span>
+                        <div class="flex items-center gap-2">
+                            <button
+                                class="rounded-lg px-3 py-1.5 text-xs font-bold"
+                                :class="trendMetric === 'revenue' ? 'bg-emerald-600 text-white' : 'bg-slate-100 text-slate-600'"
+                                @click="trendMetric = 'revenue'"
+                            >
+                                Doanh thu
+                            </button>
+                            <button
+                                class="rounded-lg px-3 py-1.5 text-xs font-bold"
+                                :class="trendMetric === 'gross_profit' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'"
+                                @click="trendMetric = 'gross_profit'"
+                            >
+                                Lợi nhuận
+                            </button>
+                        </div>
                     </div>
                     <div class="mt-8 overflow-x-auto pb-2">
                         <div
@@ -252,16 +312,23 @@ onMounted(loadReport);
                                 v-for="item in report.trend"
                                 :key="item.date"
                                 class="group flex h-full min-w-6 flex-1 flex-col items-center justify-end gap-2"
-                                :title="`${shortDate(item.date)}: ${money(item.revenue)} · ${item.successful_units} lượt`"
+                                :title="`${shortDate(item.date)}: ${money(item[trendMetric])} · ${item.successful_units} lượt`"
                             >
                                 <div class="relative flex w-full flex-1 items-end justify-center">
                                     <span
                                         class="absolute bottom-full z-10 mb-2 hidden whitespace-nowrap rounded-lg bg-slate-950 px-2 py-1 text-[11px] font-semibold text-white shadow-lg group-hover:block"
-                                        >{{ money(item.revenue) }}</span
+                                        >{{ money(item[trendMetric]) }}</span
                                     >
                                     <div
-                                        class="w-full max-w-6 rounded-t-md bg-gradient-to-t from-emerald-600 to-emerald-400 transition group-hover:from-emerald-500 group-hover:to-emerald-300"
-                                        :style="{ height: `${Math.max((item.revenue / maxTrendRevenue) * 100, item.revenue > 0 ? 4 : 0)}%` }"
+                                        class="w-full max-w-6 rounded-t-md bg-gradient-to-t transition"
+                                        :class="
+                                            trendMetric === 'revenue'
+                                                ? 'from-emerald-600 to-emerald-400 group-hover:from-emerald-500 group-hover:to-emerald-300'
+                                                : 'from-indigo-600 to-violet-400 group-hover:from-indigo-500 group-hover:to-violet-300'
+                                        "
+                                        :style="{
+                                            height: `${Math.max((item[trendMetric] / maxTrendValue) * 100, item[trendMetric] > 0 ? 4 : 0)}%`,
+                                        }"
                                     ></div>
                                 </div>
                                 <span class="text-[10px] font-semibold text-slate-400">{{ shortDate(item.date) }}</span>
@@ -330,6 +397,8 @@ onMounted(loadReport);
                                     <th class="px-5 py-3 text-right">Đơn</th>
                                     <th class="px-5 py-3 text-right">Lượt</th>
                                     <th class="px-5 py-3 text-right">Doanh thu</th>
+                                    <th class="px-5 py-3 text-right">Cost</th>
+                                    <th class="px-5 py-3 text-right">Lợi nhuận</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -338,9 +407,16 @@ onMounted(loadReport);
                                     <td class="px-5 py-4 text-right text-slate-600">{{ number(row.successful_orders) }}</td>
                                     <td class="px-5 py-4 text-right text-slate-600">{{ number(row.successful_units) }}</td>
                                     <td class="px-5 py-4 text-right font-black text-emerald-700">{{ money(row.revenue) }}</td>
+                                    <td class="px-5 py-4 text-right font-semibold text-amber-700">{{ money(row.provider_cost) }}</td>
+                                    <td class="px-5 py-4 text-right font-black text-indigo-700">
+                                        {{ money(row.gross_profit) }}
+                                        <span v-if="row.unpriced_orders > 0" class="block text-[10px] font-semibold text-amber-700">
+                                            {{ row.unpriced_orders }} đơn thiếu cost
+                                        </span>
+                                    </td>
                                 </tr>
                                 <tr v-if="!breakdownRows.length">
-                                    <td colspan="4" class="px-5 py-10 text-center text-slate-500">Chưa có đơn thành công trong kỳ.</td>
+                                    <td colspan="6" class="px-5 py-10 text-center text-slate-500">Chưa có đơn thành công trong kỳ.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -370,6 +446,9 @@ onMounted(loadReport);
                             <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                                 <span>{{ order.package }} · {{ order.successful_units }} lượt</span><span>{{ dateTime(order.completed_at) }}</span>
                             </div>
+                            <p class="mt-2 text-xs font-bold" :class="order.gross_profit === null ? 'text-amber-700' : 'text-indigo-700'">
+                                {{ order.gross_profit === null ? 'Thiếu snapshot cost provider' : `Lợi nhuận: ${money(order.gross_profit)}` }}
+                            </p>
                         </div>
                         <div v-if="!report.recent_successful_orders.length" class="p-10 text-center text-sm text-slate-500">
                             Chưa có đơn thành công.
@@ -377,6 +456,20 @@ onMounted(loadReport);
                     </div>
                 </article>
             </section>
+
+            <div
+                v-if="report.summary.unpriced_orders > 0"
+                class="flex items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"
+            >
+                <TriangleAlert class="mt-0.5 h-5 w-5 shrink-0" />
+                <div>
+                    <strong>{{ number(report.summary.unpriced_orders) }} đơn thành công chưa có snapshot cost provider</strong>
+                    <p class="mt-1 leading-6 text-amber-800">
+                        Doanh thu của các đơn này là {{ money(report.summary.unpriced_revenue) }} và chưa được cộng vào lợi nhuận để tránh báo cáo
+                        sai.
+                    </p>
+                </div>
+            </div>
 
             <div class="flex items-start gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
                 <ShieldCheck class="mt-0.5 h-5 w-5 shrink-0" />

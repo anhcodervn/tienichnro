@@ -26,8 +26,7 @@ class ProviderBalanceFallbackService
 
         if (! $candidate instanceof Order
             || ! $candidate->provider instanceof TopupProvider
-            || ! $candidate->package instanceof TopupPackage
-            || (int) ($candidate->package->provider_price ?? 0) <= 0
+            || ((int) ($candidate->provider_unit_cost ?? $candidate->package?->provider_price ?? 0)) <= 0
             || ! TopupProviderResolver::supportsBalance($candidate->provider->slug)) {
             return false;
         }
@@ -66,7 +65,7 @@ class ProviderBalanceFallbackService
 
             $provider = TopupProvider::query()->lockForUpdate()->find($order->topup_provider_id);
             $package = TopupPackage::query()->find($order->topup_package_id);
-            $providerUnitCost = (int) ($package?->provider_price ?? 0);
+            $providerUnitCost = (int) ($order->provider_unit_cost ?? $package?->provider_price ?? 0);
 
             if (! $provider instanceof TopupProvider
                 || $provider->balance_status !== 'success'
@@ -125,7 +124,20 @@ class ProviderBalanceFallbackService
                 ])->save();
             }
 
-            $order->forceFill(['failure_reason' => $reason])->save();
+            $metadata = $order->metadata ?? [];
+            $order->forceFill([
+                'failure_reason' => $reason,
+                'metadata' => [
+                    ...$metadata,
+                    'provider_manual_review' => [
+                        'code' => self::REASON_CODE,
+                        'provider_balance' => $providerBalance,
+                        'required_balance' => $requiredBalance,
+                        'currency' => $currency,
+                        'marked_at' => $markedAt->toISOString(),
+                    ],
+                ],
+            ])->save();
 
             return [
                 'already_diverted' => false,

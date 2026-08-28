@@ -6,6 +6,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Features\Topup\Services\TopupProviderResolver;
 use App\Models\OrderRecipient;
+use App\Models\PaymentTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -13,6 +14,14 @@ class OrderResource extends JsonResource
 {
     public function toArray(Request $request): array
     {
+        /** @var PaymentTransaction|null $paymentTransaction */
+        $paymentTransaction = $this->whenLoaded('latestPaymentTransaction');
+        $paymentTransferContent = $paymentTransaction instanceof PaymentTransaction
+            ? ($paymentTransaction->transfer_reference
+                ?: data_get($paymentTransaction->raw_data, 'transfer_content')
+                ?: $paymentTransaction->content)
+            : null;
+
         return [
             'id' => $this->id, 'code' => $this->code, 'email' => $this->email,
             'user_id' => $this->user_id, 'game' => $this->game?->name, 'server' => $this->server?->name,
@@ -25,6 +34,31 @@ class OrderResource extends JsonResource
                 'slug' => $this->provider->slug,
             ],
             'checkout_fields' => $this->checkout_fields_snapshot ?? [],
+            'payment_transfer_content' => $paymentTransferContent,
+            'pricing' => [
+                'sale_unit_price' => (int) ($this->sale_unit_price ?? ($this->quantity > 0 ? (int) $this->total_amount / $this->quantity : 0)),
+                'sale_total' => (int) $this->total_amount,
+                'provider_unit_cost' => $this->provider_unit_cost === null ? null : (int) $this->provider_unit_cost,
+                'provider_total_cost' => $this->provider_total_cost === null ? null : (int) $this->provider_total_cost,
+                'gross_profit' => $this->gross_profit === null ? null : (int) $this->gross_profit,
+                'gross_margin_percent' => $this->gross_profit === null || (int) $this->total_amount <= 0
+                    ? null
+                    : round(((int) $this->gross_profit / (int) $this->total_amount) * 100, 1),
+            ],
+            'payment_transaction' => $paymentTransaction instanceof PaymentTransaction ? [
+                'status' => $paymentTransaction->status,
+                'bank_code' => $paymentTransaction->bank_code,
+                'account_number' => $paymentTransaction->account_number,
+                'amount' => (int) $paymentTransaction->amount,
+                'expected_content' => $paymentTransferContent,
+                'received_content' => data_get($paymentTransaction->raw_data, 'received_content')
+                    ?: data_get($paymentTransaction->raw_data, 'callback_payload.transfer_content')
+                    ?: data_get($paymentTransaction->raw_data, 'callback_payload.transaction_description')
+                    ?: data_get($paymentTransaction->raw_data, 'callback_payload.data.order.transfer_content')
+                    ?: data_get($paymentTransaction->raw_data, 'callback_payload.payload.transaction.description'),
+                'provider_transaction_id' => $paymentTransaction->provider_transaction_id,
+                'matched_at' => $paymentTransaction->status === 'success' ? $paymentTransaction->updated_at?->toISOString() : null,
+            ] : null,
             'recipients' => $this->whenLoaded('recipients', fn (): array => $this->recipients
                 ->map(fn (OrderRecipient $recipient): array => [
                     'position' => $recipient->position,
@@ -61,11 +95,52 @@ class OrderResource extends JsonResource
                 && $this->order_status === OrderStatus::Failed
                 && TopupProviderResolver::supportsBalance($this->provider?->slug),
             'can_sync_provider' => $this->payment_status === PaymentStatus::Paid
+                && in_array($this->order_status, [OrderStatus::Processing, OrderStatus::Completed], true)
+                && TopupProviderResolver::supportsStatusChecks($this->provider?->slug)
+                && $this->hasQueryableProviderItems(),
+            'can_retry_provider_submission' => $this->payment_status === PaymentStatus::Paid
                 && $this->order_status === OrderStatus::Processing
-                && TopupProviderResolver::supportsStatusChecks($this->provider?->slug),
+                && TopupProviderResolver::supportsBalance($this->provider?->slug)
+                && ($this->isProviderBalanceManualReview() || str_contains((string) $this->failure_reason, 'Provider không đủ số dư')),
             'provider_reference' => $this->provider_reference, 'failure_reason' => $this->failure_reason,
             'paid_at' => $this->paid_at?->toISOString(), 'created_at' => $this->created_at?->toISOString(),
         ];
+    }
+
+    private function isProviderBalanceManualReview(): bool
+    {
+        if (data_get($this->metadata, 'provider_manual_review.code') === 'provider_balance_insufficient') {
+            return true;
+        }
+
+        return $this->relationLoaded('recipients') && $this->recipients->contains(
+            fn (OrderRecipient $recipient): bool => data_get($recipient->provider_response, 'manual_review.code') === 'provider_balance_insufficient',
+        );
+    }
+
+    private function hasQueryableProviderItems(): bool
+    {
+        if (! $this->relationLoaded('recipients')) {
+            return true;
+        }
+
+        $includeCompleted = $this->order_status === OrderStatus::Completed;
+
+        return $this->recipients
+            ->when(
+                $includeCompleted,
+                fn ($recipients) => $recipients->where('status', 'completed'),
+                fn ($recipients) => $recipients->whereNotIn('status', ['completed', 'failed', 'cancelled']),
+            )
+            ->contains(function (OrderRecipient $recipient): bool {
+                $includeCompleted = $this->order_status === OrderStatus::Completed;
+
+                return collect(data_get($recipient->provider_response, 'items', []))
+                    ->contains(fn (mixed $item): bool => is_array($item)
+                        && filled($item['reference'] ?? null)
+                        && ($item['status'] ?? null) !== 'failed'
+                        && (($item['status'] ?? null) !== 'completed' || $includeCompleted));
+            });
     }
 
     /** @param array<string, mixed> $item */

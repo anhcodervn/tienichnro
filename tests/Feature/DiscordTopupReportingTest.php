@@ -222,6 +222,10 @@ test('daily topup report contains only paid completed orders by completion date'
         'completed_at' => '2026-08-22 08:00:00',
         'total_amount' => 8500,
         'quantity' => 2,
+        'sale_unit_price' => 4250,
+        'provider_unit_cost' => 3500,
+        'provider_total_cost' => 7000,
+        'gross_profit' => 1500,
     ]);
     Order::factory()->create([
         'created_at' => '2026-08-22 09:00:00',
@@ -241,6 +245,10 @@ test('daily topup report contains only paid completed orders by completion date'
         && $job->details['Đơn thành công'] === 1
         && $job->details['Lượt nạp thành công'] === 2
         && $job->details['Doanh thu thành công'] === '8.500đ'
+        && $job->details['Tổng cost provider'] === '7.000đ'
+        && $job->details['Lợi nhuận gộp'] === '1.500đ'
+        && $job->details['Biên lợi nhuận'] === '17,6%'
+        && $job->details['Đơn thiếu snapshot cost'] === 0
         && $job->details['Giá trị trung bình'] === '8.500đ'
         && ! str_contains(serialize($job), '17.000đ'));
 });
