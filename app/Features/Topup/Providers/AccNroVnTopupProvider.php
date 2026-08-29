@@ -245,9 +245,11 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
         $data = is_array($body['data'] ?? null) ? $body['data'] : [];
         $providerStatus = strtolower(trim((string) ($data['status'] ?? '')));
         $providerCode = strtoupper(trim((string) ($data['status_code'] ?? '')));
+        $providerTopupId = is_scalar($data['topup_id'] ?? null) && filled($data['topup_id'])
+            ? trim((string) $data['topup_id'])
+            : null;
         $status = match (true) {
-            in_array($providerStatus, ['success', 'completed', 'complete', 'done'], true),
-            $providerCode === 'SUCCESS' => TopupProviderStatus::Completed,
+            $providerStatus === 'success' && $providerTopupId !== null => TopupProviderStatus::Completed,
             in_array($providerStatus, ['failed', 'fail', 'error', 'cancelled', 'canceled'], true),
             in_array($providerCode, ['FAILED', 'REJECTED', 'CANCELLED', 'CANCELED'], true) => TopupProviderStatus::Failed,
             $providerStatus === 'processing', $providerCode === 'PROCESSING' => TopupProviderStatus::Processing,
@@ -283,9 +285,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
                 'provider_status' => $providerStatus !== '' ? $providerStatus : null,
                 'provider_code' => $providerCode !== '' ? $providerCode : null,
                 'envelope_status' => ($body['success'] ?? null) === true ? 'success' : 'failed',
-                'provider_topup_id' => is_scalar($data['topup_id'] ?? null) && filled($data['topup_id'])
-                    ? (string) $data['topup_id']
-                    : null,
+                'provider_topup_id' => $providerTopupId,
             ],
             request: $requestSnapshot,
             providerResponse: $providerResponse,

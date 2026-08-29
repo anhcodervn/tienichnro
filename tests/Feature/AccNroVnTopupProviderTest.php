@@ -171,6 +171,37 @@ test('accnrovn creates an idempotent order with simple credentials and no signat
     Http::assertSentCount(1);
 });
 
+test('accnrovn create response completes only with success and a non empty topup id', function (mixed $topupId, string $expectedStatus): void {
+    [$order, $recipient, $provider] = accNroVnOrderFixture();
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::response([
+            'success' => true,
+            'message' => 'OK',
+            'data' => [
+                'order_id' => 'ACC-CREATE-TOPUP-ID',
+                'request_id' => $order->code.'-R001',
+                'status' => 'success',
+                'status_code' => 'SUCCESS',
+                'topup_id' => $topupId,
+            ],
+        ]),
+    ]);
+
+    $result = app(AccNroVnTopupProvider::class)->submit(
+        $order,
+        $recipient,
+        $provider,
+        $order->code.'-R001',
+    );
+
+    expect($result->status->value)->toBe($expectedStatus)
+        ->and($result->response['provider_topup_id'])->toBe($expectedStatus === 'completed' ? trim((string) $topupId) : null);
+})->with([
+    'success without topup id stays pending' => [null, 'pending'],
+    'success with empty topup id stays pending' => ['', 'pending'],
+    'success with topup id completes' => ['TOPUP-CREATE-001', 'completed'],
+]);
+
 test('accnrovn omits server when the game server has no provider code', function (): void {
     [$order, $recipient, $provider] = accNroVnOrderFixture();
     $order->server()->update(['code' => '']);
@@ -476,7 +507,7 @@ test('accnrovn queries an order by request id and completes fulfillment', functi
         ->assertJsonPath('data.provider.name', 'AccNRO')
         ->assertJsonPath('data.provider.slug', 'accnrovn')
         ->assertJsonPath('data.order_status', 'completed')
-        ->assertJsonPath('data.can_sync_provider', false)
+        ->assertJsonPath('data.can_sync_provider', true)
         ->assertJsonPath('data.recipients.0.provider_items.0.provider_topup_id', '1148567')
         ->assertJsonPath('data.recipients.0.provider_items.0.current_step', 'completed')
         ->assertJsonPath('data.recipients.0.provider_items.0.last_status_check.request.payload.request_id', 'LOCAL-ORDER-1002')
@@ -505,6 +536,52 @@ test('accnrovn queries an order by request id and completes fulfillment', functi
             && ! array_key_exists('sign', $request->data());
     });
 });
+
+test('accnrovn keeps success pending until provider returns a non empty topup id', function (mixed $topupId): void {
+    [, $recipient] = accNroVnOrderFixture([
+        'provider_request_id' => 'LOCAL-WAIT-TOPUP-ID',
+        'provider_reference' => 'ACC-NRO-WAIT-TOPUP-ID',
+        'provider_status' => 'pending',
+        'status' => 'processing',
+        'provider_response' => [
+            'items' => [
+                1 => [
+                    'unit' => 1,
+                    'request_id' => 'LOCAL-WAIT-TOPUP-ID',
+                    'reference' => 'ACC-NRO-WAIT-TOPUP-ID',
+                    'status' => 'pending',
+                ],
+            ],
+        ],
+    ]);
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/query' => Http::response([
+            'success' => true,
+            'message' => 'OK',
+            'data' => [
+                'order_id' => 'ACC-NRO-WAIT-TOPUP-ID',
+                'request_id' => 'LOCAL-WAIT-TOPUP-ID',
+                'status' => 'success',
+                'status_code' => 'SUCCESS',
+                'topup_id' => $topupId,
+            ],
+        ]),
+    ]);
+
+    app(RecipientFulfillmentService::class)->syncStatus($recipient->id, 1, 1);
+
+    expect($recipient->refresh()->status)->toBe('processing')
+        ->and($recipient->provider_status)->toBe('processing')
+        ->and($recipient->completed_at)->toBeNull()
+        ->and($recipient->provider_response['items'][1]['status'])->toBe('pending')
+        ->and($recipient->provider_response['items'][1]['response']['provider_status'])->toBe('success')
+        ->and($recipient->provider_response['items'][1]['response']['provider_topup_id'])->toBeNull();
+    Queue::assertPushed(SyncTopupRecipientStatus::class, fn (SyncTopupRecipientStatus $job): bool => $job->checkAttempt === 2);
+})->with([
+    'missing topup id' => [null],
+    'empty topup id' => [''],
+    'blank topup id' => ['   '],
+]);
 
 test('accnrovn keeps ambiguous provider results pending for reconciliation', function (): void {
     [, $recipient] = accNroVnOrderFixture([
