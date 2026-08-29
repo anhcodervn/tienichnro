@@ -10,23 +10,14 @@ use RuntimeException;
 
 class BankTransferContentService
 {
-    public const DEFAULT_SUFFIX_LENGTH = 8;
+    public const TOTAL_LENGTH = 10;
 
-    public const MIN_SUFFIX_LENGTH = 6;
+    public const MAX_PREFIX_LENGTH = 4;
 
-    public const MAX_SUFFIX_LENGTH = 8;
-
-    public function generate(ConfigRecharge $config, int $suffixLength = self::DEFAULT_SUFFIX_LENGTH): string
+    public function generate(ConfigRecharge $config): string
     {
-        if ($suffixLength < self::MIN_SUFFIX_LENGTH || $suffixLength > self::MAX_SUFFIX_LENGTH) {
-            throw new InvalidArgumentException('Mã đối soát chuyển khoản phải dài từ 6 đến 8 ký tự.');
-        }
-
         $prefix = $this->normalizePrefix((string) $config->transfer_prefix);
-
-        if ($prefix === '') {
-            throw new InvalidArgumentException('Tiền tố nội dung chuyển khoản không được để trống.');
-        }
+        $suffixLength = $this->suffixLengthFor($prefix);
 
         for ($attempt = 0; $attempt < 10; $attempt++) {
             $content = $prefix.Str::upper(Str::random($suffixLength));
@@ -48,23 +39,48 @@ class BankTransferContentService
 
     public function fromReference(string $prefix, int|string $reference): string
     {
+        $normalizedPrefix = $this->normalizePrefix($prefix);
+        $suffixLength = $this->suffixLengthFor($normalizedPrefix);
         $normalizedReference = Str::upper((string) preg_replace('/[^A-Za-z0-9]/', '', (string) $reference));
-        $suffix = Str::substr($normalizedReference, -self::DEFAULT_SUFFIX_LENGTH);
+        $suffix = Str::substr($normalizedReference, -$suffixLength);
 
-        if (Str::length($suffix) < self::MIN_SUFFIX_LENGTH) {
-            $suffix = Str::upper(Str::substr(hash('sha256', (string) $reference), 0, self::DEFAULT_SUFFIX_LENGTH));
+        if (Str::length($suffix) < $suffixLength) {
+            $suffix = Str::upper(Str::substr(hash('sha256', (string) $reference), 0, $suffixLength));
         }
 
-        return $this->normalizePrefix($prefix).$suffix;
+        return $normalizedPrefix.$suffix;
     }
 
     public function preview(string $prefix): string
     {
-        return $this->normalizePrefix($prefix).'ABC12345';
+        $normalizedPrefix = $this->normalizePrefix($prefix);
+        $suffixLength = $this->suffixLengthFor($normalizedPrefix);
+
+        return $normalizedPrefix.Str::substr('ABC1234567', 0, $suffixLength);
     }
 
     public function normalizePrefix(string $prefix): string
     {
         return Str::upper((string) preg_replace('/[^A-Za-z0-9]/', '', trim($prefix)));
+    }
+
+    public function normalizeContent(string $content): string
+    {
+        return Str::upper((string) preg_replace('/[\p{Z}\s]+/u', '', $content));
+    }
+
+    private function suffixLengthFor(string $prefix): int
+    {
+        $prefixLength = Str::length($prefix);
+
+        if ($prefixLength === 0) {
+            throw new InvalidArgumentException('Tiền tố nội dung chuyển khoản không được để trống.');
+        }
+
+        if ($prefixLength > self::MAX_PREFIX_LENGTH) {
+            throw new InvalidArgumentException('Tiền tố nội dung chuyển khoản không được dài quá 4 ký tự.');
+        }
+
+        return self::TOTAL_LENGTH - $prefixLength;
     }
 }

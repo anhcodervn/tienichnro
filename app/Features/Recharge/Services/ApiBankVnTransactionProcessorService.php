@@ -14,6 +14,7 @@ class ApiBankVnTransactionProcessorService
     public function __construct(
         private readonly BankPaymentService $bankPaymentService,
         private readonly WalletDepositService $walletDepositService,
+        private readonly BankTransferContentService $bankTransferContentService,
     ) {}
 
     /**
@@ -73,8 +74,12 @@ class ApiBankVnTransactionProcessorService
     private function ensureSameTransaction(PaymentTransaction $processedTransaction, array $payload): void
     {
         $incomingAmount = (int) str((string) ($payload['amount'] ?? 0))->before('.')->toString();
-        $receivedContent = Str::upper(trim((string) ($payload['transfer_content'] ?? $payload['transaction_description'] ?? '')));
-        $expectedContent = Str::upper(trim((string) ($processedTransaction->transfer_reference ?: $processedTransaction->content)));
+        $receivedContent = $this->bankTransferContentService->normalizeContent(
+            (string) ($payload['transfer_content'] ?? $payload['transaction_description'] ?? ''),
+        );
+        $expectedContent = $this->bankTransferContentService->normalizeContent(
+            (string) ($processedTransaction->transfer_reference ?: $processedTransaction->content),
+        );
         $hasDifferentAmount = $incomingAmount > 0 && $incomingAmount !== (int) $processedTransaction->amount;
         $hasDifferentContent = $receivedContent !== ''
             && $expectedContent !== ''

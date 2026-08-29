@@ -21,8 +21,8 @@ class RechargeConfigService
             '{account_number}' => '123456789',
             '{amount}' => '500000',
             '{user_id}' => '123',
-            '{prefix}' => 'NOIDUNG',
-            '{nd}' => 'NOIDUNGABC12345',
+            '{prefix}' => 'NAP',
+            '{nd}' => 'NAPABC1234',
         ];
     }
 

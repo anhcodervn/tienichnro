@@ -54,7 +54,11 @@ const selectedLocalBank = computed(
     () => LOCAL_BANK_OPTIONS.find((bank) => bank.name.toLowerCase() === form.value.bank_name.trim().toLowerCase()) ?? null,
 );
 const normalizedTransferPrefix = computed(() => form.value.transfer_prefix.replace(/[^a-z0-9]/gi, '').toUpperCase());
-const previewTransferContent = computed(() => `${normalizedTransferPrefix.value || 'NOIDUNG'}ABC12345`);
+const previewTransferContent = computed(() => {
+    const prefix = (normalizedTransferPrefix.value || 'NAP').slice(0, 4);
+
+    return `${prefix}${'ABC1234567'.slice(0, 10 - prefix.length)}`;
+});
 const previewQrUrl = computed(() => {
     const template = form.value.qr_template.trim();
     if (!template) {
@@ -118,7 +122,7 @@ function emptyForm(): RechargeConfigForm {
         account_name: '',
         account_number: '',
         qr_template: DEFAULT_QR_TEMPLATE,
-        transfer_prefix: 'NOIDUNG',
+        transfer_prefix: 'NAP',
         api_key: '',
         api_secret: '',
         webhook_secret: '',
@@ -575,13 +579,13 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                             <input
                                 v-model="form.transfer_prefix"
                                 type="text"
-                                maxlength="50"
+                                maxlength="4"
                                 pattern="[A-Za-z0-9]+"
                                 autocomplete="off"
                                 class="w-full rounded-[10px] border border-slate-200 bg-white px-4 py-3 text-sm uppercase outline-none transition focus:border-indigo-400"
                             />
                             <span class="block text-xs leading-5 text-slate-500"
-                                >Chỉ dùng chữ và số. Hệ thống sẽ thêm 8 ký tự đối soát viết liền sau prefix.</span
+                                >Chỉ dùng chữ và số, tối đa 4 ký tự. Toàn bộ nội dung chuyển khoản luôn dài đúng 10 ký tự.</span
                             >
                         </label>
                         <label class="flex items-center justify-between rounded-[10px] border border-slate-200 bg-white px-4 py-3">

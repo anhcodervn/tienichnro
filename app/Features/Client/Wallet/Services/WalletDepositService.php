@@ -472,7 +472,7 @@ class WalletDepositService
         $transferContent = trim((string) ($payload['transfer_content'] ?? ''));
 
         if ($transferContent !== '') {
-            $normalizedTransferContent = Str::upper($transferContent);
+            $normalizedTransferContent = $this->bankTransferContentService->normalizeContent($transferContent);
             $paymentTransaction = PaymentTransaction::query()
                 ->whereNull('order_id')
                 ->where(function (Builder $query) use ($normalizedTransferContent): void {
@@ -482,6 +482,15 @@ class WalletDepositService
                 ->where('raw_data->provider', 'apibankvn_api')
                 ->latest('id')
                 ->first();
+
+            if ($paymentTransaction instanceof PaymentTransaction) {
+                return $paymentTransaction;
+            }
+
+            $paymentTransaction = $this->findApiBankVnTransactionByDescription(
+                description: $transferContent,
+                amount: isset($payload['amount']) ? (float) $payload['amount'] : null,
+            );
 
             if ($paymentTransaction instanceof PaymentTransaction) {
                 return $paymentTransaction;
@@ -589,7 +598,7 @@ class WalletDepositService
 
     private function findApiBankVnTransactionByDescription(string $description, ?float $amount = null): ?PaymentTransaction
     {
-        $normalizedDescription = Str::upper(trim($description));
+        $normalizedDescription = $this->bankTransferContentService->normalizeContent($description);
 
         if ($normalizedDescription === '') {
             return null;
@@ -618,7 +627,7 @@ class WalletDepositService
             return false;
         }
 
-        $normalizedContent = Str::upper($expectedContent);
+        $normalizedContent = $this->bankTransferContentService->normalizeContent($expectedContent);
 
         if (! str_contains($normalizedDescription, $normalizedContent)) {
             return false;
@@ -630,6 +639,9 @@ class WalletDepositService
             return true;
         }
 
-        return str_contains($normalizedDescription, Str::upper($expectedPrefix));
+        return str_contains(
+            $normalizedDescription,
+            $this->bankTransferContentService->normalizeContent($expectedPrefix),
+        );
     }
 }

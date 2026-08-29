@@ -12,7 +12,6 @@ use App\Models\Order;
 use App\Models\PaymentTransaction;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Str;
 
 beforeEach(function (): void {
     Mail::fake();
@@ -38,7 +37,7 @@ test('bank payment uppercases callback content and duplicate provider transactio
     ]);
     $payload = [
         'transaction_id' => 'BANK-UNIQUE-001',
-        'transfer_content' => Str::lower($expectedContent),
+        'transfer_content' => 'nap abc 12345',
         'amount' => '450000.00',
         'bank_name' => 'VCB',
     ];
@@ -51,7 +50,7 @@ test('bank payment uppercases callback content and duplicate provider transactio
         ->and(PaymentTransaction::query()->count())->toBe(1)
         ->and(PaymentTransaction::query()->sole()->content)->toBe($expectedContent)
         ->and(PaymentTransaction::query()->sole()->transfer_reference)->toBe($expectedContent)
-        ->and(data_get(PaymentTransaction::query()->sole()->raw_data, 'received_content'))->toBe(Str::lower($expectedContent));
+        ->and(data_get(PaymentTransaction::query()->sole()->raw_data, 'received_content'))->toBe('nap abc 12345');
     Mail::assertQueued(PaymentReceivedMail::class, function (PaymentReceivedMail $mail) use ($order): bool {
         return $mail->order->is($order)
             && $mail->queue === 'mails'

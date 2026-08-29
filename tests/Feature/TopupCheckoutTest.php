@@ -325,7 +325,8 @@ test('bank transfer order creates one shared payment request through the configu
     $response->assertRedirect(route('orders.payment', $order));
     expect($paymentTransaction->order_id)->toBe($order->id)
         ->and($paymentTransaction->transaction_code)->toBe($order->code)
-        ->and($paymentTransaction->content)->toMatch('/^NAP[A-Z0-9]{8}$/')
+        ->and($paymentTransaction->content)->toMatch('/^NAP[A-Z0-9]{7}$/')
+        ->and(Str::length($paymentTransaction->content))->toBe(10)
         ->and($paymentTransaction->transfer_reference)->toBe($paymentTransaction->content)
         ->and($paymentTransaction->raw_data['remote_order_code'])->toBe('ABV-TOPUP-001')
         ->and($paymentTransaction->raw_data['recharge_config_id'])->toBe($config->id)

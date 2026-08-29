@@ -29,7 +29,7 @@ class UpdateRechargeConfigRequest extends FormRequest
                     }
                 },
             ],
-            'transfer_prefix' => ['required', 'string', 'max:50', 'regex:/^[A-Za-z0-9]+$/'],
+            'transfer_prefix' => ['required', 'string', 'max:4', 'regex:/^[A-Za-z0-9]+$/'],
             'api_base_url' => ['nullable', 'url', 'max:255'],
             'api_key' => ['nullable', 'string', 'max:120'],
             'api_secret' => ['nullable', 'string', 'max:255'],

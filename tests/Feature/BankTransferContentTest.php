@@ -49,9 +49,11 @@ test('guest orders and wallet deposits use the same compact transfer content for
     $walletDeposit = app(WalletDepositService::class)->createRequest($user, 200000, $config->id);
 
     expect($orderPayment)->toBeInstanceOf(PaymentTransaction::class)
-        ->and($orderPayment->content)->toMatch('/^NAP[A-Z0-9]{8}$/')
+        ->and($orderPayment->content)->toMatch('/^NAP[A-Z0-9]{7}$/')
+        ->and(Str::length($orderPayment->content))->toBe(10)
         ->and($orderPayment->transfer_reference)->toBe($orderPayment->content)
-        ->and($walletDeposit->content)->toMatch('/^NAP[A-Z0-9]{8}$/')
+        ->and($walletDeposit->content)->toMatch('/^NAP[A-Z0-9]{7}$/')
+        ->and(Str::length($walletDeposit->content))->toBe(10)
         ->and($walletDeposit->transfer_reference)->toBe($walletDeposit->content)
         ->and($walletDeposit->content)->not->toBe($orderPayment->content)
         ->and($orderPayment->content)->not->toContain(' ')
@@ -85,21 +87,23 @@ test('bank callback uppercases a compact order reference embedded in the descrip
     Queue::assertPushed(ProcessTopupOrder::class, 1);
 });
 
-test('transfer reference suffix only accepts lengths from six to eight characters', function (): void {
+test('transfer reference always has a total length of ten characters', function (): void {
     $config = sharedTransferContentConfig();
     $service = app(BankTransferContentService::class);
 
-    expect($service->generate($config, 6))->toMatch('/^NAP[A-Z0-9]{6}$/')
-        ->and($service->generate($config, 8))->toMatch('/^NAP[A-Z0-9]{8}$/');
+    expect($service->generate($config))->toMatch('/^NAP[A-Z0-9]{7}$/')
+        ->and($service->fromReference('NAPA', 123))->toMatch('/^NAPA[A-Z0-9]{6}$/')
+        ->and($service->preview('NAP'))->toBe('NAPABC1234')
+        ->and($service->normalizeContent(" nap\u{00A0}abc \t123 "))->toBe('NAPABC123');
 
-    expect(fn () => $service->generate($config, 5))->toThrow(InvalidArgumentException::class)
-        ->and(fn () => $service->generate($config, 9))->toThrow(InvalidArgumentException::class);
+    expect(fn () => $service->preview('NAPCA'))->toThrow(InvalidArgumentException::class);
 });
 
 test('recharge prefix only accepts letters and numbers', function (): void {
     $rules = (new UpdateRechargeConfigRequest)->rules()['transfer_prefix'];
 
-    expect(Validator::make(['transfer_prefix' => 'NAPCAROT'], ['transfer_prefix' => $rules])->passes())->toBeTrue()
+    expect(Validator::make(['transfer_prefix' => 'NAPA'], ['transfer_prefix' => $rules])->passes())->toBeTrue()
+        ->and(Validator::make(['transfer_prefix' => 'NAPCA'], ['transfer_prefix' => $rules])->fails())->toBeTrue()
         ->and(Validator::make(['transfer_prefix' => 'NAP-CAROT'], ['transfer_prefix' => $rules])->fails())->toBeTrue()
         ->and(Validator::make(['transfer_prefix' => 'NAP CAROT'], ['transfer_prefix' => $rules])->fails())->toBeTrue();
 });

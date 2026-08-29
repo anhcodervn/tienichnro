@@ -4,6 +4,7 @@ namespace App\Features\Topup\Services\Payments;
 
 use App\Enums\PaymentStatus;
 use App\Exceptions\ApiException;
+use App\Features\Recharge\Services\BankTransferContentService;
 use App\Features\Topup\Jobs\ProcessTopupOrder;
 use App\Mail\Orders\PaymentReceivedMail;
 use App\Models\Order;
@@ -12,17 +13,18 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 class BankPaymentService
 {
+    public function __construct(private readonly BankTransferContentService $bankTransferContentService) {}
+
     /** @param array<string, mixed> $payload */
     public function match(array $payload, array $rawPayload = []): ?PaymentTransaction
     {
         $transferContent = trim((string) ($payload['transfer_content'] ?? ''));
         $transactionDescription = trim((string) ($payload['transaction_description'] ?? ''));
         $receivedContent = $transferContent !== '' ? $transferContent : $transactionDescription;
-        $content = Str::upper($receivedContent);
+        $content = $this->bankTransferContentService->normalizeContent($receivedContent);
         $clientOrderCode = trim((string) ($payload['client_order_code'] ?? ''));
         $amount = (int) str((string) ($payload['amount'] ?? 0))->before('.')->toString();
         $orderCode = $this->resolveOrderCode($content, $clientOrderCode, $amount);
@@ -116,7 +118,7 @@ class BankPaymentService
 
     private function resolveOrderCode(string $content, string $clientOrderCode, int $amount): ?string
     {
-        $normalizedContent = Str::upper(trim($content));
+        $normalizedContent = $this->bankTransferContentService->normalizeContent($content);
 
         if ($normalizedContent === '') {
             return $this->extractOrderCode($clientOrderCode);
@@ -147,7 +149,9 @@ class BankPaymentService
             ->get();
 
         $matches = $candidates->filter(function (PaymentTransaction $candidate) use ($normalizedContent): bool {
-            $reference = Str::upper(trim((string) ($candidate->transfer_reference ?: $candidate->content)));
+            $reference = $this->bankTransferContentService->normalizeContent(
+                (string) ($candidate->transfer_reference ?: $candidate->content),
+            );
 
             return $reference !== '' && str_contains($normalizedContent, $reference);
         });

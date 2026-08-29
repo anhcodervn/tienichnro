@@ -304,7 +304,7 @@ test('apibankvn webhook cannot credit a wallet transaction already handled by po
                     'transaction_id' => 'BANK-WALLET-WINNER',
                     'type' => 'credit',
                     'amount' => 50000,
-                    'description' => 'NAPWALLET01',
+                    'description' => 'NAP WAL LET01',
                 ]],
             ],
         ]),
@@ -320,7 +320,7 @@ test('apibankvn webhook cannot credit a wallet transaction already handled by po
             'sign' => md5('webhook-secret12'),
             'transaction_id' => 'BANK-WALLET-WINNER',
             'transaction_type' => 'credit',
-            'transfer_content' => 'NAPWALLET01',
+            'transfer_content' => 'NAP WALL ET01',
             'amount' => 50000,
         ])
         ->assertSuccessful();
