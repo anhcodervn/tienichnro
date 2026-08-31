@@ -55,6 +55,19 @@ export interface ServiceArticlesSettingType {
     game_service_items: GameServiceMenuItem[];
 }
 
+export interface BioLinkItemType {
+    label: string;
+    url: string;
+    is_active: boolean;
+}
+
+export interface BioSettingType {
+    bio_title: string;
+    bio_description: string;
+    bio_avatar_url: string;
+    bio_links: BioLinkItemType[];
+}
+
 export interface BrandingSettingType {
     light_logo: string;
     dark_logo: string;

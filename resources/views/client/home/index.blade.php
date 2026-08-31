@@ -25,6 +25,26 @@
         </div>
     @endif
 
+    <a
+        href="{{ route('bio.show') }}"
+        class="group mb-4 flex min-h-16 w-full items-center gap-3 rounded-[10px] border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 px-4 py-3 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 sm:gap-4 sm:px-5"
+        data-community-cta
+    >
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-emerald-600 text-xl text-white shadow-sm sm:h-11 sm:w-11" aria-hidden="true">
+            <i class="bx bx-group"></i>
+        </span>
+        <span class="min-w-0 flex-1">
+            <span class="flex flex-wrap items-center gap-2">
+                <strong class="text-sm font-extrabold text-slate-950 sm:text-base">Tham gia cộng đồng</strong>
+                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-amber-700">Nổi bật</span>
+            </span>
+            <span class="mt-0.5 block text-xs leading-5 text-slate-600 sm:text-sm">Kết nối và truy cập nhanh các kênh chính thức của Nạp Carot.</span>
+        </span>
+        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-emerald-200 bg-white text-lg text-emerald-700 transition group-hover:translate-x-1 group-hover:border-emerald-300" aria-hidden="true">
+            <i class="bx bx-right-arrow-alt"></i>
+        </span>
+    </a>
+
     @include('client.components.topup-form', ['games' => $games, 'walletBalance' => $walletBalance])
 
     <div class="home-trust-strip" aria-label="Cam kết dịch vụ">

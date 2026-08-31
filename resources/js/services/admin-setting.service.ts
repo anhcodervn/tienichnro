@@ -1,5 +1,6 @@
 import api from '@/config/axios';
 import type {
+    BioSettingType,
     BrandingSettingType,
     ContactSettingType,
     ContentPageSettingsType,
@@ -51,6 +52,12 @@ export const adminSettingService = {
     },
     updateServiceArticles(payload: ServiceArticlesSettingType) {
         return updateTab<ServiceArticlesSettingType>('service-articles', payload);
+    },
+    getBio() {
+        return getTab<BioSettingType>('bio');
+    },
+    updateBio(payload: BioSettingType) {
+        return updateTab<BioSettingType>('bio', payload);
     },
     getBranding() {
         return getTab<BrandingSettingType>('branding');

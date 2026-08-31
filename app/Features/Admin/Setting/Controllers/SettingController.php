@@ -38,6 +38,12 @@ class SettingController extends Controller
                 'game_service_enabled' => false,
                 'game_service_items' => [],
             ],
+            'bio' => [
+                'bio_title' => '',
+                'bio_description' => '',
+                'bio_avatar_url' => '',
+                'bio_links' => [],
+            ],
             'branding' => [
                 'light_logo' => '',
                 'dark_logo' => '',
@@ -193,6 +199,12 @@ class SettingController extends Controller
             'service-articles' => [
                 'game_service_enabled' => 'game_service_enabled',
                 'game_service_items' => 'game_service_items',
+            ],
+            'bio' => [
+                'bio_title' => 'bio_title',
+                'bio_description' => 'bio_description',
+                'bio_avatar_url' => 'bio_avatar_url',
+                'bio_links' => 'bio_links',
             ],
             'branding' => [
                 'light_logo' => 'light_logo',

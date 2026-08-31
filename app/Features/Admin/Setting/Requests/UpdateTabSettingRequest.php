@@ -53,6 +53,16 @@ class UpdateTabSettingRequest extends FormRequest
                 'game_service_items.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
                 'game_service_items.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeServiceUrlRule()],
             ],
+            'bio' => [
+                'bio_title' => ['required', 'string', 'max:120', 'not_regex:/[\x00-\x1F\x7F]/u'],
+                'bio_description' => ['nullable', 'string', 'max:500'],
+                'bio_avatar_url' => ['nullable', 'string', 'max:2048', $this->safeBioUrlRule()],
+                'bio_links' => ['present', 'array', 'max:20'],
+                'bio_links.*' => ['required', 'array:label,url,is_active'],
+                'bio_links.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
+                'bio_links.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeBioUrlRule()],
+                'bio_links.*.is_active' => ['required', 'boolean'],
+            ],
             'branding' => [
                 'light_logo' => ['nullable', 'string', 'max:2048'],
                 'dark_logo' => ['nullable', 'string', 'max:2048'],
@@ -157,6 +167,10 @@ class UpdateTabSettingRequest extends FormRequest
             'game_service_items.*.label.max' => 'Tên dịch vụ không được vượt quá 80 ký tự.',
             'game_service_items.*.url.required' => 'Vui lòng nhập liên kết dịch vụ.',
             'game_service_items.*.url.distinct' => 'Liên kết dịch vụ không được trùng nhau.',
+            'bio_links.max' => 'Chỉ được cấu hình tối đa 20 liên kết bio.',
+            'bio_links.*.label.required' => 'Vui lòng nhập tên liên kết bio.',
+            'bio_links.*.url.required' => 'Vui lòng nhập URL liên kết bio.',
+            'bio_links.*.url.distinct' => 'URL liên kết bio không được trùng nhau.',
         ];
     }
 
@@ -175,6 +189,13 @@ class UpdateTabSettingRequest extends FormRequest
             'game_service_items' => 'danh sách dịch vụ game',
             'game_service_items.*.label' => 'tên dịch vụ',
             'game_service_items.*.url' => 'liên kết dịch vụ',
+            'bio_title' => 'tiêu đề trang bio',
+            'bio_description' => 'mô tả trang bio',
+            'bio_avatar_url' => 'ảnh đại diện trang bio',
+            'bio_links' => 'danh sách liên kết bio',
+            'bio_links.*.label' => 'tên liên kết bio',
+            'bio_links.*.url' => 'URL liên kết bio',
+            'bio_links.*.is_active' => 'trạng thái liên kết bio',
             'light_logo' => 'logo nền tối',
             'dark_logo' => 'logo nền sáng',
             'favicon' => 'favicon',
@@ -216,6 +237,12 @@ class UpdateTabSettingRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        if ((string) $this->route('tab') === 'bio') {
+            $this->prepareBioSettings();
+
+            return;
+        }
+
         if ((string) $this->route('tab') !== 'service-articles' || ! $this->exists('game_service_items')) {
             return;
         }
@@ -252,5 +279,40 @@ class UpdateTabSettingRequest extends FormRequest
                 $fail('Liên kết dịch vụ game phải là URL http/https hoặc đường dẫn nội bộ bắt đầu bằng /.');
             }
         };
+    }
+
+    private function safeBioUrlRule(): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail): void {
+            if ($value !== null && $value !== '' && ! SafeNavigationUrl::passes($value)) {
+                $fail('Liên kết bio phải là URL http/https hoặc đường dẫn nội bộ bắt đầu bằng /.');
+            }
+        };
+    }
+
+    private function prepareBioSettings(): void
+    {
+        $links = $this->input('bio_links');
+
+        if (! is_array($links)) {
+            return;
+        }
+
+        $this->merge([
+            'bio_title' => is_string($this->input('bio_title')) ? trim($this->input('bio_title')) : $this->input('bio_title'),
+            'bio_description' => is_string($this->input('bio_description')) ? trim($this->input('bio_description')) : $this->input('bio_description'),
+            'bio_avatar_url' => is_string($this->input('bio_avatar_url')) ? trim($this->input('bio_avatar_url')) : $this->input('bio_avatar_url'),
+            'bio_links' => array_map(static function (mixed $link): mixed {
+                if (! is_array($link)) {
+                    return $link;
+                }
+
+                return [
+                    ...$link,
+                    'label' => is_string($link['label'] ?? null) ? trim($link['label']) : ($link['label'] ?? null),
+                    'url' => is_string($link['url'] ?? null) ? trim($link['url']) : ($link['url'] ?? null),
+                ];
+            }, $links),
+        ]);
     }
 }

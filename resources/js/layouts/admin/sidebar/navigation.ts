@@ -162,6 +162,10 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 label: 'Cấu hình nội dung',
                 href: '/admin/settings/content',
             },
+            {
+                label: 'Cấu hình Bio',
+                href: '/admin/settings/bio',
+            },
         ],
     },
     {

@@ -179,6 +179,11 @@ export default {
             component: () => import('@/pages/admin/settings/content/index.vue'),
         },
         {
+            path: 'settings/bio',
+            name: 'admin.settings.bio',
+            component: () => import('@/pages/admin/settings/bio/index.vue'),
+        },
+        {
             path: 'settings/recharge',
             redirect: { name: 'admin.recharge.config' },
         },
