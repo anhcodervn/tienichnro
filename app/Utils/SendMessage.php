@@ -20,6 +20,7 @@ class SendMessage
         'recovered' => 'recovered',
         'staging' => 'staging',
         'sales' => 'sales',
+        'daily_report' => 'daily_report',
         'provider' => 'provider',
         'feedback' => 'feedback',
         'support' => 'support',

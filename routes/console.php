@@ -19,4 +19,4 @@ Schedule::command('report:discord-daily-topup')
     ->dailyAt('23:55')
     ->withoutOverlapping()
     ->onOneServer()
-    ->when(static fn (): bool => filled(config('services.discord.channels.sales')));
+    ->when(static fn (): bool => filled(config('services.discord.channels.daily_report')));

@@ -83,10 +83,12 @@ test('a refunded order queues one sales report and is excluded from successful d
         && $job->dedupeKey === "topup-order:{$order->id}:refunded"
         && $job->details['Thanh toán'] === PaymentStatus::Refunded->value);
 
+    config(['services.discord.channels.daily_report' => 'https://discord.test/daily-report']);
     Queue::fake([SendDiscordReport::class]);
     $this->artisan('report:discord-daily-topup', ['--date' => '2026-08-22'])->assertSuccessful();
 
-    Queue::assertPushed(SendDiscordReport::class, fn (SendDiscordReport $job): bool => $job->dedupeKey === 'topup-daily:2026-08-22'
+    Queue::assertPushed(SendDiscordReport::class, fn (SendDiscordReport $job): bool => $job->channel === 'daily_report'
+        && $job->dedupeKey === 'topup-daily:2026-08-22'
         && $job->details['Đơn thành công'] === 0
         && $job->details['Lượt nạp thành công'] === 0
         && $job->details['Doanh thu thành công'] === '0đ');
@@ -214,6 +216,27 @@ test('discord report job posts with mentions disabled and retries transport fail
         ->and($job->queue)->toBe('default');
 });
 
+test('daily report job posts only to its dedicated webhook', function (): void {
+    app()->detectEnvironment(fn (): string => 'local');
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://discord.test/daily-report' => Http::response([], 204),
+        'https://discord.test/sales' => Http::response([], 204),
+    ]);
+    config([
+        'services.discord.channels.daily_report' => 'https://discord.test/daily-report',
+        'services.discord.channels.sales' => 'https://discord.test/sales',
+    ]);
+    $job = new SendDiscordReport('daily_report', 'Báo cáo cuối ngày', [], 'daily-report');
+
+    $job->handle(app(DiscordReportService::class));
+
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($request): bool => $request->url() === 'https://discord.test/daily-report'
+        && str_contains((string) $request['content'], '[DAILY_REPORT]'));
+    Http::assertNotSent(fn ($request): bool => $request->url() === 'https://discord.test/sales');
+});
+
 test('daily topup report contains only paid completed orders by completion date', function (): void {
     Order::factory()->create([
         'created_at' => '2026-08-21 23:00:00',
@@ -233,14 +256,15 @@ test('daily topup report contains only paid completed orders by completion date'
         'order_status' => OrderStatus::Failed,
         'total_amount' => 17000,
     ]);
-    config(['services.discord.channels.sales' => 'https://discord.test/sales']);
+    config(['services.discord.channels.daily_report' => 'https://discord.test/daily-report']);
     Queue::fake([SendDiscordReport::class]);
 
     $this->artisan('report:discord-daily-topup', ['--date' => '2026-08-22'])
         ->expectsOutputToContain('Đã xếp báo cáo Discord ngày 22/08/2026 vào queue.')
         ->assertSuccessful();
 
-    Queue::assertPushed(SendDiscordReport::class, fn (SendDiscordReport $job): bool => $job->dedupeKey === 'topup-daily:2026-08-22'
+    Queue::assertPushed(SendDiscordReport::class, fn (SendDiscordReport $job): bool => $job->channel === 'daily_report'
+        && $job->dedupeKey === 'topup-daily:2026-08-22'
         && $job->title === 'Báo cáo topup thành công ngày 22/08/2026'
         && $job->details['Đơn thành công'] === 1
         && $job->details['Lượt nạp thành công'] === 2
@@ -251,6 +275,20 @@ test('daily topup report contains only paid completed orders by completion date'
         && $job->details['Đơn thiếu snapshot cost'] === 0
         && $job->details['Giá trị trung bình'] === '8.500đ'
         && ! str_contains(serialize($job), '17.000đ'));
+});
+
+test('daily topup report does not fall back to the sales webhook', function (): void {
+    config([
+        'services.discord.channels.daily_report' => null,
+        'services.discord.channels.sales' => 'https://discord.test/sales',
+    ]);
+    Queue::fake([SendDiscordReport::class]);
+
+    $this->artisan('report:discord-daily-topup', ['--date' => '2026-08-22'])
+        ->expectsOutputToContain('Chưa cấu hình DISCORD_WEBHOOK_DAILY_REPORT;')
+        ->assertSuccessful();
+
+    Queue::assertNotPushed(SendDiscordReport::class);
 });
 
 test('daily report rejects an invalid date', function (): void {

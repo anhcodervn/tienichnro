@@ -12,6 +12,7 @@ class DiscordReportService
     private const CHANNELS = [
         'activity',
         'alerts',
+        'daily_report',
         'feedback',
         'info',
         'ops',

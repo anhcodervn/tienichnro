@@ -46,7 +46,7 @@ class DiscordDailyTopupReportCommand extends Command
         }
 
         if (! $discordReporter->dailySummary($date)) {
-            $this->warn('Chưa cấu hình DISCORD_WEBHOOK_SALES; báo cáo không được xếp queue.');
+            $this->warn('Chưa cấu hình DISCORD_WEBHOOK_DAILY_REPORT; báo cáo không được xếp queue.');
 
             return self::SUCCESS;
         }

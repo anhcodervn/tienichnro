@@ -168,7 +168,7 @@ class TopupDiscordReporterService
         $summary = $this->topupReportService->successfulSummary($from, $to);
 
         return $this->discordReportService->queue(
-            channel: 'sales',
+            channel: 'daily_report',
             title: 'Báo cáo topup thành công ngày '.$day->format('d/m/Y'),
             details: [
                 'Đơn thành công' => $summary['successful_orders'],
