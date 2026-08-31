@@ -19,6 +19,8 @@ test('bio page is a standalone blade page with a home link', function (): void {
         ->assertSee('Tất cả liên kết chính thức tại một nơi.')
         ->assertSee('Quay về trang chủ')
         ->assertSee('href="'.route('home').'"', false);
+
+    expect(route('bio.show', [], false))->toBe('/community');
 });
 
 test('homepage shows the community call to action before the topup form', function (): void {
@@ -56,9 +58,9 @@ test('admin can customize bio links and only active links are rendered safely', 
         'bio_description' => ' Kênh chính thức ',
         'bio_avatar_url' => '/images/avatar.webp',
         'bio_links' => [
-            ['label' => ' Facebook chính thức ', 'url' => ' https://facebook.com/napcarot ', 'is_active' => true],
-            ['label' => '<script>alert(1)</script>', 'url' => '/khuyen-mai', 'is_active' => true],
-            ['label' => 'Link đang ẩn', 'url' => 'https://example.com/hidden', 'is_active' => false],
+            ['label' => ' Facebook chính thức ', 'url' => ' https://facebook.com/napcarot ', 'icon' => 'facebook', 'is_active' => true],
+            ['label' => '<script>alert(1)</script>', 'url' => '/khuyen-mai', 'icon' => 'website', 'is_active' => true],
+            ['label' => 'Link đang ẩn', 'url' => 'https://example.com/hidden', 'icon' => 'link', 'is_active' => false],
         ],
     ];
 
@@ -74,6 +76,7 @@ test('admin can customize bio links and only active links are rendered safely', 
         ->assertOk()
         ->assertSee('Facebook chính thức')
         ->assertSee('href="https://facebook.com/napcarot"', false)
+        ->assertSee('class="bxl bx-facebook-circle"', false)
         ->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', false)
         ->assertDontSee('<script>alert(1)</script>', false)
         ->assertDontSee('Link đang ẩn');
@@ -94,21 +97,51 @@ test('bio settings reject unsafe and duplicate links', function (array $links, s
     expect(array_key_exists($field, $response->json('data.errors')))->toBeTrue();
 })->with([
     'javascript URL' => [
-        [['label' => 'Không an toàn', 'url' => 'javascript:alert(1)', 'is_active' => true]],
+        [['label' => 'Không an toàn', 'url' => 'javascript:alert(1)', 'icon' => 'link', 'is_active' => true]],
         'bio_links.0.url',
     ],
     'protocol relative URL' => [
-        [['label' => 'Không an toàn', 'url' => '//example.com', 'is_active' => true]],
+        [['label' => 'Không an toàn', 'url' => '//example.com', 'icon' => 'link', 'is_active' => true]],
         'bio_links.0.url',
     ],
     'duplicate URL' => [
         [
-            ['label' => 'Link 1', 'url' => 'https://example.com', 'is_active' => true],
-            ['label' => 'Link 2', 'url' => 'https://example.com', 'is_active' => true],
+            ['label' => 'Link 1', 'url' => 'https://example.com', 'icon' => 'link', 'is_active' => true],
+            ['label' => 'Link 2', 'url' => 'https://example.com', 'icon' => 'link', 'is_active' => true],
         ],
         'bio_links.1.url',
     ],
 ]);
+
+test('bio settings reject icons outside the supported list', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $response = $this->actingAs($admin)
+        ->patchJson('/api/admin-api/settings/bio', [
+            'bio_title' => 'Nạp Carot',
+            'bio_description' => '',
+            'bio_avatar_url' => '',
+            'bio_links' => [
+                ['label' => 'Link', 'url' => 'https://example.com', 'icon' => 'bx-malicious-class', 'is_active' => true],
+            ],
+        ])
+        ->assertUnprocessable();
+
+    expect(array_key_exists('bio_links.0.icon', $response->json('data.errors')))->toBeTrue();
+});
+
+test('legacy bio links without an icon use the default link icon', function (): void {
+    app(SettingStore::class)->putMany([
+        'bio_links' => [
+            ['label' => 'Liên kết cũ', 'url' => '/lien-he', 'is_active' => true],
+        ],
+    ]);
+
+    $this->get(route('bio.show'))
+        ->assertOk()
+        ->assertSee('Liên kết cũ')
+        ->assertSee('class="bx bx-link-alt"', false);
+});
 
 test('admin bio page is registered as a separate navigation page', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);

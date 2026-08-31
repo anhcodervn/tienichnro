@@ -8,6 +8,24 @@ use Illuminate\Contracts\View\View;
 
 class BioPageController extends Controller
 {
+    /** @var array<string, string> */
+    private const BIO_ICON_CLASSES = [
+        'link' => 'bx bx-link-alt',
+        'website' => 'bx bx-globe-alt',
+        'facebook' => 'bxl bx-facebook-circle',
+        'messenger' => 'bxl bx-messenger',
+        'youtube' => 'bxl bx-youtube',
+        'discord' => 'bxl bx-discord-alt',
+        'telegram' => 'bxl bx-telegram',
+        'tiktok' => 'bxl bx-tiktok',
+        'instagram' => 'bxl bx-instagram',
+        'zalo' => 'bx bx-message-circle-dots',
+        'email' => 'bx bx-envelope',
+        'phone' => 'bx bx-phone',
+        'store' => 'bx bx-store',
+        'community' => 'bx bx-group',
+    ];
+
     public function __invoke(SettingStore $settingStore): View
     {
         $settings = $settingStore->getMany($this->defaults());
@@ -50,7 +68,7 @@ class BioPageController extends Controller
     }
 
     /**
-     * @return array<int, array{label: string, url: string}>
+     * @return array<int, array{label: string, url: string, icon_class: string}>
      */
     private function activeLinks(mixed $links): array
     {
@@ -66,6 +84,7 @@ class BioPageController extends Controller
             ->map(fn (array $link): array => [
                 'label' => trim($link['label']),
                 'url' => trim($link['url']),
+                'icon_class' => self::BIO_ICON_CLASSES[$link['icon'] ?? 'link'] ?? self::BIO_ICON_CLASSES['link'],
             ])
             ->values()
             ->all();

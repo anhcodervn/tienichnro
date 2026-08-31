@@ -7,6 +7,7 @@
     <meta name="description" content="{{ $profile['description'] }}">
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=be-vietnam-pro:400,500,600,700,800" rel="stylesheet">
+    <x-boxicon />
     @vite('resources/css/client.css')
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
@@ -34,7 +35,9 @@
             <div class="mt-8 grid gap-3" data-bio-links>
                 @forelse ($links as $link)
                     <a class="group flex min-h-16 items-center justify-between gap-4 rounded-2xl border border-white/10 bg-white/[0.07] px-5 py-3 font-bold text-white shadow-lg shadow-black/10 backdrop-blur transition hover:-translate-y-0.5 hover:border-emerald-300/60 hover:bg-white/[0.12] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300" href="{{ $link['url'] }}" data-bio-link>
-                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-emerald-300" aria-hidden="true">↗</span>
+                        <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white/10 text-xl text-emerald-300" aria-hidden="true">
+                            <i class="{{ $link['icon_class'] }}"></i>
+                        </span>
                         <span class="min-w-0 flex-1 text-left">{{ $link['label'] }}</span>
                         <span class="text-lg text-slate-400 transition group-hover:translate-x-1 group-hover:text-white" aria-hidden="true">→</span>
                     </a>

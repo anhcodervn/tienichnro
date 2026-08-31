@@ -58,6 +58,7 @@ export interface ServiceArticlesSettingType {
 export interface BioLinkItemType {
     label: string;
     url: string;
+    icon: string;
     is_active: boolean;
 }
 

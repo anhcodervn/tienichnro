@@ -9,6 +9,7 @@ use Closure;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class UpdateTabSettingRequest extends FormRequest
 {
@@ -58,9 +59,10 @@ class UpdateTabSettingRequest extends FormRequest
                 'bio_description' => ['nullable', 'string', 'max:500'],
                 'bio_avatar_url' => ['nullable', 'string', 'max:2048', $this->safeBioUrlRule()],
                 'bio_links' => ['present', 'array', 'max:20'],
-                'bio_links.*' => ['required', 'array:label,url,is_active'],
+                'bio_links.*' => ['required', 'array:label,url,icon,is_active'],
                 'bio_links.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
                 'bio_links.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeBioUrlRule()],
+                'bio_links.*.icon' => ['required', 'string', Rule::in($this->bioIconKeys())],
                 'bio_links.*.is_active' => ['required', 'boolean'],
             ],
             'branding' => [
@@ -195,6 +197,7 @@ class UpdateTabSettingRequest extends FormRequest
             'bio_links' => 'danh sách liên kết bio',
             'bio_links.*.label' => 'tên liên kết bio',
             'bio_links.*.url' => 'URL liên kết bio',
+            'bio_links.*.icon' => 'biểu tượng liên kết bio',
             'bio_links.*.is_active' => 'trạng thái liên kết bio',
             'light_logo' => 'logo nền tối',
             'dark_logo' => 'logo nền sáng',
@@ -311,8 +314,32 @@ class UpdateTabSettingRequest extends FormRequest
                     ...$link,
                     'label' => is_string($link['label'] ?? null) ? trim($link['label']) : ($link['label'] ?? null),
                     'url' => is_string($link['url'] ?? null) ? trim($link['url']) : ($link['url'] ?? null),
+                    'icon' => $link['icon'] ?? 'link',
                 ];
             }, $links),
         ]);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function bioIconKeys(): array
+    {
+        return [
+            'link',
+            'website',
+            'facebook',
+            'messenger',
+            'youtube',
+            'discord',
+            'telegram',
+            'tiktok',
+            'instagram',
+            'zalo',
+            'email',
+            'phone',
+            'store',
+            'community',
+        ];
     }
 }

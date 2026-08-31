@@ -27,6 +27,7 @@
     <link href="https://fonts.bunny.net/css?family=be-vietnam-pro:400,500,600,700|ibm-plex-sans:400,500,600,700|space-grotesk:500,600,700"
         rel="stylesheet" />
 
+    <x-boxicon />
     @routes
     @vite(['resources/css/app.css', 'resources/js/app.ts'])
 

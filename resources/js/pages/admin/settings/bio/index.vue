@@ -16,9 +16,36 @@ const form = ref<BioSettingType>({
 
 const activeLinks = computed(() => form.value.bio_links.filter((link) => link.is_active));
 
+const bioIconOptions = [
+    { value: 'link', label: 'Liên kết', className: 'bx bx-link-alt' },
+    { value: 'website', label: 'Website', className: 'bx bx-globe-alt' },
+    { value: 'facebook', label: 'Facebook', className: 'bxl bx-facebook-circle' },
+    { value: 'messenger', label: 'Messenger', className: 'bxl bx-messenger' },
+    { value: 'youtube', label: 'YouTube', className: 'bxl bx-youtube' },
+    { value: 'discord', label: 'Discord', className: 'bxl bx-discord-alt' },
+    { value: 'telegram', label: 'Telegram', className: 'bxl bx-telegram' },
+    { value: 'tiktok', label: 'TikTok', className: 'bxl bx-tiktok' },
+    { value: 'instagram', label: 'Instagram', className: 'bxl bx-instagram' },
+    { value: 'zalo', label: 'Zalo / Chat', className: 'bx bx-message-circle-dots' },
+    { value: 'email', label: 'Email', className: 'bx bx-envelope' },
+    { value: 'phone', label: 'Điện thoại', className: 'bx bx-phone' },
+    { value: 'store', label: 'Cửa hàng', className: 'bx bx-store' },
+    { value: 'community', label: 'Cộng đồng', className: 'bx bx-group' },
+] as const;
+
+const normalizeLink = (link: Partial<BioLinkItemType>): BioLinkItemType => ({
+    label: link.label ?? '',
+    url: link.url ?? '',
+    icon: link.icon ?? 'link',
+    is_active: link.is_active ?? true,
+});
+
+const iconClass = (icon: string): string => bioIconOptions.find((option) => option.value === icon)?.className ?? 'bx bx-link-alt';
+
 const createLink = (): BioLinkItemType => ({
     label: '',
     url: '',
+    icon: 'link',
     is_active: true,
 });
 
@@ -27,7 +54,7 @@ const loadSettings = async (): Promise<void> => {
         const response = await adminSettingService.getBio();
         form.value = {
             ...response.settings,
-            bio_links: Array.isArray(response.settings.bio_links) ? response.settings.bio_links : [],
+            bio_links: Array.isArray(response.settings.bio_links) ? response.settings.bio_links.map(normalizeLink) : [],
         };
     } catch (error) {
         handleErrorResponse(error);
@@ -40,7 +67,7 @@ const saveSettings = async (): Promise<void> => {
     try {
         isSaving.value = true;
         const response = await adminSettingService.updateBio(form.value);
-        form.value = { ...response.settings, bio_links: response.settings.bio_links ?? [] };
+        form.value = { ...response.settings, bio_links: (response.settings.bio_links ?? []).map(normalizeLink) };
         handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật trang Bio.' } });
     } catch (error) {
         handleErrorResponse(error);
@@ -79,12 +106,12 @@ onMounted(loadSettings);
                     <div>
                         <p class="text-xs font-bold uppercase tracking-[0.16em] text-emerald-600">Link in bio</p>
                         <h1 class="mt-1 text-xl font-bold text-slate-950">Cấu hình trang Bio</h1>
-                        <p class="mt-1 text-sm text-slate-500">Tùy chỉnh nội dung hiển thị tại đường dẫn /comutry.</p>
+                        <p class="mt-1 text-sm text-slate-500">Tùy chỉnh nội dung hiển thị tại đường dẫn /community.</p>
                     </div>
                     <div class="flex gap-2">
                         <a
                             class="inline-flex min-h-10 items-center gap-2 rounded-[8px] border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                            href="/comutry"
+                            href="/community"
                             target="_blank"
                             rel="noopener noreferrer"
                         >
@@ -160,7 +187,18 @@ onMounted(loadSettings);
 
                 <div class="mt-4 grid gap-3">
                     <div v-for="(link, index) in form.bio_links" :key="index" class="rounded-[10px] border border-slate-200 bg-slate-50 p-3">
-                        <div class="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)_auto]">
+                        <div class="grid gap-3 md:grid-cols-[150px_minmax(0,0.8fr)_minmax(0,1.2fr)_auto]">
+                            <label class="grid gap-1">
+                                <span class="text-xs font-semibold text-slate-600">Biểu tượng</span>
+                                <span class="flex min-h-10 items-center gap-2 rounded-[8px] border border-slate-300 bg-white px-2">
+                                    <i :class="[iconClass(link.icon), 'shrink-0 text-lg text-emerald-600']" aria-hidden="true"></i>
+                                    <select v-model="link.icon" class="min-w-0 flex-1 border-0 bg-transparent p-0 text-sm outline-none focus:ring-0">
+                                        <option v-for="option in bioIconOptions" :key="option.value" :value="option.value">
+                                            {{ option.label }}
+                                        </option>
+                                    </select>
+                                </span>
+                            </label>
                             <label class="grid gap-1">
                                 <span class="text-xs font-semibold text-slate-600">Tên link</span>
                                 <input
@@ -254,9 +292,10 @@ onMounted(loadSettings);
                     <div
                         v-for="(link, index) in activeLinks"
                         :key="index"
-                        class="rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 text-sm font-semibold"
+                        class="flex items-center gap-3 rounded-xl border border-white/10 bg-white/[0.07] px-4 py-3 text-sm font-semibold"
                     >
-                        {{ link.label || 'Tên liên kết' }}
+                        <i :class="[iconClass(link.icon), 'text-lg text-emerald-300']" aria-hidden="true"></i>
+                        <span>{{ link.label || 'Tên liên kết' }}</span>
                     </div>
                     <p
                         v-if="activeLinks.length === 0"
