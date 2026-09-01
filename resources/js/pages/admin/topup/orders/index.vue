@@ -86,28 +86,28 @@ const statistics = reactive<OrderStatistics>({ total: 0, pending_payment: 0, pro
 
 const summaries = computed<{ label: string; value: number; icon: Component; classes: string; iconClasses: string }[]>(() => [
     {
-        label: 'Tổng đơn hôm nay',
+        label: 'Tổng thẻ hôm nay',
         value: statistics.total,
         icon: FolderOpen,
         classes: 'border-sky-200/80 bg-gradient-to-br from-sky-50 to-white text-sky-700',
         iconClasses: 'bg-sky-100 text-sky-700',
     },
     {
-        label: 'Chờ thanh toán hôm nay',
+        label: 'Thẻ chờ thanh toán',
         value: statistics.pending_payment,
         icon: Clock3,
         classes: 'border-amber-200/80 bg-gradient-to-br from-amber-50 to-white text-amber-700',
         iconClasses: 'bg-amber-100 text-amber-700',
     },
     {
-        label: 'Đang xử lý hôm nay',
+        label: 'Thẻ đang xử lý',
         value: statistics.processing,
         icon: RefreshCcw,
         classes: 'border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-white text-indigo-700',
         iconClasses: 'bg-indigo-100 text-indigo-700',
     },
     {
-        label: 'Đơn lỗi hôm nay',
+        label: 'Thẻ lỗi hôm nay',
         value: statistics.failed,
         icon: TriangleAlert,
         classes: 'border-rose-200/80 bg-gradient-to-br from-rose-50 to-white text-rose-700 ring-1 ring-rose-600/20',
@@ -455,7 +455,7 @@ onBeforeUnmount(() => {
             </button>
         </header>
 
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Thống kê đơn hàng hôm nay">
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Thống kê số lượng thẻ hôm nay">
             <article
                 v-for="summary in summaries"
                 :key="summary.label"
@@ -470,7 +470,7 @@ onBeforeUnmount(() => {
                     <strong class="mt-1 block text-2xl font-black tabular-nums leading-none">{{
                         !initialLoaded && loading ? '—' : summary.value
                     }}</strong
-                    ><span class="mt-1 block text-xs opacity-70">đơn</span>
+                    ><span class="mt-1 block text-xs opacity-70">thẻ</span>
                 </div>
             </article>
         </div>

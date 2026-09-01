@@ -28,32 +28,37 @@ test('topup admin api rejects guests and ordinary users', function (): void {
         ->assertForbidden();
 });
 
-test('admin order statistics only count orders created today', function (): void {
+test('admin card statistics sum quantities from orders created today', function (): void {
     $this->travelTo(Carbon::parse('2026-09-01 12:00:00', config('app.timezone')));
     $admin = User::factory()->create(['role' => 'admin']);
 
     Order::factory()->create([
         'created_at' => now()->startOfDay(),
+        'quantity' => 3,
         'payment_status' => PaymentStatus::Pending,
         'order_status' => OrderStatus::Pending,
     ]);
     Order::factory()->create([
         'created_at' => now()->subHours(2),
+        'quantity' => 2,
         'payment_status' => PaymentStatus::Paid,
         'order_status' => OrderStatus::Processing,
     ]);
     Order::factory()->create([
         'created_at' => now()->subHour(),
+        'quantity' => 4,
         'payment_status' => PaymentStatus::Paid,
         'order_status' => OrderStatus::Failed,
     ]);
     Order::factory()->create([
         'created_at' => now(),
+        'quantity' => 5,
         'payment_status' => PaymentStatus::Paid,
         'order_status' => OrderStatus::Completed,
     ]);
     Order::factory()->create([
         'created_at' => now()->startOfDay()->subSecond(),
+        'quantity' => 7,
         'payment_status' => PaymentStatus::Pending,
         'order_status' => OrderStatus::Failed,
     ]);
@@ -61,10 +66,10 @@ test('admin order statistics only count orders created today', function (): void
     $this->actingAs($admin)
         ->getJson('/api/admin-api/orders?order_status=failed')
         ->assertOk()
-        ->assertJsonPath('data.statistics.total', 4)
-        ->assertJsonPath('data.statistics.pending_payment', 1)
-        ->assertJsonPath('data.statistics.processing', 1)
-        ->assertJsonPath('data.statistics.failed', 1)
+        ->assertJsonPath('data.statistics.total', 14)
+        ->assertJsonPath('data.statistics.pending_payment', 3)
+        ->assertJsonPath('data.statistics.processing', 2)
+        ->assertJsonPath('data.statistics.failed', 4)
         ->assertJsonPath('data.meta.total', 2);
 });
 

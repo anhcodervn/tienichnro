@@ -121,17 +121,17 @@ class TopupAdminService
     /**
      * @return array{total: int, pending_payment: int, processing: int, failed: int}
      */
-    public function todayOrderStatistics(): array
+    public function todayCardStatistics(): array
     {
         $startOfToday = now()->startOfDay();
         $startOfTomorrow = $startOfToday->copy()->addDay();
         $statistics = Order::query()
             ->where('created_at', '>=', $startOfToday)
             ->where('created_at', '<', $startOfTomorrow)
-            ->selectRaw('COUNT(*) as total')
-            ->selectRaw('SUM(CASE WHEN payment_status = ? THEN 1 ELSE 0 END) as pending_payment', [PaymentStatus::Pending->value])
-            ->selectRaw('SUM(CASE WHEN order_status = ? THEN 1 ELSE 0 END) as processing', [OrderStatus::Processing->value])
-            ->selectRaw('SUM(CASE WHEN order_status = ? THEN 1 ELSE 0 END) as failed', [OrderStatus::Failed->value])
+            ->selectRaw('COALESCE(SUM(quantity), 0) as total')
+            ->selectRaw('COALESCE(SUM(CASE WHEN payment_status = ? THEN quantity ELSE 0 END), 0) as pending_payment', [PaymentStatus::Pending->value])
+            ->selectRaw('COALESCE(SUM(CASE WHEN order_status = ? THEN quantity ELSE 0 END), 0) as processing', [OrderStatus::Processing->value])
+            ->selectRaw('COALESCE(SUM(CASE WHEN order_status = ? THEN quantity ELSE 0 END), 0) as failed', [OrderStatus::Failed->value])
             ->toBase()
             ->first();
 
