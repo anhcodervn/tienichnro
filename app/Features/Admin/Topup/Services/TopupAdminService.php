@@ -118,6 +118,31 @@ class TopupAdminService
             ->latest()->paginate($this->perPage($request));
     }
 
+    /**
+     * @return array{total: int, pending_payment: int, processing: int, failed: int}
+     */
+    public function todayOrderStatistics(): array
+    {
+        $startOfToday = now()->startOfDay();
+        $startOfTomorrow = $startOfToday->copy()->addDay();
+        $statistics = Order::query()
+            ->where('created_at', '>=', $startOfToday)
+            ->where('created_at', '<', $startOfTomorrow)
+            ->selectRaw('COUNT(*) as total')
+            ->selectRaw('SUM(CASE WHEN payment_status = ? THEN 1 ELSE 0 END) as pending_payment', [PaymentStatus::Pending->value])
+            ->selectRaw('SUM(CASE WHEN order_status = ? THEN 1 ELSE 0 END) as processing', [OrderStatus::Processing->value])
+            ->selectRaw('SUM(CASE WHEN order_status = ? THEN 1 ELSE 0 END) as failed', [OrderStatus::Failed->value])
+            ->toBase()
+            ->first();
+
+        return [
+            'total' => (int) ($statistics?->total ?? 0),
+            'pending_payment' => (int) ($statistics?->pending_payment ?? 0),
+            'processing' => (int) ($statistics?->processing ?? 0),
+            'failed' => (int) ($statistics?->failed ?? 0),
+        ];
+    }
+
     /** @param array<string, mixed> $payload */
     public function create(Model $model, array $payload, User $admin, Request $request): Model
     {

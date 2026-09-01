@@ -1,5 +1,7 @@
 <?php
 
+use App\Enums\OrderStatus;
+use App\Enums\PaymentStatus;
 use App\Models\AdminAuditLog;
 use App\Models\Game;
 use App\Models\GameServer;
@@ -8,6 +10,7 @@ use App\Models\PaymentTransaction;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
 use App\Models\User;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
@@ -23,6 +26,46 @@ test('topup admin api rejects guests and ordinary users', function (): void {
     $this->actingAs(User::factory()->create())
         ->getJson('/api/admin-api/topup-providers')
         ->assertForbidden();
+});
+
+test('admin order statistics only count orders created today', function (): void {
+    $this->travelTo(Carbon::parse('2026-09-01 12:00:00', config('app.timezone')));
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    Order::factory()->create([
+        'created_at' => now()->startOfDay(),
+        'payment_status' => PaymentStatus::Pending,
+        'order_status' => OrderStatus::Pending,
+    ]);
+    Order::factory()->create([
+        'created_at' => now()->subHours(2),
+        'payment_status' => PaymentStatus::Paid,
+        'order_status' => OrderStatus::Processing,
+    ]);
+    Order::factory()->create([
+        'created_at' => now()->subHour(),
+        'payment_status' => PaymentStatus::Paid,
+        'order_status' => OrderStatus::Failed,
+    ]);
+    Order::factory()->create([
+        'created_at' => now(),
+        'payment_status' => PaymentStatus::Paid,
+        'order_status' => OrderStatus::Completed,
+    ]);
+    Order::factory()->create([
+        'created_at' => now()->startOfDay()->subSecond(),
+        'payment_status' => PaymentStatus::Pending,
+        'order_status' => OrderStatus::Failed,
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/orders?order_status=failed')
+        ->assertOk()
+        ->assertJsonPath('data.statistics.total', 4)
+        ->assertJsonPath('data.statistics.pending_payment', 1)
+        ->assertJsonPath('data.statistics.processing', 1)
+        ->assertJsonPath('data.statistics.failed', 1)
+        ->assertJsonPath('data.meta.total', 2);
 });
 
 test('admin order detail exposes QR reconciliation fields without raw callback payload', function (): void {

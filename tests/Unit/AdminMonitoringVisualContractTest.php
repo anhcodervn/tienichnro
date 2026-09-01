@@ -19,7 +19,7 @@ test('operational admin pages consistently emphasize tracked counts', function (
 })->with([
     'topup orders' => [
         'resources/js/pages/admin/topup/orders/index.vue',
-        ['const summaries = computed', 'Tổng quan đơn hàng đang hiển thị', 'ring-rose-600/20'],
+        ['const summaries = computed', 'Thống kê đơn hàng hôm nay', 'statistics.pending_payment', 'ring-rose-600/20'],
     ],
     'queues' => [
         'resources/js/pages/admin/queues/index.vue',

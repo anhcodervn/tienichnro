@@ -19,7 +19,10 @@ class OrderController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        return response()->json(['status' => true, 'data' => OrderResource::collection($this->service->orders($request))->response()->getData(true)]);
+        $data = OrderResource::collection($this->service->orders($request))->response()->getData(true);
+        $data['statistics'] = $this->service->todayOrderStatistics();
+
+        return response()->json(['status' => true, 'data' => $data]);
     }
 
     public function show(Order $order): JsonResponse

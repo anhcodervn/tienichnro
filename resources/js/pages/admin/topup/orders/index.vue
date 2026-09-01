@@ -36,6 +36,13 @@ type Pagination = {
     to: number | null;
 };
 
+type OrderStatistics = {
+    total: number;
+    pending_payment: number;
+    processing: number;
+    failed: number;
+};
+
 type AdminTopupOrderUpdatedEvent = Pick<
     OrderRow,
     | 'id'
@@ -75,32 +82,33 @@ const pendingRealtimeCodes = new Set<string>();
 
 const filters = reactive({ search: '', payment_status: '', order_status: '', per_page: 20, page: 1 });
 const pagination = reactive<Pagination>({ current_page: 1, last_page: 1, per_page: 20, total: 0, from: null, to: null });
+const statistics = reactive<OrderStatistics>({ total: 0, pending_payment: 0, processing: 0, failed: 0 });
 
 const summaries = computed<{ label: string; value: number; icon: Component; classes: string; iconClasses: string }[]>(() => [
     {
-        label: 'Tổng kết quả',
-        value: pagination.total,
+        label: 'Tổng đơn hôm nay',
+        value: statistics.total,
         icon: FolderOpen,
         classes: 'border-sky-200/80 bg-gradient-to-br from-sky-50 to-white text-sky-700',
         iconClasses: 'bg-sky-100 text-sky-700',
     },
     {
-        label: 'Chờ thanh toán / trang',
-        value: orders.value.filter((order) => order.payment_status === 'pending').length,
+        label: 'Chờ thanh toán hôm nay',
+        value: statistics.pending_payment,
         icon: Clock3,
         classes: 'border-amber-200/80 bg-gradient-to-br from-amber-50 to-white text-amber-700',
         iconClasses: 'bg-amber-100 text-amber-700',
     },
     {
-        label: 'Đang xử lý / trang',
-        value: orders.value.filter((order) => order.order_status === 'processing').length,
+        label: 'Đang xử lý hôm nay',
+        value: statistics.processing,
         icon: RefreshCcw,
         classes: 'border-indigo-200/80 bg-gradient-to-br from-indigo-50 to-white text-indigo-700',
         iconClasses: 'bg-indigo-100 text-indigo-700',
     },
     {
-        label: 'Đơn lỗi / trang',
-        value: orders.value.filter((order) => order.order_status === 'failed').length,
+        label: 'Đơn lỗi hôm nay',
+        value: statistics.failed,
         icon: TriangleAlert,
         classes: 'border-rose-200/80 bg-gradient-to-br from-rose-50 to-white text-rose-700 ring-1 ring-rose-600/20',
         iconClasses: 'bg-rose-100 text-rose-700',
@@ -158,6 +166,12 @@ const load = async (showLoading = true): Promise<void> => {
         const payload = response.data.data;
         const meta = payload.meta ?? payload;
         orders.value = payload.data ?? [];
+        Object.assign(statistics, {
+            total: Number(payload.statistics?.total || 0),
+            pending_payment: Number(payload.statistics?.pending_payment || 0),
+            processing: Number(payload.statistics?.processing || 0),
+            failed: Number(payload.statistics?.failed || 0),
+        });
         Object.assign(pagination, {
             current_page: Number(meta.current_page || 1),
             last_page: Number(meta.last_page || 1),
@@ -441,7 +455,7 @@ onBeforeUnmount(() => {
             </button>
         </header>
 
-        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Tổng quan đơn hàng đang hiển thị">
+        <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Thống kê đơn hàng hôm nay">
             <article
                 v-for="summary in summaries"
                 :key="summary.label"
