@@ -37,6 +37,8 @@ class AdminUserDetailResource extends JsonResource
             ] : null,
             'stats' => $this->resource['stats'],
             'latest_login' => $this->resource['latest_login'],
+            'member_level' => $this->resource['member_level'],
+            'member_level_histories' => $this->resource['member_level_histories'],
         ];
     }
 }

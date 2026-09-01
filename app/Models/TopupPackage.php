@@ -21,7 +21,7 @@ class TopupPackage extends Model
     ];
 
     protected $fillable = [
-        'game_id', 'game_server_id', 'provider_id', 'provider_service_code', 'name', 'denomination', 'carot_amount',
+        'game_id', 'game_server_id', 'global_topup_package_id', 'provider_id', 'provider_service_code', 'name', 'denomination', 'carot_amount',
         'reward_x2_amount', 'reward_x3_amount', 'first_topup_reward_amount', 'provider_price',
         'price', 'original_price', 'description', 'bonus_text',
         'min_quantity', 'max_quantity', 'status', 'sort_order', 'metadata',
@@ -85,8 +85,18 @@ class TopupPackage extends Model
         return $this->belongsTo(TopupProvider::class, 'provider_id');
     }
 
+    public function globalTopupPackage(): BelongsTo
+    {
+        return $this->belongsTo(GlobalTopupPackage::class);
+    }
+
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function memberLevelPrices(): HasMany
+    {
+        return $this->hasMany(MemberLevelPackagePrice::class);
     }
 }

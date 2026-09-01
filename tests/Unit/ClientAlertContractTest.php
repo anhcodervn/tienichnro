@@ -6,6 +6,7 @@ test('client errors use sweetalert while the homepage announcement remains admin
     $script = file_get_contents($projectRoot.'/resources/js/client.js');
     $home = file_get_contents($projectRoot.'/resources/views/client/home/index.blade.php');
     $controller = file_get_contents($projectRoot.'/app/Features/Client/Topup/Controllers/HomeController.php');
+    $clientCss = file_get_contents($projectRoot.'/resources/css/client.css');
 
     expect($flash)
         ->toContain('hidden data-client-alert')
@@ -24,9 +25,14 @@ test('client errors use sweetalert while the homepage announcement remains admin
         ->toContain('<div class="home-notice-banner" role="note"')
         ->toContain('class="home-notice-header"')
         ->toContain('{{ $homeNoticeTitle }}')
-        ->toContain('{{ $homeNoticeHtml }}')
+        ->toContain('{!! $homeNoticeHtml->toHtml() !!}')
         ->not->toContain('<details class="home-notice-banner"')
         ->not->toContain('Xem chi tiết')
+        ->and($clientCss)
+        ->toContain('.home-notice-content *')
+        ->toContain('font-family: inherit !important;')
+        ->toContain('.home-notice-content a')
+        ->toContain('pointer-events: auto;')
         ->and($controller)
         ->toContain("'home_notice_title'")
         ->toContain("'home_notice_content'")

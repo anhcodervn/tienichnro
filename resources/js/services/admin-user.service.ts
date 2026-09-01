@@ -59,6 +59,30 @@ export type AdminUserDetailResponse = {
         at: string | null;
         ip: string | null;
     };
+    member_level: {
+        unlocked_level: { id: number; name: string; color: string; rank: number } | null;
+        effective_level: { id: number; name: string; color: string; rank: number } | null;
+        next_level: { id: number; name: string; lifetime_threshold: number } | null;
+        lifetime_completed_amount: number;
+        amount_to_next_level: number;
+        rolling_completed_amount: number;
+        maintenance_required_amount: number;
+        maintenance_remaining_amount: number;
+        maintenance_expires_at: string | null;
+        is_maintained: boolean;
+        is_temporarily_downgraded: boolean;
+        is_manual: boolean;
+        manual_level_expires_at: string | null;
+    } | null;
+    member_level_histories: Array<{
+        id: number;
+        type: string;
+        reason: string | null;
+        created_at: string;
+        from_level: { id: number; name: string; color: string } | null;
+        to_level: { id: number; name: string; color: string } | null;
+        actor: { id: number; name: string } | null;
+    }>;
 };
 
 export type AdminPaginationMeta = {

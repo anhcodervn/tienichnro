@@ -258,7 +258,15 @@ class EditorContentRenderer
             return $value;
         }
 
-        return preg_match('/^(?:https?:\/\/|mailto:|tel:)/i', $value) === 1 ? $value : null;
+        if (preg_match('/^(?:https?:\/\/|mailto:|tel:)/i', $value) === 1) {
+            return $value;
+        }
+
+        if (preg_match('/^(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?(?:[\/?#].*)?$/i', $value) === 1) {
+            return 'https://'.$value;
+        }
+
+        return null;
     }
 
     /**

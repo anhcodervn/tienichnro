@@ -66,6 +66,10 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 href: '/admin/topup/packages',
             },
             {
+                label: 'Gói nạp Global',
+                href: '/admin/topup/global-packages',
+            },
+            {
                 label: 'Nhà cung cấp',
                 href: '/admin/topup/providers',
             },
@@ -104,6 +108,10 @@ export const adminMenuGroups: AdminMenuGroup[] = [
             {
                 label: 'Lịch sử dòng tiền',
                 href: '/admin/users/wallet-transactions',
+            },
+            {
+                label: 'Level & giá đại lý',
+                href: '/admin/member-levels',
             },
         ],
     },

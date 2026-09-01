@@ -11,7 +11,12 @@ class TopupPackageResource extends JsonResource
     {
         return [
             'id' => $this->id, 'game_id' => $this->game_id, 'game_name' => $this->game?->name,
+            'game_package_mode' => $this->game?->package_mode,
             'game_server_id' => $this->game_server_id, 'server_name' => $this->server?->name,
+            'global_topup_package_id' => $this->global_topup_package_id,
+            'global_topup_package_name' => $this->globalTopupPackage?->name,
+            'global_price' => $this->globalTopupPackage?->price,
+            'global_original_price' => $this->globalTopupPackage?->original_price,
             'provider_id' => $this->provider_id, 'provider_name' => $this->provider?->name,
             'provider_service_code' => $this->provider_service_code,
             'name' => $this->name, 'denomination' => $this->denomination, 'carot_amount' => $this->carot_amount,

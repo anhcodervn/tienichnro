@@ -41,6 +41,11 @@ export default {
             props: { catalogType: 'packages' },
         },
         {
+            path: 'topup/global-packages',
+            name: 'admin.topup.global-packages',
+            component: () => import('@/pages/admin/topup/global-packages/index.vue'),
+        },
+        {
             path: 'topup/providers',
             name: 'admin.topup.providers',
             component: () => import('@/pages/admin/topup/providers/index.vue'),
@@ -49,6 +54,11 @@ export default {
             path: 'topup/orders',
             name: 'admin.topup.orders',
             component: () => import('@/pages/admin/topup/orders/index.vue'),
+        },
+        {
+            path: 'member-levels',
+            name: 'admin.member-levels.index',
+            component: () => import('@/pages/admin/member-levels/index.vue'),
         },
         {
             path: 'users',

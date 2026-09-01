@@ -188,6 +188,7 @@
 
     .home-notice-banner {
         @apply mb-4 w-full min-w-0 overflow-hidden rounded-[5px] border border-cyan-200 bg-cyan-50 text-sm text-cyan-950;
+        font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
     }
 
     .home-notice-header {
@@ -201,6 +202,17 @@
 
     .home-notice-content {
         @apply grid gap-1 border-t border-cyan-200 px-4 py-3 text-sm leading-6;
+    }
+
+    .home-notice-content,
+    .home-notice-content * {
+        font-family: inherit !important;
+    }
+
+    .home-notice-content a {
+        @apply relative z-10 cursor-pointer break-words focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2;
+        pointer-events: auto;
+        touch-action: manipulation;
     }
 
     .home-notice-content ul {

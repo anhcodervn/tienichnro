@@ -93,7 +93,12 @@ class TopupAdminService
     {
         $search = trim((string) ($filters['search'] ?? ''));
 
-        return TopupPackage::query()->with(['game:id,name', 'server:id,name', 'provider:id,name,slug'])
+        return TopupPackage::query()->with([
+            'game:id,name,package_mode',
+            'server:id,name',
+            'provider:id,name,slug',
+            'globalTopupPackage:id,name,denomination,price,original_price,status',
+        ])
             ->when($search !== '', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
             ->when(filled($filters['game_id'] ?? null), fn (Builder $query) => $query->where('game_id', $filters['game_id']))
             ->when(filled($filters['game_server_id'] ?? null), fn (Builder $query) => $query->where('game_server_id', $filters['game_server_id']))

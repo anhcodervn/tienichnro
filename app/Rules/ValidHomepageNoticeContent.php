@@ -121,7 +121,8 @@ class ValidHomepageNoticeContent implements ValidationRule
             return true;
         }
 
-        return preg_match('/^(?:https?:\/\/|mailto:|tel:)/i', $value) === 1;
+        return preg_match('/^(?:https?:\/\/|mailto:|tel:)/i', $value) === 1
+            || preg_match('/^(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?(?:[\/?#].*)?$/i', $value) === 1;
     }
 
     private function isSafeColor(mixed $value): bool

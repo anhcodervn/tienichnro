@@ -26,17 +26,29 @@ class TopupPackageController extends Controller
     {
         $package = $this->service->create(new TopupPackage, $request->validated(), $this->admin($request), $request);
 
-        return response()->json(['status' => true, 'data' => TopupPackageResource::make($package->load(['game:id,name', 'server:id,name', 'provider:id,name,slug']))], 201);
+        return response()->json(['status' => true, 'data' => TopupPackageResource::make($package->load([
+            'game:id,name,package_mode', 'server:id,name', 'provider:id,name,slug',
+            'globalTopupPackage:id,name,denomination,price,original_price,status',
+        ]))], 201);
     }
 
     public function show(TopupPackage $topupPackage): TopupPackageResource
     {
-        return TopupPackageResource::make($topupPackage->load(['game:id,name', 'server:id,name', 'provider:id,name,slug']));
+        return TopupPackageResource::make($topupPackage->load([
+            'game:id,name,package_mode', 'server:id,name', 'provider:id,name,slug',
+            'globalTopupPackage:id,name,denomination,price,original_price,status',
+        ]));
     }
 
     public function update(UpdateTopupPackageRequest $request, TopupPackage $topupPackage): TopupPackageResource
     {
-        return TopupPackageResource::make($this->service->update($topupPackage, $request->validated(), $this->admin($request), $request)->load(['game:id,name', 'server:id,name', 'provider:id,name,slug']));
+        return TopupPackageResource::make(
+            $this->service->update($topupPackage, $request->validated(), $this->admin($request), $request)
+                ->load([
+                    'game:id,name,package_mode', 'server:id,name', 'provider:id,name,slug',
+                    'globalTopupPackage:id,name,denomination,price,original_price,status',
+                ]),
+        );
     }
 
     public function destroy(Request $request, TopupPackage $topupPackage): JsonResponse

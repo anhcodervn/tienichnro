@@ -13,6 +13,7 @@ class GameResource extends JsonResource
             'id' => $this->id, 'name' => $this->name, 'slug' => $this->slug,
             'short_name' => $this->short_name, 'image' => $this->image, 'description' => $this->description,
             'reward_label' => $this->reward_label,
+            'package_mode' => $this->package_mode,
             'checkout_fields' => $this->checkoutFields(),
             'content' => $this->content, 'status' => $this->status, 'sort_order' => $this->sort_order,
             'seo_title' => $this->seo_title, 'seo_description' => $this->seo_description,

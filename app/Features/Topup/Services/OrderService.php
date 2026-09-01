@@ -70,6 +70,7 @@ class OrderService
                     lock: true,
                     quantityField: $recipientData['quantity_field'],
                     recipientQuantities: array_column($recipientData['recipients'], 'quantity'),
+                    user: $user,
                 );
                 $package = $quote['package'];
                 $package->loadMissing('provider');
@@ -102,11 +103,18 @@ class OrderService
                 $order = Order::query()->create([
                     'idempotency_key' => $idempotencyKey,
                     'user_id' => $user?->id,
+                    'member_level_id' => $quote['member_level_id'],
+                    'member_level_name' => $quote['member_level_name'],
+                    'member_level_pricing_mode' => $quote['member_level_pricing_mode'],
+                    'member_level_discount_bps' => $quote['member_level_discount_bps'],
                     'email' => $email,
                     'normalized_email' => $normalizedEmail,
                     'game_id' => $package->game_id,
                     'game_server_id' => $serverId,
                     'topup_package_id' => $package->id,
+                    'package_source' => $quote['package_source'],
+                    'global_topup_package_id' => $quote['global_topup_package_id'],
+                    'global_topup_package_name' => $quote['global_topup_package_name'],
                     'topup_provider_id' => $package->provider_id,
                     'purchase_mode' => $recipientData['mode'],
                     'checkout_fields_snapshot' => $recipientData['fields'],
@@ -118,8 +126,10 @@ class OrderService
                     'carot_amount' => $package->carot_amount,
                     'unit_price' => $quote['unit_price'],
                     'sale_unit_price' => $quote['sale_unit_price'],
+                    'retail_unit_price' => $quote['retail_unit_price'],
                     'subtotal' => $quote['subtotal'],
                     'discount_amount' => $quote['discount_amount'],
+                    'member_level_discount_amount' => $quote['member_level_discount_amount'],
                     'total_amount' => $quote['total_amount'],
                     'provider_unit_cost' => $quote['provider_unit_cost'],
                     'provider_total_cost' => $quote['provider_total_cost'],
@@ -131,8 +141,8 @@ class OrderService
                     'user_agent' => $userAgent,
                     'metadata' => [
                         'package' => [
-                            'original_price' => $package->original_price,
-                            'discount_percent' => $package->discount_percent,
+                            'original_price' => $quote['unit_price'],
+                            'package_source' => $quote['package_source'],
                             'bonus_text' => $package->bonus_text,
                         ],
                         'provider' => [

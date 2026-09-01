@@ -3,6 +3,7 @@
 namespace App\Features\Client\Topup\Controllers;
 
 use App\Features\Client\Topup\Services\TurnstileService;
+use App\Features\MemberLevel\Services\MemberLevelPriceService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\User;
@@ -18,9 +19,13 @@ class HomeController extends Controller
         SettingStore $settingStore,
         EditorContentRenderer $contentRenderer,
         TurnstileService $turnstileService,
+        MemberLevelPriceService $memberLevelPriceService,
     ): View {
         $games = Game::query()
-            ->select(['id', 'name', 'slug', 'short_name', 'reward_label', 'description', 'checkout_fields', 'status', 'sort_order'])
+            ->select([
+                'id', 'name', 'slug', 'short_name', 'reward_label', 'description', 'checkout_fields',
+                'package_mode', 'status', 'sort_order',
+            ])
             ->active()
             ->with([
                 'servers' => fn ($query) => $query
@@ -28,8 +33,8 @@ class HomeController extends Controller
                     ->active(),
                 'packages' => fn ($query) => $query
                     ->select([
-                        'id', 'game_id', 'game_server_id', 'name', 'denomination', 'carot_amount',
-                        'reward_x2_amount', 'reward_x3_amount', 'first_topup_reward_amount', 'price', 'original_price',
+                        'id', 'game_id', 'game_server_id', 'global_topup_package_id', 'name', 'denomination', 'carot_amount',
+                        'reward_x2_amount', 'reward_x3_amount', 'first_topup_reward_amount', 'provider_price', 'price', 'original_price',
                         'discount_percent', 'bonus_text', 'min_quantity', 'max_quantity',
                         'status', 'sort_order',
                     ])
@@ -42,6 +47,14 @@ class HomeController extends Controller
         /** @var User|null $user */
         $user = $request->user();
         $walletBalance = (int) ($user?->wallet()->value('balance') ?? 0);
+        $memberLevelStatus = $memberLevelPriceService->apply(
+            $games->flatMap(fn (Game $game) => $game->packages),
+            $user,
+        );
+        $games->each(fn (Game $game) => $game->setRelation(
+            'packages',
+            $game->packages->filter(fn ($package) => $package->is_price_available)->values(),
+        ));
 
         $systemSettings = $settingStore->getMany([
             'site_name' => config('app.name', 'Nạp Carot'),
@@ -59,6 +72,7 @@ class HomeController extends Controller
         return view('client.home.index', [
             'games' => $games,
             'walletBalance' => $walletBalance,
+            'memberLevelStatus' => $memberLevelStatus,
             'systemSettings' => $systemSettings,
             'homeNoticeTitle' => (string) $systemSettings['home_notice_title'],
             'homeNoticeHtml' => $contentRenderer->renderNodes($homeNoticeContent),

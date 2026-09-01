@@ -42,3 +42,20 @@ test('editor content renderer never renders an unsafe href', function (string $h
     'backslash protocol relative url' => '/\\example.com/phishing',
     'whitespace obfuscation' => "java\nscript:alert(1)",
 ]);
+
+test('editor content renderer normalizes a bare domain to an https link', function (): void {
+    $html = app(EditorContentRenderer::class)->renderNodes([
+        [
+            'type' => 'paragraph',
+            'children' => [[
+                'text' => 'Tham gia cộng đồng',
+                'href' => 'facebook.com/napcarot',
+                'target' => '_blank',
+            ]],
+        ],
+    ])->toHtml();
+
+    expect($html)->toBe(
+        '<p><a href="https://facebook.com/napcarot" target="_blank" rel="noopener noreferrer">Tham gia cộng đồng</a></p>'
+    );
+});

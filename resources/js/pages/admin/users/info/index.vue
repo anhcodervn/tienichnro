@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { adminMemberLevelService, type MemberLevel } from '@/services/admin-member-level.service';
 import {
     adminUserService,
     type AdminPaginationMeta,
@@ -7,7 +8,7 @@ import {
     type AdminUserWalletTransaction,
 } from '@/services/admin-user.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { ArrowLeft, CheckCheck, KeyRound, ListChecks, LoaderCircle, Minus, Plus, Wallet } from 'lucide-vue-next';
+import { ArrowLeft, CheckCheck, Crown, KeyRound, ListChecks, LoaderCircle, Minus, Plus, Save, Wallet } from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 
@@ -26,7 +27,9 @@ const userId = Number(route.params.user_id);
 const loading = ref(false);
 const adjustingWallet = ref(false);
 const resettingPassword = ref(false);
+const assigningLevel = ref(false);
 const detail = ref<AdminUserDetailResponse | null>(null);
+const levels = ref<MemberLevel[]>([]);
 const activeTab = ref<TabKey>('overview');
 
 const walletForm = reactive({
@@ -38,6 +41,12 @@ const walletForm = reactive({
 const passwordForm = reactive({
     password: '',
     password_confirmation: '',
+});
+
+const levelForm = reactive({
+    member_level_id: '' as number | '',
+    expires_at: '',
+    reason: '',
 });
 
 const transactionsState = reactive<TabState<AdminUserWalletTransaction>>({
@@ -125,10 +134,40 @@ const loadDetail = async (): Promise<void> => {
 
     try {
         detail.value = await adminUserService.show(userId);
+        levelForm.member_level_id = detail.value.member_level?.is_manual ? (detail.value.member_level.unlocked_level?.id ?? '') : '';
+        levelForm.expires_at = detail.value.member_level?.manual_level_expires_at?.slice(0, 16) ?? '';
     } catch (error) {
         handleErrorResponse(error);
     } finally {
         loading.value = false;
+    }
+};
+
+const loadLevels = async (): Promise<void> => {
+    try {
+        const levelCatalog = await adminMemberLevelService.catalog();
+        levels.value = levelCatalog.levels;
+    } catch (error) {
+        handleErrorResponse(error);
+    }
+};
+
+const submitLevelAssignment = async (): Promise<void> => {
+    assigningLevel.value = true;
+
+    try {
+        await adminMemberLevelService.assignUser(userId, {
+            member_level_id: levelForm.member_level_id === '' ? null : Number(levelForm.member_level_id),
+            expires_at: levelForm.expires_at || null,
+            reason: levelForm.reason || undefined,
+        });
+        levelForm.reason = '';
+        handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật level thủ công.' } });
+        await loadDetail();
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        assigningLevel.value = false;
     }
 };
 
@@ -276,7 +315,7 @@ const goToTabPage = async (tab: TabKey, page: number): Promise<void> => {
 };
 
 onMounted(async () => {
-    await loadDetail();
+    await Promise.all([loadDetail(), loadLevels()]);
 });
 </script>
 
@@ -379,6 +418,92 @@ onMounted(async () => {
                                     </div>
                                 </div>
                             </article>
+                        </section>
+
+                        <section
+                            v-if="detail.member_level"
+                            class="grid gap-4 rounded-[10px] border border-amber-200 bg-amber-50 p-4 xl:grid-cols-[minmax(0,1fr)_24rem]"
+                        >
+                            <div>
+                                <div class="flex flex-wrap items-start justify-between gap-3">
+                                    <div>
+                                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Level đại lý</p>
+                                        <h3 class="mt-1 flex items-center gap-2 text-xl font-black text-slate-950">
+                                            <Crown class="h-5 w-5 text-amber-500" />{{ detail.member_level.effective_level?.name || 'Chưa có level' }}
+                                        </h3>
+                                        <p v-if="detail.member_level.is_temporarily_downgraded" class="mt-1 text-sm font-semibold text-amber-800">
+                                            Đang tạm giảm từ {{ detail.member_level.unlocked_level?.name }} vì chưa đủ mức duy trì.
+                                        </p>
+                                    </div>
+                                    <span
+                                        v-if="detail.member_level.is_manual"
+                                        class="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700"
+                                        >Admin khóa level</span
+                                    >
+                                </div>
+                                <dl class="mt-4 grid gap-3 sm:grid-cols-3">
+                                    <div class="rounded-md bg-white p-3">
+                                        <dt class="text-xs font-semibold text-slate-500">Tổng nạp lịch sử</dt>
+                                        <dd class="mt-1 font-black text-slate-950">
+                                            {{ formatCurrency(detail.member_level.lifetime_completed_amount) }}
+                                        </dd>
+                                    </div>
+                                    <div class="rounded-md bg-white p-3">
+                                        <dt class="text-xs font-semibold text-slate-500">Nạp trong kỳ duy trì</dt>
+                                        <dd class="mt-1 font-black text-slate-950">
+                                            {{ formatCurrency(detail.member_level.rolling_completed_amount) }}
+                                        </dd>
+                                    </div>
+                                    <div class="rounded-md bg-white p-3">
+                                        <dt class="text-xs font-semibold text-slate-500">Còn thiếu duy trì</dt>
+                                        <dd class="mt-1 font-black text-amber-700">
+                                            {{ formatCurrency(detail.member_level.maintenance_remaining_amount) }}
+                                        </dd>
+                                    </div>
+                                </dl>
+                                <div v-if="detail.member_level_histories.length" class="mt-4 border-t border-amber-200 pt-3">
+                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">Lịch sử level gần đây</p>
+                                    <ul class="mt-2 grid gap-2 sm:grid-cols-2">
+                                        <li
+                                            v-for="history in detail.member_level_histories.slice(0, 6)"
+                                            :key="history.id"
+                                            class="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-xs"
+                                        >
+                                            <span class="font-semibold text-slate-700"
+                                                >{{ history.from_level?.name || 'Khởi tạo' }} → {{ history.to_level?.name || 'Tự động' }}</span
+                                            >
+                                            <time class="shrink-0 text-slate-400">{{ formatDate(history.created_at) }}</time>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <form class="grid gap-3 rounded-md border border-amber-200 bg-white p-3" @submit.prevent="submitLevelAssignment">
+                                <label class="grid gap-1 text-sm font-semibold text-slate-700"
+                                    >Level thủ công
+                                    <select v-model="levelForm.member_level_id" class="rounded-md border-slate-300">
+                                        <option value="">Tự động theo tổng nạp</option>
+                                        <option v-for="level in levels" :key="level.id" :value="level.id">{{ level.name }}</option>
+                                    </select>
+                                </label>
+                                <label class="grid gap-1 text-sm font-semibold text-slate-700"
+                                    >Khóa đến ngày<input v-model="levelForm.expires_at" class="rounded-md border-slate-300" type="datetime-local"
+                                /></label>
+                                <label class="grid gap-1 text-sm font-semibold text-slate-700"
+                                    >Lý do<input
+                                        v-model="levelForm.reason"
+                                        class="rounded-md border-slate-300"
+                                        maxlength="500"
+                                        placeholder="Tuyển đại lý, ưu đãi riêng..."
+                                /></label>
+                                <button
+                                    class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-amber-500 px-3 font-bold text-slate-950 disabled:opacity-50"
+                                    :disabled="assigningLevel"
+                                    type="submit"
+                                >
+                                    <LoaderCircle v-if="assigningLevel" class="h-4 w-4 animate-spin" /><Save v-else class="h-4 w-4" /> Lưu level
+                                </button>
+                            </form>
                         </section>
 
                         <section class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">

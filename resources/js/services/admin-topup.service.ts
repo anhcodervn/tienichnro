@@ -8,12 +8,12 @@ export const adminTopupService = {
     saveProvider: (id: number | null, payload: Record<string, unknown>) =>
         id ? axios.put(`${root}/topup-providers/${id}`, payload) : axios.post(`${root}/topup-providers`, payload),
     deleteProvider: (id: number) => axios.delete(`${root}/topup-providers/${id}`),
-    refreshProviderBalances: (providerIds: number[]) =>
-        axios.post(`${root}/topup-providers/refresh-balances`, { provider_ids: providerIds }),
+    refreshProviderBalances: (providerIds: number[]) => axios.post(`${root}/topup-providers/refresh-balances`, { provider_ids: providerIds }),
     games: (params = {}) => axios.get(`${root}/games`, { params }),
     saveGame: (id: number | null, payload: Record<string, unknown>) =>
         id ? axios.put(`${root}/games/${id}`, payload) : axios.post(`${root}/games`, payload),
     deleteGame: (id: number) => axios.delete(`${root}/games/${id}`),
+    globalPackages: () => axios.get(`${root}/global-topup-packages`),
     servers: (params = {}) => axios.get(`${root}/game-servers`, { params }),
     saveServer: (id: number | null, payload: Record<string, unknown>) =>
         id ? axios.put(`${root}/game-servers/${id}`, payload) : axios.post(`${root}/game-servers`, payload),

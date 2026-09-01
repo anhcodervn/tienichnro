@@ -8,6 +8,13 @@ use Illuminate\Validation\Validator;
 
 class StoreGameRequest extends FormRequest
 {
+    protected function prepareForValidation(): void
+    {
+        if (! $this->has('package_mode')) {
+            $this->merge(['package_mode' => 'custom']);
+        }
+    }
+
     public function authorize(): bool
     {
         return $this->user()?->role === 'admin';
@@ -20,6 +27,7 @@ class StoreGameRequest extends FormRequest
             'slug' => ['required', 'string', 'max:255', Rule::unique('games', 'slug')],
             'short_name' => ['nullable', 'string', 'max:50'],
             'reward_label' => ['required', 'string', 'max:60'],
+            'package_mode' => ['required', Rule::in(['custom', 'global'])],
             'image' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'], 'content' => ['nullable', 'string'],
             'status' => ['required', Rule::in(['active', 'inactive'])],

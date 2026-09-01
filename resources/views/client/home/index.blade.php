@@ -20,7 +20,7 @@
                 <p id="home-notice-title" class="min-w-0"><strong>Thông báo:</strong> {{ $homeNoticeTitle }}</p>
             </div>
             <div class="article-content article-content--notice home-notice-content">
-                {{ $homeNoticeHtml }}
+                {!! $homeNoticeHtml->toHtml() !!}
             </div>
         </div>
     @endif

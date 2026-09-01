@@ -2,15 +2,19 @@
 
 namespace App\Features\Topup\Services;
 
+use App\Features\MemberLevel\Services\MemberLevelPriceService;
 use App\Models\GameServer;
 use App\Models\TopupPackage;
+use App\Models\User;
 use Illuminate\Validation\ValidationException;
 
 class OrderPricingService
 {
+    public function __construct(private readonly MemberLevelPriceService $memberLevelPriceService) {}
+
     /**
      * @param  array<int, int>  $recipientQuantities
-     * @return array{package:TopupPackage,server:GameServer,unit_price:int,sale_unit_price:int,subtotal:int,discount_amount:int,total_amount:int,provider_unit_cost:int|null,provider_total_cost:int|null,gross_profit:int|null}
+     * @return array<string, mixed>
      */
     public function quote(
         int $gameId,
@@ -20,8 +24,13 @@ class OrderPricingService
         bool $lock = false,
         string $quantityField = 'quantity',
         array $recipientQuantities = [],
+        ?User $user = null,
     ): array {
-        $query = TopupPackage::query()->with(['game:id,name,status', 'server:id,game_id,name,status']);
+        $query = TopupPackage::query()->with([
+            'game:id,name,status,package_mode',
+            'globalTopupPackage:id,name,denomination,price,original_price,status',
+            'server:id,game_id,name,status',
+        ]);
 
         if ($lock) {
             $query->lockForUpdate();
@@ -66,8 +75,10 @@ class OrderPricingService
             throw ValidationException::withMessages([$quantityField => 'Số lượng không nằm trong giới hạn của gói nạp.']);
         }
 
-        $sellingPrice = (int) $package->price;
-        $unitPrice = max($sellingPrice, (int) ($package->original_price ?? $sellingPrice));
+        $memberPrice = $this->memberLevelPriceService->resolve($package, $user);
+        $retailPrice = $memberPrice['retail_price'];
+        $sellingPrice = $memberPrice['final_price'];
+        $unitPrice = $memberPrice['original_price'];
         $subtotal = $unitPrice * $quantity;
         $totalAmount = $sellingPrice * $quantity;
         $providerUnitCost = $package->provider_price === null ? null : (int) $package->provider_price;
@@ -78,12 +89,21 @@ class OrderPricingService
             'server' => $server,
             'unit_price' => $unitPrice,
             'sale_unit_price' => $sellingPrice,
+            'retail_unit_price' => $retailPrice,
             'subtotal' => $subtotal,
             'discount_amount' => $subtotal - $totalAmount,
+            'member_level_discount_amount' => $memberPrice['discount_amount'] * $quantity,
             'total_amount' => $totalAmount,
             'provider_unit_cost' => $providerUnitCost,
             'provider_total_cost' => $providerTotalCost,
             'gross_profit' => $providerTotalCost === null ? null : $totalAmount - $providerTotalCost,
+            'member_level_id' => $memberPrice['level_id'],
+            'member_level_name' => $memberPrice['level_name'],
+            'member_level_pricing_mode' => $memberPrice['pricing_mode'],
+            'member_level_discount_bps' => $memberPrice['discount_basis_points'],
+            'package_source' => $memberPrice['package_source'],
+            'global_topup_package_id' => $memberPrice['global_topup_package_id'],
+            'global_topup_package_name' => $memberPrice['global_topup_package_name'],
         ];
     }
 }

@@ -126,6 +126,21 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         return $this->hasMany(Order::class);
     }
 
+    public function memberLevelAccount(): HasOne
+    {
+        return $this->hasOne(MemberLevelAccount::class);
+    }
+
+    public function memberLevelCredits(): HasMany
+    {
+        return $this->hasMany(MemberLevelOrderCredit::class);
+    }
+
+    public function memberLevelHistories(): HasMany
+    {
+        return $this->hasMany(MemberLevelHistory::class);
+    }
+
     public function apiKeys(): HasMany
     {
         return $this->hasMany(ApiKey::class);

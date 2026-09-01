@@ -1,0 +1,36 @@
+<?php
+
+use Illuminate\Database\Migrations\Migration;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\Schema;
+
+return new class extends Migration
+{
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
+    {
+        Schema::create('member_level_package_prices', function (Blueprint $table) {
+            $table->id();
+            $table->foreignId('member_level_id')->constrained()->cascadeOnDelete();
+            $table->foreignId('topup_package_id')->constrained()->cascadeOnDelete();
+            $table->string('pricing_mode', 20)->default('discount');
+            $table->unsignedSmallInteger('discount_basis_points')->nullable();
+            $table->unsignedBigInteger('fixed_price')->nullable();
+            $table->unsignedBigInteger('minimum_profit')->nullable();
+            $table->boolean('is_active')->default(true);
+            $table->timestamps();
+
+            $table->unique(['member_level_id', 'topup_package_id'], 'member_level_package_unique');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
+    {
+        Schema::dropIfExists('member_level_package_prices');
+    }
+};

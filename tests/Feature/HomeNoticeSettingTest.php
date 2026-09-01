@@ -114,6 +114,35 @@ test('homepage notice rejects unsafe tinymce links', function (string $href): vo
     'whitespace obfuscation' => "java\nscript:alert(1)",
 ]);
 
+test('homepage notice accepts a bare domain and renders a clickable https link', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $settings = $this->actingAs($admin)
+        ->getJson('/api/admin-api/settings/homepage')
+        ->assertOk()
+        ->json('data.settings');
+
+    $this->actingAs($admin)
+        ->patchJson('/api/admin-api/settings/homepage', [
+            ...$settings,
+            'home_notice_content' => [[
+                'type' => 'paragraph',
+                'children' => [[
+                    'text' => 'Mở cộng đồng',
+                    'href' => 'facebook.com/napcarot',
+                    'target' => '_blank',
+                ]],
+            ]],
+        ])
+        ->assertOk();
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee(
+            '<a href="https://facebook.com/napcarot" target="_blank" rel="noopener noreferrer">Mở cộng đồng</a>',
+            false,
+        );
+});
+
 test('homepage tab reads existing setting keys and content pages no longer own them', function (): void {
     app(SettingStore::class)->putMany([
         'home_notice_title' => 'Thông báo đã lưu trước đó',

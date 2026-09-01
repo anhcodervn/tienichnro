@@ -3,6 +3,7 @@
 namespace App\Features\Client\Topup\Controllers;
 
 use App\Features\Client\Topup\Services\TurnstileService;
+use App\Features\MemberLevel\Services\MemberLevelPriceService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\User;
@@ -18,8 +19,12 @@ class TopupController extends Controller
         return view('client.topup.index', compact('games'));
     }
 
-    public function show(Request $request, Game $game, TurnstileService $turnstileService): View
-    {
+    public function show(
+        Request $request,
+        Game $game,
+        TurnstileService $turnstileService,
+        MemberLevelPriceService $memberLevelPriceService,
+    ): View {
         abort_unless($game->status === 'active', 404);
 
         $game->load([
@@ -28,9 +33,9 @@ class TopupController extends Controller
                 ->active(),
             'packages' => fn ($query) => $query
                 ->select([
-                    'id', 'game_id', 'game_server_id', 'name', 'denomination', 'carot_amount',
+                    'id', 'game_id', 'game_server_id', 'global_topup_package_id', 'name', 'denomination', 'carot_amount',
                     'reward_x2_amount', 'reward_x3_amount', 'first_topup_reward_amount',
-                    'price', 'original_price', 'discount_percent', 'bonus_text', 'min_quantity', 'max_quantity',
+                    'provider_price', 'price', 'original_price', 'discount_percent', 'bonus_text', 'min_quantity', 'max_quantity',
                     'status', 'sort_order',
                 ])
                 ->active(),
@@ -39,10 +44,16 @@ class TopupController extends Controller
         /** @var User|null $user */
         $user = $request->user();
         $walletBalance = (int) ($user?->wallet()->value('balance') ?? 0);
+        $memberLevelStatus = $memberLevelPriceService->apply($game->packages, $user);
+        $game->setRelation(
+            'packages',
+            $game->packages->filter(fn ($package) => $package->is_price_available)->values(),
+        );
 
         return view('client.topup.game', [
             'game' => $game,
             'walletBalance' => $walletBalance,
+            'memberLevelStatus' => $memberLevelStatus,
             'turnstileEnabled' => $turnstileService->isEnabled(),
             'turnstileSiteKey' => $turnstileService->siteKey(),
         ]);

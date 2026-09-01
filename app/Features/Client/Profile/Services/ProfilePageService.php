@@ -2,12 +2,15 @@
 
 namespace App\Features\Client\Profile\Services;
 
+use App\Features\MemberLevel\Services\MemberLevelService;
 use App\Features\Topup\Services\OrderRecipientService;
 use App\Models\User;
 use App\Models\WalletTransaction;
 
 class ProfilePageService
 {
+    public function __construct(private readonly MemberLevelService $memberLevelService) {}
+
     /**
      * @return array<string, mixed>
      */
@@ -21,6 +24,14 @@ class ProfilePageService
             'user' => $user,
             'activeTab' => $activeTab,
             'wallet' => $wallet,
+            'memberLevelStatus' => $this->memberLevelService->status($user),
+            'memberLevelHistories' => $activeTab === 'profile'
+                ? $user->memberLevelHistories()
+                    ->with(['fromLevel:id,name,color', 'toLevel:id,name,color'])
+                    ->latest('id')
+                    ->limit(8)
+                    ->get()
+                : collect(),
             'apiKeys' => $activeTab === 'api'
                 ? $user->apiKeys()
                     ->where('key_type', 'topup')

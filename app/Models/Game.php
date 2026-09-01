@@ -19,10 +19,10 @@ class Game extends Model
 
     protected $fillable = [
         'name', 'slug', 'short_name', 'reward_label', 'image', 'description', 'content', 'status',
-        'sort_order', 'seo_title', 'seo_description', 'metadata', 'checkout_fields',
+        'package_mode', 'sort_order', 'seo_title', 'seo_description', 'metadata', 'checkout_fields',
     ];
 
-    protected $attributes = ['reward_label' => 'Thực nhận', 'status' => 'active', 'sort_order' => 0];
+    protected $attributes = ['reward_label' => 'Thực nhận', 'package_mode' => 'custom', 'status' => 'active', 'sort_order' => 0];
 
     protected function casts(): array
     {

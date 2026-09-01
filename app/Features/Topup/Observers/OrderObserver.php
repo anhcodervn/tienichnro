@@ -3,6 +3,7 @@
 namespace App\Features\Topup\Observers;
 
 use App\Enums\PaymentStatus;
+use App\Features\MemberLevel\Services\MemberLevelService;
 use App\Features\Reporting\Services\TopupDiscordReporterService;
 use App\Features\Topup\Events\AdminTopupOrderUpdated;
 use App\Features\Topup\Events\OrderStatusUpdated;
@@ -10,7 +11,10 @@ use App\Models\Order;
 
 class OrderObserver
 {
-    public function __construct(private readonly TopupDiscordReporterService $discordReporter) {}
+    public function __construct(
+        private readonly TopupDiscordReporterService $discordReporter,
+        private readonly MemberLevelService $memberLevelService,
+    ) {}
 
     public function created(Order $order): void
     {
@@ -20,6 +24,10 @@ class OrderObserver
 
     public function updated(Order $order): void
     {
+        if ($order->wasChanged(['payment_status', 'order_status'])) {
+            $this->memberLevelService->synchronizeOrder($order);
+        }
+
         if ($order->wasChanged('payment_status')) {
             match ($order->payment_status) {
                 PaymentStatus::Paid => $this->discordReporter->paymentReceived($order),

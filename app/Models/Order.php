@@ -31,16 +31,19 @@ class Order extends Model
 
     protected $fillable = [
         'code', 'idempotency_key', 'user_id', 'email', 'normalized_email', 'game_id',
-        'game_server_id', 'topup_package_id', 'topup_provider_id', 'purchase_mode', 'checkout_fields_snapshot',
+        'game_server_id', 'topup_package_id', 'package_source', 'global_topup_package_id',
+        'global_topup_package_name', 'topup_provider_id', 'member_level_id', 'member_level_name',
+        'member_level_pricing_mode', 'member_level_discount_bps', 'purchase_mode', 'checkout_fields_snapshot',
         'game_account', 'game_character', 'quantity',
-        'package_name', 'denomination', 'carot_amount', 'unit_price', 'sale_unit_price', 'subtotal',
-        'discount_amount', 'total_amount', 'provider_unit_cost', 'provider_total_cost', 'gross_profit',
+        'package_name', 'denomination', 'carot_amount', 'unit_price', 'sale_unit_price', 'retail_unit_price', 'subtotal',
+        'discount_amount', 'member_level_discount_amount', 'total_amount', 'provider_unit_cost', 'provider_total_cost', 'gross_profit',
         'payment_method', 'payment_status', 'order_status',
         'provider_reference', 'paid_at', 'processing_at', 'completed_at', 'failed_at',
         'cancelled_at', 'failure_reason', 'customer_ip', 'user_agent', 'metadata',
     ];
 
     protected $attributes = [
+        'package_source' => 'custom',
         'payment_status' => PaymentStatus::Pending->value,
         'order_status' => OrderStatus::Pending->value,
     ];
@@ -52,9 +55,10 @@ class Order extends Model
             'payment_status' => PaymentStatus::class,
             'order_status' => OrderStatus::class,
             'quantity' => 'integer', 'denomination' => 'integer', 'carot_amount' => 'integer',
+            'member_level_discount_bps' => 'integer',
             'checkout_fields_snapshot' => 'array',
-            'unit_price' => 'decimal:2', 'sale_unit_price' => 'decimal:2', 'subtotal' => 'decimal:2',
-            'discount_amount' => 'decimal:2', 'total_amount' => 'decimal:2',
+            'unit_price' => 'decimal:2', 'sale_unit_price' => 'decimal:2', 'retail_unit_price' => 'decimal:2', 'subtotal' => 'decimal:2',
+            'discount_amount' => 'decimal:2', 'member_level_discount_amount' => 'decimal:2', 'total_amount' => 'decimal:2',
             'provider_unit_cost' => 'decimal:2', 'provider_total_cost' => 'decimal:2', 'gross_profit' => 'decimal:2',
             'paid_at' => 'datetime', 'processing_at' => 'datetime', 'completed_at' => 'datetime',
             'failed_at' => 'datetime', 'cancelled_at' => 'datetime', 'metadata' => 'array',
@@ -108,6 +112,16 @@ class Order extends Model
         return $this->belongsTo(TopupProvider::class, 'topup_provider_id');
     }
 
+    public function globalTopupPackage(): BelongsTo
+    {
+        return $this->belongsTo(GlobalTopupPackage::class);
+    }
+
+    public function memberLevel(): BelongsTo
+    {
+        return $this->belongsTo(MemberLevel::class);
+    }
+
     public function paymentTransactions(): HasMany
     {
         return $this->hasMany(PaymentTransaction::class);
@@ -121,5 +135,10 @@ class Order extends Model
     public function recipients(): HasMany
     {
         return $this->hasMany(OrderRecipient::class)->orderBy('position');
+    }
+
+    public function memberLevelCredit(): HasOne
+    {
+        return $this->hasOne(MemberLevelOrderCredit::class);
     }
 }

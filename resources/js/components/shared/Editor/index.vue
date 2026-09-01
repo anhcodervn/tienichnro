@@ -519,7 +519,15 @@ export default {
                 return href;
             }
 
-            return /^(?:https?:\/\/|mailto:|tel:)/i.test(href) ? href : null;
+            if (/^(?:https?:\/\/|mailto:|tel:)/i.test(href)) {
+                return href;
+            }
+
+            if (/^(?:www\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?::\d{1,5})?(?:[/?#].*)?$/i.test(href)) {
+                return `https://${href}`;
+            }
+
+            return null;
         }
 
         function escapeHtml(value: string): string {
