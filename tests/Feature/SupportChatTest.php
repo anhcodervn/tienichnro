@@ -12,9 +12,12 @@ use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Contracts\Events\ShouldDispatchAfterCommit;
 use Illuminate\Contracts\Queue\ShouldBeUnique;
 use Illuminate\Http\Client\Request;
+use Illuminate\Http\Request as HttpRequest;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Facades\Route;
 
 function supportConversationFor(User $user): SupportConversation
 {
@@ -32,6 +35,50 @@ test('regular user cannot access admin support API', function () {
     $this->actingAs($user)
         ->getJson('/api/admin-api/support/conversations')
         ->assertForbidden();
+});
+
+test('client support message limiter is scoped per user for ten seconds and one minute', function (): void {
+    $user = User::factory()->create();
+    $request = HttpRequest::create('/api/client/support/messages', 'POST');
+    $request->setUserResolver(fn (): User => $user);
+    $resolver = RateLimiter::limiter('support-user-message');
+
+    expect($resolver)->not->toBeNull();
+
+    $limits = $resolver($request);
+
+    expect(collect($limits)->pluck('maxAttempts')->all())->toBe([1, 6])
+        ->and(collect($limits)->pluck('decaySeconds')->all())->toBe([10, 60])
+        ->and(collect($limits)->pluck('key')->all())->toBe([
+            "user:{$user->id}:ten-seconds",
+            "user:{$user->id}:minute",
+        ])
+        ->and(Route::getRoutes()->getByName('client.support.messages.store')?->gatherMiddleware())
+        ->toContain('throttle:support-user-message');
+});
+
+test('user must wait ten seconds before sending another support message', function (): void {
+    $user = User::factory()->create();
+    Event::fake();
+    Queue::fake();
+
+    $this->actingAs($user)
+        ->postJson('/api/client/support/messages', ['message' => 'Tin thứ nhất'])
+        ->assertCreated();
+
+    $limitedResponse = $this->actingAs($user)
+        ->postJson('/api/client/support/messages', ['message' => 'Tin gửi quá nhanh'])
+        ->assertTooManyRequests()
+        ->assertJsonPath('status', false);
+
+    expect((int) $limitedResponse->headers->get('Retry-After'))->toBeGreaterThanOrEqual(1)
+        ->and((int) $limitedResponse->json('data.retry_after'))->toBeGreaterThanOrEqual(1);
+
+    $this->travel(10)->seconds();
+
+    $this->actingAs($user)
+        ->postJson('/api/client/support/messages', ['message' => 'Tin sau thời gian chờ'])
+        ->assertCreated();
 });
 
 test('user only sees and sends messages in their own conversation', function () {
@@ -67,6 +114,7 @@ test('sending messages stores sender role and reuses one conversation per user',
     Queue::fake();
 
     $this->actingAs($user)->postJson('/api/client/support/messages', ['message' => 'Tin thứ nhất'])->assertCreated();
+    $this->travel(10)->seconds();
     $this->actingAs($user)->postJson('/api/client/support/messages', ['message' => 'Tin thứ hai'])->assertCreated();
 
     $conversation = SupportConversation::query()->whereBelongsTo($user)->firstOrFail();

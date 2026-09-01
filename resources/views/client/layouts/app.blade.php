@@ -251,7 +251,7 @@
         @yield('content')
     </main>
 
-    @unless (request()->routeIs('content.contact'))
+    @unless (request()->routeIs(['content.contact', 'client.support.chat']))
         <x-client.floating-support :raised="request()->routeIs('wallet.deposit.*')" />
     @endunless
 

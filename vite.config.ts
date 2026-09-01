@@ -1,7 +1,7 @@
-import { defineConfig, loadEnv } from 'vite';
+import vue from '@vitejs/plugin-vue';
 import laravel from 'laravel-vite-plugin';
 import path from 'path';
-import vue from '@vitejs/plugin-vue';
+import { defineConfig, loadEnv } from 'vite';
 
 export default defineConfig(({ mode }) => {
     const env = loadEnv(mode, process.cwd(), '');
@@ -15,6 +15,7 @@ export default defineConfig(({ mode }) => {
                     'resources/js/app.ts',
                     'resources/css/client.css',
                     'resources/js/client.js',
+                    'resources/js/client-support.js',
                 ],
                 refresh: true,
             }),

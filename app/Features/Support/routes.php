@@ -11,7 +11,7 @@ Route::middleware('auth:sanctum')
     ->group(function (): void {
         Route::get('/', 'index')->name('index');
         Route::get('/unread', 'unread')->name('unread');
-        Route::post('/messages', 'store')->middleware('throttle:20,1')->name('messages.store');
+        Route::post('/messages', 'store')->middleware('throttle:support-user-message')->name('messages.store');
         Route::post('/read', 'markRead')->name('read');
     });
 

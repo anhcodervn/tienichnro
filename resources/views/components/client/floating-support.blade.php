@@ -6,9 +6,9 @@
         'bottom-[calc(env(safe-area-inset-bottom)+6rem)]' => $raised,
         'bottom-[calc(env(safe-area-inset-bottom)+1rem)]' => ! $raised,
     ])
-    href="{{ route('content.contact') }}"
-    aria-label="Liên hệ hỗ trợ"
-    title="Liên hệ hỗ trợ"
+    href="{{ route('client.support.chat') }}"
+    aria-label="Chat với hỗ trợ"
+    title="Chat với hỗ trợ"
     data-floating-support
 >
     <span class="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-xl text-emerald-700 shadow-sm">
@@ -16,7 +16,7 @@
         <i class="bx bx-message-circle-dots relative" aria-hidden="true"></i>
     </span>
     <span class="hidden min-[390px]:block">
-        <strong class="block text-sm leading-5">Liên hệ hỗ trợ</strong>
-        <span class="block text-[11px] font-medium text-emerald-100">Phản hồi nhanh</span>
+        <strong class="block text-sm leading-5">Chat hỗ trợ</strong>
+        <span class="block text-[11px] font-medium text-emerald-100">Trò chuyện realtime</span>
     </span>
 </a>
