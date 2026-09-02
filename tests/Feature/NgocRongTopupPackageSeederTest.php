@@ -38,7 +38,7 @@ test('ngoc rong price list uses nineteen percent provider cost and fifteen perce
         ->and($packages)->toHaveCount(7)
         ->and($packages->first()->id)->toBe($legacyPackage->id)
         ->and($packages->pluck('provider_id')->unique()->values()->all())->toBe([$provider->id])
-        ->and($packages->pluck('provider_service_code')->unique()->values()->all())->toBe(['nr']);
+        ->and($game->provider_service_code)->toBe('nr');
 
     $expectedPackages = [
         10000 => [8100, 8500, 13, 22, 32, 26],

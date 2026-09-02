@@ -28,7 +28,6 @@ class CatalogGameResource extends JsonResource
             'packages' => $this->whenLoaded('packages', fn (): array => $this->packages
                 ->map(fn (TopupPackage $package): array => [
                     'id' => $package->id,
-                    'server_id' => $package->game_server_id,
                     'name' => $package->name,
                     'price' => $package->denomination !== null ? (int) $package->denomination : null,
                     'sale_price' => (int) $package->price,

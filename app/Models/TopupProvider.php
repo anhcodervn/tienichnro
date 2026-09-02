@@ -44,6 +44,11 @@ class TopupProvider extends Model
         return $this->hasMany(TopupPackage::class, 'provider_id');
     }
 
+    public function globalPackages(): HasMany
+    {
+        return $this->hasMany(GlobalTopupPackage::class, 'provider_id');
+    }
+
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class, 'topup_provider_id');

@@ -69,6 +69,7 @@ class TopupProviderResolver
 
     public function assertAvailable(TopupPackage $package, GameServer $server): void
     {
+        $package->loadMissing(['game', 'provider']);
         $provider = $package->provider;
 
         if (! $provider instanceof TopupProvider) {

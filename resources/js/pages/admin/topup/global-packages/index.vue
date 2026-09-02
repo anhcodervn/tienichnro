@@ -4,22 +4,27 @@ import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { BadgeDollarSign, Boxes, LoaderCircle, Plus, Save, Trash2 } from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
-type LevelDraft = { pricing_mode: 'discount' | 'fixed'; discount_value: string; fixed_price: string; minimum_profit: string };
+type NumericDraft = string | number;
+type LevelDraft = { pricing_mode: 'discount' | 'fixed'; discount_value: NumericDraft; fixed_price: NumericDraft; minimum_profit: NumericDraft };
 type Preview = { minimum: number; maximum: number; floorApplied: boolean };
 
-const catalog = ref<GlobalPackageCatalog>({ global_packages: [], levels: [] });
+const catalog = ref<GlobalPackageCatalog>({ global_packages: [], levels: [], providers: [] });
 const loading = ref(false);
 const saving = ref(false);
 const editingId = ref<number | null>(null);
 const selectedLevelId = ref<number | null>(null);
 const drafts = reactive<Record<number, LevelDraft>>({});
 const form = reactive({
+    provider_id: '' as string | number,
     name: '',
     code: '',
     denomination: '' as string | number,
+    provider_price: '' as string | number,
     price: '' as string | number,
-    original_price: '' as string | number,
     description: '',
+    bonus_text: '',
+    min_quantity: 1,
+    max_quantity: '' as string | number,
     status: 'active' as 'active' | 'inactive',
     sort_order: 0,
 });
@@ -31,16 +36,21 @@ const compactFieldClass =
     'min-h-10 w-full rounded-md border-2 border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-950 outline-none transition hover:border-slate-400 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-100';
 const money = (value: number | null): string => `${new Intl.NumberFormat('vi-VN').format(value ?? 0)}đ`;
 const notify = (message: string): void => handleSuccessResponse({ data: { status: true, message } });
+const nullableNumber = (value: string | number): number | null => (value === '' ? null : Number(value));
 
 const resetForm = (): void => {
     editingId.value = null;
     Object.assign(form, {
+        provider_id: '',
         name: '',
         code: '',
         denomination: '',
+        provider_price: '',
         price: '',
-        original_price: '',
         description: '',
+        bonus_text: '',
+        min_quantity: 1,
+        max_quantity: '',
         status: 'active',
         sort_order: catalog.value.global_packages.length,
     });
@@ -78,12 +88,16 @@ const load = async (): Promise<void> => {
 const edit = (globalPackage: GlobalTopupPackage): void => {
     editingId.value = globalPackage.id;
     Object.assign(form, {
+        provider_id: globalPackage.provider_id ?? '',
         name: globalPackage.name,
         code: globalPackage.code,
         denomination: globalPackage.denomination,
+        provider_price: globalPackage.provider_price,
         price: globalPackage.price,
-        original_price: globalPackage.original_price,
         description: globalPackage.description ?? '',
+        bonus_text: globalPackage.bonus_text ?? '',
+        min_quantity: globalPackage.min_quantity,
+        max_quantity: globalPackage.max_quantity ?? '',
         status: globalPackage.status,
         sort_order: globalPackage.sort_order,
     });
@@ -94,10 +108,15 @@ const save = async (): Promise<void> => {
     try {
         await adminGlobalPackageService.save(editingId.value, {
             ...form,
+            provider_id: form.provider_id === '' ? null : Number(form.provider_id),
             denomination: Number(form.denomination),
+            provider_price: Number(form.provider_price),
             price: Number(form.price),
-            original_price: Number(form.original_price),
             description: form.description || null,
+            bonus_text: form.bonus_text || null,
+            min_quantity: Number(form.min_quantity),
+            max_quantity: nullableNumber(form.max_quantity),
+            metadata: {},
             sort_order: Number(form.sort_order),
         });
         notify(editingId.value ? 'Đã cập nhật gói nạp Global.' : 'Đã tạo gói nạp Global.');
@@ -123,9 +142,10 @@ const remove = async (globalPackage: GlobalTopupPackage): Promise<void> => {
     }
 };
 
-const numberOr = (value: string, fallback: number): number => {
+const isBlankNumber = (value: NumericDraft): boolean => String(value).trim() === '';
+const numberOr = (value: NumericDraft, fallback: number): number => {
     const parsed = Number(value);
-    return value.trim() !== '' && Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
+    return !isBlankNumber(value) && Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
 };
 
 const preview = (globalPackage: GlobalTopupPackage): Preview => {
@@ -139,15 +159,13 @@ const preview = (globalPackage: GlobalTopupPackage): Preview => {
             ? numberOr(draft.fixed_price, globalPackage.price)
             : globalPackage.price - Math.trunc((globalPackage.price * discount) / 100);
     const profit = numberOr(draft.minimum_profit, level.minimum_profit);
-    const minCost = globalPackage.provider_price_min == null ? null : Number(globalPackage.provider_price_min);
-    const maxCost = globalPackage.provider_price_max == null ? null : Number(globalPackage.provider_price_max);
-    const finalPrice = (cost: number | null): number =>
-        cost == null ? Math.min(globalPackage.price, candidate) : Math.min(globalPackage.price, Math.max(candidate, cost + profit));
+    const providerCost = Number(globalPackage.provider_price);
+    const finalPrice = Math.min(globalPackage.price, Math.max(candidate, providerCost + profit));
 
     return {
-        minimum: finalPrice(minCost),
-        maximum: finalPrice(maxCost),
-        floorApplied: maxCost != null && maxCost + profit > candidate,
+        minimum: finalPrice,
+        maximum: finalPrice,
+        floorApplied: providerCost + profit > candidate,
     };
 };
 
@@ -155,7 +173,7 @@ const saveLevelPrice = async (globalPackage: GlobalTopupPackage): Promise<void> 
     const level = selectedLevel.value;
     const draft = drafts[globalPackage.id];
     if (!level || !draft) return;
-    if (draft.pricing_mode === 'fixed' && draft.fixed_price.trim() === '') {
+    if (draft.pricing_mode === 'fixed' && isBlankNumber(draft.fixed_price)) {
         handleErrorResponse({ message: `Vui lòng nhập giá cố định cho ${globalPackage.name}.` });
         return;
     }
@@ -166,7 +184,7 @@ const saveLevelPrice = async (globalPackage: GlobalTopupPackage): Promise<void> 
             discount_basis_points:
                 draft.pricing_mode === 'discount' ? Math.round(numberOr(draft.discount_value, level.default_discount_bps / 100) * 100) : null,
             fixed_price: draft.pricing_mode === 'fixed' ? Number(draft.fixed_price) : null,
-            minimum_profit: draft.minimum_profit.trim() === '' ? null : Number(draft.minimum_profit),
+            minimum_profit: isBlankNumber(draft.minimum_profit) ? null : Number(draft.minimum_profit),
             is_active: true,
         });
         notify(`Đã lưu giá ${globalPackage.name} cho ${level.name}.`);
@@ -188,8 +206,8 @@ const resetLevelPrice = async (globalPackage: GlobalTopupPackage): Promise<void>
 };
 
 onMounted(async () => {
-    resetForm();
     await load();
+    resetForm();
 });
 </script>
 
@@ -197,11 +215,9 @@ onMounted(async () => {
     <main class="grid gap-5 p-4 sm:p-6">
         <header class="flex flex-col gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <p class="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">Giá bán dùng chung, provider theo từng game</p>
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">Gói hoàn chỉnh dùng chung cho mọi game Global</p>
                 <h1 class="mt-1 text-2xl font-black text-slate-950">Gói nạp Global</h1>
-                <p class="mt-1 text-sm text-slate-500">
-                    Chỉnh giá một lần; mỗi game vẫn gửi mã dịch vụ, server và dữ liệu tài khoản tới đúng provider.
-                </p>
+                <p class="mt-1 text-sm text-slate-500">Chỉ quản lý mệnh giá, giá bán, giá vốn, provider, giới hạn và giá theo level.</p>
             </div>
             <button
                 type="button"
@@ -216,23 +232,52 @@ onMounted(async () => {
             <LoaderCircle class="h-8 w-8 animate-spin text-slate-400" />
         </div>
 
-        <section v-else class="grid items-start gap-5 xl:grid-cols-[22rem_minmax(0,1fr)]">
+        <section v-else class="grid items-start gap-5 xl:grid-cols-[30rem_minmax(0,1fr)]">
             <form class="grid gap-3 rounded-lg border border-slate-200 bg-white p-5 shadow-sm" @submit.prevent="save">
                 <h2 class="flex items-center gap-2 font-black">
                     <Boxes class="h-5 w-5 text-violet-600" /> {{ editingId ? 'Sửa gói Global' : 'Tạo gói Global' }}
                 </h2>
-                <label class="grid gap-1 text-sm font-bold">Tên<input v-model.trim="form.name" required :class="formFieldClass" /></label>
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="grid gap-1 text-sm font-bold">Tên<input v-model.trim="form.name" required :class="formFieldClass" /></label>
+                    <label class="grid gap-1 text-sm font-bold"
+                        >Mã<input v-model.trim="form.code" required pattern="[a-z0-9][a-z0-9_-]*" :class="[formFieldClass, 'font-mono']"
+                    /></label>
+                    <label class="grid gap-1 text-sm font-bold"
+                        >Mệnh giá<input v-model="form.denomination" required min="1" type="number" :class="formFieldClass"
+                    /></label>
+                </div>
+
+                <div class="grid gap-3 rounded-md border border-violet-200 bg-violet-50/60 p-3">
+                    <h3 class="text-sm font-black text-violet-950">Provider dùng chung</h3>
+                    <div class="grid gap-3 sm:grid-cols-2">
+                        <label class="grid gap-1 text-sm font-bold"
+                            >Provider<select v-model="form.provider_id" :class="[formFieldClass, 'font-normal']">
+                                <option value="">Xử lý thủ công</option>
+                                <option v-for="provider in catalog.providers" :key="provider.id" :value="provider.id">
+                                    {{ provider.name }} · {{ provider.slug }}
+                                </option>
+                            </select></label
+                        >
+                        <label class="grid gap-1 text-sm font-bold"
+                            >Giá vốn provider<input v-model="form.provider_price" required min="0" type="number" :class="formFieldClass"
+                        /></label>
+                    </div>
+                </div>
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="grid gap-1 text-sm font-bold"
+                        >Giá bán chung<input v-model="form.price" required min="0" type="number" :class="formFieldClass"
+                    /></label>
+                    <label class="grid gap-1 text-sm font-bold"
+                        >Số lượng tối thiểu<input v-model.number="form.min_quantity" required min="1" max="10" type="number" :class="formFieldClass"
+                    /></label>
+                    <label class="grid gap-1 text-sm font-bold"
+                        >Số lượng tối đa<input v-model="form.max_quantity" min="1" max="10" type="number" :class="formFieldClass"
+                    /></label>
+                </div>
+
                 <label class="grid gap-1 text-sm font-bold"
-                    >Mã<input v-model.trim="form.code" required pattern="[a-z0-9][a-z0-9_-]*" :class="[formFieldClass, 'font-mono']"
-                /></label>
-                <label class="grid gap-1 text-sm font-bold"
-                    >Mệnh giá<input v-model="form.denomination" required min="1" type="number" :class="formFieldClass"
-                /></label>
-                <label class="grid gap-1 text-sm font-bold"
-                    >Giá bán chung<input v-model="form.price" required min="0" type="number" :class="formFieldClass"
-                /></label>
-                <label class="grid gap-1 text-sm font-bold"
-                    >Giá gốc hiển thị<input v-model="form.original_price" required min="1" type="number" :class="formFieldClass"
+                    >Nhãn khuyến mãi<input v-model.trim="form.bonus_text" maxlength="255" :class="formFieldClass"
                 /></label>
                 <label class="grid gap-1 text-sm font-bold"
                     >Mô tả<textarea v-model="form.description" rows="3" :class="[formFieldClass, 'font-normal']"></textarea>
@@ -263,7 +308,7 @@ onMounted(async () => {
                 >
                     <div>
                         <h2 class="font-black text-slate-950">Giá theo level</h2>
-                        <p class="text-xs text-slate-500">Giá sau giảm được chặn theo giá vốn của từng game đã ánh xạ.</p>
+                        <p class="text-xs text-slate-500">Giá sau giảm được chặn theo giá vốn provider của chính gói Global.</p>
                     </div>
                     <select v-model="selectedLevelId" :class="compactFieldClass" @change="hydrateDrafts">
                         <option v-for="level in catalog.levels" :key="level.id" :value="level.id">
@@ -281,8 +326,9 @@ onMounted(async () => {
                         <div>
                             <h3 class="font-black text-slate-950">{{ globalPackage.name }}</h3>
                             <p class="text-sm text-slate-500">
-                                {{ money(globalPackage.denomination) }} · bán {{ money(globalPackage.price) }} ·
-                                {{ globalPackage.packages_count }} gói game ánh xạ
+                                {{ money(globalPackage.denomination) }} · {{ globalPackage.provider_name ?? 'Thủ công' }} · vốn
+                                {{ money(globalPackage.provider_price) }} · bán {{ money(globalPackage.price) }} ·
+                                {{ globalPackage.packages_count }} gói game tự đồng bộ
                             </p>
                         </div>
                         <div class="flex gap-3 text-sm font-bold">

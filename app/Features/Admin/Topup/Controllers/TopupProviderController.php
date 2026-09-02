@@ -56,7 +56,7 @@ class TopupProviderController extends Controller
 
     public function destroy(Request $request, TopupProvider $topupProvider): JsonResponse
     {
-        if ($topupProvider->packages()->exists() || $topupProvider->orders()->exists()) {
+        if ($topupProvider->packages()->exists() || $topupProvider->globalPackages()->exists() || $topupProvider->orders()->exists()) {
             throw ValidationException::withMessages([
                 'provider' => 'Không thể xóa provider đang được gán cho gói nạp hoặc đơn hàng.',
             ]);

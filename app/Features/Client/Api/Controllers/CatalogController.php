@@ -24,12 +24,8 @@ class CatalogController extends Controller
                 'packages' => fn (HasMany $query): HasMany => $query
                     ->active()
                     ->whereNotNull('denomination')
-                    ->where(function ($query): void {
-                        $query->whereNull('game_server_id')
-                            ->orWhereHas('server', fn ($serverQuery) => $serverQuery->active());
-                    })
                     ->select([
-                        'id', 'game_id', 'game_server_id', 'global_topup_package_id', 'name', 'denomination', 'provider_price', 'price',
+                        'id', 'game_id', 'global_topup_package_id', 'name', 'denomination', 'provider_price', 'price',
                         'original_price', 'min_quantity', 'max_quantity', 'sort_order',
                     ]),
             ])

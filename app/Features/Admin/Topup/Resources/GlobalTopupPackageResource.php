@@ -14,20 +14,26 @@ class GlobalTopupPackageResource extends JsonResource
     {
         return [
             'id' => $this->id,
+            'provider_id' => $this->provider_id,
+            'provider_name' => $this->provider?->name,
+            'provider_slug' => $this->provider?->slug,
             'name' => $this->name,
             'code' => $this->code,
             'denomination' => $this->denomination,
+            'provider_price' => $this->provider_price,
             'price' => $this->price,
-            'original_price' => $this->original_price,
-            'discount_percent' => $this->original_price > 0
-                ? round((($this->original_price - $this->price) * 100) / $this->original_price, 2)
+            'original_price' => $this->denomination,
+            'discount_percent' => $this->denomination > 0
+                ? round((($this->denomination - $this->price) * 100) / $this->denomination, 2)
                 : 0,
             'description' => $this->description,
+            'bonus_text' => $this->bonus_text,
+            'min_quantity' => $this->min_quantity,
+            'max_quantity' => $this->max_quantity,
             'status' => $this->status,
             'sort_order' => $this->sort_order,
+            'metadata' => $this->metadata ?? [],
             'packages_count' => $this->whenCounted('packages'),
-            'provider_price_min' => $this->whenAggregated('packages', 'provider_price', 'min'),
-            'provider_price_max' => $this->whenAggregated('packages', 'provider_price', 'max'),
             'level_prices' => $this->whenLoaded('levelPrices'),
             'created_at' => $this->created_at?->toISOString(),
         ];

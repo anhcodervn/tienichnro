@@ -10,7 +10,10 @@ use Illuminate\Validation\ValidationException;
 
 class OrderPricingService
 {
-    public function __construct(private readonly MemberLevelPriceService $memberLevelPriceService) {}
+    public function __construct(
+        private readonly MemberLevelPriceService $memberLevelPriceService,
+        private readonly GameRewardService $gameRewardService,
+    ) {}
 
     /**
      * @param  array<int, int>  $recipientQuantities
@@ -27,9 +30,9 @@ class OrderPricingService
         ?User $user = null,
     ): array {
         $query = TopupPackage::query()->with([
-            'game:id,name,status,package_mode',
-            'globalTopupPackage:id,name,denomination,price,original_price,status',
-            'server:id,game_id,name,status',
+            'game:id,name,short_name,reward_label,provider_service_code,status,package_mode',
+            'globalTopupPackage.provider',
+            'server:id,game_id,name,code,status',
         ]);
 
         if ($lock) {
@@ -46,9 +49,7 @@ class OrderPricingService
             throw ValidationException::withMessages(['package_id' => 'Gói nạp không thuộc trò chơi đã chọn.']);
         }
 
-        if ($package->game_server_id !== null && $package->game_server_id !== $serverId) {
-            throw ValidationException::withMessages(['server_id' => 'Gói nạp không áp dụng cho máy chủ đã chọn.']);
-        }
+        $this->gameRewardService->applyToPackage($package);
 
         $serverQuery = GameServer::query()
             ->whereKey($serverId)
@@ -65,6 +66,7 @@ class OrderPricingService
             throw ValidationException::withMessages(['server_id' => 'Máy chủ không tồn tại hoặc đang tạm tắt.']);
         }
 
+        $memberPrice = $this->memberLevelPriceService->resolve($package, $user);
         $quantitiesToValidate = $recipientQuantities !== [] ? $recipientQuantities : [$quantity];
         $hasInvalidQuantity = collect($quantitiesToValidate)->contains(
             fn (mixed $recipientQuantity): bool => (int) $recipientQuantity < $package->min_quantity
@@ -75,13 +77,12 @@ class OrderPricingService
             throw ValidationException::withMessages([$quantityField => 'Số lượng không nằm trong giới hạn của gói nạp.']);
         }
 
-        $memberPrice = $this->memberLevelPriceService->resolve($package, $user);
         $retailPrice = $memberPrice['retail_price'];
         $sellingPrice = $memberPrice['final_price'];
         $unitPrice = $memberPrice['original_price'];
         $subtotal = $unitPrice * $quantity;
         $totalAmount = $sellingPrice * $quantity;
-        $providerUnitCost = $package->provider_price === null ? null : (int) $package->provider_price;
+        $providerUnitCost = $memberPrice['provider_price'];
         $providerTotalCost = $providerUnitCost === null ? null : $providerUnitCost * $quantity;
 
         return [

@@ -10,6 +10,7 @@ use App\Mail\Orders\OrderCreatedMail;
 use App\Models\ConfigRecharge;
 use App\Models\Game;
 use App\Models\GameServer;
+use App\Models\GlobalTopupPackageGameSetting;
 use App\Models\Order;
 use App\Models\OrderRecipient;
 use App\Models\PaymentTransaction;
@@ -36,6 +37,38 @@ test('guest home renders the purchase layout reward table and seo content withou
         'reward_x3_amount' => 495,
         'first_topup_reward_amount' => 390,
         'provider_price' => 76543,
+    ]);
+    GlobalTopupPackageGameSetting::factory()->for($game)->create([
+        'denomination' => 100000,
+        'receives' => [
+            [
+                'code' => 'GM',
+                'label' => 'Gem mở',
+                'base_amount' => 195,
+                'reward_x2_amount' => 345,
+                'reward_x3_amount' => 495,
+                'first_topup_reward_amount' => 390,
+            ],
+            [
+                'code' => 'GK',
+                'label' => 'Gem khóa',
+                'base_amount' => 95,
+                'reward_x2_amount' => 145,
+                'reward_x3_amount' => 195,
+                'first_topup_reward_amount' => 190,
+            ],
+        ],
+    ]);
+    GlobalTopupPackageGameSetting::factory()->for($game)->create([
+        'denomination' => 20000,
+        'receives' => [[
+            'code' => 'DOC_LAP',
+            'label' => 'Thực nhận độc lập',
+            'base_amount' => 777,
+            'reward_x2_amount' => null,
+            'reward_x3_amount' => null,
+            'first_topup_reward_amount' => null,
+        ]],
     ]);
     $inactivePackage = TopupPackage::factory()->for($game)->inactive()->create(['name' => 'Gói đã tạm dừng']);
 
@@ -71,6 +104,11 @@ test('guest home renders the purchase layout reward table and seo content withou
         ->assertSee('90.000đ')
         ->assertSee('Bảng thực nhận theo từng game')
         ->assertSee('100.000đ')
+        ->assertSee('20.000đ')
+        ->assertSee('Thực nhận độc lập')
+        ->assertSee('777')
+        ->assertSee('Gem mở')
+        ->assertSee('Gem khóa')
         ->assertSee('195')
         ->assertSee('345')
         ->assertSee('495')
@@ -157,7 +195,6 @@ function topupCatalog(array $packageAttributes = []): array
     $game = Game::factory()->create();
     $server = GameServer::factory()->for($game)->create();
     $package = TopupPackage::factory()->for($game)->create([
-        'game_server_id' => $server->id,
         'price' => 90000,
         'original_price' => 100000,
         'min_quantity' => 1,
@@ -242,6 +279,7 @@ test('checkout snapshots direct provider field names without provider-specific m
         ],
     ]);
     $game->update([
+        'provider_service_code' => 'nr',
         'checkout_fields' => [
             ['key' => 'account', 'label' => 'Email/Số điện thoại', 'placeholder' => '', 'required' => true],
         ],
@@ -249,7 +287,6 @@ test('checkout snapshots direct provider field names without provider-specific m
     $server->update(['code' => '16']);
     $package->update([
         'provider_id' => $provider->id,
-        'provider_service_code' => 'nr',
     ]);
 
     $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
@@ -264,6 +301,7 @@ test('checkout snapshots direct provider field names without provider-specific m
         ->and(data_get($order->metadata, 'provider'))->toBe([
             'slug' => 'accnrovn',
             'service_code' => 'nr',
+            'server_code' => '16',
         ]);
 });
 
@@ -666,8 +704,8 @@ test('checkout requires an active server belonging to the selected game', functi
         ->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
             'server_id' => $sameGameServer->id,
         ]))
-        ->assertRedirect(route('topup.index'))
-        ->assertSessionHasErrors('server_id');
+        ->assertSessionHasNoErrors()
+        ->assertRedirect();
 
     $server->update(['status' => 'inactive']);
 
@@ -676,7 +714,8 @@ test('checkout requires an active server belonging to the selected game', functi
         ->assertRedirect(route('topup.index'))
         ->assertSessionHasErrors('server_id');
 
-    expect(Order::query()->count())->toBe(0);
+    expect(Order::query()->count())->toBe(1)
+        ->and(Order::query()->sole()->game_server_id)->toBe($sameGameServer->id);
 });
 
 test('guest checkout always falls back to bank transfer', function (): void {

@@ -47,7 +47,6 @@ class TopupOrderController extends Controller
         try {
             $package = $this->resolveTopupPackage->handle(
                 gameId: (int) $validated['game'],
-                serverId: (int) $validated['server'],
                 denomination: (int) $validated['price'],
             );
             $order = $this->orderService->create(

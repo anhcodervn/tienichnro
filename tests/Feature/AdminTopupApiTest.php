@@ -203,7 +203,6 @@ test('catalog lists support server side search filters and pagination', function
     $targetProvider = TopupProvider::factory()->create(['name' => 'The9p', 'slug' => 'the9p']);
     TopupProvider::factory()->create(['name' => 'Provider khác']);
     TopupPackage::factory()->for($targetGame)->create([
-        'game_server_id' => $targetServer->id,
         'provider_id' => $targetProvider->id,
         'name' => 'Gói Ngọc Rồng 100k',
         'provider_price' => 81000,
@@ -225,7 +224,7 @@ test('catalog lists support server side search filters and pagination', function
         ->assertJsonCount(1, 'data.data')
         ->assertJsonPath('data.data.0.id', $targetServer->id);
 
-    $this->actingAs($admin)->getJson('/api/admin-api/topup-packages?search=Ngọc&game_id='.$targetGame->id.'&game_server_id='.$targetServer->id.'&provider_id='.$targetProvider->id.'&status=active&min_price=80000&max_price=90000')
+    $this->actingAs($admin)->getJson('/api/admin-api/topup-packages?search=Ngọc&game_id='.$targetGame->id.'&provider_id='.$targetProvider->id.'&status=active&min_price=80000&max_price=90000')
         ->assertOk()
         ->assertJsonCount(1, 'data.data')
         ->assertJsonPath('data.data.0.name', 'Gói Ngọc Rồng 100k');
@@ -392,17 +391,20 @@ test('admin can create update and delete an empty game with audit logs', functio
         'name' => 'Ninja School Online',
         'slug' => 'ninja-school-online',
         'reward_label' => 'Xu',
+        'provider_service_code' => 'nso',
         'checkout_fields' => [
             ['key' => 'account_id', 'label' => 'ID tài khoản', 'placeholder' => 'Nhập ID', 'required' => true],
             ['key' => 'character_name', 'label' => 'Tên nhân vật', 'placeholder' => null, 'required' => false],
         ],
         'status' => 'active',
         'sort_order' => 1,
-    ])->assertCreated();
+    ])->assertCreated()
+        ->assertJsonPath('data.provider_service_code', 'nso');
 
     $game = Game::query()->findOrFail($created->json('data.id'));
 
     expect($game->reward_label)->toBe('Xu')
+        ->and($game->provider_service_code)->toBe('nso')
         ->and($game->checkout_fields)->toHaveCount(2)
         ->and($game->checkout_fields[0]['key'])->toBe('account_id');
 
@@ -410,10 +412,12 @@ test('admin can create update and delete an empty game with audit logs', functio
         'name' => 'Ninja School',
         'slug' => $game->slug,
         'reward_label' => 'Xu',
+        'provider_service_code' => 'nso-v2',
         'checkout_fields' => $game->checkout_fields,
         'status' => $game->status,
         'sort_order' => $game->sort_order,
-    ])->assertOk();
+    ])->assertOk()
+        ->assertJsonPath('data.provider_service_code', 'nso-v2');
 
     $this->actingAs($admin)->deleteJson("/api/admin-api/games/{$game->id}")
         ->assertOk();
@@ -493,19 +497,16 @@ test('catalog deletion requires child records to be removed first', function ():
     $admin = User::factory()->create(['role' => 'admin']);
     $game = Game::factory()->create();
     $server = GameServer::factory()->for($game)->create();
-    $package = TopupPackage::factory()->for($game)->create(['game_server_id' => $server->id]);
+    $package = TopupPackage::factory()->for($game)->create();
 
     $this->actingAs($admin)->deleteJson("/api/admin-api/games/{$game->id}")
         ->assertUnprocessable()
         ->assertJsonValidationErrors('game');
 
     $this->actingAs($admin)->deleteJson("/api/admin-api/game-servers/{$server->id}")
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors('server');
+        ->assertOk();
 
     $this->actingAs($admin)->deleteJson("/api/admin-api/topup-packages/{$package->id}")
-        ->assertOk();
-    $this->actingAs($admin)->deleteJson("/api/admin-api/game-servers/{$server->id}")
         ->assertOk();
     $this->actingAs($admin)->deleteJson("/api/admin-api/games/{$game->id}")
         ->assertOk();
@@ -520,7 +521,7 @@ test('catalog records with order history cannot be deleted', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $game = Game::factory()->create();
     $server = GameServer::factory()->for($game)->create();
-    $package = TopupPackage::factory()->for($game)->create(['game_server_id' => $server->id]);
+    $package = TopupPackage::factory()->for($game)->create();
     Order::factory()->create([
         'game_id' => $game->id,
         'game_server_id' => $server->id,
@@ -545,20 +546,14 @@ test('catalog records with order history cannot be deleted', function (): void {
 
 test('admin package pricing stores provider cost and calculates discount on the server', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
-    $game = Game::factory()->create();
+    $game = Game::factory()->create(['provider_service_code' => 'NRO']);
     $provider = TopupProvider::factory()->create();
 
     $created = $this->actingAs($admin)->postJson('/api/admin-api/topup-packages', [
         'game_id' => $game->id,
-        'game_server_id' => null,
         'provider_id' => $provider->id,
-        'provider_service_code' => 'NRO',
         'name' => 'Gói 10.000đ',
         'denomination' => 10000,
-        'carot_amount' => 13,
-        'reward_x2_amount' => 22,
-        'reward_x3_amount' => 32,
-        'first_topup_reward_amount' => 26,
         'provider_price' => 8100,
         'original_price' => 10000,
         'price' => 8500,
@@ -571,12 +566,7 @@ test('admin package pricing stores provider cost and calculates discount on the 
         ->assertJsonPath('data.original_price', '10000.00')
         ->assertJsonPath('data.price', '8500.00')
         ->assertJsonPath('data.discount_percent', '15.00')
-        ->assertJsonPath('data.carot_amount', 13)
-        ->assertJsonPath('data.reward_x2_amount', 22)
-        ->assertJsonPath('data.reward_x3_amount', 32)
-        ->assertJsonPath('data.first_topup_reward_amount', 26)
         ->assertJsonPath('data.provider_id', $provider->id)
-        ->assertJsonPath('data.provider_service_code', 'NRO')
         ->assertJsonPath('data.provider_name', $provider->name);
 
     $package = TopupPackage::query()->findOrFail($created->json('data.id'));
@@ -584,12 +574,17 @@ test('admin package pricing stores provider cost and calculates discount on the 
     expect($package->provider_price)->toBe('8100.00')
         ->and($package->original_price)->toBe('10000.00')
         ->and($package->price)->toBe('8500.00')
-        ->and($package->carot_amount)->toBe(13)
-        ->and($package->reward_x2_amount)->toBe(22)
-        ->and($package->reward_x3_amount)->toBe(32)
-        ->and($package->first_topup_reward_amount)->toBe(26)
-        ->and($package->provider_service_code)->toBe('NRO')
+        ->and($package->providerServiceCode())->toBe('NRO')
         ->and($package->discount_percent)->toBe('15.00');
+
+    expect($created->json('data'))->not->toHaveKeys([
+        'provider_service_code',
+        'game_server_id',
+        'carot_amount',
+        'reward_x2_amount',
+        'reward_x3_amount',
+        'first_topup_reward_amount',
+    ]);
 
     $this->actingAs($admin)
         ->postJson('/api/admin-api/topup-packages', [
@@ -614,9 +609,7 @@ test('admin package pricing rejects provider cost above sale price and original 
     $otherGameServer = GameServer::factory()->create();
     $payload = [
         'game_id' => $game->id,
-        'game_server_id' => null,
         'name' => 'Gói 10.000đ',
-        'carot_amount' => 1,
         'provider_price' => 8100,
         'original_price' => 10000,
         'price' => 8500,
@@ -637,9 +630,20 @@ test('admin package pricing rejects provider cost above sale price and original 
         ->assertJsonValidationErrors('original_price');
 
     $this->actingAs($admin)
-        ->postJson('/api/admin-api/topup-packages', [...$payload, 'reward_x2_amount' => -1])
+        ->postJson('/api/admin-api/topup-packages', [
+            ...$payload,
+            'carot_amount' => 13,
+            'reward_x2_amount' => 22,
+            'reward_x3_amount' => 32,
+            'first_topup_reward_amount' => 26,
+        ])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors('reward_x2_amount');
+        ->assertJsonValidationErrors([
+            'carot_amount',
+            'reward_x2_amount',
+            'reward_x3_amount',
+            'first_topup_reward_amount',
+        ]);
 
     $this->actingAs($admin)
         ->postJson('/api/admin-api/topup-packages', [...$payload, 'game_server_id' => $otherGameServer->id])

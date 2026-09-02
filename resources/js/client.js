@@ -865,6 +865,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
 
     const syncPackageSelection = () => {
         const packageId = topupPackage?.value || '';
+        const denomination = topupPackage?.selectedOptions[0]?.dataset.denomination || '';
 
         packageButtons.forEach((button) => {
             button.setAttribute('aria-pressed', String(button.dataset.packageButton === packageId));
@@ -877,11 +878,17 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
             if (selected)
                 playAnimation(element, [{ backgroundColor: 'rgb(236 254 255)' }, { backgroundColor: 'rgb(207 250 254)' }], { duration: 280 });
         });
+
+        document.querySelectorAll('[data-reward-denomination]').forEach((element) => {
+            const selected = element.dataset.rewardDenomination === denomination;
+            element.classList.toggle('is-selected', selected);
+            if (selected)
+                playAnimation(element, [{ backgroundColor: 'rgb(236 254 255)' }, { backgroundColor: 'rgb(207 250 254)' }], { duration: 280 });
+        });
     };
 
     const syncPackageCards = () => {
         const gameId = game?.value || '';
-        const serverId = server?.value || '';
 
         packageGroups.forEach((group) => {
             group.hidden = group.dataset.packageOptions !== gameId;
@@ -890,8 +897,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         packageButtons.forEach((button) => {
             const group = button.closest('[data-package-options]');
             const matchesGame = group?.dataset.packageOptions === gameId;
-            const matchesServer = !serverId || !button.dataset.packageServer || button.dataset.packageServer === serverId;
-            button.hidden = !matchesGame || !matchesServer;
+            button.hidden = !matchesGame;
         });
     };
 
@@ -1004,9 +1010,27 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
             !bulkResult.hasInvalidRows &&
             (purchaseMode?.value === 'bulk' ? count > 0 : count >= minimum && count <= maximum);
         const packageLabel = option?.dataset.denomination ? formatMoney(Number(option.dataset.denomination)) : option?.dataset.name || 'Chưa chọn';
-        const rewardAmount = Number(option?.dataset.reward || 0) * count;
-        const rewardX2Amount = Number(option?.dataset.rewardX2 || 0) * count;
-        const rewardX3Amount = Number(option?.dataset.rewardX3 || 0) * count;
+        let rewardItems = [];
+        try {
+            rewardItems = JSON.parse(option?.dataset.rewards || '[]');
+        } catch {
+            rewardItems = [];
+        }
+        const formatRewards = (field) => {
+            const availableItems = rewardItems.filter((item) => item?.[field] !== null && item?.[field] !== undefined && item?.[field] !== '');
+            if (availableItems.length === 0) return '';
+
+            return availableItems
+                .map((item) => {
+                    const amount = new Intl.NumberFormat('vi-VN').format(Number(item[field]) * count);
+                    const unit = availableItems.length > 1 ? item.code || item.label : item.label || rewardLabel;
+                    return `${amount} ${unit}`;
+                })
+                .join(' | ');
+        };
+        const rewardDisplay = formatRewards('base_amount');
+        const rewardX2Display = formatRewards('reward_x2_amount');
+        const rewardX3Display = formatRewards('reward_x3_amount');
 
         if (total) total.textContent = formatMoney(paymentTotal);
         if (discount) discount.textContent = `-${formatMoney(discountTotal)}`;
@@ -1018,15 +1042,15 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
 
         if (summaryRewards) summaryRewards.hidden = !hasPackage;
         if (summaryReward) {
-            summaryReward.textContent = rewardAmount > 0 ? `${new Intl.NumberFormat('vi-VN').format(rewardAmount)} ${rewardLabel}` : 'Đang cập nhật';
+            summaryReward.textContent = rewardDisplay || 'Đang cập nhật';
         }
         if (summaryRewardX2) {
-            summaryRewardX2.hidden = rewardX2Amount <= 0;
-            summaryRewardX2.textContent = `KM X2: ${new Intl.NumberFormat('vi-VN').format(rewardX2Amount)}`;
+            summaryRewardX2.hidden = rewardX2Display === '';
+            summaryRewardX2.textContent = `KM X2: ${rewardX2Display}`;
         }
         if (summaryRewardX3) {
-            summaryRewardX3.hidden = rewardX3Amount <= 0;
-            summaryRewardX3.textContent = `KM X3: ${new Intl.NumberFormat('vi-VN').format(rewardX3Amount)}`;
+            summaryRewardX3.hidden = rewardX3Display === '';
+            summaryRewardX3.textContent = `KM X3: ${rewardX3Display}`;
         }
 
         if (submitButton) submitButton.disabled = !canSubmit;
@@ -1152,12 +1176,9 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
             const matchingOption = Array.from(picker.options).find((option) => option.value === server?.value && !option.disabled);
             picker.value = matchingOption ? matchingOption.value : '';
         });
-        const serverId = server?.value || '';
-
         topupPackage?.querySelectorAll('option[data-game]').forEach((option) => {
             const matchesGame = option.dataset.game === gameId;
-            const matchesServer = !serverId || !option.dataset.server || option.dataset.server === serverId;
-            option.hidden = !matchesGame || !matchesServer;
+            option.hidden = !matchesGame;
             option.disabled = option.hidden;
         });
 

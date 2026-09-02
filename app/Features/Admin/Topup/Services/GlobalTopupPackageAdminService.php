@@ -2,85 +2,99 @@
 
 namespace App\Features\Admin\Topup\Services;
 
+use App\Features\Topup\Services\GlobalTopupPackageSyncService;
 use App\Models\AdminAuditLog;
 use App\Models\GlobalTopupPackage;
 use App\Models\MemberLevel;
 use App\Models\MemberLevelGlobalPackagePrice;
+use App\Models\TopupProvider;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
 class GlobalTopupPackageAdminService
 {
+    public function __construct(private readonly GlobalTopupPackageSyncService $syncService) {}
+
     /** @return array<string, mixed> */
     public function catalog(): array
     {
         return [
             'global_packages' => GlobalTopupPackage::query()
+                ->with('provider:id,name,slug')
                 ->withCount('packages')
-                ->withMin('packages', 'provider_price')
-                ->withMax('packages', 'provider_price')
-                ->with(['levelPrices' => fn ($query) => $query->orderBy('member_level_id')])
+                ->with([
+                    'levelPrices' => fn ($query) => $query->orderBy('member_level_id'),
+                ])
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get(),
             'levels' => MemberLevel::query()
                 ->orderBy('rank')
                 ->get(['id', 'name', 'rank', 'default_discount_bps', 'minimum_profit', 'status']),
+            'providers' => TopupProvider::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug']),
         ];
     }
 
     /** @param array<string, mixed> $payload */
     public function create(array $payload, User $admin, Request $request): GlobalTopupPackage
     {
-        $globalPackage = GlobalTopupPackage::query()->create($payload);
-        $this->audit($admin, 'global_topup_package_created', $globalPackage, [], $globalPackage->getAttributes(), $request);
+        return DB::transaction(function () use ($payload, $admin, $request): GlobalTopupPackage {
+            $payload['original_price'] = (int) $payload['denomination'];
+            $payload['metadata'] = [
+                ...($payload['metadata'] ?? []),
+                'requires_game_rewards' => true,
+            ];
+            $globalPackage = GlobalTopupPackage::query()->create($payload);
+            $this->syncService->sync($globalPackage);
+            $this->audit($admin, 'global_topup_package_created', $globalPackage, [], $globalPackage->getAttributes(), $request);
 
-        return $globalPackage;
+            return $globalPackage->load('provider:id,name,slug');
+        }, 3);
     }
 
     /** @param array<string, mixed> $payload */
     public function update(GlobalTopupPackage $globalPackage, array $payload, User $admin, Request $request): GlobalTopupPackage
     {
-        $highestProviderPrice = (int) ($globalPackage->packages()->max('provider_price') ?? 0);
-
-        if ((int) $payload['price'] < $highestProviderPrice) {
-            throw ValidationException::withMessages([
-                'price' => "Giá gói Global phải từ {$highestProviderPrice}đ vì có gói game đang dùng giá vốn này.",
-            ]);
-        }
-
         if ((int) $payload['denomination'] !== $globalPackage->denomination && $globalPackage->packages()->exists()) {
             throw ValidationException::withMessages([
-                'denomination' => 'Không thể đổi mệnh giá khi gói Global đã được ánh xạ vào gói game.',
+                'denomination' => 'Không thể đổi mệnh giá khi gói Global đã được đồng bộ vào game.',
             ]);
         }
 
-        if (($payload['status'] ?? null) === 'inactive' && $this->hasActiveGlobalMapping($globalPackage)) {
-            throw ValidationException::withMessages([
-                'status' => 'Không thể tắt gói Global đang được gói hoạt động của game Global sử dụng.',
-            ]);
-        }
+        return DB::transaction(function () use ($globalPackage, $payload, $admin, $request): GlobalTopupPackage {
+            $old = $globalPackage->getAttributes();
+            $payload['original_price'] = (int) $payload['denomination'];
+            $payload['metadata'] = [
+                ...($globalPackage->metadata ?? []),
+                ...($payload['metadata'] ?? []),
+            ];
+            $globalPackage->update($payload);
+            $this->syncService->sync($globalPackage->refresh());
+            $this->audit($admin, 'global_topup_package_updated', $globalPackage, $old, $globalPackage->getAttributes(), $request);
 
-        $old = $globalPackage->getAttributes();
-        $globalPackage->update($payload);
-        $this->audit($admin, 'global_topup_package_updated', $globalPackage, $old, $globalPackage->getAttributes(), $request);
-
-        return $globalPackage->refresh();
+            return $globalPackage->refresh()->load('provider:id,name,slug');
+        }, 3);
     }
 
     public function delete(GlobalTopupPackage $globalPackage, User $admin, Request $request): void
     {
-        if ($globalPackage->packages()->exists()) {
+        if ($globalPackage->packages()->whereHas('orders')->exists()) {
             throw ValidationException::withMessages([
-                'global_package' => 'Hãy gỡ gói Global khỏi tất cả gói game trước khi xóa.',
+                'global_package' => 'Không thể xóa gói Global đã phát sinh đơn hàng. Hãy chuyển sang Tạm tắt.',
             ]);
         }
 
-        $old = $globalPackage->getAttributes();
-        $this->audit($admin, 'global_topup_package_deleted', $globalPackage, $old, [], $request);
-        $globalPackage->delete();
+        DB::transaction(function () use ($globalPackage, $admin, $request): void {
+            $old = $globalPackage->getAttributes();
+            $globalPackage->packages()->delete();
+            $this->audit($admin, 'global_topup_package_deleted', $globalPackage, $old, [], $request);
+            $globalPackage->delete();
+        }, 3);
     }
 
     /** @param array<string, mixed> $payload */
@@ -118,14 +132,6 @@ class GlobalTopupPackageAdminService
         $old = $levelPrice->getAttributes();
         $this->audit($admin, 'global_topup_package_level_price_deleted', $levelPrice, $old, [], $request);
         $levelPrice->delete();
-    }
-
-    private function hasActiveGlobalMapping(GlobalTopupPackage $globalPackage): bool
-    {
-        return $globalPackage->packages()
-            ->where('status', 'active')
-            ->whereHas('game', fn ($query) => $query->where('package_mode', 'global')->where('status', 'active'))
-            ->exists();
     }
 
     /** @param array<string, mixed> $old @param array<string, mixed> $new */

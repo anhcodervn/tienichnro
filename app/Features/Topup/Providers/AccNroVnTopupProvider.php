@@ -32,7 +32,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
     public function assertConfigured(TopupProvider $provider, TopupPackage $package, GameServer $server): void
     {
         $config = $this->configuration($provider);
-        $game = trim((string) $package->provider_service_code);
+        $game = (string) $package->providerServiceCode();
         $hasInvalidConfiguration = $config['partner_id'] === ''
             || $config['secret_key'] === ''
             || $game === ''
@@ -356,7 +356,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
 
     private function serverCode(Order $order): string
     {
-        $serverCode = trim((string) $order->server?->code);
+        $serverCode = trim((string) data_get($order->metadata, 'provider.server_code', $order->server?->code));
 
         if ($serverCode !== '' || $order->game_server_id === null) {
             return $serverCode;

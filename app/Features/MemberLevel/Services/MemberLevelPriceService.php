@@ -79,6 +79,7 @@ class MemberLevelPriceService
             $package->setAttribute('package_source', $price['package_source']);
             $package->setAttribute('price', $price['final_price']);
             $package->setAttribute('original_price', $price['original_price']);
+            $package->setAttribute('discount_percent', $package->calculateDiscountPercent());
         }
 
         return $status;
@@ -107,7 +108,7 @@ class MemberLevelPriceService
         }
 
         $minimumProfit = $override?->minimum_profit ?? $level?->minimum_profit ?? 0;
-        $providerPrice = $package->provider_price === null ? null : (int) $package->provider_price;
+        $providerPrice = $source['provider_price'];
         $priceFloor = $providerPrice === null ? $retailPrice : $providerPrice + $minimumProfit;
         $finalPrice = min($retailPrice, max(0, $candidatePrice, $priceFloor));
 
@@ -121,6 +122,7 @@ class MemberLevelPriceService
             'final_price' => $finalPrice,
             'discount_amount' => $retailPrice - $finalPrice,
             'minimum_profit' => $minimumProfit,
+            'provider_price' => $providerPrice,
             'original_price' => (int) $source['original_price'],
             'package_source' => $source['package_source'],
             'global_topup_package_id' => $source['global_topup_package_id'],

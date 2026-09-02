@@ -42,8 +42,8 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
             $errors[] = 'partner_key';
         }
 
-        if (blank($package->provider_service_code)) {
-            $errors[] = 'mã dịch vụ của gói';
+        if (blank($package->providerServiceCode())) {
+            $errors[] = 'mã dịch vụ của game';
         }
 
         if (blank($server->code)) {
@@ -69,7 +69,7 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
 
         $config = $this->configuration($provider);
         $serviceCode = (string) data_get($order->metadata, 'provider.service_code');
-        $serverCode = (string) $order->server?->code;
+        $serverCode = (string) data_get($order->metadata, 'provider.server_code', $order->server?->code);
         $providerFields = $this->providerFields($recipient);
         unset($providerFields['server']);
         [$username, $primaryKey] = $this->primaryRecipientField($order, $providerFields, 'username');

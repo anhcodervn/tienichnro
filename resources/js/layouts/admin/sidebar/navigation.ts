@@ -70,6 +70,10 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 href: '/admin/topup/global-packages',
             },
             {
+                label: 'Bảng thực nhận game',
+                href: '/admin/topup/global-rewards',
+            },
+            {
                 label: 'Nhà cung cấp',
                 href: '/admin/topup/providers',
             },

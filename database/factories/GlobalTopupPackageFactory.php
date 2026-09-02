@@ -23,11 +23,22 @@ class GlobalTopupPackageFactory extends Factory
             'name' => 'Gói Global '.number_format($denomination),
             'code' => fake()->unique()->slug(2),
             'denomination' => $denomination,
+            'provider_id' => null,
+            'provider_service_codes' => [],
+            'carot_amount' => null,
+            'reward_x2_amount' => null,
+            'reward_x3_amount' => null,
+            'first_topup_reward_amount' => null,
+            'provider_price' => 0,
             'price' => (int) round($denomination * 0.95),
             'original_price' => $denomination,
             'description' => null,
+            'bonus_text' => null,
+            'min_quantity' => 1,
+            'max_quantity' => 10,
             'status' => 'active',
             'sort_order' => 0,
+            'metadata' => [],
         ];
     }
 }

@@ -3,7 +3,6 @@
 namespace App\Features\Admin\Topup\Requests;
 
 use App\Models\Game;
-use App\Models\GameServer;
 use App\Models\TopupProvider;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -24,7 +23,7 @@ class ListTopupPackageRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:100'],
             'game_id' => ['nullable', 'integer', Rule::exists(Game::class, 'id')],
-            'game_server_id' => ['nullable', 'integer', Rule::exists(GameServer::class, 'id')],
+            'game_server_id' => ['prohibited'],
             'provider_id' => ['nullable', 'integer', Rule::exists(TopupProvider::class, 'id')],
             'status' => ['nullable', Rule::in(['active', 'inactive'])],
             'min_price' => ['nullable', 'integer', 'min:0'],

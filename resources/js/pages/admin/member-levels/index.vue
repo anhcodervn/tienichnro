@@ -50,6 +50,10 @@ const emptyForm = (): MemberLevelPayload => ({
 const form = reactive<MemberLevelPayload>(emptyForm());
 const selectedLevel = computed(() => catalog.value.levels.find((item) => item.id === selectedLevelId.value) ?? null);
 const selectedGame = computed(() => catalog.value.games.find((item) => item.id === selectedGameId.value) ?? null);
+const formFieldClass =
+    'min-h-11 w-full rounded-md border-2 border-slate-300 bg-slate-50 px-3 py-2 text-slate-950 outline-none transition hover:border-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-100';
+const compactFieldClass =
+    'min-h-10 rounded-md border-2 border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-950 outline-none transition hover:border-slate-400 focus:border-amber-500 focus:bg-white focus:ring-4 focus:ring-amber-100';
 const money = (value: number | null): string => `${new Intl.NumberFormat('vi-VN').format(value ?? 0)}đ`;
 const notify = (message: string): void => handleSuccessResponse({ data: { status: true, message } });
 
@@ -294,54 +298,46 @@ onMounted(load);
             <section class="grid gap-5 xl:grid-cols-[22rem_minmax(0,1fr)]">
                 <form class="grid content-start gap-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm" @submit.prevent="saveLevel">
                     <h2 class="font-black text-slate-950">{{ editingLevelId ? 'Chỉnh sửa level' : 'Tạo level' }}</h2>
-                    <label class="grid gap-1 text-sm font-bold"
-                        >Tên level<input v-model="form.name" class="rounded-md border-slate-300" required
-                    /></label>
+                    <label class="grid gap-1 text-sm font-bold">Tên level<input v-model="form.name" :class="formFieldClass" required /></label>
                     <div class="grid grid-cols-2 gap-3">
-                        <label class="grid gap-1 text-sm font-bold"
-                            >Mã<input v-model="form.code" class="rounded-md border-slate-300" required /></label
+                        <label class="grid gap-1 text-sm font-bold">Mã<input v-model="form.code" :class="formFieldClass" required /></label
                         ><label class="grid gap-1 text-sm font-bold"
-                            >Hạng<input v-model.number="form.rank" class="rounded-md border-slate-300" min="0" type="number" required
+                            >Hạng<input v-model.number="form.rank" :class="formFieldClass" min="0" type="number" required
                         /></label>
                     </div>
                     <label class="grid gap-1 text-sm font-bold"
-                        >Tổng nạp mở khóa<input
-                            v-model.number="form.lifetime_threshold"
-                            class="rounded-md border-slate-300"
-                            min="0"
-                            type="number"
-                            required
+                        >Tổng nạp mở khóa<input v-model.number="form.lifetime_threshold" :class="formFieldClass" min="0" type="number" required
                     /></label>
                     <div class="grid grid-cols-2 gap-3">
                         <label class="grid gap-1 text-sm font-bold"
                             >Nạp duy trì<input
                                 v-model.number="form.maintenance_amount"
-                                class="rounded-md border-slate-300"
+                                :class="formFieldClass"
                                 min="0"
                                 type="number"
                                 required /></label
                         ><label class="grid gap-1 text-sm font-bold"
-                            >Số ngày<input v-model.number="form.maintenance_days" class="rounded-md border-slate-300" min="1" type="number" required
+                            >Số ngày<input v-model.number="form.maintenance_days" :class="formFieldClass" min="1" type="number" required
                         /></label>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <label class="grid gap-1 text-sm font-bold"
                             >Giảm mặc định (%)<input
                                 :value="form.default_discount_bps / 100"
-                                class="rounded-md border-slate-300"
+                                :class="formFieldClass"
                                 max="100"
                                 min="0"
                                 step="0.01"
                                 type="number"
                                 @input="form.default_discount_bps = Math.round(Number(($event.target as HTMLInputElement).value) * 100)" /></label
                         ><label class="grid gap-1 text-sm font-bold"
-                            >Lãi tối thiểu<input v-model.number="form.minimum_profit" class="rounded-md border-slate-300" min="0" type="number"
+                            >Lãi tối thiểu<input v-model.number="form.minimum_profit" :class="formFieldClass" min="0" type="number"
                         /></label>
                     </div>
                     <div class="grid grid-cols-2 gap-3">
                         <label class="grid gap-1 text-sm font-bold"
-                            >Màu<input v-model="form.color" class="h-10 w-full rounded-md border-slate-300" type="color" /></label
-                        ><label class="grid gap-1 text-sm font-bold">Icon<input v-model="form.icon" class="rounded-md border-slate-300" /></label>
+                            >Màu<input v-model="form.color" :class="[formFieldClass, 'cursor-pointer p-1']" type="color" /></label
+                        ><label class="grid gap-1 text-sm font-bold">Icon<input v-model="form.icon" :class="formFieldClass" /></label>
                     </div>
                     <button
                         class="inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-amber-500 px-4 font-black hover:bg-amber-400 disabled:opacity-50"
@@ -360,7 +356,7 @@ onMounted(load);
                             </h2>
                             <p class="mt-1 text-sm text-slate-500">Giá luôn được chặn bởi giá vốn cộng lợi nhuận tối thiểu.</p>
                         </div>
-                        <select v-model="selectedGameId" class="rounded-md border-slate-300 text-sm">
+                        <select v-model="selectedGameId" :class="[compactFieldClass, 'w-full sm:w-auto sm:min-w-[14rem]']">
                             <option v-for="game in catalog.games" :key="game.id" :value="game.id">{{ game.name }}</option>
                         </select>
                     </header>
@@ -382,7 +378,7 @@ onMounted(load);
                                     <td class="px-4 py-3 font-bold">{{ packageItem.name }}</td>
                                     <td class="px-4 py-3">{{ money(packageItem.price) }} / {{ money(packageItem.provider_price) }}</td>
                                     <td class="px-4 py-3">
-                                        <select v-model="overrideDrafts[packageItem.id].pricing_mode" class="rounded-md border-slate-300">
+                                        <select v-model="overrideDrafts[packageItem.id].pricing_mode" :class="[compactFieldClass, 'w-32']">
                                             <option value="discount">Giảm %</option>
                                             <option value="fixed">Giá cố định</option>
                                         </select>
@@ -391,7 +387,7 @@ onMounted(load);
                                         <input
                                             v-if="overrideDrafts[packageItem.id].pricing_mode === 'discount'"
                                             v-model="overrideDrafts[packageItem.id].discount_value"
-                                            class="w-28 rounded-md border-slate-300"
+                                            :class="[compactFieldClass, 'w-28']"
                                             min="0"
                                             max="100"
                                             step="0.01"
@@ -400,7 +396,7 @@ onMounted(load);
                                         /><input
                                             v-else
                                             v-model="overrideDrafts[packageItem.id].fixed_price"
-                                            class="w-36 rounded-md border-slate-300"
+                                            :class="[compactFieldClass, 'w-36']"
                                             min="0"
                                             placeholder="Giá bán"
                                             type="number"
@@ -409,7 +405,7 @@ onMounted(load);
                                     <td class="px-4 py-3">
                                         <input
                                             v-model="overrideDrafts[packageItem.id].minimum_profit"
-                                            class="w-32 rounded-md border-slate-300"
+                                            :class="[compactFieldClass, 'w-32']"
                                             min="0"
                                             placeholder="Mặc định"
                                             type="number"

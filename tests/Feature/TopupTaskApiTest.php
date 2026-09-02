@@ -43,7 +43,6 @@ function topupApiCatalog(array $packageAttributes = []): array
     $game = Game::factory()->create();
     $server = GameServer::factory()->for($game)->create();
     $package = TopupPackage::factory()->for($game)->create([
-        'game_server_id' => $server->id,
         'denomination' => 100000,
         'price' => 90000,
         'original_price' => 100000,
@@ -145,6 +144,7 @@ test('catalog returns active games servers packages sale prices and game payload
         ->assertJsonPath('data.0.packages.0.id', $package->id)
         ->assertJsonPath('data.0.packages.0.price', 100000)
         ->assertJsonPath('data.0.packages.0.sale_price', 90000)
+        ->assertJsonMissingPath('data.0.packages.0.server_id')
         ->assertJsonMissingPath('data.0.packages.0.provider_id')
         ->assertJsonMissingPath('data.0.packages.0.provider_price');
 });
@@ -438,7 +438,7 @@ test('create order rejects an ambiguous denomination instead of choosing a provi
     $this->withHeaders(topupApiCredentials($user))
         ->postJson('/api/v1/orders', topupApiPayload($game, $server, $package))
         ->assertUnprocessable()
-        ->assertJsonPath('message', 'Có nhiều gói nạp trùng game, server và mệnh giá. Vui lòng liên hệ quản trị viên.');
+        ->assertJsonPath('message', 'Có nhiều gói nạp trùng game và mệnh giá. Vui lòng liên hệ quản trị viên.');
 
     expect(Order::query()->count())->toBe(0);
 });

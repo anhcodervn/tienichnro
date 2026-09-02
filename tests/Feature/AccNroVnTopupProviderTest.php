@@ -671,6 +671,7 @@ test('admin refreshes accnrovn balance with simple credentials and no signature'
 function accNroVnOrderFixture(array $recipientOverrides = []): array
 {
     $game = Game::factory()->create([
+        'provider_service_code' => 'nr',
         'checkout_fields' => [
             ['key' => 'account', 'label' => 'Email/Số điện thoại', 'placeholder' => '', 'required' => true],
         ],
@@ -684,7 +685,6 @@ function accNroVnOrderFixture(array $recipientOverrides = []): array
     $package = TopupPackage::factory()->for($game)->create([
         'game_server_id' => $server->id,
         'provider_id' => $provider->id,
-        'provider_service_code' => 'nr',
         'denomination' => 50_000,
     ]);
     $order = Order::factory()->create([

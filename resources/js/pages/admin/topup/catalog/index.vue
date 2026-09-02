@@ -11,7 +11,6 @@ type OptionRow = {
     reward_label?: string;
     package_mode?: 'custom' | 'global';
 };
-type GlobalPackageOption = { id: number; name: string; denomination: number; price: number; status: 'active' | 'inactive' };
 type CatalogRow = Record<string, any> & { id: number; name: string; status: 'active' | 'inactive' };
 type PaginationMeta = { current_page: number; last_page: number; per_page: number; total: number; from: number | null; to: number | null };
 type CheckoutField = { key: string; label: string; placeholder: string; required: boolean };
@@ -26,9 +25,7 @@ const route = useRoute();
 const router = useRouter();
 const rows = ref<CatalogRow[]>([]);
 const games = ref<OptionRow[]>([]);
-const servers = ref<OptionRow[]>([]);
 const providers = ref<OptionRow[]>([]);
-const globalPackages = ref<GlobalPackageOption[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const editingId = ref<number | null>(null);
@@ -37,7 +34,6 @@ const filters = reactive({
     search: '',
     status: '',
     game_id: '',
-    game_server_id: '',
     provider_id: '',
     min_price: '',
     max_price: '',
@@ -55,10 +51,7 @@ const pageContent = computed(
         })[props.catalogType],
 );
 
-const filteredServers = computed(() => servers.value.filter((server) => !filters.game_id || server.game_id === Number(filters.game_id)));
-const formServers = computed(() => servers.value.filter((server) => !form.game_id || server.game_id === Number(form.game_id)));
-const selectedFormGame = computed(() => games.value.find((game) => game.id === Number(form.game_id)) ?? null);
-const activeGlobalPackages = computed(() => globalPackages.value.filter((globalPackage) => globalPackage.status === 'active'));
+const customGames = computed(() => games.value.filter((game) => game.package_mode !== 'global'));
 const discountPercent = computed(() => {
     const originalPrice = Number(form.original_price || 0);
     const salePrice = Number(form.price || 0);
@@ -82,6 +75,7 @@ const resetEditor = (): void => {
             slug: '',
             short_name: '',
             reward_label: 'Thực nhận',
+            provider_service_code: '',
             package_mode: 'custom',
             image: '',
             description: '',
@@ -98,16 +92,9 @@ const resetEditor = (): void => {
     } else {
         Object.assign(form, {
             game_id: '',
-            game_server_id: '',
-            global_topup_package_id: '',
             provider_id: '',
-            provider_service_code: '',
             name: '',
             denomination: '',
-            carot_amount: '',
-            reward_x2_amount: '',
-            reward_x3_amount: '',
-            first_topup_reward_amount: '',
             provider_price: '',
             original_price: '',
             price: '',
@@ -123,7 +110,7 @@ const resetEditor = (): void => {
 };
 
 const readFiltersFromRoute = (): void => {
-    const keys = ['search', 'status', 'game_id', 'game_server_id', 'provider_id', 'min_price', 'max_price', 'per_page'] as const;
+    const keys = ['search', 'status', 'game_id', 'provider_id', 'min_price', 'max_price', 'per_page'] as const;
     keys.forEach((key) => {
         const value = route.query[key];
         filters[key] = typeof value === 'string' ? value : key === 'per_page' ? '20' : '';
@@ -138,7 +125,7 @@ const queryParams = (): Record<string, string | number> => {
             ? ['search', 'status']
             : props.catalogType === 'servers'
               ? ['search', 'status', 'game_id']
-              : ['search', 'status', 'game_id', 'game_server_id', 'provider_id', 'min_price', 'max_price'];
+              : ['search', 'status', 'game_id', 'provider_id', 'min_price', 'max_price'];
 
     allowed.forEach((key) => {
         const value = filters[key as keyof typeof filters];
@@ -155,19 +142,13 @@ const loadLookups = async (): Promise<void> => {
 
     const requests: Promise<any>[] = [adminTopupService.games({ per_page: 100 })];
     if (props.catalogType === 'packages') {
-        requests.push(
-            adminTopupService.servers({ per_page: 100 }),
-            adminTopupService.providers({ per_page: 100 }),
-            adminTopupService.globalPackages(),
-        );
+        requests.push(adminTopupService.providers({ per_page: 100 }));
     }
 
     const responses = await Promise.all(requests);
     games.value = responses[0].data.data.data;
     if (props.catalogType === 'packages') {
-        servers.value = responses[1].data.data.data;
-        providers.value = responses[2].data.data.data;
-        globalPackages.value = responses[3].data.data.global_packages;
+        providers.value = responses[1].data.data.data;
     }
 };
 
@@ -235,7 +216,6 @@ const clearFilters = async (): Promise<void> => {
         search: '',
         status: '',
         game_id: '',
-        game_server_id: '',
         provider_id: '',
         min_price: '',
         max_price: '',
@@ -292,6 +272,7 @@ const payload = (): Record<string, unknown> => {
             slug: form.slug,
             short_name: form.short_name || null,
             reward_label: form.reward_label || 'Thực nhận',
+            provider_service_code: form.provider_service_code?.trim() || null,
             package_mode: form.package_mode,
             image: form.image || null,
             description: form.description || null,
@@ -321,16 +302,9 @@ const payload = (): Record<string, unknown> => {
     }
     return {
         game_id: Number(form.game_id),
-        game_server_id: form.game_server_id ? Number(form.game_server_id) : null,
-        global_topup_package_id: form.global_topup_package_id ? Number(form.global_topup_package_id) : null,
         provider_id: form.provider_id ? Number(form.provider_id) : null,
-        provider_service_code: form.provider_service_code?.trim() || null,
         name: form.name,
         denomination: form.denomination === '' ? null : Number(form.denomination),
-        carot_amount: form.carot_amount === '' ? null : Number(form.carot_amount),
-        reward_x2_amount: form.reward_x2_amount === '' ? null : Number(form.reward_x2_amount),
-        reward_x3_amount: form.reward_x3_amount === '' ? null : Number(form.reward_x3_amount),
-        first_topup_reward_amount: form.first_topup_reward_amount === '' ? null : Number(form.first_topup_reward_amount),
         provider_price: Number(form.provider_price),
         original_price: Number(form.original_price),
         price: Number(form.price),
@@ -382,22 +356,6 @@ const remove = async (row: CatalogRow): Promise<void> => {
     await refreshRows();
 };
 
-watch(
-    () => filters.game_id,
-    () => {
-        if (filters.game_server_id && !filteredServers.value.some((server) => server.id === Number(filters.game_server_id))) {
-            filters.game_server_id = '';
-        }
-    },
-);
-watch(
-    () => form.game_id,
-    () => {
-        if (form.global_topup_package_id && !activeGlobalPackages.value.some((item) => item.id === Number(form.global_topup_package_id))) {
-            form.global_topup_package_id = '';
-        }
-    },
-);
 watch(() => props.catalogType, load, { immediate: true });
 </script>
 
@@ -453,16 +411,6 @@ watch(() => props.catalogType, load, { immediate: true });
                         </label>
                         <template v-if="catalogType === 'packages'">
                             <label class="text-sm font-semibold text-slate-700">
-                                Máy chủ
-                                <select
-                                    v-model="filters.game_server_id"
-                                    class="mt-1.5 min-h-10 w-full rounded-md border border-slate-300 px-3 font-normal"
-                                >
-                                    <option value="">Tất cả máy chủ</option>
-                                    <option v-for="server in filteredServers" :key="server.id" :value="server.id">{{ server.name }}</option>
-                                </select>
-                            </label>
-                            <label class="text-sm font-semibold text-slate-700">
                                 Provider
                                 <select
                                     v-model="filters.provider_id"
@@ -514,6 +462,7 @@ watch(() => props.catalogType, load, { immediate: true });
                                     <th class="p-4">Game</th>
                                     <th class="p-4">Slug</th>
                                     <th class="p-4">Đơn vị nhận</th>
+                                    <th class="p-4">Mã provider</th>
                                     <th class="p-4">Loại gói</th>
                                     <th class="p-4">Máy chủ</th>
                                     <th class="p-4">Gói nạp</th>
@@ -529,11 +478,10 @@ watch(() => props.catalogType, load, { immediate: true });
                                 </tr>
                                 <tr v-else>
                                     <th class="p-4">Tên</th>
-                                    <th class="p-4">Thuộc game/server</th>
+                                    <th class="p-4">Thuộc game</th>
                                     <th class="p-4">Giá provider</th>
                                     <th class="p-4">Giá gốc riêng</th>
                                     <th class="p-4">Giá áp dụng</th>
-                                    <th class="p-4">Giá trị nhận</th>
                                     <th class="p-4">Trạng thái</th>
                                     <th class="p-4 text-right">Thao tác</th>
                                 </tr>
@@ -547,10 +495,13 @@ watch(() => props.catalogType, load, { immediate: true });
                                         </td>
                                         <td class="p-4 font-mono text-xs">{{ row.slug }}</td>
                                         <td class="p-4">{{ row.reward_label || 'Thực nhận' }}</td>
+                                        <td class="p-4 font-mono text-xs font-semibold text-slate-700">{{ row.provider_service_code || '—' }}</td>
                                         <td class="p-4">
                                             <span
                                                 class="rounded-md px-2 py-1 text-xs font-semibold"
-                                                :class="row.package_mode === 'global' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-600'"
+                                                :class="
+                                                    row.package_mode === 'global' ? 'bg-violet-50 text-violet-700' : 'bg-slate-100 text-slate-600'
+                                                "
                                             >
                                                 {{ row.package_mode === 'global' ? 'Dùng gói Global' : 'Gói riêng' }}
                                             </span>
@@ -567,32 +518,13 @@ watch(() => props.catalogType, load, { immediate: true });
                                         <td class="p-4 font-semibold text-slate-950">{{ row.name }}</td>
                                         <td class="p-4">
                                             {{ row.game_name }}
-                                            <div class="text-xs text-slate-500">
-                                                {{ row.server_name || 'Mọi máy chủ' }} · Provider: {{ row.provider_name || 'Chưa gán' }}
-                                            </div>
+                                            <div class="text-xs text-slate-500">Provider: {{ row.provider_name || 'Chưa gán' }}</div>
                                         </td>
                                         <td class="p-4">{{ formatMoney(row.provider_price) }}</td>
                                         <td class="p-4">{{ formatMoney(row.original_price) }}</td>
                                         <td class="p-4 font-bold text-slate-950">
-                                            {{
-                                                row.game_package_mode === 'global' && row.global_price == null
-                                                    ? 'Chưa ánh xạ'
-                                                    : formatMoney(row.game_package_mode === 'global' ? row.global_price : row.price)
-                                            }}
-                                            <div v-if="row.game_package_mode === 'global'" class="text-xs font-normal text-violet-700">
-                                                {{
-                                                    row.global_topup_package_name
-                                                        ? `Global · ${row.global_topup_package_name}`
-                                                        : 'Cần ánh xạ gói nạp Global'
-                                                }}
-                                            </div>
-                                            <div v-else class="text-xs font-normal text-emerald-700">Riêng · giảm {{ row.discount_percent }}%</div>
-                                        </td>
-                                        <td class="p-4 text-xs leading-5 text-slate-600">
-                                            <strong class="block text-sm text-slate-950">Cơ bản: {{ row.carot_amount ?? '—' }}</strong>
-                                            <span class="block">KM X2: {{ row.reward_x2_amount ?? '—' }}</span>
-                                            <span class="block">KM X3: {{ row.reward_x3_amount ?? '—' }}</span>
-                                            <span class="block">Nạp đầu: {{ row.first_topup_reward_amount ?? '—' }}</span>
+                                            {{ formatMoney(row.price) }}
+                                            <div class="text-xs font-normal text-emerald-700">Riêng · giảm {{ row.discount_percent }}%</div>
                                         </td>
                                     </template>
                                     <td class="p-4">
@@ -651,7 +583,9 @@ watch(() => props.catalogType, load, { immediate: true });
                             class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal"
                         >
                             <option value="" disabled>Chọn game</option>
-                            <option v-for="game in games" :key="game.id" :value="game.id">{{ game.name }}</option>
+                            <option v-for="game in catalogType === 'packages' ? customGames : games" :key="game.id" :value="game.id">
+                                {{ game.name }}
+                            </option>
                         </select></label
                     >
                     <label class="text-sm font-semibold text-slate-700"
@@ -679,6 +613,16 @@ watch(() => props.catalogType, load, { immediate: true });
                                 placeholder="Ví dụ: Lượng / Ngọc, Xu, Gem"
                                 class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal"
                         /></label>
+                        <label class="text-sm font-semibold text-slate-700"
+                            >Mã dịch vụ provider của game<input
+                                v-model.trim="form.provider_service_code"
+                                maxlength="100"
+                                placeholder="Ví dụ: nr"
+                                class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal"
+                            /><small class="mt-1.5 block font-normal leading-5 text-slate-500"
+                                >Mã game do provider quy định. Gói riêng và tất cả gói Global của game này đều tự động dùng chung mã này.</small
+                            ></label
+                        >
                         <fieldset class="grid gap-3 rounded-md border border-violet-200 bg-violet-50/60 p-4">
                             <legend class="px-1 text-sm font-bold text-violet-900">Loại gói nạp</legend>
                             <label class="text-sm font-semibold text-slate-700"
@@ -691,7 +635,8 @@ watch(() => props.catalogType, load, { immediate: true });
                                 </select></label
                             >
                             <p class="text-xs leading-5 text-violet-700">
-                                Mỗi gói game vẫn giữ provider, mã dịch vụ, server và dữ liệu nhận riêng; chỉ giá bán được lấy từ gói Global đã ánh xạ.
+                                Provider lấy từ gói nạp, mã dịch vụ lấy từ Game, còn server và bảng thực nhận được cấu hình theo game. Giá bán lấy từ
+                                gói Global được tự động đồng bộ theo mệnh giá.
                             </p>
                         </fieldset>
                         <fieldset class="rounded-md border border-slate-200 bg-slate-50 p-4">
@@ -788,15 +733,6 @@ watch(() => props.catalogType, load, { immediate: true });
                     </template>
                     <template v-else>
                         <label class="text-sm font-semibold text-slate-700"
-                            >Máy chủ<select
-                                v-model="form.game_server_id"
-                                class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal"
-                            >
-                                <option value="">Mọi máy chủ</option>
-                                <option v-for="server in formServers" :key="server.id" :value="server.id">{{ server.name }}</option>
-                            </select></label
-                        >
-                        <label class="text-sm font-semibold text-slate-700"
                             >Provider<select
                                 v-model="form.provider_id"
                                 class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal"
@@ -806,71 +742,12 @@ watch(() => props.catalogType, load, { immediate: true });
                             </select></label
                         >
                         <label class="text-sm font-semibold text-slate-700"
-                            >Mã dịch vụ provider<input
-                                v-model.trim="form.provider_service_code"
-                                maxlength="100"
-                                placeholder="Ví dụ: nro"
+                            >Mệnh giá<input
+                                v-model="form.denomination"
+                                type="number"
+                                min="0"
                                 class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal"
-                            /><small class="mt-1.5 block font-normal text-slate-500"
-                                >Lấy từ danh sách sản phẩm của provider. Gói nạp tự động bắt buộc có mã này trước khi nhận đơn.</small
-                            ></label
-                        >
-                        <div class="grid grid-cols-2 gap-3">
-                            <label class="text-sm font-semibold text-slate-700"
-                                >Mệnh giá<input
-                                    v-model="form.denomination"
-                                    type="number"
-                                    min="0"
-                                    class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal" /></label
-                            ><label class="text-sm font-semibold text-slate-700"
-                                >Thực nhận cơ bản<input
-                                    v-model="form.carot_amount"
-                                    type="number"
-                                    min="0"
-                                    class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal"
-                            /></label>
-                        </div>
-                        <label class="text-sm font-semibold text-slate-700"
-                            >Gói nạp Global<select
-                                v-model="form.global_topup_package_id"
-                                :required="selectedFormGame?.package_mode === 'global'"
-                                class="mt-1.5 min-h-11 w-full rounded-md border border-violet-300 bg-violet-50 px-3 font-normal"
-                            >
-                                <option value="">Chưa ánh xạ</option>
-                                <option v-for="item in activeGlobalPackages" :key="item.id" :value="item.id">
-                                    {{ item.name }} · mệnh giá {{ formatMoney(item.denomination) }} · bán {{ formatMoney(item.price) }}
-                                </option>
-                            </select>
-                            <small class="mt-1.5 block font-normal text-violet-700">
-                                Có thể ánh xạ trước khi chuyển game sang Global. Mệnh giá phải trùng; provider và mã dịch vụ vẫn lấy từ gói game này.
-                            </small></label
-                        >
-                        <div class="rounded-md border border-slate-200 bg-slate-50 p-3">
-                            <p class="text-xs font-semibold uppercase tracking-wide text-slate-500">Bảng thực nhận trong game</p>
-                            <div class="mt-3 grid grid-cols-2 gap-3">
-                                <label class="text-sm font-semibold text-slate-700"
-                                    >KM X2<input
-                                        v-model="form.reward_x2_amount"
-                                        type="number"
-                                        min="0"
-                                        class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 font-normal" /></label
-                                ><label class="text-sm font-semibold text-slate-700"
-                                    >KM X3<input
-                                        v-model="form.reward_x3_amount"
-                                        type="number"
-                                        min="0"
-                                        class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 font-normal"
-                                /></label>
-                                <label class="col-span-2 text-sm font-semibold text-slate-700"
-                                    >X2 nạp đầu<input
-                                        v-model="form.first_topup_reward_amount"
-                                        type="number"
-                                        min="0"
-                                        class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 font-normal"
-                                /></label>
-                            </div>
-                            <p class="mt-2 text-xs leading-5 text-slate-500">Để trống giá trị chưa áp dụng. Bảng public sẽ hiển thị dấu “—”.</p>
-                        </div>
+                        /></label>
                         <label class="text-sm font-semibold text-slate-700"
                             >Giá gốc provider<input
                                 v-model="form.provider_price"

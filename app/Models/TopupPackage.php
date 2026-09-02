@@ -65,6 +65,74 @@ class TopupPackage extends Model
         return sprintf('%d.%02d', intdiv($discountBasisPoints, 100), $discountBasisPoints % 100);
     }
 
+    public function providerServiceCode(): ?string
+    {
+        $serviceCode = trim((string) $this->game?->provider_service_code);
+
+        return $serviceCode !== '' ? $serviceCode : null;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function rewardItems(?string $fallbackLabel = null): array
+    {
+        $items = data_get($this->metadata, 'global_receives');
+
+        if (is_array($items) && $items !== []) {
+            return array_values($items);
+        }
+
+        if ($this->carot_amount === null) {
+            return [];
+        }
+
+        return [[
+            'code' => '',
+            'label' => $fallbackLabel ?: 'Thực nhận',
+            'base_amount' => $this->carot_amount,
+            'reward_x2_amount' => $this->reward_x2_amount,
+            'reward_x3_amount' => $this->reward_x3_amount,
+            'first_topup_reward_amount' => $this->first_topup_reward_amount,
+        ]];
+    }
+
+    public function rewardLabel(?string $fallbackLabel = null): string
+    {
+        $items = $this->rewardItems($fallbackLabel);
+
+        if (count($items) === 1) {
+            return (string) data_get($items, '0.label', $fallbackLabel ?: 'Thực nhận');
+        }
+
+        return collect($items)
+            ->map(fn (array $item): string => (string) ($item['code'] ?: $item['label']))
+            ->implode(' | ');
+    }
+
+    public function rewardAmounts(string $field = 'base_amount', int $quantity = 1, ?string $fallbackLabel = null): ?string
+    {
+        $amounts = collect($this->rewardItems($fallbackLabel))
+            ->map(fn (array $item): mixed => $item[$field] ?? null)
+            ->filter(fn (mixed $amount): bool => $amount !== null)
+            ->map(fn (mixed $amount): string => number_format((int) $amount * $quantity, 0, ',', '.'));
+
+        return $amounts->isEmpty() ? null : $amounts->implode(' | ');
+    }
+
+    public function rewardDisplay(string $field = 'base_amount', int $quantity = 1, ?string $fallbackLabel = null): ?string
+    {
+        $items = collect($this->rewardItems($fallbackLabel));
+        $isMultiple = $items->count() > 1;
+        $display = $items
+            ->filter(fn (array $item): bool => ($item[$field] ?? null) !== null)
+            ->map(function (array $item) use ($field, $quantity, $isMultiple): string {
+                $unit = $isMultiple ? ($item['code'] ?: $item['label']) : $item['label'];
+
+                return number_format((int) $item[$field] * $quantity, 0, ',', '.').' '.$unit;
+            });
+
+        return $display->isEmpty() ? null : $display->implode(' | ');
+    }
+
     public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'active');

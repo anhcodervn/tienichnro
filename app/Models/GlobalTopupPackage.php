@@ -5,6 +5,7 @@ namespace App\Models;
 use Database\Factories\GlobalTopupPackageFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GlobalTopupPackage extends Model
@@ -13,24 +14,46 @@ class GlobalTopupPackage extends Model
     use HasFactory;
 
     protected $fillable = [
-        'name', 'code', 'denomination', 'price', 'original_price', 'description', 'status', 'sort_order',
+        'provider_id', 'provider_service_codes', 'name', 'code', 'denomination', 'carot_amount',
+        'reward_x2_amount', 'reward_x3_amount', 'first_topup_reward_amount', 'provider_price',
+        'price', 'original_price', 'description', 'bonus_text', 'min_quantity', 'max_quantity',
+        'status', 'sort_order', 'metadata',
     ];
 
-    protected $attributes = ['status' => 'active', 'sort_order' => 0];
+    protected $attributes = ['provider_price' => 0, 'min_quantity' => 1, 'status' => 'active', 'sort_order' => 0];
 
     protected function casts(): array
     {
         return [
             'denomination' => 'integer',
+            'carot_amount' => 'integer',
+            'reward_x2_amount' => 'integer',
+            'reward_x3_amount' => 'integer',
+            'first_topup_reward_amount' => 'integer',
+            'provider_price' => 'integer',
             'price' => 'integer',
             'original_price' => 'integer',
+            'min_quantity' => 'integer',
+            'max_quantity' => 'integer',
             'sort_order' => 'integer',
+            'provider_service_codes' => 'array',
+            'metadata' => 'array',
         ];
+    }
+
+    public function provider(): BelongsTo
+    {
+        return $this->belongsTo(TopupProvider::class, 'provider_id');
     }
 
     public function packages(): HasMany
     {
         return $this->hasMany(TopupPackage::class);
+    }
+
+    public function gameSettings(): HasMany
+    {
+        return $this->hasMany(GlobalTopupPackageGameSetting::class, 'denomination', 'denomination');
     }
 
     public function levelPrices(): HasMany

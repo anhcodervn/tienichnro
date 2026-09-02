@@ -188,7 +188,7 @@
 
     .home-notice-banner {
         @apply mb-4 w-full min-w-0 overflow-hidden rounded-[5px] border border-cyan-200 bg-cyan-50 text-sm text-cyan-950;
-        font-family: "Be Vietnam Pro", ui-sans-serif, system-ui, sans-serif;
+        font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
     }
 
     .home-notice-header {
@@ -559,6 +559,11 @@
     }
 
     .home-reward-table [data-package-column].is-selected {
+        @apply bg-cyan-50 font-extrabold text-cyan-900;
+    }
+
+    .home-reward-table [data-reward-denomination].is-selected > th,
+    .home-reward-table [data-reward-denomination].is-selected > td {
         @apply bg-cyan-50 font-extrabold text-cyan-900;
     }
 

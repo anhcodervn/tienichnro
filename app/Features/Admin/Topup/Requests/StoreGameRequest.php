@@ -27,6 +27,7 @@ class StoreGameRequest extends FormRequest
             'slug' => ['required', 'string', 'max:255', Rule::unique('games', 'slug')],
             'short_name' => ['nullable', 'string', 'max:50'],
             'reward_label' => ['required', 'string', 'max:60'],
+            'provider_service_code' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/'],
             'package_mode' => ['required', Rule::in(['custom', 'global'])],
             'image' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string'], 'content' => ['nullable', 'string'],

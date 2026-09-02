@@ -4,6 +4,7 @@ namespace App\Features\Client\Topup\Controllers;
 
 use App\Features\Client\Topup\Services\TurnstileService;
 use App\Features\MemberLevel\Services\MemberLevelPriceService;
+use App\Features\Topup\Services\GameRewardService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\User;
@@ -24,6 +25,7 @@ class TopupController extends Controller
         Game $game,
         TurnstileService $turnstileService,
         MemberLevelPriceService $memberLevelPriceService,
+        GameRewardService $gameRewardService,
     ): View {
         abort_unless($game->status === 'active', 404);
 
@@ -33,10 +35,10 @@ class TopupController extends Controller
                 ->active(),
             'packages' => fn ($query) => $query
                 ->select([
-                    'id', 'game_id', 'game_server_id', 'global_topup_package_id', 'name', 'denomination', 'carot_amount',
+                    'id', 'game_id', 'global_topup_package_id', 'name', 'denomination', 'carot_amount',
                     'reward_x2_amount', 'reward_x3_amount', 'first_topup_reward_amount',
                     'provider_price', 'price', 'original_price', 'discount_percent', 'bonus_text', 'min_quantity', 'max_quantity',
-                    'status', 'sort_order',
+                    'status', 'sort_order', 'metadata',
                 ])
                 ->active(),
         ]);
@@ -44,6 +46,7 @@ class TopupController extends Controller
         /** @var User|null $user */
         $user = $request->user();
         $walletBalance = (int) ($user?->wallet()->value('balance') ?? 0);
+        $gameRewardService->applyToPackages($game->packages);
         $memberLevelStatus = $memberLevelPriceService->apply($game->packages, $user);
         $game->setRelation(
             'packages',

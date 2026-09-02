@@ -119,7 +119,6 @@
                             <option
                                 value="{{ $package->id }}"
                                 data-game="{{ $game->id }}"
-                                data-server="{{ $package->game_server_id }}"
                                 data-name="{{ $package->name }}"
                                 data-denomination="{{ (int) ($package->denomination ?? $package->original_price) }}"
                                 data-original="{{ (int) $package->original_price }}"
@@ -133,6 +132,7 @@
                                 data-reward-x2="{{ $package->reward_x2_amount }}"
                                 data-reward-x3="{{ $package->reward_x3_amount }}"
                                 data-reward-first="{{ $package->first_topup_reward_amount }}"
+                                data-rewards="{{ json_encode($package->rewardItems($game->reward_label), JSON_UNESCAPED_UNICODE) }}"
                                 @selected((string) $requestedPackage === (string) $package->id)
                             >{{ $package->name }} · {{ number_format((int) $package->price, 0, ',', '.') }}đ</option>
                         @endforeach
@@ -146,7 +146,6 @@
                                 type="button"
                                 class="home-package-option"
                                 data-package-button="{{ $package->id }}"
-                                data-package-server="{{ $package->game_server_id }}"
                                 aria-pressed="{{ (string) $requestedPackage === (string) $package->id ? 'true' : 'false' }}"
                             >
                                 <span class="home-package-check" aria-hidden="true">✓</span>
@@ -327,9 +326,9 @@
 
             <div class="home-summary-rewards" data-summary-rewards @if (! $initialPackage) hidden @endif>
                 <p class="flex items-center gap-1.5"><i class="bx bx-gift text-base text-cyan-700" aria-hidden="true"></i>Dự kiến nhận trong game</p>
-                <span data-summary-reward>{{ $initialPackage?->carot_amount !== null ? number_format($initialPackage->carot_amount * $initialQuantity, 0, ',', '.').' '.($initialGameModel?->reward_label ?: 'Thực nhận') : 'Đang cập nhật' }}</span>
-                <span data-summary-reward-x2 @if ($initialPackage?->reward_x2_amount === null) hidden @endif>KM X2: {{ number_format((int) $initialPackage?->reward_x2_amount * $initialQuantity, 0, ',', '.') }}</span>
-                <span data-summary-reward-x3 @if ($initialPackage?->reward_x3_amount === null) hidden @endif>KM X3: {{ number_format((int) $initialPackage?->reward_x3_amount * $initialQuantity, 0, ',', '.') }}</span>
+                <span data-summary-reward>{{ $initialPackage?->rewardDisplay('base_amount', $initialQuantity, $initialGameModel?->reward_label) ?? 'Đang cập nhật' }}</span>
+                <span data-summary-reward-x2 @if ($initialPackage?->rewardDisplay('reward_x2_amount', $initialQuantity, $initialGameModel?->reward_label) === null) hidden @endif>KM X2: {{ $initialPackage?->rewardDisplay('reward_x2_amount', $initialQuantity, $initialGameModel?->reward_label) }}</span>
+                <span data-summary-reward-x3 @if ($initialPackage?->rewardDisplay('reward_x3_amount', $initialQuantity, $initialGameModel?->reward_label) === null) hidden @endif>KM X3: {{ $initialPackage?->rewardDisplay('reward_x3_amount', $initialQuantity, $initialGameModel?->reward_label) }}</span>
             </div>
 
             <div class="home-field home-payment-field">

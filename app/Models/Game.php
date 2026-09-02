@@ -18,7 +18,7 @@ class Game extends Model
     ];
 
     protected $fillable = [
-        'name', 'slug', 'short_name', 'reward_label', 'image', 'description', 'content', 'status',
+        'name', 'slug', 'short_name', 'reward_label', 'provider_service_code', 'image', 'description', 'content', 'status',
         'package_mode', 'sort_order', 'seo_title', 'seo_description', 'metadata', 'checkout_fields',
     ];
 
@@ -63,6 +63,11 @@ class Game extends Model
     public function packages(): HasMany
     {
         return $this->hasMany(TopupPackage::class)->orderBy('sort_order')->orderBy('id');
+    }
+
+    public function globalPackageSettings(): HasMany
+    {
+        return $this->hasMany(GlobalTopupPackageGameSetting::class);
     }
 
     public function orders(): HasMany

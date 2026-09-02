@@ -46,6 +46,11 @@ export default {
             component: () => import('@/pages/admin/topup/global-packages/index.vue'),
         },
         {
+            path: 'topup/global-rewards',
+            name: 'admin.topup.global-rewards',
+            component: () => import('@/pages/admin/topup/global-rewards/index.vue'),
+        },
+        {
             path: 'topup/providers',
             name: 'admin.topup.providers',
             component: () => import('@/pages/admin/topup/providers/index.vue'),

@@ -598,6 +598,7 @@ test('checkout rejects an incomplete automatic provider before creating an order
 
 test('checkout accepts a configured provider and stores only an internal routing snapshot', function (): void {
     $game = Game::factory()->create([
+        'provider_service_code' => 'nr',
         'checkout_fields' => [
             ['key' => 'account', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
         ],
@@ -614,7 +615,6 @@ test('checkout accepts a configured provider and stores only an internal routing
     $package = TopupPackage::factory()->for($game)->create([
         'game_server_id' => $server->id,
         'provider_id' => $provider->id,
-        'provider_service_code' => 'nr',
     ]);
 
     $this->post(route('checkout.store'), [
@@ -686,6 +686,7 @@ test('client model serialization hides every provider implementation detail', fu
 function the9pOrderFixture(array $recipientOverrides = []): array
 {
     $game = Game::factory()->create([
+        'provider_service_code' => 'nr',
         'checkout_fields' => [
             ['key' => 'username', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
         ],
@@ -705,7 +706,6 @@ function the9pOrderFixture(array $recipientOverrides = []): array
     $package = TopupPackage::factory()->for($game)->create([
         'game_server_id' => $server->id,
         'provider_id' => $provider->id,
-        'provider_service_code' => 'nr',
         'denomination' => 10000,
     ]);
     $order = Order::factory()->create([

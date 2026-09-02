@@ -73,7 +73,7 @@ class OrderService
                     user: $user,
                 );
                 $package = $quote['package'];
-                $package->loadMissing('provider');
+                $package->loadMissing(['game', 'provider']);
                 $this->providerResolver->assertAvailable($package, $quote['server']);
                 $walletBalance = $user instanceof User && $requestedPaymentMethod === PaymentMethod::Wallet
                     ? Wallet::query()
@@ -144,10 +144,12 @@ class OrderService
                             'original_price' => $quote['unit_price'],
                             'package_source' => $quote['package_source'],
                             'bonus_text' => $package->bonus_text,
+                            'receives' => $package->rewardItems($package->game?->reward_label),
                         ],
                         'provider' => [
                             'slug' => $package->provider?->slug ?? 'manual',
-                            'service_code' => $package->provider_service_code,
+                            'service_code' => $package->providerServiceCode(),
+                            'server_code' => $quote['server']->code,
                         ],
                     ],
                 ]);

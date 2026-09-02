@@ -8,6 +8,7 @@ use App\Features\Admin\Topup\Actions\ReorderFailedTopupOrderAction;
 use App\Features\Admin\Topup\Actions\RetryProviderBalanceOrderAction;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Jobs\ProcessTopupOrder;
+use App\Features\Topup\Services\GlobalTopupPackageSyncService;
 use App\Features\Topup\Services\OrderStatusService;
 use App\Features\Topup\Services\RecipientFulfillmentService;
 use App\Features\Topup\Services\TopupProviderResolver;
@@ -36,6 +37,7 @@ class TopupAdminService
         private readonly ReorderFailedTopupOrderAction $reorderFailedTopupOrder,
         private readonly RetryProviderBalanceOrderAction $retryProviderBalanceOrder,
         private readonly RecipientFulfillmentService $recipientFulfillmentService,
+        private readonly GlobalTopupPackageSyncService $globalPackageSyncService,
     ) {}
 
     /** @param array<string, mixed> $filters */
@@ -94,14 +96,12 @@ class TopupAdminService
         $search = trim((string) ($filters['search'] ?? ''));
 
         return TopupPackage::query()->with([
-            'game:id,name,package_mode',
-            'server:id,name',
+            'game:id,name',
             'provider:id,name,slug',
-            'globalTopupPackage:id,name,denomination,price,original_price,status',
         ])
+            ->whereNull('global_topup_package_id')
             ->when($search !== '', fn (Builder $query) => $query->where('name', 'like', "%{$search}%"))
             ->when(filled($filters['game_id'] ?? null), fn (Builder $query) => $query->where('game_id', $filters['game_id']))
-            ->when(filled($filters['game_server_id'] ?? null), fn (Builder $query) => $query->where('game_server_id', $filters['game_server_id']))
             ->when(filled($filters['provider_id'] ?? null), fn (Builder $query) => $query->where('provider_id', $filters['provider_id']))
             ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
             ->when(isset($filters['min_price']), fn (Builder $query) => $query->where('price', '>=', $filters['min_price']))
@@ -151,7 +151,16 @@ class TopupAdminService
     /** @param array<string, mixed> $payload */
     public function create(Model $model, array $payload, User $admin, Request $request): Model
     {
+        if ($model instanceof TopupPackage) {
+            $payload['game_server_id'] = null;
+        }
+
         $model->fill($payload)->save();
+
+        if ($model instanceof Game) {
+            $this->globalPackageSyncService->syncGame($model);
+        }
+
         $this->audit($admin, 'created', $model, [], $this->auditSnapshot($model), $request);
 
         return $model->refresh();
@@ -161,7 +170,17 @@ class TopupAdminService
     public function update(Model $model, array $payload, User $admin, Request $request): Model
     {
         $old = $this->auditSnapshot($model);
+
+        if ($model instanceof TopupPackage) {
+            $payload['game_server_id'] = null;
+        }
+
         $model->fill($payload)->save();
+
+        if ($model instanceof Game) {
+            $this->globalPackageSyncService->syncGame($model);
+        }
+
         $priceChanged = $model instanceof TopupPackage
             && array_intersect(['provider_price', 'original_price', 'price'], array_keys($payload)) !== [];
         $action = $model instanceof TopupProvider && array_key_exists('connection_config', $payload)
@@ -197,6 +216,13 @@ class TopupAdminService
         DB::transaction(function () use ($model, $admin, $request): void {
             /** @var Game|GameServer|TopupPackage $lockedModel */
             $lockedModel = $model->newQuery()->lockForUpdate()->findOrFail($model->getKey());
+
+            if ($lockedModel instanceof TopupPackage && $lockedModel->global_topup_package_id !== null) {
+                throw ValidationException::withMessages([
+                    'package' => 'Gói này được đồng bộ tự động từ Gói nạp Global và không thể xóa thủ công.',
+                ]);
+            }
+
             [$errorKey, $message, $blockingRelations] = match (true) {
                 $lockedModel instanceof Game => [
                     'game',
@@ -205,8 +231,8 @@ class TopupAdminService
                 ],
                 $lockedModel instanceof GameServer => [
                     'server',
-                    'Không thể xóa máy chủ khi còn gói nạp hoặc đơn hàng. Hãy xóa dữ liệu liên quan trước hoặc chuyển máy chủ sang Tạm tắt.',
-                    ['packages', 'orders'],
+                    'Không thể xóa máy chủ khi còn đơn hàng. Hãy chuyển máy chủ sang Tạm tắt để giữ lịch sử.',
+                    ['orders'],
                 ],
                 default => [
                     'package',

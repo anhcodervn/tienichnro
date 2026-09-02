@@ -17,6 +17,7 @@ class GameFactory extends Factory
             'slug' => Str::slug($name).'-'.fake()->unique()->numberBetween(1, 9999),
             'short_name' => Str::upper(Str::substr(Str::slug($name, ''), 0, 8)),
             'reward_label' => 'Thực nhận',
+            'provider_service_code' => null,
             'description' => fake()->sentence(),
             'status' => 'active',
             'sort_order' => fake()->numberBetween(0, 100),

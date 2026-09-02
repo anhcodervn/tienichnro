@@ -79,6 +79,11 @@
             </header>
 
             @foreach ($games as $game)
+                @php
+                    $rewardSettings = $game->globalPackageSettings->filter(
+                        fn ($setting) => collect($setting->receives)->contains(fn ($receive) => is_array($receive)),
+                    );
+                @endphp
                 <div
                     id="reward-panel-{{ $game->id }}"
                     role="tabpanel"
@@ -86,45 +91,45 @@
                     data-game-reward="{{ $game->id }}"
                     @if ((string) $game->id !== $initialGameId) hidden @endif
                 >
-                    @if ($game->packages->isNotEmpty())
+                    @if ($rewardSettings->isNotEmpty())
                         <div class="home-table-scroll" tabindex="0" role="region" aria-label="Bảng thực nhận {{ $game->name }}">
                             <table class="home-price-table home-reward-table" aria-describedby="reward-table-description">
                                 <caption class="sr-only">Bảng thực nhận {{ $game->name }} theo từng mệnh giá</caption>
                                 <thead>
                                     <tr>
-                                        <th scope="col">Nhóm</th>
-                                        @foreach ($game->packages as $package)
-                                            <th scope="col" data-package-column="{{ $package->id }}">
-                                                {{ $package->denomination ? number_format($package->denomination, 0, ',', '.').'đ' : $package->name }}
-                                            </th>
-                                        @endforeach
+                                        <th scope="col">Mệnh giá</th>
+                                        <th scope="col">Đơn vị nhận</th>
+                                        <th scope="col">Cơ bản</th>
+                                        <th scope="col">KM X2</th>
+                                        <th scope="col">KM X3</th>
+                                        <th scope="col">Nạp đầu</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    <tr>
-                                        <th scope="row">{{ $game->reward_label ?: 'Thực nhận' }}</th>
-                                        @foreach ($game->packages as $package)
-                                            <td data-package-column="{{ $package->id }}">{{ $package->carot_amount !== null ? number_format($package->carot_amount, 0, ',', '.') : '—' }}</td>
+                                    @foreach ($rewardSettings as $setting)
+                                        @php $receives = collect($setting->receives)->filter(fn ($receive) => is_array($receive))->values(); @endphp
+                                        @foreach ($receives as $receiveIndex => $receive)
+                                            <tr data-reward-denomination="{{ $setting->denomination }}">
+                                                @if ($receiveIndex === 0)
+                                                    <th scope="rowgroup" rowspan="{{ $receives->count() }}">
+                                                        {{ number_format($setting->denomination, 0, ',', '.') }}đ
+                                                    </th>
+                                                @endif
+                                                <td>
+                                                    <span class="inline-flex items-baseline gap-1">
+                                                        <strong>{{ data_get($receive, 'label', data_get($receive, 'code', 'Thực nhận')) }}</strong>
+                                                        @if (filled(data_get($receive, 'code')))
+                                                            <span class="text-xs font-bold text-slate-500">({{ data_get($receive, 'code') }})</span>
+                                                        @endif
+                                                    </span>
+                                                </td>
+                                                <td>{{ data_get($receive, 'base_amount') !== null ? number_format((int) data_get($receive, 'base_amount'), 0, ',', '.') : '—' }}</td>
+                                                <td>{{ data_get($receive, 'reward_x2_amount') !== null ? number_format((int) data_get($receive, 'reward_x2_amount'), 0, ',', '.') : '—' }}</td>
+                                                <td>{{ data_get($receive, 'reward_x3_amount') !== null ? number_format((int) data_get($receive, 'reward_x3_amount'), 0, ',', '.') : '—' }}</td>
+                                                <td>{{ data_get($receive, 'first_topup_reward_amount') !== null ? number_format((int) data_get($receive, 'first_topup_reward_amount'), 0, ',', '.') : '—' }}</td>
+                                            </tr>
                                         @endforeach
-                                    </tr>
-                                    <tr>
-                                        <th scope="row">KM X2</th>
-                                        @foreach ($game->packages as $package)
-                                            <td data-package-column="{{ $package->id }}">{{ $package->reward_x2_amount !== null ? number_format($package->reward_x2_amount, 0, ',', '.') : '—' }}</td>
-                                        @endforeach
-                                    </tr>
-                                    <tr>
-                                        <th scope="row">KM X3</th>
-                                        @foreach ($game->packages as $package)
-                                            <td data-package-column="{{ $package->id }}">{{ $package->reward_x3_amount !== null ? number_format($package->reward_x3_amount, 0, ',', '.') : '—' }}</td>
-                                        @endforeach
-                                    </tr>
-                                    <tr>
-                                        <th scope="row">X2 nạp đầu</th>
-                                        @foreach ($game->packages as $package)
-                                            <td data-package-column="{{ $package->id }}">{{ $package->first_topup_reward_amount !== null ? number_format($package->first_topup_reward_amount, 0, ',', '.') : '—' }}</td>
-                                        @endforeach
-                                    </tr>
+                                    @endforeach
                                 </tbody>
                             </table>
                         </div>
