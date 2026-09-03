@@ -20,6 +20,7 @@ test('user detail owns the per member pricing interface', function (): void {
         ->and($userDetail)->toContain('border-2 border-slate-300', 'member_price', 'minimum_profit')
         ->and($userDetail)->toContain('globalPrice', "pricing_source === 'global'", 'submitGlobalPrice')
         ->and($userDetail)->toContain('selectedPricingScope', 'gamePricingScopes', 'selectedGamePriceRows', 'Chọn phạm vi set giá')
+        ->and($userDetail)->toContain('globalPackageRows', 'Các gói Global đang áp dụng', 'Giá sau giảm được tính theo mức Global')
         ->and($userService)->toContain('/prices/${packageId}', 'updatePrice', 'deletePrice')
         ->and($userService)->toContain('/global-price', 'updateGlobalPrice', 'deleteGlobalPrice');
 });

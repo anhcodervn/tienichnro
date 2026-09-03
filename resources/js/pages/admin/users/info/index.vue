@@ -3,6 +3,7 @@ import {
     adminUserService,
     type AdminPaginationMeta,
     type AdminUserDetailResponse,
+    type AdminUserGlobalPackagePreview,
     type AdminUserGlobalPrice,
     type AdminUserLog,
     type AdminUserPackagePrice,
@@ -51,6 +52,7 @@ const resettingGlobalPrice = ref(false);
 const detail = ref<AdminUserDetailResponse | null>(null);
 const priceRows = ref<AdminUserPackagePrice[]>([]);
 const globalPrice = ref<AdminUserGlobalPrice>({ discount_percent: 0, minimum_profit: 0, is_active: false });
+const globalPackageRows = ref<AdminUserGlobalPackagePreview[]>([]);
 const selectedPricingScope = ref('global');
 const activeTab = ref<TabKey>('overview');
 
@@ -222,6 +224,7 @@ const loadPrices = async (): Promise<void> => {
 const applyPricingResponse = (response: AdminUserPricingResponse): void => {
     priceRows.value = response.prices;
     globalPrice.value = response.global_price;
+    globalPackageRows.value = response.global_packages;
 
     if (selectedPricingScope.value !== 'global' && !gamePricingScopes.value.some((scope) => scope.value === selectedPricingScope.value)) {
         selectedPricingScope.value = 'global';
@@ -770,6 +773,54 @@ onMounted(loadDetail);
                                                 class="h-4 w-4"
                                             />
                                         </button>
+                                    </div>
+                                </div>
+                                <div class="border-t-2 border-indigo-100">
+                                    <div class="flex flex-wrap items-center justify-between gap-2 bg-slate-50 px-4 py-3">
+                                        <div>
+                                            <h4 class="text-sm font-black text-slate-900">Các gói Global đang áp dụng</h4>
+                                            <p class="mt-1 text-xs text-slate-500">Giá sau giảm được tính theo mức Global phía trên.</p>
+                                        </div>
+                                        <span class="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-bold text-indigo-700">
+                                            {{ globalPackageRows.length }} gói
+                                        </span>
+                                    </div>
+                                    <div class="overflow-x-auto">
+                                        <table class="w-full min-w-[720px]">
+                                            <thead
+                                                class="border-y border-slate-200 bg-white text-left text-xs font-bold uppercase tracking-wide text-slate-500"
+                                            >
+                                                <tr>
+                                                    <th class="px-4 py-3">Gói Global</th>
+                                                    <th class="px-4 py-3">Mệnh giá</th>
+                                                    <th class="px-4 py-3">Giá chuẩn</th>
+                                                    <th class="px-4 py-3">Giá thành viên</th>
+                                                    <th class="px-4 py-3">Được giảm</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <tr v-if="globalPackageRows.length === 0">
+                                                    <td colspan="5" class="px-4 py-10 text-center text-sm text-slate-500">
+                                                        Chưa có gói Global đang hoạt động. Hãy kiểm tra trạng thái gói trong quản lý nạp game.
+                                                    </td>
+                                                </tr>
+                                                <tr v-for="row in globalPackageRows" :key="row.id" class="border-t border-slate-200 text-sm">
+                                                    <td class="px-4 py-3 font-bold text-slate-900">{{ row.name }}</td>
+                                                    <td class="px-4 py-3 font-semibold text-slate-700">{{ formatCurrency(row.denomination) }}</td>
+                                                    <td class="px-4 py-3 font-semibold text-slate-700">{{ formatCurrency(row.base_price) }}</td>
+                                                    <td class="px-4 py-3 font-black text-indigo-600">{{ formatCurrency(row.member_price) }}</td>
+                                                    <td class="px-4 py-3">
+                                                        <span
+                                                            v-if="row.discount_amount > 0"
+                                                            class="rounded bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700"
+                                                        >
+                                                            -{{ formatCurrency(row.discount_amount) }}
+                                                        </span>
+                                                        <span v-else class="text-slate-400">--</span>
+                                                    </td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
                                     </div>
                                 </div>
                             </section>

@@ -117,9 +117,19 @@ export type AdminUserGlobalPrice = {
     is_active: boolean;
 };
 
+export type AdminUserGlobalPackagePreview = {
+    id: number;
+    name: string;
+    denomination: number;
+    base_price: number;
+    member_price: number;
+    discount_amount: number;
+};
+
 export type AdminUserPricingResponse = {
     prices: AdminUserPackagePrice[];
     global_price: AdminUserGlobalPrice;
+    global_packages: AdminUserGlobalPackagePreview[];
 };
 
 export type PaginatedAdminUserRelation<T> = {

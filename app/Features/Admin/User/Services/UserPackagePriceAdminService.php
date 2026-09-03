@@ -4,6 +4,7 @@ namespace App\Features\Admin\User\Services;
 
 use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Features\Topup\Services\UserPackagePricingService;
+use App\Models\GlobalTopupPackage;
 use App\Models\TopupPackage;
 use App\Models\User;
 use App\Models\UserGlobalPrice;
@@ -17,7 +18,7 @@ class UserPackagePriceAdminService
         private readonly UserPackagePricingService $userPackagePricingService,
     ) {}
 
-    /** @return array{prices:array<int, array<string, mixed>>,global_price:array<string, mixed>} */
+    /** @return array{prices:array<int, array<string, mixed>>,global_price:array<string, mixed>,global_packages:array<int, array<string, mixed>>} */
     public function catalog(User $user): array
     {
         $packages = TopupPackage::query()
@@ -60,6 +61,30 @@ class UserPackagePriceAdminService
             ->all();
 
         $globalRule = UserGlobalPrice::query()->where('user_id', $user->id)->first();
+        $globalPackages = GlobalTopupPackage::query()
+            ->where('status', 'active')
+            ->orderBy('sort_order')
+            ->orderBy('denomination')
+            ->get()
+            ->map(function (GlobalTopupPackage $globalPackage) use ($user): array {
+                $basePrice = (int) $globalPackage->price;
+                $price = $this->userPackagePricingService->resolveGlobal(
+                    $user,
+                    $basePrice,
+                    (int) $globalPackage->provider_price,
+                );
+
+                return [
+                    'id' => $globalPackage->id,
+                    'name' => $globalPackage->name,
+                    'denomination' => (int) $globalPackage->denomination,
+                    'base_price' => $basePrice,
+                    'member_price' => $price['price'],
+                    'discount_amount' => $price['discount_amount'],
+                ];
+            })
+            ->values()
+            ->all();
 
         return [
             'prices' => $prices,
@@ -68,6 +93,7 @@ class UserPackagePriceAdminService
                 'minimum_profit' => (int) ($globalRule?->minimum_profit ?? 0),
                 'is_active' => (bool) ($globalRule?->is_active ?? false),
             ],
+            'global_packages' => $globalPackages,
         ];
     }
 

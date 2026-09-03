@@ -3,6 +3,7 @@
 use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Models\ApiKey;
 use App\Models\Game;
+use App\Models\GlobalTopupPackage;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\TenantPackagePrice;
@@ -168,13 +169,23 @@ test('platform admin can configure one global discount for a member', function (
     $main = Tenant::query()->where('is_main', true)->firstOrFail();
     $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
     $member = User::factory()->create(['tenant_id' => $main->id]);
+    GlobalTopupPackage::factory()->create([
+        'name' => 'Global 100K',
+        'denomination' => 100000,
+        'price' => 90000,
+        'provider_price' => 70000,
+        'status' => 'active',
+    ]);
     $this->actingAs($admin)->putJson("/api/admin-api/users/{$member->id}/global-price", [
         'discount_percent' => 8.5,
         'minimum_profit' => 1000,
         'is_active' => true,
     ])->assertOk()
         ->assertJsonPath('data.global_price.discount_percent', 8.5)
-        ->assertJsonPath('data.global_price.minimum_profit', 1000);
+        ->assertJsonPath('data.global_price.minimum_profit', 1000)
+        ->assertJsonPath('data.global_packages.0.name', 'Global 100K')
+        ->assertJsonPath('data.global_packages.0.member_price', 82350)
+        ->assertJsonPath('data.global_packages.0.discount_amount', 7650);
 
     expect(UserGlobalPrice::query()->where('user_id', $member->id)->value('discount_basis_points'))->toBe(850);
 });
