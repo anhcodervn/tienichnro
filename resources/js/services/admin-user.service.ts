@@ -108,6 +108,18 @@ export type AdminUserPackagePrice = {
     fixed_price: number | null;
     minimum_profit: number;
     is_active: boolean;
+    pricing_source: 'standard' | 'global' | 'package';
+};
+
+export type AdminUserGlobalPrice = {
+    discount_percent: number;
+    minimum_profit: number;
+    is_active: boolean;
+};
+
+export type AdminUserPricingResponse = {
+    prices: AdminUserPackagePrice[];
+    global_price: AdminUserGlobalPrice;
 };
 
 export type PaginatedAdminUserRelation<T> = {
@@ -138,22 +150,34 @@ export const adminUserService = {
         return response.data.data;
     },
 
-    async prices(userId: number | string): Promise<AdminUserPackagePrice[]> {
+    async prices(userId: number | string): Promise<AdminUserPricingResponse> {
         const response = await api.get(`/api/admin-api/users/${userId}/prices`);
 
-        return response.data.data.prices as AdminUserPackagePrice[];
+        return response.data.data as AdminUserPricingResponse;
     },
 
-    async updatePrice(userId: number | string, packageId: number, payload: Record<string, unknown>): Promise<AdminUserPackagePrice[]> {
+    async updatePrice(userId: number | string, packageId: number, payload: Record<string, unknown>): Promise<AdminUserPricingResponse> {
         const response = await api.put(`/api/admin-api/users/${userId}/prices/${packageId}`, payload);
 
-        return response.data.data.prices as AdminUserPackagePrice[];
+        return response.data.data as AdminUserPricingResponse;
     },
 
-    async deletePrice(userId: number | string, packageId: number): Promise<AdminUserPackagePrice[]> {
+    async deletePrice(userId: number | string, packageId: number): Promise<AdminUserPricingResponse> {
         const response = await api.delete(`/api/admin-api/users/${userId}/prices/${packageId}`);
 
-        return response.data.data.prices as AdminUserPackagePrice[];
+        return response.data.data as AdminUserPricingResponse;
+    },
+
+    async updateGlobalPrice(userId: number | string, payload: Record<string, unknown>): Promise<AdminUserPricingResponse> {
+        const response = await api.put(`/api/admin-api/users/${userId}/global-price`, payload);
+
+        return response.data.data as AdminUserPricingResponse;
+    },
+
+    async deleteGlobalPrice(userId: number | string): Promise<AdminUserPricingResponse> {
+        const response = await api.delete(`/api/admin-api/users/${userId}/global-price`);
+
+        return response.data.data as AdminUserPricingResponse;
     },
 
     async walletTransactions(

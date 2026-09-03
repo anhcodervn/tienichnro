@@ -2,11 +2,13 @@
 
 use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Models\ApiKey;
+use App\Models\Game;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\TenantPackagePrice;
 use App\Models\TopupPackage;
 use App\Models\User;
+use App\Models\UserGlobalPrice;
 use App\Models\UserPackagePrice;
 use App\Utils\Site;
 use Illuminate\Support\Facades\Hash;
@@ -114,4 +116,65 @@ test('child admin can manage pricing only for members of their website', functio
         'minimum_profit' => 0,
         'is_active' => true,
     ])->assertNotFound();
+});
+
+test('global member discount applies once to every game', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $user = User::factory()->create(['tenant_id' => $main->id]);
+    $games = Game::factory()->count(2)->create(['package_mode' => 'custom']);
+    $packages = $games->map(function (Game $game): TopupPackage {
+        return TopupPackage::factory()->for($game)->create([
+            'denomination' => 100000,
+            'price' => 90000,
+            'provider_price' => 70000,
+        ]);
+    });
+    UserGlobalPrice::factory()->for($user)->create([
+        'discount_basis_points' => 1000,
+    ]);
+
+    $prices = $packages->map(fn (TopupPackage $package): array => Site::for(
+        $main,
+        fn (): array => app(TopupPackagePricingService::class)->resolve($package, $user),
+    ));
+
+    expect($prices->pluck('final_price')->all())->toBe([81000, 81000])
+        ->and($prices->pluck('user_pricing_source')->all())->toBe(['global', 'global']);
+});
+
+test('game package member price overrides the global member discount', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $user = User::factory()->create(['tenant_id' => $main->id]);
+    $game = Game::factory()->create(['package_mode' => 'custom']);
+    $package = TopupPackage::factory()->for($game)->create([
+        'denomination' => 100000,
+        'price' => 90000,
+        'provider_price' => 70000,
+    ]);
+    UserGlobalPrice::factory()->for($user)->create([
+        'discount_basis_points' => 1000,
+    ]);
+    UserPackagePrice::factory()->for($user)->for($package, 'package')->create([
+        'discount_basis_points' => 500,
+    ]);
+
+    $price = Site::for($main, fn (): array => app(TopupPackagePricingService::class)->resolve($package, $user));
+
+    expect($price['final_price'])->toBe(85500)
+        ->and($price['user_pricing_source'])->toBe('package');
+});
+
+test('platform admin can configure one global discount for a member', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
+    $member = User::factory()->create(['tenant_id' => $main->id]);
+    $this->actingAs($admin)->putJson("/api/admin-api/users/{$member->id}/global-price", [
+        'discount_percent' => 8.5,
+        'minimum_profit' => 1000,
+        'is_active' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.global_price.discount_percent', 8.5)
+        ->assertJsonPath('data.global_price.minimum_profit', 1000);
+
+    expect(UserGlobalPrice::query()->where('user_id', $member->id)->value('discount_basis_points'))->toBe(850);
 });

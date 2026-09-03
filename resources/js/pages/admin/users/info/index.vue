@@ -3,8 +3,10 @@ import {
     adminUserService,
     type AdminPaginationMeta,
     type AdminUserDetailResponse,
+    type AdminUserGlobalPrice,
     type AdminUserLog,
     type AdminUserPackagePrice,
+    type AdminUserPricingResponse,
     type AdminUserWalletTransaction,
 } from '@/services/admin-user.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
@@ -41,10 +43,15 @@ const loading = ref(false);
 const adjustingWallet = ref(false);
 const resettingPassword = ref(false);
 const pricesLoading = ref(false);
+const pricesLoaded = ref(false);
 const savingPriceId = ref<number | null>(null);
 const resettingPriceId = ref<number | null>(null);
+const savingGlobalPrice = ref(false);
+const resettingGlobalPrice = ref(false);
 const detail = ref<AdminUserDetailResponse | null>(null);
 const priceRows = ref<AdminUserPackagePrice[]>([]);
+const globalPrice = ref<AdminUserGlobalPrice>({ discount_percent: 0, minimum_profit: 0, is_active: false });
+const selectedPricingScope = ref('global');
 const activeTab = ref<TabKey>('overview');
 
 const walletForm = reactive({
@@ -87,6 +94,22 @@ const formatCurrency = (value: number | null | undefined): string =>
         currency: 'VND',
         maximumFractionDigits: 0,
     }).format(value ?? 0);
+
+const gamePricingScopes = computed(() => {
+    const games = new Map<string, number>();
+
+    priceRows.value.forEach((row) => {
+        const game = row.game || 'Chưa phân loại';
+        games.set(game, (games.get(game) ?? 0) + 1);
+    });
+
+    return Array.from(games, ([label, count]) => ({ value: `game:${label}`, label, count })).sort((left, right) =>
+        left.label.localeCompare(right.label, 'vi'),
+    );
+});
+
+const selectedGameName = computed(() => selectedPricingScope.value.replace(/^game:/, ''));
+const selectedGamePriceRows = computed(() => priceRows.value.filter((row) => (row.game || 'Chưa phân loại') === selectedGameName.value));
 
 const formatDate = (value: string | null, includeTime = false): string => {
     if (!value) {
@@ -187,7 +210,8 @@ const loadPrices = async (): Promise<void> => {
     pricesLoading.value = true;
 
     try {
-        priceRows.value = await adminUserService.prices(userId);
+        applyPricingResponse(await adminUserService.prices(userId));
+        pricesLoaded.value = true;
     } catch (error) {
         handleErrorResponse(error);
     } finally {
@@ -195,17 +219,28 @@ const loadPrices = async (): Promise<void> => {
     }
 };
 
+const applyPricingResponse = (response: AdminUserPricingResponse): void => {
+    priceRows.value = response.prices;
+    globalPrice.value = response.global_price;
+
+    if (selectedPricingScope.value !== 'global' && !gamePricingScopes.value.some((scope) => scope.value === selectedPricingScope.value)) {
+        selectedPricingScope.value = 'global';
+    }
+};
+
 const savePrice = async (row: AdminUserPackagePrice): Promise<void> => {
     savingPriceId.value = row.package_id;
 
     try {
-        priceRows.value = await adminUserService.updatePrice(userId, row.package_id, {
-            pricing_mode: row.pricing_mode,
-            discount_percent: row.pricing_mode === 'discount' ? Number(row.discount_percent) : null,
-            fixed_price: row.pricing_mode === 'fixed' ? Number(row.fixed_price) : null,
-            minimum_profit: Number(row.minimum_profit),
-            is_active: row.is_active,
-        });
+        applyPricingResponse(
+            await adminUserService.updatePrice(userId, row.package_id, {
+                pricing_mode: row.pricing_mode,
+                discount_percent: row.pricing_mode === 'discount' ? Number(row.discount_percent) : null,
+                fixed_price: row.pricing_mode === 'fixed' ? Number(row.fixed_price) : null,
+                minimum_profit: Number(row.minimum_profit),
+                is_active: row.is_active,
+            }),
+        );
         handleSuccessResponse({ data: { status: true, message: 'Đã lưu giá riêng cho thành viên.' } });
     } catch (error) {
         handleErrorResponse(error);
@@ -218,7 +253,7 @@ const resetPrice = async (row: AdminUserPackagePrice): Promise<void> => {
     resettingPriceId.value = row.package_id;
 
     try {
-        priceRows.value = await adminUserService.deletePrice(userId, row.package_id);
+        applyPricingResponse(await adminUserService.deletePrice(userId, row.package_id));
         handleSuccessResponse({ data: { status: true, message: 'Đã đưa gói về giá mặc định của website.' } });
     } catch (error) {
         handleErrorResponse(error);
@@ -227,10 +262,42 @@ const resetPrice = async (row: AdminUserPackagePrice): Promise<void> => {
     }
 };
 
+const submitGlobalPrice = async (): Promise<void> => {
+    savingGlobalPrice.value = true;
+
+    try {
+        applyPricingResponse(
+            await adminUserService.updateGlobalPrice(userId, {
+                discount_percent: Number(globalPrice.value.discount_percent),
+                minimum_profit: Number(globalPrice.value.minimum_profit),
+                is_active: globalPrice.value.is_active,
+            }),
+        );
+        handleSuccessResponse({ data: { status: true, message: 'Đã lưu chiết khấu Global cho thành viên.' } });
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        savingGlobalPrice.value = false;
+    }
+};
+
+const resetGlobalPrice = async (): Promise<void> => {
+    resettingGlobalPrice.value = true;
+
+    try {
+        applyPricingResponse(await adminUserService.deleteGlobalPrice(userId));
+        handleSuccessResponse({ data: { status: true, message: 'Đã xóa chiết khấu Global của thành viên.' } });
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        resettingGlobalPrice.value = false;
+    }
+};
+
 const openTab = async (tab: TabKey): Promise<void> => {
     activeTab.value = tab;
 
-    if (tab === 'pricing' && priceRows.value.length === 0) {
+    if (tab === 'pricing' && !pricesLoaded.value) {
         await loadPrices();
     }
 
@@ -606,111 +673,242 @@ onMounted(loadDetail);
                             Đang tải bảng giá thành viên...
                         </div>
 
-                        <div v-else class="overflow-x-auto rounded-[10px] border border-slate-300">
-                            <table class="w-full min-w-[1180px]">
-                                <thead class="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
-                                    <tr>
-                                        <th class="px-3 py-3">Game / gói</th>
-                                        <th class="px-3 py-3">Mệnh giá</th>
-                                        <th class="px-3 py-3">Giá chuẩn</th>
-                                        <th class="px-3 py-3">Cách tính</th>
-                                        <th class="px-3 py-3">Mức giá</th>
-                                        <th class="px-3 py-3">Lãi tối thiểu</th>
-                                        <th class="px-3 py-3">Giá thành viên</th>
-                                        <th class="px-3 py-3 text-center">Áp dụng</th>
-                                        <th class="px-3 py-3 text-right">Thao tác</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    <tr v-if="priceRows.length === 0">
-                                        <td colspan="9" class="px-4 py-12 text-center text-sm text-slate-500">Chưa có gói nạp đang hoạt động.</td>
-                                    </tr>
-                                    <tr v-for="row in priceRows" :key="row.package_id" class="border-t border-slate-200 align-top text-sm">
-                                        <td class="px-3 py-3">
-                                            <p class="font-bold text-slate-900">{{ row.game || 'Chưa phân loại' }}</p>
-                                            <p class="mt-1 text-xs text-slate-500">{{ row.package }}</p>
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-3 font-semibold text-slate-700">
-                                            {{ formatCurrency(row.denomination) }}
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-3 font-semibold text-slate-700">{{ formatCurrency(row.base_price) }}</td>
-                                        <td class="px-3 py-3">
-                                            <select
-                                                v-model="row.pricing_mode"
-                                                class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-700 outline-none focus:border-[#465fff]"
-                                            >
-                                                <option value="discount">Giảm theo %</option>
-                                                <option value="fixed">Giá cố định</option>
-                                            </select>
-                                        </td>
-                                        <td class="px-3 py-3">
-                                            <div v-if="row.pricing_mode === 'discount'" class="relative w-28">
-                                                <input
-                                                    v-model.number="row.discount_percent"
-                                                    type="number"
-                                                    min="0"
-                                                    max="100"
-                                                    step="0.01"
-                                                    class="w-full rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 pr-7 text-sm text-slate-700 outline-none focus:border-[#465fff]"
-                                                />
-                                                <span class="pointer-events-none absolute right-3 top-2 text-sm text-slate-400">%</span>
-                                            </div>
+                        <div v-else class="grid gap-5">
+                            <nav class="rounded-[10px] border-2 border-slate-300 bg-white p-3" aria-label="Phạm vi bảng giá">
+                                <p class="px-1 pb-2 text-xs font-black uppercase tracking-[0.16em] text-slate-500">Chọn phạm vi set giá</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <button
+                                        type="button"
+                                        class="inline-flex items-center gap-2 rounded-[8px] border-2 px-3.5 py-2.5 text-sm font-bold transition"
+                                        :class="
+                                            selectedPricingScope === 'global'
+                                                ? 'border-indigo-600 bg-indigo-600 text-white shadow-sm'
+                                                : 'border-slate-300 bg-white text-slate-700 hover:border-indigo-300 hover:text-indigo-700'
+                                        "
+                                        @click="selectedPricingScope = 'global'"
+                                    >
+                                        <BadgePercent class="h-4 w-4" />Global
+                                        <span class="rounded bg-white/20 px-1.5 py-0.5 text-[11px]">Tất cả game</span>
+                                    </button>
+                                    <button
+                                        v-for="scope in gamePricingScopes"
+                                        :key="scope.value"
+                                        type="button"
+                                        class="inline-flex items-center gap-2 rounded-[8px] border-2 px-3.5 py-2.5 text-sm font-bold transition"
+                                        :class="
+                                            selectedPricingScope === scope.value
+                                                ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
+                                                : 'border-slate-300 bg-white text-slate-700 hover:border-slate-500'
+                                        "
+                                        @click="selectedPricingScope = scope.value"
+                                    >
+                                        {{ scope.label }}
+                                        <span class="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] text-slate-600">{{ scope.count }} gói</span>
+                                    </button>
+                                </div>
+                            </nav>
+
+                            <section
+                                v-if="selectedPricingScope === 'global'"
+                                class="overflow-hidden rounded-[10px] border-2 border-indigo-200 bg-white"
+                            >
+                                <div class="border-b border-indigo-200 bg-indigo-50 px-4 py-4">
+                                    <h3 class="font-black text-indigo-950">Chiết khấu Global toàn bộ game</h3>
+                                    <p class="mt-1 text-sm leading-6 text-indigo-800">
+                                        Cấu hình một lần cho thành viên và tự áp dụng cho mọi game, cả gói chung lẫn gói riêng. Giá riêng từng game ở
+                                        bảng dưới sẽ được ưu tiên nếu có.
+                                    </p>
+                                </div>
+                                <div class="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] md:items-end">
+                                    <label class="grid gap-1.5 text-sm font-bold text-slate-700">
+                                        Chiết khấu chung (%)
+                                        <input
+                                            v-model.number="globalPrice.discount_percent"
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            step="0.01"
+                                            class="rounded-[8px] border-2 border-slate-300 bg-white px-3 py-2.5 font-medium outline-none focus:border-[#465fff]"
+                                        />
+                                    </label>
+                                    <label class="grid gap-1.5 text-sm font-bold text-slate-700">
+                                        Lãi tối thiểu mỗi đơn
+                                        <input
+                                            v-model.number="globalPrice.minimum_profit"
+                                            type="number"
+                                            min="0"
+                                            class="rounded-[8px] border-2 border-slate-300 bg-white px-3 py-2.5 font-medium outline-none focus:border-[#465fff]"
+                                        />
+                                    </label>
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <label class="inline-flex items-center gap-2 text-sm font-bold text-slate-700">
                                             <input
-                                                v-else
-                                                v-model.number="row.fixed_price"
-                                                type="number"
-                                                min="0"
-                                                class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
-                                            />
-                                        </td>
-                                        <td class="px-3 py-3">
-                                            <input
-                                                v-model.number="row.minimum_profit"
-                                                type="number"
-                                                min="0"
-                                                class="w-28 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
-                                            />
-                                        </td>
-                                        <td class="whitespace-nowrap px-3 py-3">
-                                            <p class="font-black text-[#465fff]">{{ formatCurrency(row.member_price) }}</p>
-                                            <p v-if="row.discount_amount > 0" class="mt-1 text-xs font-semibold text-emerald-600">
-                                                Giảm {{ formatCurrency(row.discount_amount) }}
-                                            </p>
-                                        </td>
-                                        <td class="px-3 py-3 text-center">
-                                            <input
-                                                v-model="row.is_active"
+                                                v-model="globalPrice.is_active"
                                                 type="checkbox"
                                                 class="h-5 w-5 rounded border-2 border-slate-400 text-[#465fff] focus:ring-[#465fff]"
                                             />
-                                        </td>
-                                        <td class="px-3 py-3">
-                                            <div class="flex justify-end gap-2">
-                                                <button
-                                                    type="button"
-                                                    class="inline-flex items-center gap-1.5 rounded-[8px] bg-[#465fff] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
-                                                    :disabled="savingPriceId === row.package_id || resettingPriceId === row.package_id"
-                                                    @click="savePrice(row)"
-                                                >
-                                                    <LoaderCircle v-if="savingPriceId === row.package_id" class="h-3.5 w-3.5 animate-spin" />
-                                                    <Save v-else class="h-3.5 w-3.5" />
-                                                    Lưu
-                                                </button>
-                                                <button
-                                                    type="button"
-                                                    title="Xóa giá riêng"
-                                                    class="inline-flex items-center justify-center rounded-[8px] border-2 border-slate-300 bg-white p-2 text-slate-600 hover:border-orange-300 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
-                                                    :disabled="savingPriceId === row.package_id || resettingPriceId === row.package_id"
-                                                    @click="resetPrice(row)"
-                                                >
-                                                    <LoaderCircle v-if="resettingPriceId === row.package_id" class="h-3.5 w-3.5 animate-spin" />
-                                                    <RotateCcw v-else class="h-3.5 w-3.5" />
-                                                </button>
-                                            </div>
-                                        </td>
-                                    </tr>
-                                </tbody>
-                            </table>
+                                            Áp dụng
+                                        </label>
+                                        <button
+                                            type="button"
+                                            class="inline-flex items-center gap-1.5 rounded-[8px] bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white disabled:opacity-60"
+                                            :disabled="savingGlobalPrice || resettingGlobalPrice"
+                                            @click="submitGlobalPrice"
+                                        >
+                                            <LoaderCircle v-if="savingGlobalPrice" class="h-4 w-4 animate-spin" /><Save v-else class="h-4 w-4" />Lưu
+                                            Global
+                                        </button>
+                                        <button
+                                            type="button"
+                                            title="Xóa chiết khấu Global"
+                                            class="inline-flex items-center justify-center rounded-[8px] border-2 border-slate-300 bg-white p-2.5 text-slate-600 hover:border-orange-300 hover:text-orange-600 disabled:opacity-60"
+                                            :disabled="savingGlobalPrice || resettingGlobalPrice"
+                                            @click="resetGlobalPrice"
+                                        >
+                                            <LoaderCircle v-if="resettingGlobalPrice" class="h-4 w-4 animate-spin" /><RotateCcw
+                                                v-else
+                                                class="h-4 w-4"
+                                            />
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section v-else class="overflow-hidden rounded-[10px] border-2 border-slate-300 bg-white">
+                                <div class="border-b border-slate-200 bg-slate-50 px-4 py-4">
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <div>
+                                            <p class="text-xs font-black uppercase tracking-[0.16em] text-slate-400">Giá riêng theo game</p>
+                                            <h3 class="mt-1 text-lg font-black text-slate-950">{{ selectedGameName }}</h3>
+                                        </div>
+                                        <span class="rounded-full border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-slate-600">
+                                            {{ selectedGamePriceRows.length }} gói nạp
+                                        </span>
+                                    </div>
+                                    <p class="mt-2 text-sm text-slate-600">Chỉ lưu tại đây khi muốn ghi đè mức Global cho riêng game hoặc gói này.</p>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full min-w-[1080px]">
+                                        <thead class="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                                            <tr>
+                                                <th class="px-3 py-3">Gói nạp</th>
+                                                <th class="px-3 py-3">Mệnh giá</th>
+                                                <th class="px-3 py-3">Giá chuẩn</th>
+                                                <th class="px-3 py-3">Cách tính</th>
+                                                <th class="px-3 py-3">Mức giá</th>
+                                                <th class="px-3 py-3">Lãi tối thiểu</th>
+                                                <th class="px-3 py-3">Giá thành viên</th>
+                                                <th class="px-3 py-3 text-center">Áp dụng</th>
+                                                <th class="px-3 py-3 text-right">Thao tác</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr v-if="selectedGamePriceRows.length === 0">
+                                                <td colspan="9" class="px-4 py-12 text-center text-sm text-slate-500">
+                                                    Chưa có gói nạp đang hoạt động.
+                                                </td>
+                                            </tr>
+                                            <tr
+                                                v-for="row in selectedGamePriceRows"
+                                                :key="row.package_id"
+                                                class="border-t border-slate-200 align-top text-sm"
+                                            >
+                                                <td class="px-3 py-3">
+                                                    <p class="font-bold text-slate-900">{{ row.package }}</p>
+                                                </td>
+                                                <td class="whitespace-nowrap px-3 py-3 font-semibold text-slate-700">
+                                                    {{ formatCurrency(row.denomination) }}
+                                                </td>
+                                                <td class="whitespace-nowrap px-3 py-3 font-semibold text-slate-700">
+                                                    {{ formatCurrency(row.base_price) }}
+                                                </td>
+                                                <td class="px-3 py-3">
+                                                    <select
+                                                        v-model="row.pricing_mode"
+                                                        class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-700 outline-none focus:border-[#465fff]"
+                                                    >
+                                                        <option value="discount">Giảm theo %</option>
+                                                        <option value="fixed">Giá cố định</option>
+                                                    </select>
+                                                </td>
+                                                <td class="px-3 py-3">
+                                                    <div v-if="row.pricing_mode === 'discount'" class="relative w-28">
+                                                        <input
+                                                            v-model.number="row.discount_percent"
+                                                            type="number"
+                                                            min="0"
+                                                            max="100"
+                                                            step="0.01"
+                                                            class="w-full rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 pr-7 text-sm text-slate-700 outline-none focus:border-[#465fff]"
+                                                        />
+                                                        <span class="pointer-events-none absolute right-3 top-2 text-sm text-slate-400">%</span>
+                                                    </div>
+                                                    <input
+                                                        v-else
+                                                        v-model.number="row.fixed_price"
+                                                        type="number"
+                                                        min="0"
+                                                        class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
+                                                    />
+                                                </td>
+                                                <td class="px-3 py-3">
+                                                    <input
+                                                        v-model.number="row.minimum_profit"
+                                                        type="number"
+                                                        min="0"
+                                                        class="w-28 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
+                                                    />
+                                                </td>
+                                                <td class="whitespace-nowrap px-3 py-3">
+                                                    <p class="font-black text-[#465fff]">{{ formatCurrency(row.member_price) }}</p>
+                                                    <span
+                                                        v-if="row.pricing_source === 'global'"
+                                                        class="mt-1 inline-flex rounded bg-indigo-50 px-2 py-0.5 text-[11px] font-bold text-indigo-700"
+                                                        >Đang theo Global</span
+                                                    >
+                                                    <p v-if="row.discount_amount > 0" class="mt-1 text-xs font-semibold text-emerald-600">
+                                                        Giảm {{ formatCurrency(row.discount_amount) }}
+                                                    </p>
+                                                </td>
+                                                <td class="px-3 py-3 text-center">
+                                                    <input
+                                                        v-model="row.is_active"
+                                                        type="checkbox"
+                                                        class="h-5 w-5 rounded border-2 border-slate-400 text-[#465fff] focus:ring-[#465fff]"
+                                                    />
+                                                </td>
+                                                <td class="px-3 py-3">
+                                                    <div class="flex justify-end gap-2">
+                                                        <button
+                                                            type="button"
+                                                            class="inline-flex items-center gap-1.5 rounded-[8px] bg-[#465fff] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                                            :disabled="savingPriceId === row.package_id || resettingPriceId === row.package_id"
+                                                            @click="savePrice(row)"
+                                                        >
+                                                            <LoaderCircle v-if="savingPriceId === row.package_id" class="h-3.5 w-3.5 animate-spin" />
+                                                            <Save v-else class="h-3.5 w-3.5" />
+                                                            Lưu
+                                                        </button>
+                                                        <button
+                                                            type="button"
+                                                            title="Xóa giá riêng"
+                                                            class="inline-flex items-center justify-center rounded-[8px] border-2 border-slate-300 bg-white p-2 text-slate-600 hover:border-orange-300 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                                            :disabled="savingPriceId === row.package_id || resettingPriceId === row.package_id"
+                                                            @click="resetPrice(row)"
+                                                        >
+                                                            <LoaderCircle
+                                                                v-if="resettingPriceId === row.package_id"
+                                                                class="h-3.5 w-3.5 animate-spin"
+                                                            />
+                                                            <RotateCcw v-else class="h-3.5 w-3.5" />
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </section>
                         </div>
                     </div>
 

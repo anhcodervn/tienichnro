@@ -14,6 +14,7 @@ use App\Features\Admin\User\Requests\AdminUserIndexRequest;
 use App\Features\Admin\User\Requests\AdminUserRelatedListRequest;
 use App\Features\Admin\User\Requests\AdminUserStatusRequest;
 use App\Features\Admin\User\Requests\AdminWalletAdjustRequest;
+use App\Features\Admin\User\Requests\UpsertUserGlobalPriceRequest;
 use App\Features\Admin\User\Requests\UpsertUserPackagePriceRequest;
 use App\Features\Admin\User\Resources\AdminUserDetailResource;
 use App\Features\Admin\User\Resources\AdminUserResource;
@@ -75,7 +76,7 @@ class UserController extends Controller
 
     public function prices(User $user, UserPackagePriceAdminService $service): JsonResponse
     {
-        return response()->json(ApiResponse::success(data: ['prices' => $service->catalog($user)]));
+        return response()->json(ApiResponse::success(data: $service->catalog($user)));
     }
 
     public function updatePrice(
@@ -88,7 +89,7 @@ class UserController extends Controller
 
         return response()->json(ApiResponse::success(
             'Đã cập nhật chiết khấu riêng cho thành viên.',
-            ['prices' => $service->catalog($user)],
+            $service->catalog($user),
         ));
     }
 
@@ -98,7 +99,32 @@ class UserController extends Controller
 
         return response()->json(ApiResponse::success(
             'Đã đưa thành viên về giá mặc định của website.',
-            ['prices' => $service->catalog($user)],
+            $service->catalog($user),
+        ));
+    }
+
+    public function updateGlobalPrice(
+        UpsertUserGlobalPriceRequest $request,
+        User $user,
+        UserPackagePriceAdminService $service,
+    ): JsonResponse {
+        $service->saveGlobal($user, $request->validated());
+
+        return response()->json(ApiResponse::success(
+            'Đã cập nhật chiết khấu Global cho thành viên.',
+            $service->catalog($user),
+        ));
+    }
+
+    public function deleteGlobalPrice(
+        User $user,
+        UserPackagePriceAdminService $service,
+    ): JsonResponse {
+        $service->deleteGlobal($user);
+
+        return response()->json(ApiResponse::success(
+            'Đã xóa chiết khấu Global của thành viên.',
+            $service->catalog($user),
         ));
     }
 

@@ -4,12 +4,16 @@ namespace App\Features\Topup\Services;
 
 use App\Models\TopupPackage;
 use App\Models\User;
+use App\Models\UserGlobalPrice;
 use App\Models\UserPackagePrice;
 
 class UserPackagePricingService
 {
     /** @var array<int, array<int, UserPackagePrice|null>> */
     private array $rules = [];
+
+    /** @var array<int, UserGlobalPrice|null> */
+    private array $globalRules = [];
 
     /** @param array<int, int> $packageIds */
     public function prime(User $user, array $packageIds): void
@@ -26,11 +30,23 @@ class UserPackagePricingService
         }
     }
 
-    /** @return array{price:int,discount_amount:int,pricing_mode:string,discount_basis_points:int,minimum_profit:int} */
+    public function primeGlobal(User $user): void
+    {
+        if (array_key_exists($user->id, $this->globalRules)) {
+            return;
+        }
+
+        $this->globalRules[$user->id] = UserGlobalPrice::query()
+            ->where('user_id', $user->id)
+            ->where('is_active', true)
+            ->first();
+    }
+
+    /** @return array{price:int,discount_amount:int,pricing_mode:string,pricing_source:string,discount_basis_points:int,minimum_profit:int} */
     public function resolve(?User $user, TopupPackage $package, int $basePrice, ?int $costFloor): array
     {
         if (! $user instanceof User) {
-            return $this->result($basePrice, $basePrice, 'standard', 0, 0);
+            return $this->result($basePrice, $basePrice, 'standard', 'standard', 0, 0);
         }
 
         if (! array_key_exists($package->id, $this->rules[$user->id] ?? [])) {
@@ -38,27 +54,60 @@ class UserPackagePricingService
         }
 
         $rule = $this->rules[$user->id][$package->id];
+        $pricingSource = 'package';
 
         if (! $rule instanceof UserPackagePrice) {
-            return $this->result($basePrice, $basePrice, 'standard', 0, 0);
+            return $this->resolveGlobal($user, $basePrice, $costFloor);
         }
 
+        return $this->applyRule($rule, $basePrice, $costFloor, $pricingSource);
+    }
+
+    /** @return array{price:int,discount_amount:int,pricing_mode:string,pricing_source:string,discount_basis_points:int,minimum_profit:int} */
+    public function resolveGlobal(?User $user, int $basePrice, ?int $costFloor): array
+    {
+        if (! $user instanceof User) {
+            return $this->result($basePrice, $basePrice, 'standard', 'standard', 0, 0);
+        }
+
+        if (! array_key_exists($user->id, $this->globalRules)) {
+            $this->primeGlobal($user);
+        }
+
+        $rule = $this->globalRules[$user->id];
+
+        if (! $rule instanceof UserGlobalPrice) {
+            return $this->result($basePrice, $basePrice, 'standard', 'standard', 0, 0);
+        }
+
+        return $this->applyRule($rule, $basePrice, $costFloor, 'global');
+    }
+
+    /** @return array{price:int,discount_amount:int,pricing_mode:string,pricing_source:string,discount_basis_points:int,minimum_profit:int} */
+    private function applyRule(
+        UserPackagePrice|UserGlobalPrice $rule,
+        int $basePrice,
+        ?int $costFloor,
+        string $pricingSource,
+    ): array {
         $discountBasisPoints = (int) ($rule->discount_basis_points ?? 0);
-        $candidatePrice = $rule->pricing_mode === UserPackagePrice::MODE_FIXED
+        $pricingMode = $rule instanceof UserGlobalPrice ? UserPackagePrice::MODE_DISCOUNT : $rule->pricing_mode;
+        $candidatePrice = $pricingMode === UserPackagePrice::MODE_FIXED
             ? (int) ($rule->fixed_price ?? $basePrice)
             : $basePrice - intdiv($basePrice * $discountBasisPoints, 10000);
         $minimumProfit = (int) $rule->minimum_profit;
         $minimumPrice = $costFloor === null ? 0 : $costFloor + $minimumProfit;
         $finalPrice = min($basePrice, max(0, $candidatePrice, $minimumPrice));
 
-        return $this->result($basePrice, $finalPrice, $rule->pricing_mode, $discountBasisPoints, $minimumProfit);
+        return $this->result($basePrice, $finalPrice, $pricingMode, $pricingSource, $discountBasisPoints, $minimumProfit);
     }
 
-    /** @return array{price:int,discount_amount:int,pricing_mode:string,discount_basis_points:int,minimum_profit:int} */
+    /** @return array{price:int,discount_amount:int,pricing_mode:string,pricing_source:string,discount_basis_points:int,minimum_profit:int} */
     private function result(
         int $basePrice,
         int $finalPrice,
         string $pricingMode,
+        string $pricingSource,
         int $discountBasisPoints,
         int $minimumProfit,
     ): array {
@@ -66,6 +115,7 @@ class UserPackagePricingService
             'price' => $finalPrice,
             'discount_amount' => $basePrice - $finalPrice,
             'pricing_mode' => $pricingMode,
+            'pricing_source' => $pricingSource,
             'discount_basis_points' => $discountBasisPoints,
             'minimum_profit' => $minimumProfit,
         ];

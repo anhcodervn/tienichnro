@@ -41,10 +41,12 @@ class TopupPackagePricingService
 
         if ($billingUser instanceof User) {
             $this->userPackagePricingService->prime($billingUser, $packageIds);
+            $this->userPackagePricingService->primeGlobal($billingUser);
         }
 
         if ($user instanceof User) {
             $this->userPackagePricingService->prime($user, $packageIds);
+            $this->userPackagePricingService->primeGlobal($user);
         }
 
         foreach ($packages as $package) {
@@ -64,6 +66,7 @@ class TopupPackagePricingService
             $package->setAttribute('tenant_profit', $price['tenant_profit']);
             $package->setAttribute('tenant_pricing_mode', $price['tenant_pricing_mode']);
             $package->setAttribute('user_pricing_mode', $price['user_pricing_mode']);
+            $package->setAttribute('user_pricing_source', $price['user_pricing_source']);
             $package->setAttribute('user_discount_amount', $price['user_discount_amount']);
             $package->setAttribute('package_source', $price['package_source']);
             $package->setAttribute('price', $price['final_price']);
@@ -86,6 +89,7 @@ class TopupPackagePricingService
                 'tenant_profit' => 0,
                 'tenant_pricing_mode' => 'base_price',
                 'user_pricing_mode' => 'standard',
+                'user_pricing_source' => 'standard',
                 'user_discount_amount' => 0,
             ];
         }
@@ -102,6 +106,7 @@ class TopupPackagePricingService
                 'tenant_profit' => 0,
                 'tenant_pricing_mode' => 'base_price',
                 'user_pricing_mode' => $userPrice['pricing_mode'],
+                'user_pricing_source' => $userPrice['pricing_source'],
                 'user_discount_amount' => $userPrice['discount_amount'],
             ];
         }
@@ -123,6 +128,7 @@ class TopupPackagePricingService
             'tenant_profit' => $userPrice['price'] - $billingPrice['price'],
             'tenant_pricing_mode' => $tenantPrice['pricing_mode'],
             'user_pricing_mode' => $userPrice['pricing_mode'],
+            'user_pricing_source' => $userPrice['pricing_source'],
             'user_discount_amount' => $userPrice['discount_amount'],
         ];
     }
