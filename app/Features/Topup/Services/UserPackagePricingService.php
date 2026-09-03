@@ -2,9 +2,10 @@
 
 namespace App\Features\Topup\Services;
 
+use App\Models\GlobalTopupPackage;
 use App\Models\TopupPackage;
 use App\Models\User;
-use App\Models\UserGlobalPrice;
+use App\Models\UserGlobalPackagePrice;
 use App\Models\UserPackagePrice;
 
 class UserPackagePricingService
@@ -12,7 +13,7 @@ class UserPackagePricingService
     /** @var array<int, array<int, UserPackagePrice|null>> */
     private array $rules = [];
 
-    /** @var array<int, UserGlobalPrice|null> */
+    /** @var array<int, array<int, UserGlobalPackagePrice|null>> */
     private array $globalRules = [];
 
     /** @param array<int, int> $packageIds */
@@ -30,16 +31,25 @@ class UserPackagePricingService
         }
     }
 
-    public function primeGlobal(User $user): void
+    /** @param array<int, int> $globalPackageIds */
+    public function primeGlobal(User $user, array $globalPackageIds): void
     {
-        if (array_key_exists($user->id, $this->globalRules)) {
+        $globalPackageIds = array_values(array_unique(array_filter($globalPackageIds)));
+
+        if ($globalPackageIds === []) {
             return;
         }
 
-        $this->globalRules[$user->id] = UserGlobalPrice::query()
+        $rules = UserGlobalPackagePrice::query()
             ->where('user_id', $user->id)
+            ->whereIn('global_topup_package_id', $globalPackageIds)
             ->where('is_active', true)
-            ->first();
+            ->get()
+            ->keyBy('global_topup_package_id');
+
+        foreach ($globalPackageIds as $globalPackageId) {
+            $this->globalRules[$user->id][$globalPackageId] = $rules->get($globalPackageId);
+        }
     }
 
     /** @return array{price:int,discount_amount:int,pricing_mode:string,pricing_source:string,discount_basis_points:int,minimum_profit:int} */
@@ -57,26 +67,34 @@ class UserPackagePricingService
         $pricingSource = 'package';
 
         if (! $rule instanceof UserPackagePrice) {
-            return $this->resolveGlobal($user, $basePrice, $costFloor);
+            $globalPackageId = (int) ($package->global_topup_package_id ?? 0);
+
+            if ($globalPackageId <= 0 || $package->game?->package_mode !== 'global') {
+                return $this->result($basePrice, $basePrice, 'standard', 'standard', 0, 0);
+            }
+
+            return $this->resolveGlobal($user, $globalPackageId, $basePrice, $costFloor);
         }
 
         return $this->applyRule($rule, $basePrice, $costFloor, $pricingSource);
     }
 
     /** @return array{price:int,discount_amount:int,pricing_mode:string,pricing_source:string,discount_basis_points:int,minimum_profit:int} */
-    public function resolveGlobal(?User $user, int $basePrice, ?int $costFloor): array
+    public function resolveGlobal(?User $user, GlobalTopupPackage|int $globalPackage, int $basePrice, ?int $costFloor): array
     {
         if (! $user instanceof User) {
             return $this->result($basePrice, $basePrice, 'standard', 'standard', 0, 0);
         }
 
-        if (! array_key_exists($user->id, $this->globalRules)) {
-            $this->primeGlobal($user);
+        $globalPackageId = $globalPackage instanceof GlobalTopupPackage ? $globalPackage->id : $globalPackage;
+
+        if (! array_key_exists($globalPackageId, $this->globalRules[$user->id] ?? [])) {
+            $this->primeGlobal($user, [$globalPackageId]);
         }
 
-        $rule = $this->globalRules[$user->id];
+        $rule = $this->globalRules[$user->id][$globalPackageId];
 
-        if (! $rule instanceof UserGlobalPrice) {
+        if (! $rule instanceof UserGlobalPackagePrice) {
             return $this->result($basePrice, $basePrice, 'standard', 'standard', 0, 0);
         }
 
@@ -85,13 +103,13 @@ class UserPackagePricingService
 
     /** @return array{price:int,discount_amount:int,pricing_mode:string,pricing_source:string,discount_basis_points:int,minimum_profit:int} */
     private function applyRule(
-        UserPackagePrice|UserGlobalPrice $rule,
+        UserPackagePrice|UserGlobalPackagePrice $rule,
         int $basePrice,
         ?int $costFloor,
         string $pricingSource,
     ): array {
         $discountBasisPoints = (int) ($rule->discount_basis_points ?? 0);
-        $pricingMode = $rule instanceof UserGlobalPrice ? UserPackagePrice::MODE_DISCOUNT : $rule->pricing_mode;
+        $pricingMode = $rule->pricing_mode;
         $candidatePrice = $pricingMode === UserPackagePrice::MODE_FIXED
             ? (int) ($rule->fixed_price ?? $basePrice)
             : $basePrice - intdiv($basePrice * $discountBasisPoints, 10000);

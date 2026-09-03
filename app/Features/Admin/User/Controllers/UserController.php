@@ -14,12 +14,12 @@ use App\Features\Admin\User\Requests\AdminUserIndexRequest;
 use App\Features\Admin\User\Requests\AdminUserRelatedListRequest;
 use App\Features\Admin\User\Requests\AdminUserStatusRequest;
 use App\Features\Admin\User\Requests\AdminWalletAdjustRequest;
-use App\Features\Admin\User\Requests\UpsertUserGlobalPriceRequest;
 use App\Features\Admin\User\Requests\UpsertUserPackagePriceRequest;
 use App\Features\Admin\User\Resources\AdminUserDetailResource;
 use App\Features\Admin\User\Resources\AdminUserResource;
 use App\Features\Admin\User\Services\UserPackagePriceAdminService;
 use App\Http\Controllers\Controller;
+use App\Models\GlobalTopupPackage;
 use App\Models\TopupPackage;
 use App\Models\User;
 use App\Utils\ApiResponse;
@@ -104,11 +104,12 @@ class UserController extends Controller
     }
 
     public function updateGlobalPrice(
-        UpsertUserGlobalPriceRequest $request,
+        UpsertUserPackagePriceRequest $request,
         User $user,
+        GlobalTopupPackage $globalTopupPackage,
         UserPackagePriceAdminService $service,
     ): JsonResponse {
-        $service->saveGlobal($user, $request->validated());
+        $service->saveGlobal($user, $globalTopupPackage, $request->validated());
 
         return response()->json(ApiResponse::success(
             'Đã cập nhật chiết khấu Global cho thành viên.',
@@ -118,9 +119,10 @@ class UserController extends Controller
 
     public function deleteGlobalPrice(
         User $user,
+        GlobalTopupPackage $globalTopupPackage,
         UserPackagePriceAdminService $service,
     ): JsonResponse {
-        $service->deleteGlobal($user);
+        $service->deleteGlobal($user, $globalTopupPackage);
 
         return response()->json(ApiResponse::success(
             'Đã xóa chiết khấu Global của thành viên.',

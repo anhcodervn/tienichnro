@@ -4,12 +4,13 @@ use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Models\ApiKey;
 use App\Models\Game;
 use App\Models\GlobalTopupPackage;
+use App\Models\GlobalTopupPackageGameSetting;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\TenantPackagePrice;
 use App\Models\TopupPackage;
 use App\Models\User;
-use App\Models\UserGlobalPrice;
+use App\Models\UserGlobalPackagePrice;
 use App\Models\UserPackagePrice;
 use App\Utils\Site;
 use Illuminate\Support\Facades\Hash;
@@ -119,18 +120,24 @@ test('child admin can manage pricing only for members of their website', functio
     ])->assertNotFound();
 });
 
-test('global member discount applies once to every game', function (): void {
+test('global package member discount applies to every game using that package', function (): void {
     $main = Tenant::query()->where('is_main', true)->firstOrFail();
     $user = User::factory()->create(['tenant_id' => $main->id]);
-    $games = Game::factory()->count(2)->create(['package_mode' => 'custom']);
-    $packages = $games->map(function (Game $game): TopupPackage {
+    $globalPackage = GlobalTopupPackage::factory()->create([
+        'denomination' => 100000,
+        'price' => 90000,
+        'provider_price' => 70000,
+    ]);
+    $games = Game::factory()->count(2)->create(['package_mode' => 'global']);
+    $packages = $games->map(function (Game $game) use ($globalPackage): TopupPackage {
+        GlobalTopupPackageGameSetting::factory()->for($game)->create(['denomination' => $globalPackage->denomination]);
+
         return TopupPackage::factory()->for($game)->create([
+            'global_topup_package_id' => $globalPackage->id,
             'denomination' => 100000,
-            'price' => 90000,
-            'provider_price' => 70000,
         ]);
     });
-    UserGlobalPrice::factory()->for($user)->create([
+    UserGlobalPackagePrice::factory()->for($user)->for($globalPackage, 'globalPackage')->create([
         'discount_basis_points' => 1000,
     ]);
 
@@ -146,13 +153,18 @@ test('global member discount applies once to every game', function (): void {
 test('game package member price overrides the global member discount', function (): void {
     $main = Tenant::query()->where('is_main', true)->firstOrFail();
     $user = User::factory()->create(['tenant_id' => $main->id]);
-    $game = Game::factory()->create(['package_mode' => 'custom']);
-    $package = TopupPackage::factory()->for($game)->create([
+    $game = Game::factory()->create(['package_mode' => 'global']);
+    $globalPackage = GlobalTopupPackage::factory()->create([
         'denomination' => 100000,
         'price' => 90000,
         'provider_price' => 70000,
     ]);
-    UserGlobalPrice::factory()->for($user)->create([
+    GlobalTopupPackageGameSetting::factory()->for($game)->create(['denomination' => $globalPackage->denomination]);
+    $package = TopupPackage::factory()->for($game)->create([
+        'global_topup_package_id' => $globalPackage->id,
+        'denomination' => 100000,
+    ]);
+    UserGlobalPackagePrice::factory()->for($user)->for($globalPackage, 'globalPackage')->create([
         'discount_basis_points' => 1000,
     ]);
     UserPackagePrice::factory()->for($user)->for($package, 'package')->create([
@@ -165,27 +177,52 @@ test('game package member price overrides the global member discount', function 
         ->and($price['user_pricing_source'])->toBe('package');
 });
 
-test('platform admin can configure one global discount for a member', function (): void {
+test('platform admin can configure each global package price for a member', function (): void {
     $main = Tenant::query()->where('is_main', true)->firstOrFail();
     $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
     $member = User::factory()->create(['tenant_id' => $main->id]);
-    GlobalTopupPackage::factory()->create([
+    $globalPackage = GlobalTopupPackage::factory()->create([
         'name' => 'Global 100K',
         'denomination' => 100000,
         'price' => 90000,
         'provider_price' => 70000,
         'status' => 'active',
     ]);
-    $this->actingAs($admin)->putJson("/api/admin-api/users/{$member->id}/global-price", [
+    $secondGlobalPackage = GlobalTopupPackage::factory()->create([
+        'name' => 'Global 200K',
+        'denomination' => 200000,
+        'price' => 180000,
+        'provider_price' => 140000,
+        'status' => 'active',
+    ]);
+    $this->actingAs($admin)->putJson("/api/admin-api/users/{$member->id}/global-prices/{$globalPackage->id}", [
+        'pricing_mode' => 'discount',
         'discount_percent' => 8.5,
+        'fixed_price' => null,
         'minimum_profit' => 1000,
         'is_active' => true,
     ])->assertOk()
-        ->assertJsonPath('data.global_price.discount_percent', 8.5)
-        ->assertJsonPath('data.global_price.minimum_profit', 1000)
         ->assertJsonPath('data.global_packages.0.name', 'Global 100K')
+        ->assertJsonPath('data.global_packages.0.discount_percent', 8.5)
+        ->assertJsonPath('data.global_packages.0.minimum_profit', 1000)
         ->assertJsonPath('data.global_packages.0.member_price', 82350)
-        ->assertJsonPath('data.global_packages.0.discount_amount', 7650);
+        ->assertJsonPath('data.global_packages.0.discount_amount', 7650)
+        ->assertJsonPath('data.global_packages.1.name', 'Global 200K')
+        ->assertJsonPath('data.global_packages.1.member_price', 180000)
+        ->assertJsonPath('data.global_packages.1.is_active', false);
 
-    expect(UserGlobalPrice::query()->where('user_id', $member->id)->value('discount_basis_points'))->toBe(850);
+    $this->actingAs($admin)->putJson("/api/admin-api/users/{$member->id}/global-prices/{$secondGlobalPackage->id}", [
+        'pricing_mode' => 'fixed',
+        'discount_percent' => null,
+        'fixed_price' => 150000,
+        'minimum_profit' => 1000,
+        'is_active' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.global_packages.0.member_price', 82350)
+        ->assertJsonPath('data.global_packages.1.member_price', 150000)
+        ->assertJsonPath('data.global_packages.1.pricing_mode', 'fixed');
+
+    expect(UserGlobalPackagePrice::query()->where('user_id', $member->id)->count())->toBe(2)
+        ->and(UserGlobalPackagePrice::query()->where('user_id', $member->id)->where('global_topup_package_id', $globalPackage->id)->value('discount_basis_points'))->toBe(850)
+        ->and(UserGlobalPackagePrice::query()->where('user_id', $member->id)->where('global_topup_package_id', $secondGlobalPackage->id)->value('fixed_price'))->toBe(150000);
 });

@@ -7,7 +7,7 @@ use App\Features\Topup\Services\UserPackagePricingService;
 use App\Models\GlobalTopupPackage;
 use App\Models\TopupPackage;
 use App\Models\User;
-use App\Models\UserGlobalPrice;
+use App\Models\UserGlobalPackagePrice;
 use App\Models\UserPackagePrice;
 use App\Utils\Site;
 
@@ -18,7 +18,7 @@ class UserPackagePriceAdminService
         private readonly UserPackagePricingService $userPackagePricingService,
     ) {}
 
-    /** @return array{prices:array<int, array<string, mixed>>,global_price:array<string, mixed>,global_packages:array<int, array<string, mixed>>} */
+    /** @return array{prices:array<int, array<string, mixed>>,global_packages:array<int, array<string, mixed>>} */
     public function catalog(User $user): array
     {
         $packages = TopupPackage::query()
@@ -60,16 +60,26 @@ class UserPackagePriceAdminService
             ->values()
             ->all();
 
-        $globalRule = UserGlobalPrice::query()->where('user_id', $user->id)->first();
         $globalPackages = GlobalTopupPackage::query()
             ->where('status', 'active')
             ->orderBy('sort_order')
             ->orderBy('denomination')
+            ->get();
+        $this->userPackagePricingService->primeGlobal(
+            $user,
+            $globalPackages->pluck('id')->map(fn (mixed $id): int => (int) $id)->all(),
+        );
+        $globalRules = UserGlobalPackagePrice::query()
+            ->where('user_id', $user->id)
             ->get()
-            ->map(function (GlobalTopupPackage $globalPackage) use ($user): array {
+            ->keyBy('global_topup_package_id');
+        $globalPrices = $globalPackages
+            ->map(function (GlobalTopupPackage $globalPackage) use ($globalRules, $user): array {
+                $rule = $globalRules->get($globalPackage->id);
                 $basePrice = (int) $globalPackage->price;
                 $price = $this->userPackagePricingService->resolveGlobal(
                     $user,
+                    $globalPackage,
                     $basePrice,
                     (int) $globalPackage->provider_price,
                 );
@@ -81,6 +91,11 @@ class UserPackagePriceAdminService
                     'base_price' => $basePrice,
                     'member_price' => $price['price'],
                     'discount_amount' => $price['discount_amount'],
+                    'pricing_mode' => $rule?->pricing_mode ?? UserGlobalPackagePrice::MODE_DISCOUNT,
+                    'discount_percent' => $rule?->discount_basis_points === null ? 0 : $rule->discount_basis_points / 100,
+                    'fixed_price' => $rule?->fixed_price,
+                    'minimum_profit' => (int) ($rule?->minimum_profit ?? 0),
+                    'is_active' => (bool) ($rule?->is_active ?? false),
                 ];
             })
             ->values()
@@ -88,12 +103,7 @@ class UserPackagePriceAdminService
 
         return [
             'prices' => $prices,
-            'global_price' => [
-                'discount_percent' => $globalRule?->discount_basis_points === null ? 0 : $globalRule->discount_basis_points / 100,
-                'minimum_profit' => (int) ($globalRule?->minimum_profit ?? 0),
-                'is_active' => (bool) ($globalRule?->is_active ?? false),
-            ],
-            'global_packages' => $globalPackages,
+            'global_packages' => $globalPrices,
         ];
     }
 
@@ -107,15 +117,11 @@ class UserPackagePriceAdminService
     }
 
     /** @param array<string, mixed> $payload */
-    public function saveGlobal(User $user, array $payload): UserGlobalPrice
+    public function saveGlobal(User $user, GlobalTopupPackage $globalPackage, array $payload): UserGlobalPackagePrice
     {
-        return UserGlobalPrice::query()->updateOrCreate(
-            ['user_id' => $user->id],
-            [
-                'discount_basis_points' => (int) round((float) $payload['discount_percent'] * 100),
-                'minimum_profit' => (int) $payload['minimum_profit'],
-                'is_active' => (bool) $payload['is_active'],
-            ],
+        return UserGlobalPackagePrice::query()->updateOrCreate(
+            ['user_id' => $user->id, 'global_topup_package_id' => $globalPackage->id],
+            $this->priceAttributes($payload),
         );
     }
 
@@ -127,10 +133,11 @@ class UserPackagePriceAdminService
             ->delete();
     }
 
-    public function deleteGlobal(User $user): void
+    public function deleteGlobal(User $user, GlobalTopupPackage $globalPackage): void
     {
-        UserGlobalPrice::query()
+        UserGlobalPackagePrice::query()
             ->where('user_id', $user->id)
+            ->where('global_topup_package_id', $globalPackage->id)
             ->delete();
     }
 

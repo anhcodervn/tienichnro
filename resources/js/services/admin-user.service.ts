@@ -111,12 +111,6 @@ export type AdminUserPackagePrice = {
     pricing_source: 'standard' | 'global' | 'package';
 };
 
-export type AdminUserGlobalPrice = {
-    discount_percent: number;
-    minimum_profit: number;
-    is_active: boolean;
-};
-
 export type AdminUserGlobalPackagePreview = {
     id: number;
     name: string;
@@ -124,11 +118,15 @@ export type AdminUserGlobalPackagePreview = {
     base_price: number;
     member_price: number;
     discount_amount: number;
+    pricing_mode: 'discount' | 'fixed';
+    discount_percent: number;
+    fixed_price: number | null;
+    minimum_profit: number;
+    is_active: boolean;
 };
 
 export type AdminUserPricingResponse = {
     prices: AdminUserPackagePrice[];
-    global_price: AdminUserGlobalPrice;
     global_packages: AdminUserGlobalPackagePreview[];
 };
 
@@ -178,14 +176,14 @@ export const adminUserService = {
         return response.data.data as AdminUserPricingResponse;
     },
 
-    async updateGlobalPrice(userId: number | string, payload: Record<string, unknown>): Promise<AdminUserPricingResponse> {
-        const response = await api.put(`/api/admin-api/users/${userId}/global-price`, payload);
+    async updateGlobalPrice(userId: number | string, globalPackageId: number, payload: Record<string, unknown>): Promise<AdminUserPricingResponse> {
+        const response = await api.put(`/api/admin-api/users/${userId}/global-prices/${globalPackageId}`, payload);
 
         return response.data.data as AdminUserPricingResponse;
     },
 
-    async deleteGlobalPrice(userId: number | string): Promise<AdminUserPricingResponse> {
-        const response = await api.delete(`/api/admin-api/users/${userId}/global-price`);
+    async deleteGlobalPrice(userId: number | string, globalPackageId: number): Promise<AdminUserPricingResponse> {
+        const response = await api.delete(`/api/admin-api/users/${userId}/global-prices/${globalPackageId}`);
 
         return response.data.data as AdminUserPricingResponse;
     },

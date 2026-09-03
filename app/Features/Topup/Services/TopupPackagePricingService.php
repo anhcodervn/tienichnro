@@ -37,16 +37,17 @@ class TopupPackagePricingService
         }
 
         $packageIds = $packages->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
+        $globalPackageIds = $packages->pluck('global_topup_package_id')->filter()->map(fn (mixed $id): int => (int) $id)->unique()->values()->all();
         $billingUser = $tenant !== null && ! $tenant->is_main ? $tenant->billingUser()->first() : null;
 
         if ($billingUser instanceof User) {
             $this->userPackagePricingService->prime($billingUser, $packageIds);
-            $this->userPackagePricingService->primeGlobal($billingUser);
+            $this->userPackagePricingService->primeGlobal($billingUser, $globalPackageIds);
         }
 
         if ($user instanceof User) {
             $this->userPackagePricingService->prime($user, $packageIds);
-            $this->userPackagePricingService->primeGlobal($user);
+            $this->userPackagePricingService->primeGlobal($user, $globalPackageIds);
         }
 
         foreach ($packages as $package) {

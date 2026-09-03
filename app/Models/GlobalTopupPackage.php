@@ -56,6 +56,11 @@ class GlobalTopupPackage extends Model
         return $this->hasMany(GlobalTopupPackageGameSetting::class, 'denomination', 'denomination');
     }
 
+    public function userPrices(): HasMany
+    {
+        return $this->hasMany(UserGlobalPackagePrice::class);
+    }
+
     public function levelPrices(): HasMany
     {
         return $this->hasMany(MemberLevelGlobalPackagePrice::class);
