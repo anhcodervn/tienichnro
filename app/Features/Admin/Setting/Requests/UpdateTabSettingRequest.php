@@ -38,6 +38,23 @@ class UpdateTabSettingRequest extends FormRequest
                 'home_notice_content' => ['present', 'array', new ValidHomepageNoticeContent],
                 'home_notice_is_published' => ['required', 'boolean'],
             ],
+            'popup-notice' => [
+                'home_popup_title' => ['required', 'string', 'max:255'],
+                'home_popup_content' => [
+                    'present',
+                    'array',
+                    new ValidHomepageNoticeContent,
+                    function (string $attribute, mixed $value, Closure $fail): void {
+                        if ($this->boolean('home_popup_is_published') && is_array($value) && $value === []) {
+                            $fail('Vui lòng nhập nội dung trước khi bật thông báo popup.');
+                        }
+                    },
+                ],
+                'home_popup_is_published' => ['required', 'boolean'],
+                'home_popup_display_mode' => ['required', Rule::in(['modal', 'popup'])],
+                'home_popup_allow_dismiss' => ['required', 'boolean'],
+                'home_popup_dismiss_hours' => ['required', 'integer', 'between:1,8760'],
+            ],
             'service-articles' => [
                 'game_service_enabled' => ['required', 'boolean'],
                 'game_service_items' => [

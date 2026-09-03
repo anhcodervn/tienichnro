@@ -7,11 +7,115 @@ use App\Support\SettingStore;
 test('only admins can manage homepage notice settings', function (): void {
     $this->getJson('/api/admin-api/settings/homepage')->assertUnauthorized();
     $this->patchJson('/api/admin-api/settings/homepage', [])->assertUnauthorized();
+    $this->getJson('/api/admin-api/settings/popup-notice')->assertUnauthorized();
+    $this->patchJson('/api/admin-api/settings/popup-notice', [])->assertUnauthorized();
 
     $user = User::factory()->create();
 
     $this->actingAs($user)->getJson('/api/admin-api/settings/homepage')->assertForbidden();
     $this->actingAs($user)->patchJson('/api/admin-api/settings/homepage', [])->assertForbidden();
+    $this->actingAs($user)->getJson('/api/admin-api/settings/popup-notice')->assertForbidden();
+    $this->actingAs($user)->patchJson('/api/admin-api/settings/popup-notice', [])->assertForbidden();
+});
+
+test('admin can configure the homepage popup notice', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $settings = $this->actingAs($admin)
+        ->getJson('/api/admin-api/settings/popup-notice')
+        ->assertOk()
+        ->assertJsonPath('data.settings.home_popup_is_published', false)
+        ->assertJsonPath('data.settings.home_popup_display_mode', 'modal')
+        ->assertJsonPath('data.settings.home_popup_allow_dismiss', false)
+        ->json('data.settings');
+
+    $content = [[
+        'type' => 'paragraph',
+        'children' => [[
+            'text' => 'Mở trang hỗ trợ',
+            'bold' => true,
+            'color' => '#dc2626',
+            'href' => '/chat',
+        ]],
+    ]];
+
+    $this->actingAs($admin)
+        ->patchJson('/api/admin-api/settings/popup-notice', [
+            ...$settings,
+            'home_popup_title' => 'Bảo trì dịch vụ',
+            'home_popup_content' => $content,
+            'home_popup_is_published' => true,
+            'home_popup_display_mode' => 'popup',
+            'home_popup_allow_dismiss' => true,
+            'home_popup_dismiss_hours' => 12,
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.settings.home_popup_title', 'Bảo trì dịch vụ')
+        ->assertJsonPath('data.settings.home_popup_content.0.children.0.href', '/chat')
+        ->assertJsonPath('data.settings.home_popup_display_mode', 'popup')
+        ->assertJsonPath('data.settings.home_popup_dismiss_hours', '12');
+
+    expect(Setting::query()->where('key', 'home_popup_content')->firstOrFail()->type)->toBe('json')
+        ->and(Setting::query()->where('key', 'home_popup_is_published')->firstOrFail()->type)->toBe('boolean');
+});
+
+test('homepage popup renders safely for guests and authenticated users', function (): void {
+    app(SettingStore::class)->putMany([
+        'home_popup_title' => 'Ưu đãi thành viên',
+        'home_popup_content' => [[
+            'type' => 'paragraph',
+            'children' => [[
+                'text' => 'Xem chi tiết',
+                'bold' => true,
+                'color' => '#dc2626',
+                'href' => 'https://napcarot.com/uu-dai',
+                'target' => '_blank',
+            ]],
+        ]],
+        'home_popup_is_published' => true,
+        'home_popup_display_mode' => 'modal',
+        'home_popup_allow_dismiss' => true,
+        'home_popup_dismiss_hours' => 48,
+    ]);
+
+    $assertPopup = function ($response): void {
+        $response
+            ->assertOk()
+            ->assertSee('data-home-popup', false)
+            ->assertSee('data-dismiss-enabled="true"', false)
+            ->assertSee('data-dismiss-hours="48"', false)
+            ->assertSee('data-display-mode="modal"', false)
+            ->assertSee('Ưu đãi thành viên')
+            ->assertSeeText('Đã hiểu')
+            ->assertSeeText('Đóng trong 48 giờ')
+            ->assertDontSeeText('Đã hiểu và đóng trong 48 giờ')
+            ->assertSee(
+                '<a href="https://napcarot.com/uu-dai" target="_blank" rel="noopener noreferrer"><span style="color:#dc2626"><strong>Xem chi tiết</strong></span></a>',
+                false,
+            );
+    };
+
+    $assertPopup($this->get(route('home')));
+    $assertPopup($this->actingAs(User::factory()->create())->get(route('home')));
+});
+
+test('homepage popup validates display and dismissal settings', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $this->actingAs($admin)
+        ->patchJson('/api/admin-api/settings/popup-notice', [
+            'home_popup_title' => 'Thông báo',
+            'home_popup_content' => [],
+            'home_popup_is_published' => true,
+            'home_popup_display_mode' => 'banner',
+            'home_popup_allow_dismiss' => true,
+            'home_popup_dismiss_hours' => 0,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonStructure([
+            'data' => [
+                'errors' => ['home_popup_display_mode', 'home_popup_dismiss_hours'],
+            ],
+        ]);
 });
 
 test('homepage does not invent an announcement when admin content is empty', function (): void {

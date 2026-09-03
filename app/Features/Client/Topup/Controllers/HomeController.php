@@ -70,6 +70,12 @@ class HomeController extends Controller
             'home_notice_title' => 'Thông báo quan trọng',
             'home_notice_content' => [],
             'home_notice_is_published' => true,
+            'home_popup_title' => 'Thông báo',
+            'home_popup_content' => [],
+            'home_popup_is_published' => false,
+            'home_popup_display_mode' => 'modal',
+            'home_popup_allow_dismiss' => false,
+            'home_popup_dismiss_hours' => 24,
         ]);
         $homeNoticeContent = is_array($systemSettings['home_notice_content'])
             ? $systemSettings['home_notice_content']
@@ -82,8 +88,40 @@ class HomeController extends Controller
             'homeNoticeTitle' => (string) $systemSettings['home_notice_title'],
             'homeNoticeHtml' => $contentRenderer->renderNodes($homeNoticeContent),
             'homeNoticeIsPublished' => (bool) $systemSettings['home_notice_is_published'],
+            ...$this->homePopupData($systemSettings, $contentRenderer),
             'turnstileEnabled' => $turnstileService->isEnabled(),
             'turnstileSiteKey' => $turnstileService->siteKey(),
         ]);
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return array<string, mixed>
+     */
+    private function homePopupData(array $settings, EditorContentRenderer $contentRenderer): array
+    {
+        $content = is_array($settings['home_popup_content']) ? $settings['home_popup_content'] : [];
+        $title = (string) $settings['home_popup_title'];
+        $displayMode = in_array($settings['home_popup_display_mode'], ['modal', 'popup'], true)
+            ? (string) $settings['home_popup_display_mode']
+            : 'modal';
+        $dismissHours = max(1, min(8760, (int) $settings['home_popup_dismiss_hours']));
+        $fingerprint = hash('sha256', (string) json_encode([
+            'title' => $title,
+            'content' => $content,
+            'display_mode' => $displayMode,
+            'allow_dismiss' => (bool) $settings['home_popup_allow_dismiss'],
+            'dismiss_hours' => $dismissHours,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        return [
+            'homePopupTitle' => $title,
+            'homePopupHtml' => $contentRenderer->renderNodes($content),
+            'homePopupIsPublished' => (bool) $settings['home_popup_is_published'],
+            'homePopupDisplayMode' => $displayMode,
+            'homePopupAllowDismiss' => (bool) $settings['home_popup_allow_dismiss'],
+            'homePopupDismissHours' => $dismissHours,
+            'homePopupKey' => substr($fingerprint, 0, 24),
+        ];
     }
 }

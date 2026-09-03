@@ -35,6 +35,14 @@ class SettingController extends Controller
                 'home_notice_content' => [],
                 'home_notice_is_published' => true,
             ],
+            'popup-notice' => [
+                'home_popup_title' => 'Thông báo',
+                'home_popup_content' => [],
+                'home_popup_is_published' => false,
+                'home_popup_display_mode' => 'modal',
+                'home_popup_allow_dismiss' => false,
+                'home_popup_dismiss_hours' => 24,
+            ],
             'service-articles' => [
                 'game_service_enabled' => false,
                 'game_service_items' => [],
@@ -196,6 +204,14 @@ class SettingController extends Controller
                 'home_notice_title' => 'home_notice_title',
                 'home_notice_content' => 'home_notice_content',
                 'home_notice_is_published' => 'home_notice_is_published',
+            ],
+            'popup-notice' => [
+                'home_popup_title' => 'home_popup_title',
+                'home_popup_content' => 'home_popup_content',
+                'home_popup_is_published' => 'home_popup_is_published',
+                'home_popup_display_mode' => 'home_popup_display_mode',
+                'home_popup_allow_dismiss' => 'home_popup_allow_dismiss',
+                'home_popup_dismiss_hours' => 'home_popup_dismiss_hours',
             ],
             'service-articles' => [
                 'game_service_enabled' => 'game_service_enabled',
@@ -484,7 +500,7 @@ class SettingController extends Controller
         }
 
         abort_unless(in_array($tab, [
-            'system', 'general', 'homepage', 'service-articles', 'bio', 'branding',
+            'system', 'general', 'homepage', 'popup-notice', 'service-articles', 'bio', 'branding',
             'contact', 'seo', 'options', 'content-pages', 'slider-images',
         ], true), 403, 'Website đại lý không được thay đổi cấu hình hệ thống này.');
     }

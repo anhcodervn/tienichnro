@@ -280,6 +280,91 @@ const animateAndRelease = (element, keyframes, options = {}) => {
     return animation;
 };
 
+const initializeHomePopup = () => {
+    const popup = document.querySelector('[data-home-popup]');
+    const panel = popup?.querySelector('[data-home-popup-panel]');
+
+    if (!popup || !panel) return;
+
+    const allowDismiss = popup.dataset.dismissEnabled === 'true';
+    const dismissHours = Math.max(1, Number(popup.dataset.dismissHours) || 1);
+    const popupKey = String(popup.dataset.popupKey || '').replace(/[^a-z0-9-]/gi, '');
+    const storageKey = popupKey ? `napcarot.home-popup.${popupKey}` : '';
+
+    if (allowDismiss && storageKey) {
+        try {
+            const dismissedUntil = Number(window.localStorage.getItem(storageKey) || 0);
+
+            if (dismissedUntil > Date.now()) return;
+            window.localStorage.removeItem(storageKey);
+        } catch {
+            // The popup remains usable when storage is blocked by the browser.
+        }
+    }
+
+    const isModal = popup.dataset.displayMode === 'modal';
+    const closeButtons = popup.querySelectorAll('[data-home-popup-close]');
+    const dismissButtons = popup.querySelectorAll('[data-home-popup-dismiss]');
+    let isClosing = false;
+
+    const finishClosing = () => {
+        popup.hidden = true;
+        popup.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('client-home-popup-open');
+    };
+
+    const closePopup = (rememberDismissal = false) => {
+        if (isClosing) return;
+        isClosing = true;
+
+        if (rememberDismissal && allowDismiss && storageKey) {
+            try {
+                window.localStorage.setItem(storageKey, String(Date.now() + dismissHours * 60 * 60 * 1000));
+            } catch {
+                // Closing must still work when storage is blocked by the browser.
+            }
+        }
+
+        const animation = playAnimation(
+            panel,
+            [
+                { opacity: 1, transform: 'translateY(0) scale(1)' },
+                { opacity: 0, transform: `translateY(${isModal ? '8px' : '16px'}) scale(0.98)` },
+            ],
+            { duration: 160 },
+        );
+
+        if (animation) {
+            void animation.finished.then(finishClosing).catch(finishClosing);
+            return;
+        }
+
+        finishClosing();
+    };
+
+    popup.hidden = false;
+    popup.setAttribute('aria-hidden', 'false');
+    if (isModal) document.body.classList.add('client-home-popup-open');
+
+    animateAndRelease(
+        panel,
+        [
+            { opacity: 0, transform: `translateY(${isModal ? '10px' : '18px'}) scale(0.98)` },
+            { opacity: 1, transform: 'translateY(0) scale(1)' },
+        ],
+        { duration: 240 },
+    );
+
+    closeButtons.forEach((button) => button.addEventListener('click', () => closePopup()));
+    dismissButtons.forEach((button) => button.addEventListener('click', () => closePopup(true)));
+    document.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape' && !popup.hidden) closePopup();
+    });
+    panel.focus({ preventScroll: true });
+};
+
+initializeHomePopup();
+
 const copyText = async (value) => {
     if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(value);

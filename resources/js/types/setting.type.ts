@@ -45,6 +45,15 @@ export interface HomepageNoticeSettingType {
     home_notice_is_published: boolean;
 }
 
+export interface PopupNoticeSettingType {
+    home_popup_title: string;
+    home_popup_content: unknown[];
+    home_popup_is_published: boolean;
+    home_popup_display_mode: 'modal' | 'popup';
+    home_popup_allow_dismiss: boolean;
+    home_popup_dismiss_hours: number;
+}
+
 export interface GameServiceMenuItem {
     label: string;
     url: string;

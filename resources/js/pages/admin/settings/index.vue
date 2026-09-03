@@ -13,6 +13,7 @@ import type {
     GeneralSettingType,
     HomepageNoticeSettingType,
     MonitoringSettingType,
+    PopupNoticeSettingType,
     SeoSettingType,
     ServiceArticlesSettingType,
 } from '@/types/setting.type';
@@ -20,7 +21,17 @@ import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { Gamepad2, Plus, Trash2 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 
-type TabKey = 'general' | 'homepage' | 'service-articles' | 'branding' | 'contact' | 'seo' | 'custom-code' | 'monitoring' | 'security';
+type TabKey =
+    | 'general'
+    | 'homepage'
+    | 'popup-notice'
+    | 'service-articles'
+    | 'branding'
+    | 'contact'
+    | 'seo'
+    | 'custom-code'
+    | 'monitoring'
+    | 'security';
 
 const tabs: Array<{ key: TabKey; label: string; description: string }> = [
     {
@@ -32,6 +43,11 @@ const tabs: Array<{ key: TabKey; label: string; description: string }> = [
         key: 'homepage',
         label: 'Thông báo trang chủ',
         description: 'Soạn nội dung hiển thị phía trên form nạp game trên trang chủ.',
+    },
+    {
+        key: 'popup-notice',
+        label: 'Thông báo popup',
+        description: 'Soạn popup tự động hiển thị khi khách hoặc thành viên mở trang chủ.',
     },
     {
         key: 'service-articles',
@@ -76,6 +92,7 @@ const loading = ref(true);
 const saving = ref<Record<TabKey, boolean>>({
     general: false,
     homepage: false,
+    'popup-notice': false,
     'service-articles': false,
     branding: false,
     contact: false,
@@ -97,6 +114,15 @@ const homepageForm = ref<HomepageNoticeSettingType>({
     home_notice_title: 'Thông báo quan trọng',
     home_notice_content: [],
     home_notice_is_published: true,
+});
+
+const popupNoticeForm = ref<PopupNoticeSettingType>({
+    home_popup_title: 'Thông báo',
+    home_popup_content: [],
+    home_popup_is_published: false,
+    home_popup_display_mode: 'modal',
+    home_popup_allow_dismiss: false,
+    home_popup_dismiss_hours: 24,
 });
 
 const serviceArticlesForm = ref<ServiceArticlesSettingType>({
@@ -152,9 +178,10 @@ const loadData = async (): Promise<void> => {
     try {
         loading.value = true;
 
-        const [general, homepage, serviceArticles, branding, contact, seo, monitoring] = await Promise.all([
+        const [general, homepage, popupNotice, serviceArticles, branding, contact, seo, monitoring] = await Promise.all([
             adminSettingService.getGeneral(),
             adminSettingService.getHomepage(),
+            adminSettingService.getPopupNotice(),
             adminSettingService.getServiceArticles(),
             adminSettingService.getBranding(),
             adminSettingService.getContact(),
@@ -167,6 +194,12 @@ const loadData = async (): Promise<void> => {
             ...homepageForm.value,
             ...homepage.settings,
             home_notice_content: Array.isArray(homepage.settings.home_notice_content) ? homepage.settings.home_notice_content : [],
+        };
+        popupNoticeForm.value = {
+            ...popupNoticeForm.value,
+            ...popupNotice.settings,
+            home_popup_content: Array.isArray(popupNotice.settings.home_popup_content) ? popupNotice.settings.home_popup_content : [],
+            home_popup_dismiss_hours: Number(popupNotice.settings.home_popup_dismiss_hours) || 24,
         };
         serviceArticlesForm.value = {
             ...serviceArticlesForm.value,
@@ -227,6 +260,19 @@ const saveHomepage = async (): Promise<void> => {
             home_notice_content: Array.isArray(response.settings.home_notice_content) ? response.settings.home_notice_content : [],
         };
         handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật thông báo trang chủ.' } });
+    });
+};
+
+const savePopupNotice = async (): Promise<void> => {
+    await withSaving('popup-notice', async () => {
+        const response = await adminSettingService.updatePopupNotice(popupNoticeForm.value);
+        popupNoticeForm.value = {
+            ...popupNoticeForm.value,
+            ...response.settings,
+            home_popup_content: Array.isArray(response.settings.home_popup_content) ? response.settings.home_popup_content : [],
+            home_popup_dismiss_hours: Number(response.settings.home_popup_dismiss_hours) || 24,
+        };
+        handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật thông báo popup.' } });
     });
 };
 
@@ -511,6 +557,113 @@ onMounted(async () => {
                                 :class="homepageForm.home_notice_is_published ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'"
                             >
                                 {{ homepageForm.home_notice_is_published ? 'Đang hiển thị' : 'Đang ẩn' }}
+                            </span>
+                        </div>
+                    </aside>
+                </div>
+
+                <div v-show="activeTab === 'popup-notice'" class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
+                    <article class="rounded-[10px] border border-slate-200 bg-white p-4">
+                        <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-start sm:justify-between">
+                            <div>
+                                <h3 class="text-sm font-semibold text-slate-900">Thông báo popup trang chủ</h3>
+                                <p class="text-sm text-slate-500">Hiển thị cho cả khách chưa đăng nhập và thành viên đã đăng nhập.</p>
+                            </div>
+
+                            <button
+                                type="button"
+                                class="rounded-[10px] bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-60"
+                                :disabled="saving['popup-notice']"
+                                @click="savePopupNotice"
+                            >
+                                {{ saving['popup-notice'] ? 'Đang lưu...' : 'Lưu popup' }}
+                            </button>
+                        </div>
+
+                        <div class="grid gap-4 pt-4">
+                            <label class="space-y-1">
+                                <span class="text-xs font-semibold text-slate-600">Tiêu đề popup</span>
+                                <input
+                                    v-model="popupNoticeForm.home_popup_title"
+                                    type="text"
+                                    maxlength="255"
+                                    class="w-full rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100"
+                                    placeholder="Thông báo"
+                                />
+                            </label>
+
+                            <div class="space-y-1">
+                                <span class="text-xs font-semibold text-slate-600">Nội dung popup</span>
+                                <div class="overflow-hidden rounded-[10px] border border-slate-300 bg-white p-2">
+                                    <Editor v-model="popupNoticeForm.home_popup_content" :allow-images="false" :debounce="0" :height="360" />
+                                </div>
+                            </div>
+
+                            <fieldset class="grid gap-2 rounded-[10px] border border-slate-300 bg-slate-50 p-3">
+                                <legend class="px-1 text-xs font-semibold text-slate-700">Kiểu hiển thị</legend>
+                                <label class="flex cursor-pointer items-start gap-3 rounded-[8px] border border-slate-200 bg-white p-3">
+                                    <input v-model="popupNoticeForm.home_popup_display_mode" type="radio" value="modal" class="mt-0.5 h-4 w-4 border-slate-300" />
+                                    <span>
+                                        <span class="block text-sm font-semibold text-slate-900">Modal giữa màn hình</span>
+                                        <span class="mt-0.5 block text-xs text-slate-500">Có lớp nền tối, phù hợp với thông báo quan trọng.</span>
+                                    </span>
+                                </label>
+                                <label class="flex cursor-pointer items-start gap-3 rounded-[8px] border border-slate-200 bg-white p-3">
+                                    <input v-model="popupNoticeForm.home_popup_display_mode" type="radio" value="popup" class="mt-0.5 h-4 w-4 border-slate-300" />
+                                    <span>
+                                        <span class="block text-sm font-semibold text-slate-900">Popup góc màn hình</span>
+                                        <span class="mt-0.5 block text-xs text-slate-500">Gọn hơn và không che toàn bộ nội dung trang.</span>
+                                    </span>
+                                </label>
+                            </fieldset>
+
+                            <label class="flex items-center justify-between gap-3 rounded-[10px] border border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                                <span>
+                                    <span class="block font-semibold text-slate-900">Bật thông báo popup</span>
+                                    <span class="mt-1 block text-xs text-slate-500">Tắt để ngừng hiển thị nhưng vẫn giữ nội dung đã soạn.</span>
+                                </span>
+                                <input v-model="popupNoticeForm.home_popup_is_published" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+                            </label>
+
+                            <label class="flex items-center justify-between gap-3 rounded-[10px] border border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                                <span>
+                                    <span class="block font-semibold text-slate-900">Cho phép ghi nhớ khi đóng</span>
+                                    <span class="mt-1 block text-xs text-slate-500">Nếu tắt, popup sẽ hiện lại mỗi lần tải trang chủ.</span>
+                                </span>
+                                <input v-model="popupNoticeForm.home_popup_allow_dismiss" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+                            </label>
+
+                            <label class="space-y-1" :class="{ 'opacity-50': !popupNoticeForm.home_popup_allow_dismiss }">
+                                <span class="text-xs font-semibold text-slate-600">Thời gian không hiển thị lại</span>
+                                <div class="flex items-center gap-2">
+                                    <input
+                                        v-model.number="popupNoticeForm.home_popup_dismiss_hours"
+                                        type="number"
+                                        min="1"
+                                        max="8760"
+                                        class="w-full rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                                        :disabled="!popupNoticeForm.home_popup_allow_dismiss"
+                                    />
+                                    <span class="shrink-0 text-sm font-semibold text-slate-600">giờ</span>
+                                </div>
+                            </label>
+                        </div>
+                    </article>
+
+                    <aside class="rounded-[10px] border border-slate-200 bg-slate-50 p-4">
+                        <p class="text-xs uppercase tracking-[0.18em] text-slate-400">Cách hoạt động</p>
+                        <div class="mt-3 grid gap-3 rounded-[10px] border border-slate-200 bg-white p-4 text-sm leading-6 text-slate-600">
+                            <p class="font-semibold text-slate-900">{{ popupNoticeForm.home_popup_title || 'Thông báo' }}</p>
+                            <p>Popup chỉ xuất hiện tại trang chủ và áp dụng giống nhau cho khách lẫn thành viên.</p>
+                            <p v-if="popupNoticeForm.home_popup_allow_dismiss">
+                                Sau khi đóng, trình duyệt sẽ ẩn thông báo trong <strong>{{ popupNoticeForm.home_popup_dismiss_hours || 1 }} giờ</strong>.
+                            </p>
+                            <p v-else>Sau khi đóng, thông báo sẽ xuất hiện lại ở lần tải trang chủ tiếp theo.</p>
+                            <span
+                                class="inline-flex w-fit rounded-[5px] px-2 py-1 text-xs font-semibold"
+                                :class="popupNoticeForm.home_popup_is_published ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-500'"
+                            >
+                                {{ popupNoticeForm.home_popup_is_published ? 'Đang bật' : 'Đang tắt' }}
                             </span>
                         </div>
                     </aside>

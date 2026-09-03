@@ -11,6 +11,17 @@
         : (string) $games->first()?->id;
 @endphp
 
+@if ($homePopupIsPublished && $homePopupHtml->isNotEmpty())
+    <x-client.home-popup
+        :title="$homePopupTitle"
+        :content="$homePopupHtml"
+        :display-mode="$homePopupDisplayMode"
+        :allow-dismiss="$homePopupAllowDismiss"
+        :dismiss-hours="$homePopupDismissHours"
+        :popup-key="$homePopupKey"
+    />
+@endif
+
 <section class="client-container py-5 sm:py-7">
 
     @if ($homeNoticeIsPublished && $homeNoticeHtml->isNotEmpty())

@@ -219,6 +219,19 @@
         color: inherit;
     }
 
+    body.client-home-popup-open {
+        @apply overflow-hidden;
+    }
+
+    .home-popup-content span[style*='color'] * {
+        color: inherit;
+    }
+
+    .home-popup-content a {
+        @apply relative z-10 cursor-pointer break-words;
+        pointer-events: auto;
+    }
+
     .home-notice-content ul {
         @apply list-disc space-y-1 pl-5;
     }

@@ -10,6 +10,7 @@ import type {
     HomepageNoticeSettingType,
     MonitoringSettingType,
     OptionSettingType,
+    PopupNoticeSettingType,
     SecuritySettingType,
     SeoSettingType,
     ServiceArticlesSettingType,
@@ -46,6 +47,12 @@ export const adminSettingService = {
     },
     updateHomepage(payload: HomepageNoticeSettingType) {
         return updateTab<HomepageNoticeSettingType>('homepage', payload);
+    },
+    getPopupNotice() {
+        return getTab<PopupNoticeSettingType>('popup-notice');
+    },
+    updatePopupNotice(payload: PopupNoticeSettingType) {
+        return updateTab<PopupNoticeSettingType>('popup-notice', payload);
     },
     getServiceArticles() {
         return getTab<ServiceArticlesSettingType>('service-articles');
