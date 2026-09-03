@@ -602,7 +602,11 @@ export default {
                 setup(editor: typeof editorInstance) {
                     editorInstance = editor;
 
-                    editor.on('input change keyup undo redo', () => {
+                    editor.on('input change keyup undo redo ExecCommand NodeChange', () => {
+                        emitCurrentEditorContent();
+                    });
+
+                    editor.on('blur', () => {
                         emitCurrentEditorContent();
                     });
                 },

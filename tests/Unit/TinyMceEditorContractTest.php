@@ -47,7 +47,8 @@ test('tinymce captures all text input and preserves whitespace and html characte
     $source = file_get_contents($editorPath);
 
     expect($source)
-        ->toContain("editor.on('input change keyup undo redo'")
+        ->toContain("editor.on('input change keyup undo redo ExecCommand NodeChange'")
+        ->toContain("editor.on('blur'")
         ->toContain('if (!node.textContent)')
         ->toContain("escapeHtml(item.text ?? '').replace(/\\n/g, '<br>')")
         ->toContain("value.replace(/[&<>\"']/g")
@@ -108,6 +109,8 @@ test('client blade pages apply article typography to rendered editor content', f
         ->toContain('.article-content h1')
         ->toContain('.article-content img')
         ->toContain('.article-content table')
+        ->toContain(".home-notice-content span[style*='color'] *")
+        ->toContain('color: inherit;')
         ->and($seoPage)->toContain('article-content client-card')
         ->and($contentPage)->toContain('class="article-content mt-8')
         ->and($homePage)->toContain('article-content article-content--notice home-notice-content');

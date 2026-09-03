@@ -127,6 +127,7 @@
                                 <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.index') }}"><i class="bx bx-user-circle text-lg" aria-hidden="true"></i>Tổng quan tài khoản</a>
                                 <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('wallet.deposit.index') }}"><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i>Nạp tiền</a>
                                 <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.orders.index') }}"><i class="bx bx-receipt text-lg" aria-hidden="true"></i>Lịch sử đơn hàng</a>
+                                <a data-account-support-link @class(['flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.support.chat'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.support.chat')]) href="{{ route('client.support.chat') }}"><i class="bx bx-message-circle-dots text-lg" aria-hidden="true"></i>Liên hệ hỗ trợ</a>
                                 @if ($showAgencyWebsite)
                                     <a @class(['flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.agency.website'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.agency.website')]) href="{{ route('client.agency.website') }}"><i class="bx bx-store-alt text-lg" aria-hidden="true"></i>Tạo website đại lý</a>
                                 @endif
@@ -232,6 +233,7 @@
                         </div>
                     </div>
                     <div class="grid gap-2">
+                        <a data-account-support-link class="client-button-secondary w-full justify-start bg-white" href="{{ route('client.support.chat') }}"><i class="bx bx-message-circle-dots text-lg" aria-hidden="true"></i>Liên hệ hỗ trợ</a>
                         @if (auth()->user()->role === 'admin')
                             <a class="client-button-secondary w-full bg-white" href="/admin">Trang quản trị</a>
                         @endif
