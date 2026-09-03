@@ -2,8 +2,10 @@
 
 namespace App\Features\Admin\RechargeConfig\Requests;
 
+use App\Utils\Site;
 use Closure;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class UpdateRechargeConfigRequest extends FormRequest
 {
@@ -15,7 +17,7 @@ class UpdateRechargeConfigRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'provider' => ['required', 'string', 'in:manual,apibankvn_api'],
+            'provider' => ['required', 'string', Rule::in(Site::isChild() ? ['apibankvn_api'] : ['manual', 'apibankvn_api'])],
             'bank_name' => ['required', 'string', 'max:120'],
             'account_name' => ['required', 'string', 'max:120'],
             'account_number' => ['required', 'string', 'max:80'],
@@ -42,7 +44,7 @@ class UpdateRechargeConfigRequest extends FormRequest
     protected function prepareForValidation(): void
     {
         $this->merge([
-            'provider' => (string) $this->input('provider', 'manual'),
+            'provider' => (string) $this->input('provider', Site::isChild() ? 'apibankvn_api' : 'manual'),
             'transfer_prefix' => strtoupper(trim((string) $this->input('transfer_prefix', ''))),
             'api_base_url' => 'https://apibankvn.com',
             'api_key' => filled($this->input('api_key'))

@@ -2,8 +2,10 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
 use App\Notifications\QueuedResetPasswordNotification;
 use App\Notifications\QueuedVerifyEmailNotification;
+use App\Support\TenantContext;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Auth\Passwords\CanResetPassword as CanResetPasswordTrait;
 use Illuminate\Contracts\Auth\CanResetPassword;
@@ -21,9 +23,10 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements CanResetPassword, JWTSubject, MustVerifyEmailContract
 {
-    use CanResetPasswordTrait, HasApiTokens, HasFactory, MustVerifyEmail, Notifiable, SoftDeletes;
+    use BelongsToTenant, CanResetPasswordTrait, HasApiTokens, HasFactory, MustVerifyEmail, Notifiable, SoftDeletes;
 
     protected $fillable = [
+        'tenant_id',
         'name',
         'username',
         'email',
@@ -69,9 +72,13 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         });
 
         static::created(function (self $user): void {
-            $user->wallets()->firstOrCreate([
-                'type' => Wallet::TYPE_MAIN,
-            ], [
+            $walletIdentity = ['type' => Wallet::TYPE_MAIN];
+
+            if (app(TenantContext::class)->hasTenantColumn('wallets')) {
+                $walletIdentity['tenant_id'] = $user->tenant_id;
+            }
+
+            $user->wallets()->firstOrCreate($walletIdentity, [
                 'balance' => 0,
                 'hold_balance' => 0,
                 'total_recharge' => 0,
@@ -146,6 +153,11 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         return $this->hasMany(ApiKey::class);
     }
 
+    public function packagePrices(): HasMany
+    {
+        return $this->hasMany(UserPackagePrice::class);
+    }
+
     public function adminAuditLogs(): HasMany
     {
         return $this->hasMany(AdminAuditLog::class, 'admin_id');
@@ -203,7 +215,7 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         $original = $username;
         $counter = 1;
 
-        while (static::withTrashed()->where('username', $username)->exists()) {
+        while (static::withTrashed()->where('tenant_id', $this->tenant_id)->where('username', $username)->exists()) {
             $suffix = (string) $counter;
             $username = Str::limit($original, max(1, 32 - strlen($suffix)), '').$suffix;
             $counter++;

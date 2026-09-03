@@ -1,9 +1,10 @@
 <?php
 
 use App\Features\Client\Wallet\Services\WalletService;
-use App\Features\MemberLevel\Services\MemberLevelService;
 use App\Models\User;
 use App\Support\SettingStore;
+use App\Support\TenantContext;
+use App\Utils\Site;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -28,14 +29,24 @@ Route::middleware('auth:sanctum')->group(function (): void {
         ])]]);
     });
 
-    Route::get('/user', function (Request $request, WalletService $walletService, MemberLevelService $memberLevelService) {
+    Route::get('/user', function (Request $request, WalletService $walletService) {
         $user = $request->user();
         abort_unless($user instanceof User, 401);
 
         return [
             ...$user->only(['id', 'username', 'email', 'phone', 'full_name', 'avatar', 'role', 'status', 'name']),
             'wallet' => $walletService->getWalletInfo($user),
-            'member_level' => $memberLevelService->status($user),
+            'site' => [
+                'id' => Site::id(),
+                'name' => Site::mySite()?->name,
+                'slug' => Site::mySite()?->slug,
+                'is_main' => Site::isMain(),
+            ],
+            'capabilities' => [
+                'platform_admin' => $user->role === 'admin' && Site::isMain(),
+                'tenant_admin' => $user->role === 'admin',
+                'multi_site' => app(TenantContext::class)->isActive(),
+            ],
         ];
     });
 });
@@ -65,6 +76,6 @@ if (file_exists(base_path('app/Features/Admin/Reporting/routes.php'))) {
     require base_path('app/Features/Admin/Reporting/routes.php');
 }
 
-if (file_exists(base_path('app/Features/Admin/MemberLevel/routes.php'))) {
-    require base_path('app/Features/Admin/MemberLevel/routes.php');
+if (file_exists(base_path('app/Features/Tenant/routes.php'))) {
+    require base_path('app/Features/Tenant/routes.php');
 }

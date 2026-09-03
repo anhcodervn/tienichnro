@@ -4,6 +4,9 @@ export type AdminRechargeHistoryItem = {
     id: number;
     transaction_code: string;
     amount: number;
+    bonus_amount: number;
+    bonus_percent: number;
+    credited_amount: number;
     content: string | null;
     status: 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled' | 'expired';
     bank_name: string | null;

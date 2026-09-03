@@ -3,7 +3,6 @@
     $walletBalance = $walletBalance ?? 0;
     $turnstileEnabled = (bool) ($turnstileEnabled ?? false);
     $turnstileSiteKey = (string) ($turnstileSiteKey ?? '');
-    $memberLevelStatus = $memberLevelStatus ?? null;
     $requestedGame = old('game_id', $selectedGame?->id ?? $games->first()?->id);
     $initialGame = $games->contains(fn ($game) => (string) $game->id === (string) $requestedGame)
         ? $requestedGame
@@ -79,22 +78,6 @@
         </div>
         <span class="home-checkout-secure inline-flex items-center gap-1.5"><i class="bx bx-shield text-base" aria-hidden="true"></i>Giá được xác nhận lại trên hệ thống</span>
     </header>
-
-    @auth
-        @if ($memberLevelStatus && $memberLevelStatus['effective_level'])
-            <div class="mx-4 mt-4 flex flex-col gap-2 rounded-[5px] border border-amber-200 bg-amber-50 p-3 text-sm sm:mx-5 sm:flex-row sm:items-center sm:justify-between">
-                <p class="flex items-center gap-2 font-bold text-amber-950">
-                    <i class="bx bx-crown text-xl text-amber-500" aria-hidden="true"></i>
-                    Giá {{ $memberLevelStatus['effective_level']['name'] }} đang được áp dụng
-                </p>
-                @if ($memberLevelStatus['is_temporarily_downgraded'])
-                    <span class="font-semibold text-amber-800">Nạp thêm {{ number_format($memberLevelStatus['maintenance_remaining_amount'], 0, ',', '.') }}đ để khôi phục {{ $memberLevelStatus['unlocked_level']['name'] }}</span>
-                @elseif ($memberLevelStatus['next_level'])
-                    <span class="font-semibold text-amber-800">Còn {{ number_format($memberLevelStatus['amount_to_next_level'], 0, ',', '.') }}đ để lên {{ $memberLevelStatus['next_level']['name'] }}</span>
-                @endif
-            </div>
-        @endif
-    @endauth
 
     <div class="home-checkout-layout">
         <div class="home-checkout-fields">

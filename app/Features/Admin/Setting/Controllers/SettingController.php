@@ -8,6 +8,7 @@ use App\Features\Admin\Setting\Requests\UpdateSystemSettingRequest;
 use App\Features\Admin\Setting\Requests\UpdateTabSettingRequest;
 use App\Http\Controllers\Controller;
 use App\Support\SettingStore;
+use App\Utils\Site;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
@@ -321,6 +322,7 @@ class SettingController extends Controller
 
     public function show(string $tab, SettingStore $settingStore): JsonResponse
     {
+        $this->assertTabAllowed($tab);
         if ($tab === self::SYSTEM_TAB) {
             return response()->json([
                 'status' => true,
@@ -360,6 +362,7 @@ class SettingController extends Controller
         SettingStore $settingStore,
         UpdateCustomCodeSettingsAction $updateCustomCodeSettings,
     ): JsonResponse {
+        $this->assertTabAllowed($tab);
         abort_if($tab === self::SYSTEM_TAB || $tab === 'options', 404);
         abort_if(! $this->tabExists($tab), 404);
 
@@ -472,5 +475,17 @@ class SettingController extends Controller
             'turnstile_secret_key' => '',
             'turnstile_secret_configured' => $secretKey !== '',
         ];
+    }
+
+    private function assertTabAllowed(string $tab): void
+    {
+        if (Site::isMain()) {
+            return;
+        }
+
+        abort_unless(in_array($tab, [
+            'system', 'general', 'homepage', 'service-articles', 'bio', 'branding',
+            'contact', 'seo', 'options', 'content-pages', 'slider-images',
+        ], true), 403, 'Website đại lý không được thay đổi cấu hình hệ thống này.');
     }
 }

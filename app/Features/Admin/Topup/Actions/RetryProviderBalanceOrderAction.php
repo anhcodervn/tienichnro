@@ -10,6 +10,7 @@ use App\Features\Topup\Services\TopupProviderBalanceService;
 use App\Features\Topup\Services\TopupProviderResolver;
 use App\Models\Order;
 use App\Models\OrderRecipient;
+use App\Models\Scopes\TenantScope;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 
@@ -62,7 +63,7 @@ class RetryProviderBalanceOrderAction
         }
 
         return DB::transaction(function () use ($order): Order {
-            $lockedOrder = Order::query()->lockForUpdate()->findOrFail($order->id);
+            $lockedOrder = Order::query()->withoutGlobalScope(TenantScope::class)->lockForUpdate()->findOrFail($order->id);
             $recipients = $lockedOrder->recipients()->lockForUpdate()->get();
 
             $lockedOrder->setRelation('recipients', $recipients);

@@ -19,9 +19,12 @@ use App\Models\AdminAuditLog;
 use App\Models\Game;
 use App\Models\GameServer;
 use App\Models\Order;
+use App\Models\Scopes\TenantScope;
+use App\Models\Tenant;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
 use App\Models\User;
+use App\Support\TenantContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -38,6 +41,7 @@ class TopupAdminService
         private readonly RetryProviderBalanceOrderAction $retryProviderBalanceOrder,
         private readonly RecipientFulfillmentService $recipientFulfillmentService,
         private readonly GlobalTopupPackageSyncService $globalPackageSyncService,
+        private readonly TenantContext $tenantContext,
     ) {}
 
     /** @param array<string, mixed> $filters */
@@ -113,7 +117,14 @@ class TopupAdminService
 
     public function orders(Request $request): LengthAwarePaginator
     {
-        return Order::query()->with(['game:id,name', 'server:id,name', 'provider:id,name,slug'])
+        $relations = ['game:id,name', 'server:id,name', 'provider:id,name,slug'];
+
+        if ($this->tenantContext->isActive() && $this->tenantContext->isMain()) {
+            $relations[] = 'tenant:id,name,slug';
+        }
+
+        return $this->orderQuery($request->integer('tenant_id') ?: null)
+            ->with($relations)
             ->when($request->filled('search'), function (Builder $query) use ($request): void {
                 $search = trim($request->string('search')->toString());
                 $query->where(fn (Builder $nested) => $nested->where('code', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
@@ -126,11 +137,11 @@ class TopupAdminService
     /**
      * @return array{total: int, pending_payment: int, processing: int, failed: int}
      */
-    public function todayCardStatistics(): array
+    public function todayCardStatistics(?int $tenantId = null): array
     {
         $startOfToday = now()->startOfDay();
         $startOfTomorrow = $startOfToday->copy()->addDay();
-        $statistics = Order::query()
+        $statistics = $this->orderQuery($tenantId)
             ->where('created_at', '>=', $startOfToday)
             ->where('created_at', '<', $startOfTomorrow)
             ->selectRaw('COALESCE(SUM(quantity), 0) as total')
@@ -146,6 +157,11 @@ class TopupAdminService
             'processing' => (int) ($statistics?->processing ?? 0),
             'failed' => (int) ($statistics?->failed ?? 0),
         ];
+    }
+
+    public function findOrder(string $code): Order
+    {
+        return $this->orderQuery()->where('code', $code)->firstOrFail();
     }
 
     /** @param array<string, mixed> $payload */
@@ -275,7 +291,7 @@ class TopupAdminService
         $dispatchTopup = false;
 
         $order = DB::transaction(function () use ($order, $action, $reason, $admin, $request, &$dispatchTopup): Order {
-            $order = Order::query()->lockForUpdate()->findOrFail($order->id);
+            $order = $this->orderQuery()->lockForUpdate()->findOrFail($order->id);
             $old = $order->getAttributes();
 
             match ($action) {
@@ -323,7 +339,13 @@ class TopupAdminService
         $includeCompleted = $order->order_status === OrderStatus::Completed;
 
         try {
-            $checked = $this->recipientFulfillmentService->syncOrder($order->id, $includeCompleted);
+            $tenant = $this->tenantContext->isActive() ? $order->tenant()->first() : null;
+            $checked = $tenant instanceof Tenant
+                ? $this->tenantContext->run(
+                    $tenant,
+                    fn (): int => $this->recipientFulfillmentService->syncOrder($order->id, $includeCompleted),
+                )
+                : $this->recipientFulfillmentService->syncOrder($order->id, $includeCompleted);
         } catch (TopupProviderConnectionException $exception) {
             report($exception);
 
@@ -383,6 +405,18 @@ class TopupAdminService
     private function perPage(Request $request): int
     {
         return min(max($request->integer('per_page', 20), 1), 100);
+    }
+
+    private function orderQuery(?int $tenantId = null): Builder
+    {
+        $query = Order::query();
+
+        if ($this->tenantContext->isActive() && $this->tenantContext->isMain()) {
+            $query->withoutGlobalScope(TenantScope::class)
+                ->when($tenantId !== null, fn (Builder $builder) => $builder->where('tenant_id', $tenantId));
+        }
+
+        return $query;
     }
 
     /** @param array<string, mixed> $filters */

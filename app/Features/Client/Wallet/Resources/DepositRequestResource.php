@@ -33,6 +33,8 @@ class DepositRequestResource extends JsonResource
             ],
             'amount' => (float) $this->amount,
             'bonus_amount' => (float) ($raw['bonus_amount'] ?? 0),
+            'bonus_percent' => (float) ($raw['bonus_percent'] ?? 0),
+            'credited_amount' => (float) ($raw['credited_amount'] ?? ((float) $this->amount + (float) ($raw['bonus_amount'] ?? 0))),
             'status' => $status,
             'content' => $this->content,
             'account_number' => $this->account_number,

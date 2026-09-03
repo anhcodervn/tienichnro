@@ -9,8 +9,10 @@ use App\Features\Client\Wallet\Resources\ClientRechargeConfigResource;
 use App\Features\Client\Wallet\Resources\DepositRequestResource;
 use App\Features\Client\Wallet\Services\WalletDepositService;
 use App\Features\Client\Wallet\Services\WalletService;
+use App\Features\Recharge\Services\RechargeBonusService;
 use App\Http\Controllers\Controller;
 use App\Models\PaymentTransaction;
+use App\Models\RechargeBonusTier;
 use App\Models\User;
 use App\Utils\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -21,6 +23,7 @@ class WalletController extends Controller
     public function __construct(
         private readonly WalletService $walletService,
         private readonly WalletDepositService $walletDepositService,
+        private readonly RechargeBonusService $rechargeBonusService,
     ) {}
 
     public function index(WalletOverviewRequest $request): JsonResponse
@@ -36,6 +39,10 @@ class WalletController extends Controller
                 : null,
             'recharge_configs' => collect($resolvedConfigs)
                 ->map(fn (array $item): array => (new ClientRechargeConfigResource($item['config']))->resolve())
+                ->values()
+                ->all(),
+            'bonus_tiers' => $this->rechargeBonusService->active()
+                ->map(fn (RechargeBonusTier $tier): array => $this->rechargeBonusService->serialize($tier))
                 ->values()
                 ->all(),
         ]));

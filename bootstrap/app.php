@@ -1,7 +1,11 @@
 <?php
 
 use App\Http\Middleware\EnsureAdminUser;
+use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsureSiteIsActive;
+use App\Http\Middleware\EnsureTenancyIsActive;
+use App\Http\Middleware\EnsureTenantSession;
+use App\Http\Middleware\ResolveTenant;
 use App\Support\SettingStore;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -22,6 +26,10 @@ return Application::configure(basePath: dirname(__DIR__))
         ['middleware' => ['web', 'auth:sanctum']],
     )
     ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->prependToGroup('web', ResolveTenant::class);
+        $middleware->prependToGroup('api', ResolveTenant::class);
+        $middleware->appendToGroup('web', EnsureTenantSession::class);
+        $middleware->appendToGroup('api', EnsureTenantSession::class);
         $middleware->statefulApi();
         $middleware->trustProxies(at: '*');
         $middleware->trimStrings(except: ['content.*', '*_content.*', 'custom_css', 'custom_js']);
@@ -30,6 +38,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
         $middleware->alias([
             'admin' => EnsureAdminUser::class,
+            'platform.admin' => EnsurePlatformAdmin::class,
+            'tenancy.active' => EnsureTenancyIsActive::class,
             'site.active' => EnsureSiteIsActive::class,
         ]);
     })

@@ -46,6 +46,8 @@ export type DepositRequestItem = {
     };
     amount: number;
     bonus_amount: number;
+    bonus_percent: number;
+    credited_amount: number;
     status: 'pending' | 'processing' | 'paid' | 'failed' | 'cancelled' | 'expired';
     content: string | null;
     account_number: string | null;
@@ -55,6 +57,14 @@ export type DepositRequestItem = {
     confirmed_at: string | null;
     expires_at: string | null;
     can_confirm: boolean;
+};
+
+export type RechargeBonusTierType = {
+    id: number;
+    minimum_amount: number;
+    bonus_basis_points: number;
+    bonus_percent: number;
+    is_active: boolean;
 };
 
 export type DepositRequestListResponse = {

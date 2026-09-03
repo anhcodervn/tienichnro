@@ -5,10 +5,6 @@ test('global package inputs stay visually distinct and easy to focus', function 
 
     expect($page)
         ->toContain('const formFieldClass =')
-        ->toContain('const compactFieldClass =')
-        ->toContain('type NumericDraft = string | number')
-        ->toContain('const isBlankNumber = (value: NumericDraft)')
-        ->toContain('const numberOr = (value: NumericDraft')
         ->toContain('border-2 border-slate-300 bg-slate-50')
         ->toContain('hover:border-slate-400')
         ->toContain('focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-100')
@@ -18,9 +14,10 @@ test('global package inputs stay visually distinct and easy to focus', function 
         ->not->toContain('Giá gốc hiển thị')
         ->not->toContain('draft.fixed_price.trim()')
         ->not->toContain('draft.minimum_profit.trim()')
+        ->not->toContain('level_prices')
+        ->not->toContain('catalog.levels')
         ->toContain('v-model.number="form.min_quantity"')
         ->toContain(':class="formFieldClass"')
-        ->toContain(':class="compactFieldClass"')
         ->not->toContain('game_settings')
         ->not->toContain('KM X3')
         ->not->toMatch('/<(?:input|select|textarea)[^>]*class="[^"]*border-slate-300/');

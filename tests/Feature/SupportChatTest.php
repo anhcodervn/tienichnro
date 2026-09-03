@@ -244,7 +244,7 @@ test('support broadcast uses private owned channels and excludes sensitive field
     expect($event)->toBeInstanceOf(ShouldBroadcast::class)
         ->and($event)->toBeInstanceOf(ShouldDispatchAfterCommit::class)
         ->and($channels)->each->toBeInstanceOf(PrivateChannel::class)
-        ->and(collect($channels)->pluck('name')->all())->toBe(['private-users.7.support', 'private-admin.support'])
+        ->and(collect($channels)->pluck('name')->all())->toBe(['private-users.7.support', 'private-admin.sites.0.support'])
         ->and($event->broadcastQueue())->toBe('default')
         ->and($event->broadcastAs())->toBe('support.message.created')
         ->and($encodedPayload)->not->toContain('email', 'token', 'password');

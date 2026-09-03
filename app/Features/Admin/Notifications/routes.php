@@ -3,7 +3,7 @@
 use App\Features\Admin\Notifications\Controllers\NotificationsController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:sanctum', 'admin'])
+Route::middleware(['auth:sanctum', 'admin', 'platform.admin'])
     ->prefix('admin-api/notifications')
     ->name('admin.notifications.')
     ->controller(NotificationsController::class)

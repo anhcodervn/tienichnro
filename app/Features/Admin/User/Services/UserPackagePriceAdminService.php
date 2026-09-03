@@ -1,0 +1,87 @@
+<?php
+
+namespace App\Features\Admin\User\Services;
+
+use App\Features\Topup\Services\TopupPackagePricingService;
+use App\Features\Topup\Services\UserPackagePricingService;
+use App\Models\TopupPackage;
+use App\Models\User;
+use App\Models\UserPackagePrice;
+use App\Utils\Site;
+
+class UserPackagePriceAdminService
+{
+    public function __construct(
+        private readonly TopupPackagePricingService $topupPackagePricingService,
+        private readonly UserPackagePricingService $userPackagePricingService,
+    ) {}
+
+    /** @return array<int, array<string, mixed>> */
+    public function catalog(User $user): array
+    {
+        $packages = TopupPackage::query()
+            ->with('game:id,name')
+            ->where('status', 'active')
+            ->orderBy('game_id')
+            ->orderBy('denomination')
+            ->get();
+        $this->topupPackagePricingService->apply($packages);
+        $this->userPackagePricingService->prime($user, $packages->pluck('id')->map(fn (mixed $id): int => (int) $id)->all());
+        $rules = UserPackagePrice::query()->where('user_id', $user->id)->get()->keyBy('topup_package_id');
+
+        return $packages
+            ->filter(fn (TopupPackage $package): bool => (bool) $package->is_price_available)
+            ->map(function (TopupPackage $package) use ($rules, $user): array {
+                $rule = $rules->get($package->id);
+                $basePrice = (int) $package->selling_price;
+                $costFloor = Site::isMain()
+                    ? ($package->provider_price === null ? null : (int) $package->provider_price)
+                    : (int) $package->tenant_cost_price;
+                $price = $this->userPackagePricingService->resolve($user, $package, $basePrice, $costFloor);
+
+                return [
+                    'package_id' => $package->id,
+                    'game' => $package->game?->name,
+                    'package' => $package->name,
+                    'denomination' => (int) $package->denomination,
+                    'base_price' => $basePrice,
+                    'member_price' => $price['price'],
+                    'discount_amount' => $price['discount_amount'],
+                    'pricing_mode' => $rule?->pricing_mode ?? UserPackagePrice::MODE_DISCOUNT,
+                    'discount_percent' => $rule?->discount_basis_points === null ? 0 : $rule->discount_basis_points / 100,
+                    'fixed_price' => $rule?->fixed_price,
+                    'minimum_profit' => (int) ($rule?->minimum_profit ?? 0),
+                    'is_active' => (bool) ($rule?->is_active ?? false),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function save(User $user, TopupPackage $package, array $payload): UserPackagePrice
+    {
+        return UserPackagePrice::query()->updateOrCreate(
+            ['user_id' => $user->id, 'topup_package_id' => $package->id],
+            [
+                'pricing_mode' => $payload['pricing_mode'],
+                'discount_basis_points' => $payload['pricing_mode'] === UserPackagePrice::MODE_DISCOUNT
+                    ? (int) round((float) $payload['discount_percent'] * 100)
+                    : null,
+                'fixed_price' => $payload['pricing_mode'] === UserPackagePrice::MODE_FIXED
+                    ? (int) $payload['fixed_price']
+                    : null,
+                'minimum_profit' => (int) $payload['minimum_profit'],
+                'is_active' => (bool) $payload['is_active'],
+            ],
+        );
+    }
+
+    public function delete(User $user, TopupPackage $package): void
+    {
+        UserPackagePrice::query()
+            ->where('user_id', $user->id)
+            ->where('topup_package_id', $package->id)
+            ->delete();
+    }
+}

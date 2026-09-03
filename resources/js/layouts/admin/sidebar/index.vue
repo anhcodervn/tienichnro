@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useSystemSetting } from '@/composables/useSystemSetting';
 import { useSupportStore } from '@/stores/support.store';
+import { useUserStore } from '@/stores/user.store';
 import { ChevronRight, ShieldCheck, X } from 'lucide-vue-next';
 import { computed, onMounted, reactive, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
@@ -16,8 +17,30 @@ const emit = defineEmits<{
 
 const route = useRoute();
 const supportStore = useSupportStore();
+const userStore = useUserStore();
 const { settings, fetchSettings } = useSystemSetting();
 const sidebarLogo = computed(() => settings.value.dark_logo || settings.value.light_logo);
+const isPlatformAdmin = computed(() => userStore.user?.capabilities?.platform_admin === true);
+const isMultiSiteActive = computed(() => userStore.user?.capabilities?.multi_site === true);
+const visibleMenuGroups = computed(() =>
+    adminMenuGroups
+        .filter(
+            (group) =>
+                (!group.platformOnly || isPlatformAdmin.value) &&
+                (!group.childOnly || !isPlatformAdmin.value) &&
+                (!group.tenancyOnly || isMultiSiteActive.value),
+        )
+        .map((group) => ({
+            ...group,
+            children: group.children?.filter(
+                (child) =>
+                    (!child.platformOnly || isPlatformAdmin.value) &&
+                    (!child.childOnly || !isPlatformAdmin.value) &&
+                    (!child.tenancyOnly || isMultiSiteActive.value),
+            ),
+        }))
+        .filter((group) => group.href || (group.children?.length ?? 0) > 0),
+);
 
 onMounted(() => {
     void fetchSettings().catch(() => {});
@@ -48,7 +71,7 @@ const isGroupActive = (group: AdminMenuGroup): boolean => {
 };
 
 const isChildActive = (href: string): boolean => {
-    const menuChildHrefs = adminMenuGroups.flatMap((group) => group.children?.map((child) => child.href) ?? []);
+    const menuChildHrefs = visibleMenuGroups.value.flatMap((group) => group.children?.map((child) => child.href) ?? []);
 
     return findBestMatchingChildHref(menuChildHrefs, route.path) === href;
 };
@@ -66,7 +89,7 @@ const closeSidebarOnMobile = (): void => {
 watch(
     () => route.path,
     () => {
-        for (const group of adminMenuGroups) {
+        for (const group of visibleMenuGroups.value) {
             if (group.children) {
                 expandedGroups[group.key] = isGroupActive(group);
             }
@@ -126,7 +149,7 @@ watch(
                 </div>
 
                 <div class="space-y-2">
-                    <template v-for="group in adminMenuGroups" :key="group.key">
+                    <template v-for="group in visibleMenuGroups" :key="group.key">
                         <RouterLink
                             v-if="group.href"
                             :to="group.href"

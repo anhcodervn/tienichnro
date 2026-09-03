@@ -34,7 +34,6 @@ class GlobalTopupPackageResource extends JsonResource
             'sort_order' => $this->sort_order,
             'metadata' => $this->metadata ?? [],
             'packages_count' => $this->whenCounted('packages'),
-            'level_prices' => $this->whenLoaded('levelPrices'),
             'created_at' => $this->created_at?->toISOString(),
         ];
     }

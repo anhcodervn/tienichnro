@@ -11,6 +11,7 @@ use App\Jobs\SendSupportMessageToDiscord;
 use App\Models\SupportConversation;
 use App\Models\SupportMessage;
 use App\Models\User;
+use App\Support\TenantContext;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\Cursor;
 use Illuminate\Support\Facades\DB;
@@ -90,7 +91,7 @@ class SupportChatService
     public function sendAsUser(User $user, string $content): array
     {
         $conversation = SupportConversation::query()->createOrFirst(
-            ['user_id' => $user->id],
+            $this->conversationIdentity($user),
             ['status' => SupportConversation::STATUS_OPEN],
         );
 
@@ -111,7 +112,7 @@ class SupportChatService
     {
         $user = User::query()->where('role', SupportMessage::ROLE_USER)->findOrFail($userId);
         $conversation = SupportConversation::query()->createOrFirst(
-            ['user_id' => $user->id],
+            $this->conversationIdentity($user),
             ['status' => SupportConversation::STATUS_OPEN],
         );
 
@@ -193,11 +194,17 @@ class SupportChatService
     {
         $message = DB::transaction(function () use ($conversation, $sender, $senderRole, $content): SupportMessage {
             $lockedConversation = SupportConversation::query()->lockForUpdate()->findOrFail($conversation->id);
-            $message = $lockedConversation->messages()->create([
+            $messageAttributes = [
                 'sender_id' => $sender->id,
                 'sender_role' => $senderRole,
                 'message' => $content,
-            ]);
+            ];
+
+            if (app(TenantContext::class)->isActive()) {
+                $messageAttributes['tenant_id'] = $lockedConversation->tenant_id;
+            }
+
+            $message = $lockedConversation->messages()->create($messageAttributes);
 
             $lockedConversation->update([
                 'status' => SupportConversation::STATUS_OPEN,
@@ -230,6 +237,18 @@ class SupportChatService
             'message' => SupportMessageResource::make($message)->resolve(),
             'stats' => $this->unreadStats($conversation->user),
         ];
+    }
+
+    /** @return array<string, int|null> */
+    private function conversationIdentity(User $user): array
+    {
+        $identity = ['user_id' => $user->id];
+
+        if (app(TenantContext::class)->isActive()) {
+            $identity['tenant_id'] = $user->tenant_id;
+        }
+
+        return $identity;
     }
 
     /** @return array<string, mixed> */

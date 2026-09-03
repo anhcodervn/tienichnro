@@ -3,8 +3,8 @@
 namespace App\Features\Client\Topup\Controllers;
 
 use App\Features\Client\Topup\Services\TurnstileService;
-use App\Features\MemberLevel\Services\MemberLevelPriceService;
 use App\Features\Topup\Services\GameRewardService;
+use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\User;
@@ -20,7 +20,7 @@ class HomeController extends Controller
         SettingStore $settingStore,
         EditorContentRenderer $contentRenderer,
         TurnstileService $turnstileService,
-        MemberLevelPriceService $memberLevelPriceService,
+        TopupPackagePricingService $topupPackagePricingService,
         GameRewardService $gameRewardService,
     ): View {
         $games = Game::query()
@@ -56,10 +56,7 @@ class HomeController extends Controller
             $games->flatMap(fn (Game $game) => $game->packages),
             $games->flatMap(fn (Game $game) => $game->globalPackageSettings),
         );
-        $memberLevelStatus = $memberLevelPriceService->apply(
-            $games->flatMap(fn (Game $game) => $game->packages),
-            $user,
-        );
+        $topupPackagePricingService->apply($games->flatMap(fn (Game $game) => $game->packages), $user);
         $games->each(fn (Game $game) => $game->setRelation(
             'packages',
             $game->packages->filter(fn ($package) => $package->is_price_available)->values(),
@@ -81,7 +78,6 @@ class HomeController extends Controller
         return view('client.home.index', [
             'games' => $games,
             'walletBalance' => $walletBalance,
-            'memberLevelStatus' => $memberLevelStatus,
             'systemSettings' => $systemSettings,
             'homeNoticeTitle' => (string) $systemSettings['home_notice_title'],
             'homeNoticeHtml' => $contentRenderer->renderNodes($homeNoticeContent),

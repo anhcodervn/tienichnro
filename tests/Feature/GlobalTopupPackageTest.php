@@ -1,18 +1,14 @@
 <?php
 
 use App\Enums\PaymentMethod;
-use App\Features\MemberLevel\Services\MemberLevelPriceService;
 use App\Features\Topup\Services\GlobalTopupPackageSyncService;
 use App\Features\Topup\Services\OrderPricingService;
 use App\Features\Topup\Services\OrderService;
+use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Models\Game;
 use App\Models\GameServer;
 use App\Models\GlobalTopupPackage;
 use App\Models\GlobalTopupPackageGameSetting;
-use App\Models\MemberLevel;
-use App\Models\MemberLevelAccount;
-use App\Models\MemberLevelGlobalPackagePrice;
-use App\Models\MemberLevelPackagePrice;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
 use App\Models\User;
@@ -25,11 +21,6 @@ it('protects and lets admins manage global topup packages', function () {
     $this->getJson('/api/admin-api/global-topup-packages')->assertUnauthorized();
 
     $admin = User::factory()->create(['role' => 'admin']);
-    $level = MemberLevel::factory()->create([
-        'code' => 'global-agency',
-        'rank' => 10,
-        'lifetime_threshold' => 10000000,
-    ]);
     $provider = TopupProvider::factory()->create(['slug' => 'the9p']);
     $game = Game::factory()->create([
         'package_mode' => 'global',
@@ -81,21 +72,13 @@ it('protects and lets admins manage global topup packages', function () {
         ]],
     ])->assertSuccessful();
 
-    $this->actingAs($admin)->putJson("/api/admin-api/global-topup-packages/{$globalPackage->id}/levels/{$level->id}", [
-        'pricing_mode' => 'discount',
-        'discount_basis_points' => 500,
-        'fixed_price' => null,
-        'minimum_profit' => 1000,
-        'is_active' => true,
-    ])->assertSuccessful();
-
     $this->actingAs($admin)->getJson('/api/admin-api/global-topup-packages')
         ->assertSuccessful()
         ->assertJsonPath('data.global_packages.0.code', 'carot-teamobi-100k')
         ->assertJsonPath('data.global_packages.0.denomination', 100000)
         ->assertJsonPath('data.global_packages.0.provider_id', $provider->id)
         ->assertJsonPath('data.global_packages.0.provider_price', 70000)
-        ->assertJsonPath('data.global_packages.0.level_prices.0.member_level_id', $level->id);
+        ->assertJsonMissingPath('data.global_packages.0.level_prices');
 
     $mapping->refresh();
 
@@ -166,7 +149,7 @@ it('switches an existing game to global mode and builds denomination mappings au
     expect($mapping->refresh()->status)->toBe('active');
 });
 
-it('uses one global price and global level override across games while custom games stay independent', function () {
+it('uses one global price across games while custom games stay independent', function () {
     $globalPackage = GlobalTopupPackage::factory()->create([
         'name' => 'Carot Teamobi 100K',
         'denomination' => 100000,
@@ -174,26 +157,6 @@ it('uses one global price and global level override across games while custom ga
         'price' => 90000,
         'original_price' => 100000,
     ]);
-    $level = MemberLevel::factory()->create([
-        'code' => 'global-level',
-        'rank' => 10,
-        'lifetime_threshold' => 10000000,
-        'default_discount_bps' => 100,
-        'minimum_profit' => 500,
-    ]);
-    $user = User::factory()->create();
-    MemberLevelAccount::factory()->for($user)->create([
-        'manual_level_id' => $level->id,
-        'manual_level_expires_at' => now()->addMonth(),
-    ]);
-    MemberLevelGlobalPackagePrice::factory()->create([
-        'member_level_id' => $level->id,
-        'global_topup_package_id' => $globalPackage->id,
-        'pricing_mode' => 'discount',
-        'discount_basis_points' => 1000,
-        'minimum_profit' => 1000,
-    ]);
-
     $globalGames = Game::factory()->count(2)->create([
         'package_mode' => 'global',
     ]);
@@ -207,32 +170,18 @@ it('uses one global price and global level override across games while custom ga
         'price' => 88000,
         'original_price' => 100000,
     ]));
-    MemberLevelPackagePrice::factory()->create([
-        'member_level_id' => $level->id,
-        'topup_package_id' => $globalPackages->first()->id,
-        'pricing_mode' => 'fixed',
-        'fixed_price' => 89000,
-    ]);
-
-    $service = app(MemberLevelPriceService::class);
-    $firstGlobalPrice = $service->resolve($globalPackages->first(), $user);
-    $secondGlobalPrice = $service->resolve($globalPackages->last(), $user);
+    $service = app(TopupPackagePricingService::class);
+    $firstGlobalPrice = $service->resolve($globalPackages->first());
+    $secondGlobalPrice = $service->resolve($globalPackages->last());
 
     expect($firstGlobalPrice['package_source'])->toBe('global')
         ->and($firstGlobalPrice['retail_price'])->toBe(90000)
-        ->and($firstGlobalPrice['final_price'])->toBe(86000)
-        ->and($secondGlobalPrice['final_price'])->toBe(86000);
+        ->and($firstGlobalPrice['final_price'])->toBe(90000)
+        ->and($secondGlobalPrice['final_price'])->toBe(90000);
 
     $globalPackage->update(['price' => 95000]);
-    expect($service->resolve($globalPackages->first()->refresh(), $user)['final_price'])->toBe(86000)
-        ->and($service->resolve($globalPackages->last()->refresh(), $user)['final_price'])->toBe(86000);
-
-    MemberLevelGlobalPackagePrice::query()
-        ->where('member_level_id', $level->id)
-        ->where('global_topup_package_id', $globalPackage->id)
-        ->update(['pricing_mode' => 'fixed', 'discount_basis_points' => null, 'fixed_price' => 82000]);
-    expect($service->resolve($globalPackages->first()->refresh(), $user)['final_price'])->toBe(86000)
-        ->and($service->resolve($globalPackages->last()->refresh(), $user)['final_price'])->toBe(86000);
+    expect($service->resolve($globalPackages->first()->refresh())['final_price'])->toBe(95000)
+        ->and($service->resolve($globalPackages->last()->refresh())['final_price'])->toBe(95000);
 
     $customGame = Game::factory()->create(['package_mode' => 'custom']);
     $customPackage = TopupPackage::factory()->for($customGame)->create([
@@ -240,16 +189,9 @@ it('uses one global price and global level override across games while custom ga
         'price' => 100000,
         'original_price' => 110000,
     ]);
-    MemberLevelPackagePrice::factory()->create([
-        'member_level_id' => $level->id,
-        'topup_package_id' => $customPackage->id,
-        'pricing_mode' => 'fixed',
-        'fixed_price' => 90000,
-    ]);
-
-    $customPrice = $service->resolve($customPackage, $user);
+    $customPrice = $service->resolve($customPackage);
     expect($customPrice['package_source'])->toBe('custom')
-        ->and($customPrice['final_price'])->toBe(90000);
+        ->and($customPrice['final_price'])->toBe(100000);
 });
 
 it('uses every global package value and provider across games while keeping each game service code', function () {

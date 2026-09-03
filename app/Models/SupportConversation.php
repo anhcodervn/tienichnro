@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\SupportConversationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,11 +13,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 class SupportConversation extends Model
 {
     /** @use HasFactory<SupportConversationFactory> */
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     public const STATUS_OPEN = 'open';
 
     protected $fillable = [
+        'tenant_id',
         'user_id',
         'status',
         'last_message_at',

@@ -1,19 +1,13 @@
 <script setup lang="ts">
 import { adminGlobalPackageService, type GlobalPackageCatalog, type GlobalTopupPackage } from '@/services/admin-global-package.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { BadgeDollarSign, Boxes, LoaderCircle, Plus, Save, Trash2 } from 'lucide-vue-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { Boxes, LoaderCircle, Plus, Save, Trash2 } from 'lucide-vue-next';
+import { onMounted, reactive, ref } from 'vue';
 
-type NumericDraft = string | number;
-type LevelDraft = { pricing_mode: 'discount' | 'fixed'; discount_value: NumericDraft; fixed_price: NumericDraft; minimum_profit: NumericDraft };
-type Preview = { minimum: number; maximum: number; floorApplied: boolean };
-
-const catalog = ref<GlobalPackageCatalog>({ global_packages: [], levels: [], providers: [] });
+const catalog = ref<GlobalPackageCatalog>({ global_packages: [], providers: [] });
 const loading = ref(false);
 const saving = ref(false);
 const editingId = ref<number | null>(null);
-const selectedLevelId = ref<number | null>(null);
-const drafts = reactive<Record<number, LevelDraft>>({});
 const form = reactive({
     provider_id: '' as string | number,
     name: '',
@@ -29,11 +23,8 @@ const form = reactive({
     sort_order: 0,
 });
 
-const selectedLevel = computed(() => catalog.value.levels.find((level) => level.id === selectedLevelId.value) ?? null);
 const formFieldClass =
     'min-h-11 w-full rounded-md border-2 border-slate-300 bg-slate-50 px-3 py-2 text-slate-950 outline-none transition hover:border-slate-400 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-100';
-const compactFieldClass =
-    'min-h-10 w-full rounded-md border-2 border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-950 outline-none transition hover:border-slate-400 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-100';
 const money = (value: number | null): string => `${new Intl.NumberFormat('vi-VN').format(value ?? 0)}đ`;
 const notify = (message: string): void => handleSuccessResponse({ data: { status: true, message } });
 const nullableNumber = (value: string | number): number | null => (value === '' ? null : Number(value));
@@ -56,28 +47,10 @@ const resetForm = (): void => {
     });
 };
 
-const hydrateDrafts = (): void => {
-    if (!selectedLevel.value) return;
-
-    for (const globalPackage of catalog.value.global_packages) {
-        const override = globalPackage.level_prices.find((price) => price.member_level_id === selectedLevel.value?.id);
-        drafts[globalPackage.id] = {
-            pricing_mode: override?.pricing_mode ?? 'discount',
-            discount_value: override?.discount_basis_points != null ? String(override.discount_basis_points / 100) : '',
-            fixed_price: override?.fixed_price != null ? String(override.fixed_price) : '',
-            minimum_profit: override?.minimum_profit != null ? String(override.minimum_profit) : '',
-        };
-    }
-};
-
 const load = async (): Promise<void> => {
     loading.value = true;
     try {
         catalog.value = await adminGlobalPackageService.catalog();
-        selectedLevelId.value = catalog.value.levels.some((level) => level.id === selectedLevelId.value)
-            ? selectedLevelId.value
-            : (catalog.value.levels[0]?.id ?? null);
-        hydrateDrafts();
     } catch (error) {
         handleErrorResponse(error);
     } finally {
@@ -142,69 +115,6 @@ const remove = async (globalPackage: GlobalTopupPackage): Promise<void> => {
     }
 };
 
-const isBlankNumber = (value: NumericDraft): boolean => String(value).trim() === '';
-const numberOr = (value: NumericDraft, fallback: number): number => {
-    const parsed = Number(value);
-    return !isBlankNumber(value) && Number.isFinite(parsed) ? Math.max(0, parsed) : fallback;
-};
-
-const preview = (globalPackage: GlobalTopupPackage): Preview => {
-    const draft = drafts[globalPackage.id];
-    const level = selectedLevel.value;
-    if (!draft || !level) return { minimum: globalPackage.price, maximum: globalPackage.price, floorApplied: false };
-
-    const discount = Math.min(100, numberOr(draft.discount_value, level.default_discount_bps / 100));
-    const candidate =
-        draft.pricing_mode === 'fixed'
-            ? numberOr(draft.fixed_price, globalPackage.price)
-            : globalPackage.price - Math.trunc((globalPackage.price * discount) / 100);
-    const profit = numberOr(draft.minimum_profit, level.minimum_profit);
-    const providerCost = Number(globalPackage.provider_price);
-    const finalPrice = Math.min(globalPackage.price, Math.max(candidate, providerCost + profit));
-
-    return {
-        minimum: finalPrice,
-        maximum: finalPrice,
-        floorApplied: providerCost + profit > candidate,
-    };
-};
-
-const saveLevelPrice = async (globalPackage: GlobalTopupPackage): Promise<void> => {
-    const level = selectedLevel.value;
-    const draft = drafts[globalPackage.id];
-    if (!level || !draft) return;
-    if (draft.pricing_mode === 'fixed' && isBlankNumber(draft.fixed_price)) {
-        handleErrorResponse({ message: `Vui lòng nhập giá cố định cho ${globalPackage.name}.` });
-        return;
-    }
-
-    try {
-        await adminGlobalPackageService.saveLevelPrice(globalPackage.id, level.id, {
-            pricing_mode: draft.pricing_mode,
-            discount_basis_points:
-                draft.pricing_mode === 'discount' ? Math.round(numberOr(draft.discount_value, level.default_discount_bps / 100) * 100) : null,
-            fixed_price: draft.pricing_mode === 'fixed' ? Number(draft.fixed_price) : null,
-            minimum_profit: isBlankNumber(draft.minimum_profit) ? null : Number(draft.minimum_profit),
-            is_active: true,
-        });
-        notify(`Đã lưu giá ${globalPackage.name} cho ${level.name}.`);
-        await load();
-    } catch (error) {
-        handleErrorResponse(error);
-    }
-};
-
-const resetLevelPrice = async (globalPackage: GlobalTopupPackage): Promise<void> => {
-    if (!selectedLevel.value) return;
-    try {
-        await adminGlobalPackageService.deleteLevelPrice(globalPackage.id, selectedLevel.value.id);
-        notify(`Đã dùng lại mức giảm mặc định cho ${globalPackage.name}.`);
-        await load();
-    } catch (error) {
-        handleErrorResponse(error);
-    }
-};
-
 onMounted(async () => {
     await load();
     resetForm();
@@ -217,7 +127,7 @@ onMounted(async () => {
             <div>
                 <p class="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">Gói hoàn chỉnh dùng chung cho mọi game Global</p>
                 <h1 class="mt-1 text-2xl font-black text-slate-950">Gói nạp Global</h1>
-                <p class="mt-1 text-sm text-slate-500">Chỉ quản lý mệnh giá, giá bán, giá vốn, provider, giới hạn và giá theo level.</p>
+                <p class="mt-1 text-sm text-slate-500">Quản lý mệnh giá, giá bán chung, giá vốn provider và giới hạn cho mọi game dùng Global.</p>
             </div>
             <button
                 type="button"
@@ -303,20 +213,6 @@ onMounted(async () => {
             </form>
 
             <div class="grid min-w-0 gap-4">
-                <div
-                    class="flex flex-col gap-3 rounded-lg border border-slate-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-                >
-                    <div>
-                        <h2 class="font-black text-slate-950">Giá theo level</h2>
-                        <p class="text-xs text-slate-500">Giá sau giảm được chặn theo giá vốn provider của chính gói Global.</p>
-                    </div>
-                    <select v-model="selectedLevelId" :class="compactFieldClass" @change="hydrateDrafts">
-                        <option v-for="level in catalog.levels" :key="level.id" :value="level.id">
-                            {{ level.name }} · mặc định {{ level.default_discount_bps / 100 }}%
-                        </option>
-                    </select>
-                </div>
-
                 <article
                     v-for="globalPackage in catalog.global_packages"
                     :key="globalPackage.id"
@@ -334,53 +230,6 @@ onMounted(async () => {
                         <div class="flex gap-3 text-sm font-bold">
                             <button type="button" class="text-violet-700" @click="edit(globalPackage)">Sửa</button
                             ><button type="button" class="text-rose-600" @click="remove(globalPackage)"><Trash2 class="inline h-4 w-4" /> Xóa</button>
-                        </div>
-                    </div>
-                    <div v-if="selectedLevel && drafts[globalPackage.id]" class="grid gap-3 lg:grid-cols-5">
-                        <label class="grid gap-1 text-xs font-bold"
-                            >Cách tính<select v-model="drafts[globalPackage.id].pricing_mode" :class="compactFieldClass">
-                                <option value="discount">Giảm theo %</option>
-                                <option value="fixed">Giá cố định</option>
-                            </select></label
-                        >
-                        <label v-if="drafts[globalPackage.id].pricing_mode === 'discount'" class="grid gap-1 text-xs font-bold"
-                            >Giảm (%)<input
-                                v-model="drafts[globalPackage.id].discount_value"
-                                min="0"
-                                max="100"
-                                step="0.01"
-                                type="number"
-                                :class="compactFieldClass"
-                        /></label>
-                        <label v-else class="grid gap-1 text-xs font-bold"
-                            >Giá cố định<input v-model="drafts[globalPackage.id].fixed_price" min="0" type="number" :class="compactFieldClass"
-                        /></label>
-                        <label class="grid gap-1 text-xs font-bold"
-                            >Lãi tối thiểu<input v-model="drafts[globalPackage.id].minimum_profit" min="0" type="number" :class="compactFieldClass"
-                        /></label>
-                        <div class="rounded-md border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
-                            <span class="block font-bold">Giá sau giảm</span
-                            ><strong class="text-base"
-                                >{{ money(preview(globalPackage).minimum)
-                                }}<template v-if="preview(globalPackage).maximum !== preview(globalPackage).minimum">
-                                    – {{ money(preview(globalPackage).maximum) }}</template
-                                ></strong
-                            ><span v-if="preview(globalPackage).floorApplied" class="block">Có áp sàn giá vốn</span>
-                        </div>
-                        <div class="flex items-end gap-2">
-                            <button
-                                type="button"
-                                class="min-h-10 flex-1 rounded-md bg-slate-950 px-3 text-sm font-bold text-white"
-                                @click="saveLevelPrice(globalPackage)"
-                            >
-                                <BadgeDollarSign class="mr-1 inline h-4 w-4" /> Lưu giá</button
-                            ><button
-                                type="button"
-                                class="min-h-10 rounded-md border border-slate-300 px-3 text-sm font-bold"
-                                @click="resetLevelPrice(globalPackage)"
-                            >
-                                Mặc định
-                            </button>
                         </div>
                     </div>
                 </article>

@@ -1,8 +1,10 @@
 import {
+    BadgeDollarSign,
     BellRing,
     BookMarked,
     ChartNoAxesCombined,
     Gamepad2,
+    Globe2,
     LayoutDashboard,
     ListChecks,
     Mail,
@@ -17,6 +19,9 @@ import {
 export type AdminMenuChild = {
     label: string;
     href: string;
+    platformOnly?: boolean;
+    childOnly?: boolean;
+    tenancyOnly?: boolean;
 };
 
 export type AdminMenuGroup = {
@@ -26,9 +31,28 @@ export type AdminMenuGroup = {
     href?: string;
     children?: AdminMenuChild[];
     badge?: 'support';
+    platformOnly?: boolean;
+    childOnly?: boolean;
+    tenancyOnly?: boolean;
 };
 
 export const adminMenuGroups: AdminMenuGroup[] = [
+    {
+        key: 'tenant-sites',
+        label: 'Website đại lý',
+        icon: Globe2,
+        href: '/admin/sites',
+        platformOnly: true,
+        tenancyOnly: true,
+    },
+    {
+        key: 'tenant-prices',
+        label: 'Giá bán website',
+        icon: BadgeDollarSign,
+        href: '/admin/site-prices',
+        childOnly: true,
+        tenancyOnly: true,
+    },
     {
         key: 'dashboard',
         label: 'Dashboard',
@@ -78,6 +102,7 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 href: '/admin/topup/providers',
             },
         ],
+        platformOnly: true,
     },
     {
         key: 'topup-orders',
@@ -113,10 +138,6 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 label: 'Lịch sử dòng tiền',
                 href: '/admin/users/wallet-transactions',
             },
-            {
-                label: 'Level & giá đại lý',
-                href: '/admin/member-levels',
-            },
         ],
     },
     {
@@ -133,6 +154,7 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 href: '/admin/notifications',
             },
         ],
+        platformOnly: true,
     },
     {
         key: 'seo-management',
@@ -160,6 +182,7 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 href: '/admin/seo/sitemaps',
             },
         ],
+        platformOnly: true,
     },
     {
         key: 'settings',
@@ -185,12 +208,14 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         label: 'Gửi email',
         icon: Mail,
         href: '/admin/mail',
+        platformOnly: true,
     },
     {
         key: 'queues',
         label: 'Quản lý queue',
         icon: ListChecks,
         href: '/admin/queues',
+        platformOnly: true,
     },
 ];
 

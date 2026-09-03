@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\SupportMessageFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -10,13 +11,14 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class SupportMessage extends Model
 {
     /** @use HasFactory<SupportMessageFactory> */
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     public const ROLE_USER = 'user';
 
     public const ROLE_ADMIN = 'admin';
 
     protected $fillable = [
+        'tenant_id',
         'support_conversation_id',
         'sender_id',
         'sender_role',

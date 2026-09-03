@@ -59,30 +59,6 @@ export type AdminUserDetailResponse = {
         at: string | null;
         ip: string | null;
     };
-    member_level: {
-        unlocked_level: { id: number; name: string; color: string; rank: number } | null;
-        effective_level: { id: number; name: string; color: string; rank: number } | null;
-        next_level: { id: number; name: string; lifetime_threshold: number } | null;
-        lifetime_completed_amount: number;
-        amount_to_next_level: number;
-        rolling_completed_amount: number;
-        maintenance_required_amount: number;
-        maintenance_remaining_amount: number;
-        maintenance_expires_at: string | null;
-        is_maintained: boolean;
-        is_temporarily_downgraded: boolean;
-        is_manual: boolean;
-        manual_level_expires_at: string | null;
-    } | null;
-    member_level_histories: Array<{
-        id: number;
-        type: string;
-        reason: string | null;
-        created_at: string;
-        from_level: { id: number; name: string; color: string } | null;
-        to_level: { id: number; name: string; color: string } | null;
-        actor: { id: number; name: string } | null;
-    }>;
 };
 
 export type AdminPaginationMeta = {
@@ -119,6 +95,21 @@ export type AdminUserLog = {
     created_at: string | null;
 };
 
+export type AdminUserPackagePrice = {
+    package_id: number;
+    game: string | null;
+    package: string;
+    denomination: number;
+    base_price: number;
+    member_price: number;
+    discount_amount: number;
+    pricing_mode: 'discount' | 'fixed';
+    discount_percent: number;
+    fixed_price: number | null;
+    minimum_profit: number;
+    is_active: boolean;
+};
+
 export type PaginatedAdminUserRelation<T> = {
     data: T[];
     meta: AdminPaginationMeta;
@@ -145,6 +136,24 @@ export const adminUserService = {
         const response = await api.get(`/api/admin-api/users/${userId}`);
 
         return response.data.data;
+    },
+
+    async prices(userId: number | string): Promise<AdminUserPackagePrice[]> {
+        const response = await api.get(`/api/admin-api/users/${userId}/prices`);
+
+        return response.data.data.prices as AdminUserPackagePrice[];
+    },
+
+    async updatePrice(userId: number | string, packageId: number, payload: Record<string, unknown>): Promise<AdminUserPackagePrice[]> {
+        const response = await api.put(`/api/admin-api/users/${userId}/prices/${packageId}`, payload);
+
+        return response.data.data.prices as AdminUserPackagePrice[];
+    },
+
+    async deletePrice(userId: number | string, packageId: number): Promise<AdminUserPackagePrice[]> {
+        const response = await api.delete(`/api/admin-api/users/${userId}/prices/${packageId}`);
+
+        return response.data.data.prices as AdminUserPackagePrice[];
     },
 
     async walletTransactions(

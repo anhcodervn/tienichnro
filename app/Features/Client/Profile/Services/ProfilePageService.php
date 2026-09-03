@@ -2,14 +2,13 @@
 
 namespace App\Features\Client\Profile\Services;
 
-use App\Features\MemberLevel\Services\MemberLevelService;
-use App\Features\Topup\Services\OrderRecipientService;
+use App\Features\Client\Api\Services\ApiDocumentationService;
 use App\Models\User;
 use App\Models\WalletTransaction;
 
 class ProfilePageService
 {
-    public function __construct(private readonly MemberLevelService $memberLevelService) {}
+    public function __construct(private readonly ApiDocumentationService $documentationService) {}
 
     /**
      * @return array<string, mixed>
@@ -24,14 +23,6 @@ class ProfilePageService
             'user' => $user,
             'activeTab' => $activeTab,
             'wallet' => $wallet,
-            'memberLevelStatus' => $this->memberLevelService->status($user),
-            'memberLevelHistories' => $activeTab === 'profile'
-                ? $user->memberLevelHistories()
-                    ->with(['fromLevel:id,name,color', 'toLevel:id,name,color'])
-                    ->latest('id')
-                    ->limit(8)
-                    ->get()
-                : collect(),
             'apiKeys' => $activeTab === 'api'
                 ? $user->apiKeys()
                     ->where('key_type', 'topup')
@@ -40,15 +31,7 @@ class ProfilePageService
                     ->get(['id', 'name', 'api_key', 'permissions', 'last_used_at', 'expired_at', 'created_at'])
                 : collect(),
             'apiDocumentation' => $activeTab === 'api-docs'
-                ? [
-                    'base_url' => url('/api/v1'),
-                    'balance_endpoint' => route('api.v1.balance'),
-                    'catalog_endpoint' => route('api.v1.catalog'),
-                    'create_order_endpoint' => route('api.v1.orders.store'),
-                    'order_status_endpoint' => route('api.v1.orders.show', ['order' => 'ORDER_ID']),
-                    'max_recipients' => OrderRecipientService::MAX_RECIPIENTS,
-                    'max_quantity_per_recipient' => OrderRecipientService::MAX_QUANTITY_PER_RECIPIENT,
-                ]
+                ? $this->documentationService->data()
                 : null,
             'userLogs' => $activeTab === 'logs'
                 ? $user->userLogs()->latest('id')->paginate(12, ['id', 'action', 'description', 'ip', 'user_agent', 'created_at'], 'logs_page')->withQueryString()

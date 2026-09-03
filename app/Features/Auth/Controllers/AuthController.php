@@ -13,6 +13,7 @@ use App\Features\Reporting\Services\DiscordReportService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\MailQueue;
+use App\Utils\Site;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\JsonResponse;
@@ -157,6 +158,7 @@ class AuthController extends Controller
 
     public function redirectToGoogle(Request $request): RedirectResponse
     {
+        abort_unless(Site::isMain(), 404);
         if (! $this->googleAuthService->isConfigured()) {
             return redirect()
                 ->route('auth.login')
@@ -171,6 +173,7 @@ class AuthController extends Controller
 
     public function handleGoogleCallback(Request $request): RedirectResponse
     {
+        abort_unless(Site::isMain(), 404);
         $expectedState = $request->session()->pull('google_oauth_state');
         $receivedState = $request->string('state')->toString();
 

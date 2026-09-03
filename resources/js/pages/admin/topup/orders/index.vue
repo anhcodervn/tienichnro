@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { adminTenantService } from '@/services/admin-tenant.service';
 import { adminTopupService } from '@/services/admin-topup.service';
+import { useUserStore } from '@/stores/user.store';
 import { handleErrorResponse } from '@/utils/response';
 import { echo } from '@laravel/echo-vue';
 import {
@@ -43,6 +45,8 @@ type OrderStatistics = {
     failed: number;
 };
 
+type SiteOption = { id: number; name: string; domain?: string | null; is_main: boolean };
+
 type AdminTopupOrderUpdatedEvent = Pick<
     OrderRow,
     | 'id'
@@ -58,6 +62,8 @@ type AdminTopupOrderUpdatedEvent = Pick<
 > & { updated_at: string };
 
 const orders = ref<OrderRow[]>([]);
+const sites = ref<SiteOption[]>([]);
+const userStore = useUserStore();
 const orderDetails = ref<Record<string, OrderRow>>({});
 const loading = ref(false);
 const initialLoaded = ref(false);
@@ -76,11 +82,15 @@ let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 let realtimeRefreshRunning = false;
 let realtimeRefreshQueued = false;
 let previousBodyOverflow = '';
-const realtimeChannelName = 'admin.topup.orders';
+const isPlatformAdmin = computed(() => userStore.user?.capabilities?.platform_admin === true);
+const showSiteFilter = computed(() => isPlatformAdmin.value && userStore.user?.capabilities?.multi_site === true);
+const realtimeChannelName = computed(() =>
+    showSiteFilter.value ? 'admin.platform.topup.orders' : `admin.sites.${userStore.user?.site?.id}.topup.orders`,
+);
 const realtimeEventName = '.admin.topup.order.updated';
 const pendingRealtimeCodes = new Set<string>();
 
-const filters = reactive({ search: '', payment_status: '', order_status: '', per_page: 20, page: 1 });
+const filters = reactive({ search: '', tenant_id: '', payment_status: '', order_status: '', per_page: 20, page: 1 });
 const pagination = reactive<Pagination>({ current_page: 1, last_page: 1, per_page: 20, total: 0, from: null, to: null });
 const statistics = reactive<OrderStatistics>({ total: 0, pending_payment: 0, processing: 0, failed: 0 });
 
@@ -158,6 +168,7 @@ const load = async (showLoading = true): Promise<void> => {
     try {
         const response = await adminTopupService.orders({
             search: filters.search || undefined,
+            tenant_id: filters.tenant_id || undefined,
             payment_status: filters.payment_status || undefined,
             order_status: filters.order_status || undefined,
             per_page: filters.per_page,
@@ -185,6 +196,17 @@ const load = async (showLoading = true): Promise<void> => {
     } finally {
         if (showLoading) loading.value = false;
         initialLoaded.value = true;
+    }
+};
+
+const loadSites = async (): Promise<void> => {
+    if (!showSiteFilter.value) return;
+
+    try {
+        const response = await adminTenantService.list({ per_page: 100 });
+        sites.value = response.data.data.sites;
+    } catch {
+        sites.value = [];
     }
 };
 
@@ -265,7 +287,7 @@ const applyFilters = async (): Promise<void> => {
 };
 
 const clearFilters = async (): Promise<void> => {
-    Object.assign(filters, { search: '', payment_status: '', order_status: '', per_page: 20, page: 1 });
+    Object.assign(filters, { search: '', tenant_id: '', payment_status: '', order_status: '', per_page: 20, page: 1 });
     await load();
 };
 
@@ -415,11 +437,12 @@ onMounted(() => {
     window.addEventListener('resize', closeMenu);
     window.addEventListener('scroll', closeMenu, true);
     window.addEventListener('keydown', handleEscape);
-    const realtimeChannel = echo().private(realtimeChannelName);
+    const realtimeChannel = echo().private(realtimeChannelName.value);
     realtimeChannel.listen(realtimeEventName, handleRealtimeOrderUpdated);
     realtimeChannel.subscribed(() => {
         if (initialLoaded.value) void load(false);
     });
+    void loadSites();
     void load();
 });
 onBeforeUnmount(() => {
@@ -427,8 +450,8 @@ onBeforeUnmount(() => {
     window.removeEventListener('resize', closeMenu);
     window.removeEventListener('scroll', closeMenu, true);
     window.removeEventListener('keydown', handleEscape);
-    echo().private(realtimeChannelName).stopListening(realtimeEventName, handleRealtimeOrderUpdated);
-    echo().leave(realtimeChannelName);
+    echo().private(realtimeChannelName.value).stopListening(realtimeEventName, handleRealtimeOrderUpdated);
+    echo().leave(realtimeChannelName.value);
     document.body.style.overflow = previousBodyOverflow;
     if (copiedTimer) clearTimeout(copiedTimer);
     if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
@@ -486,8 +509,13 @@ onBeforeUnmount(() => {
                 ><ChevronDown class="h-4 w-4 transition" :class="mobileFiltersOpen ? 'rotate-180' : ''" />
             </button>
             <form
-                :class="mobileFiltersOpen ? 'grid' : 'hidden lg:grid'"
-                class="mt-3 gap-3 lg:mt-0 lg:grid-cols-[minmax(260px,1fr)_190px_190px_110px_auto] lg:items-end"
+                class="mt-3 gap-3 lg:mt-0 lg:items-end"
+                :class="[
+                    mobileFiltersOpen ? 'grid' : 'hidden lg:grid',
+                    showSiteFilter
+                        ? 'lg:grid-cols-[minmax(220px,1fr)_180px_170px_170px_100px_auto]'
+                        : 'lg:grid-cols-[minmax(260px,1fr)_190px_190px_110px_auto]',
+                ]"
                 @submit.prevent="applyFilters"
             >
                 <label class="text-sm font-bold text-slate-700"
@@ -497,6 +525,15 @@ onBeforeUnmount(() => {
                             class="min-h-11 w-full rounded-xl border-slate-200 bg-slate-50 pl-9 pr-3 font-normal outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-indigo-100"
                             placeholder="Mã đơn hoặc email..." /></span
                 ></label>
+                <label v-if="showSiteFilter" class="text-sm font-bold text-slate-700"
+                    >Website<select
+                        v-model="filters.tenant_id"
+                        class="mt-1.5 min-h-11 w-full rounded-xl border-slate-200 bg-slate-50 px-3 font-normal focus:border-indigo-500 focus:ring-indigo-100"
+                    >
+                        <option value="">Tất cả website</option>
+                        <option v-for="site in sites" :key="site.id" :value="String(site.id)">{{ site.name }}</option>
+                    </select></label
+                >
                 <label class="text-sm font-bold text-slate-700"
                     >Thanh toán<select
                         v-model="filters.payment_status"
@@ -621,6 +658,7 @@ onBeforeUnmount(() => {
                                     </div>
                                     <p class="mt-1 max-w-[185px] truncate text-xs text-slate-500" :title="order.email">{{ order.email }}</p>
                                     <p class="mt-1 text-xs text-slate-400">{{ formatDateTime(order.created_at) }}</p>
+                                    <p v-if="showSiteFilter && order.site" class="mt-1 text-xs font-bold text-blue-600">{{ order.site.name }}</p>
                                 </td>
                                 <td class="px-4 py-4">
                                     <p class="font-bold text-slate-900">{{ order.game || 'Chưa xác định game' }}</p>

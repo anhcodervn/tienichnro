@@ -3,16 +3,17 @@
 namespace App\Features\Client\Api\Controllers;
 
 use App\Features\Client\Api\Resources\CatalogGameResource;
-use App\Features\MemberLevel\Services\MemberLevelPriceService;
+use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class CatalogController extends Controller
 {
-    public function __invoke(Request $request, MemberLevelPriceService $memberLevelPriceService): JsonResponse
+    public function __invoke(Request $request, TopupPackagePricingService $topupPackagePricingService): JsonResponse
     {
         $games = Game::query()
             ->active()
@@ -33,10 +34,9 @@ class CatalogController extends Controller
             ->orderBy('id')
             ->get();
 
-        $memberLevelStatus = $memberLevelPriceService->apply(
-            $games->flatMap(fn (Game $game) => $game->packages),
-            $request->user(),
-        );
+        /** @var User|null $user */
+        $user = $request->user();
+        $topupPackagePricingService->apply($games->flatMap(fn (Game $game) => $game->packages), $user);
         $games->each(fn (Game $game) => $game->setRelation(
             'packages',
             $game->packages->filter(fn ($package) => $package->is_price_available)->values(),
@@ -45,7 +45,6 @@ class CatalogController extends Controller
         return response()->json([
             'status' => true,
             'data' => CatalogGameResource::collection($games)->resolve(),
-            'member_level' => $memberLevelStatus,
         ]);
     }
 }

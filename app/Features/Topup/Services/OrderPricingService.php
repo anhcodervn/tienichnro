@@ -2,7 +2,6 @@
 
 namespace App\Features\Topup\Services;
 
-use App\Features\MemberLevel\Services\MemberLevelPriceService;
 use App\Models\GameServer;
 use App\Models\TopupPackage;
 use App\Models\User;
@@ -11,7 +10,7 @@ use Illuminate\Validation\ValidationException;
 class OrderPricingService
 {
     public function __construct(
-        private readonly MemberLevelPriceService $memberLevelPriceService,
+        private readonly TopupPackagePricingService $topupPackagePricingService,
         private readonly GameRewardService $gameRewardService,
     ) {}
 
@@ -66,7 +65,7 @@ class OrderPricingService
             throw ValidationException::withMessages(['server_id' => 'Máy chủ không tồn tại hoặc đang tạm tắt.']);
         }
 
-        $memberPrice = $this->memberLevelPriceService->resolve($package, $user);
+        $price = $this->topupPackagePricingService->resolve($package, $user);
         $quantitiesToValidate = $recipientQuantities !== [] ? $recipientQuantities : [$quantity];
         $hasInvalidQuantity = collect($quantitiesToValidate)->contains(
             fn (mixed $recipientQuantity): bool => (int) $recipientQuantity < $package->min_quantity
@@ -77,12 +76,13 @@ class OrderPricingService
             throw ValidationException::withMessages([$quantityField => 'Số lượng không nằm trong giới hạn của gói nạp.']);
         }
 
-        $retailPrice = $memberPrice['retail_price'];
-        $sellingPrice = $memberPrice['final_price'];
-        $unitPrice = $memberPrice['original_price'];
+        $retailPrice = $price['retail_price'];
+        $sellingPrice = $price['final_price'];
+        $tenantCostPrice = (int) $price['tenant_cost_price'];
+        $unitPrice = $price['original_price'];
         $subtotal = $unitPrice * $quantity;
         $totalAmount = $sellingPrice * $quantity;
-        $providerUnitCost = $memberPrice['provider_price'];
+        $providerUnitCost = $price['provider_price'];
         $providerTotalCost = $providerUnitCost === null ? null : $providerUnitCost * $quantity;
 
         return [
@@ -93,18 +93,17 @@ class OrderPricingService
             'retail_unit_price' => $retailPrice,
             'subtotal' => $subtotal,
             'discount_amount' => $subtotal - $totalAmount,
-            'member_level_discount_amount' => $memberPrice['discount_amount'] * $quantity,
             'total_amount' => $totalAmount,
             'provider_unit_cost' => $providerUnitCost,
             'provider_total_cost' => $providerTotalCost,
             'gross_profit' => $providerTotalCost === null ? null : $totalAmount - $providerTotalCost,
-            'member_level_id' => $memberPrice['level_id'],
-            'member_level_name' => $memberPrice['level_name'],
-            'member_level_pricing_mode' => $memberPrice['pricing_mode'],
-            'member_level_discount_bps' => $memberPrice['discount_basis_points'],
-            'package_source' => $memberPrice['package_source'],
-            'global_topup_package_id' => $memberPrice['global_topup_package_id'],
-            'global_topup_package_name' => $memberPrice['global_topup_package_name'],
+            'tenant_cost_unit_price' => $tenantCostPrice,
+            'tenant_cost_total' => $tenantCostPrice * $quantity,
+            'tenant_profit' => ((int) $price['tenant_profit']) * $quantity,
+            'tenant_pricing_mode' => $price['tenant_pricing_mode'] ?? 'base_price',
+            'package_source' => $price['package_source'],
+            'global_topup_package_id' => $price['global_topup_package_id'],
+            'global_topup_package_name' => $price['global_topup_package_name'],
         ];
     }
 }

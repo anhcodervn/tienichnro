@@ -9,7 +9,9 @@ use App\Features\Admin\Topup\Services\TopupAdminService;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
 use App\Models\PaymentTransaction;
+use App\Models\Scopes\TenantScope;
 use App\Models\User;
+use App\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,22 +22,22 @@ class OrderController extends Controller
     public function index(Request $request): JsonResponse
     {
         $data = OrderResource::collection($this->service->orders($request))->response()->getData(true);
-        $data['statistics'] = $this->service->todayCardStatistics();
+        $data['statistics'] = $this->service->todayCardStatistics($request->integer('tenant_id') ?: null);
 
         return response()->json(['status' => true, 'data' => $data]);
     }
 
-    public function show(Order $order): JsonResponse
+    public function show(string $order): JsonResponse
     {
-        return $this->sensitiveOrderResponse($order);
+        return $this->sensitiveOrderResponse($this->service->findOrder($order));
     }
 
-    public function update(UpdateOrderStatusRequest $request, Order $order): JsonResponse
+    public function update(UpdateOrderStatusRequest $request, string $order): JsonResponse
     {
         /** @var User $admin */
         $admin = $request->user();
         $order = $this->service->updateOrder(
-            $order,
+            $this->service->findOrder($order),
             $request->string('action')->toString(),
             $request->filled('reason') ? $request->string('reason')->toString() : null,
             $admin,
@@ -47,10 +49,22 @@ class OrderController extends Controller
 
     private function sensitiveOrderResponse(Order $order): JsonResponse
     {
-        $order->load(['game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients', 'latestPaymentTransaction']);
+        $relations = ['game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients', 'latestPaymentTransaction'];
+
+        if (app(TenantContext::class)->isActive() && app(TenantContext::class)->isMain()) {
+            $relations[] = 'tenant:id,name,slug';
+        }
+
+        $order->load($relations);
 
         if ($order->payment_method === PaymentMethod::BankTransfer && $order->latestPaymentTransaction === null) {
-            $legacyTransaction = PaymentTransaction::query()
+            $legacyTransactionQuery = PaymentTransaction::query();
+
+            if (app(TenantContext::class)->isActive() && app(TenantContext::class)->isMain()) {
+                $legacyTransactionQuery->withoutGlobalScope(TenantScope::class)->where('tenant_id', $order->tenant_id);
+            }
+
+            $legacyTransaction = $legacyTransactionQuery
                 ->whereNull('order_id')
                 ->where('transaction_code', $order->code)
                 ->latest('id')

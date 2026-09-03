@@ -6,6 +6,7 @@ use App\Events\WalletDepositCredited;
 use App\Exceptions\ApiException;
 use App\Features\Recharge\Services\ApiBankVnPartnerService;
 use App\Features\Recharge\Services\BankTransferContentService;
+use App\Features\Recharge\Services\RechargeBonusService;
 use App\Features\Recharge\Services\RechargeConfigService;
 use App\Features\Reporting\Services\DiscordReportService;
 use App\Models\ConfigRecharge;
@@ -26,6 +27,7 @@ class WalletDepositService
         private readonly RechargeConfigService $rechargeConfigService,
         private readonly BankTransferContentService $bankTransferContentService,
         private readonly ApiBankVnPartnerService $apiBankVnPartnerService,
+        private readonly RechargeBonusService $rechargeBonusService,
         private readonly DiscordReportService $discordReportService,
     ) {}
 
@@ -74,9 +76,12 @@ class WalletDepositService
             throw new ApiException('Hệ thống chưa cấu hình nhận tiền hoặc đang tạm tắt.', 422);
         }
 
+        $depositAmount = (int) round($amount);
+        $bonus = $this->rechargeBonusService->calculate($depositAmount);
+
         return $this->rechargeConfigService->isApiBankVnProvider($config)
-            ? $this->createApiBankVnRequest($user, $config, $amount)
-            : $this->createManualRequest($user, $config, $amount);
+            ? $this->createApiBankVnRequest($user, $config, $depositAmount, $bonus)
+            : $this->createManualRequest($user, $config, $depositAmount, $bonus);
     }
 
     public function confirmRequest(PaymentTransaction $paymentTransaction, User $user): PaymentTransaction
@@ -176,7 +181,8 @@ class WalletDepositService
         return $paymentTransaction;
     }
 
-    private function createManualRequest(User $user, ConfigRecharge $config, float $amount): PaymentTransaction
+    /** @param array<string, mixed> $bonus */
+    private function createManualRequest(User $user, ConfigRecharge $config, int $amount, array $bonus): PaymentTransaction
     {
         $transactionCode = 'DEP'.strtoupper(Str::random(10));
         $transferContent = $this->bankTransferContentService->generate($config);
@@ -203,14 +209,15 @@ class WalletDepositService
                 'transfer_content' => $transferContent,
                 'requested_transfer_prefix' => $this->rechargeConfigService->normalizePrefix((string) $config->transfer_prefix),
                 'requested_transfer_content' => $transferContent,
-                'bonus_amount' => 0,
+                ...$this->bonusSnapshot($bonus),
                 'confirmed_at' => null,
                 'expires_at' => now()->addDay()->toISOString(),
             ],
         ]);
     }
 
-    private function createApiBankVnRequest(User $user, ConfigRecharge $config, float $amount): PaymentTransaction
+    /** @param array<string, mixed> $bonus */
+    private function createApiBankVnRequest(User $user, ConfigRecharge $config, int $amount, array $bonus): PaymentTransaction
     {
         $transactionCode = 'DEP'.strtoupper(Str::random(10));
         $requestedTransferContent = $this->bankTransferContentService->generate($config);
@@ -241,7 +248,7 @@ class WalletDepositService
                 'requested_transfer_prefix' => $this->rechargeConfigService->normalizePrefix((string) $config->transfer_prefix),
                 'requested_transfer_content' => $requestedTransferContent,
                 'account_name' => $partnerOrder['account_name'] ?? $config->account_name,
-                'bonus_amount' => 0,
+                ...$this->bonusSnapshot($bonus),
                 'confirmed_at' => null,
                 'expires_at' => $partnerOrder['expires_at'] ?? now()->addHour()->toISOString(),
                 'remote_order' => $partnerOrder,
@@ -322,13 +329,16 @@ class WalletDepositService
                 $wallet = Wallet::query()->whereKey($wallet->id)->lockForUpdate()->firstOrFail();
             }
 
-            $balanceBefore = (float) $wallet->balance;
-            $creditAmount = (float) $lockedTransaction->amount;
+            $raw = is_array($lockedTransaction->raw_data) ? $lockedTransaction->raw_data : [];
+            $depositAmount = (int) $lockedTransaction->amount;
+            $bonusAmount = max(0, (int) ($raw['bonus_amount'] ?? 0));
+            $creditAmount = $depositAmount + $bonusAmount;
+            $balanceBefore = (int) $wallet->balance;
             $balanceAfter = $balanceBefore + $creditAmount;
 
             $wallet->forceFill([
                 'balance' => $balanceAfter,
-                'total_recharge' => (float) $wallet->total_recharge + $creditAmount,
+                'total_recharge' => (int) $wallet->total_recharge + $depositAmount,
             ])->save();
 
             WalletTransaction::query()->create([
@@ -340,10 +350,16 @@ class WalletDepositService
                 'reference_type' => PaymentTransaction::class,
                 'reference_id' => $lockedTransaction->id,
                 'description' => 'Nạp tiền thành công qua apibankvn.com mã:'.$lockedTransaction->transaction_code,
+                'metadata' => [
+                    'deposit_amount' => $depositAmount,
+                    'bonus_amount' => $bonusAmount,
+                    'credited_amount' => $creditAmount,
+                    'bonus_tier_id' => $raw['bonus_tier_id'] ?? null,
+                    'bonus_basis_points' => $raw['bonus_basis_points'] ?? 0,
+                ],
                 'status' => 'success',
             ]);
 
-            $raw = is_array($lockedTransaction->raw_data) ? $lockedTransaction->raw_data : [];
             $raw['remote_order'] = $partnerOrder;
             $raw['remote_order_code'] = $partnerOrder['order_code'] ?? ($raw['remote_order_code'] ?? null);
             $raw['remote_status'] = $partnerOrder['status'] ?? 'paid';
@@ -351,6 +367,7 @@ class WalletDepositService
             $raw['expires_at'] = $partnerOrder['expires_at'] ?? ($raw['expires_at'] ?? null);
             $raw['paid_at'] = $partnerOrder['paid_at'] ?? now()->toISOString();
             $raw['callback_metadata'] = $partnerOrder['metadata'] ?? ($raw['callback_metadata'] ?? null);
+            $raw['credited_amount'] = $creditAmount;
             $raw['confirmed_at'] = $markConfirmed
                 ? now()->toISOString()
                 : ($raw['confirmed_at'] ?? null);
@@ -368,7 +385,9 @@ class WalletDepositService
                 'user_id' => $user->id,
                 'scope' => Notification::SCOPE_USER,
                 'title' => 'Nạp tiền thành công',
-                'content' => number_format($creditAmount, 0, ',', '.').'đ đã được cộng vào ví của bạn.',
+                'content' => $bonusAmount > 0
+                    ? number_format($creditAmount, 0, ',', '.').'đ đã được cộng vào ví, gồm '.number_format($bonusAmount, 0, ',', '.').'đ khuyến mãi.'
+                    : number_format($depositAmount, 0, ',', '.').'đ đã được cộng vào ví của bạn.',
                 'redirect_url' => "/wallet?view=payment&request={$lockedTransaction->id}&from=deposit",
                 'type' => 'success',
                 'is_read' => false,
@@ -379,6 +398,8 @@ class WalletDepositService
                 'payment_transaction_id' => $lockedTransaction->id,
                 'transaction_code' => $lockedTransaction->transaction_code,
                 'amount' => number_format($creditAmount, 2, '.', ''),
+                'deposit_amount' => $depositAmount,
+                'bonus_amount' => $bonusAmount,
                 'balance_before' => number_format($balanceBefore, 2, '.', ''),
                 'balance' => (string) $wallet->balance,
                 'total_recharge' => (string) $wallet->total_recharge,
@@ -416,7 +437,9 @@ class WalletDepositService
                 details: [
                     'Mã giao dịch' => $eventPayload['transaction_code'],
                     'User ID' => $eventPayload['user_id'],
-                    'Số tiền' => number_format((float) $eventPayload['amount'], 0, ',', '.').' đ',
+                    'Tiền thực nạp' => number_format($eventPayload['deposit_amount'], 0, ',', '.').' đ',
+                    'Tiền khuyến mãi' => number_format($eventPayload['bonus_amount'], 0, ',', '.').' đ',
+                    'Tổng cộng ví' => number_format((float) $eventPayload['amount'], 0, ',', '.').' đ',
                     'Số dư trước' => number_format((float) $eventPayload['balance_before'], 0, ',', '.').' đ',
                     'Số dư sau' => number_format((float) $eventPayload['balance'], 0, ',', '.').' đ',
                 ],
@@ -425,6 +448,19 @@ class WalletDepositService
         }
 
         return $creditedTransaction;
+    }
+
+    /** @param array<string, mixed> $bonus @return array<string, int|float|null> */
+    private function bonusSnapshot(array $bonus): array
+    {
+        return [
+            'bonus_tier_id' => $bonus['tier_id'],
+            'bonus_minimum_amount' => $bonus['minimum_amount'],
+            'bonus_basis_points' => $bonus['bonus_basis_points'],
+            'bonus_percent' => $bonus['bonus_percent'],
+            'bonus_amount' => $bonus['bonus_amount'],
+            'credited_amount' => $bonus['credited_amount'],
+        ];
     }
 
     private function usesApiBankVn(PaymentTransaction $paymentTransaction): bool

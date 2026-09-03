@@ -10,6 +10,7 @@ use App\Features\Recharge\Services\RechargeConfigService;
 use App\Http\Controllers\Controller;
 use App\Models\ConfigRecharge;
 use App\Utils\ApiResponse;
+use App\Utils\Site;
 use Illuminate\Http\JsonResponse;
 
 class RechargeConfigController extends Controller
@@ -26,6 +27,11 @@ class RechargeConfigController extends Controller
                 ->map(fn (ConfigRecharge $config): array => (new RechargeConfigResource($config))->resolve())
                 ->values()
                 ->all(),
+            'site' => [
+                'is_main' => Site::isMain(),
+                'callback_url' => $this->callbackUrl(),
+                'allowed_providers' => Site::isChild() ? ['apibankvn_api'] : ['manual', 'apibankvn_api'],
+            ],
         ]));
     }
 
@@ -103,5 +109,14 @@ class RechargeConfigController extends Controller
             : ($payload['api_base_url'] ?? null);
 
         return $payload;
+    }
+
+    private function callbackUrl(): string
+    {
+        $domain = Site::domain();
+
+        return $domain === null
+            ? url('/api/recharge/callbacks/apibankvn')
+            : "https://{$domain}/api/recharge/callbacks/apibankvn";
     }
 }

@@ -4,17 +4,23 @@ namespace App\Features\Client\Wallet\Services;
 
 use App\Events\WalletBalanceChanged;
 use App\Exceptions\ApiException;
+use App\Models\Scopes\TenantScope;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use App\Support\TenantContext;
 
 class WalletService
 {
     public function createWallet(User $user, string $type = Wallet::TYPE_MAIN): Wallet
     {
-        return $user->wallets()->firstOrCreate([
-            'type' => $type,
-        ], [
+        $identity = ['type' => $type];
+
+        if (app(TenantContext::class)->isActive()) {
+            $identity['tenant_id'] = $user->tenant_id;
+        }
+
+        return $user->wallets()->firstOrCreate($identity, [
             'balance' => 0,
             'hold_balance' => 0,
             'total_recharge' => 0,
@@ -81,6 +87,7 @@ class WalletService
         }
 
         $wallet = Wallet::query()
+            ->withoutGlobalScope(TenantScope::class)
             ->where('user_id', $user->id)
             ->where('type', $type)
             ->lockForUpdate()
@@ -89,6 +96,7 @@ class WalletService
         if (! $wallet instanceof Wallet) {
             $wallet = $this->createWallet($user, $type);
             $wallet = Wallet::query()
+                ->withoutGlobalScope(TenantScope::class)
                 ->whereKey($wallet->id)
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -106,7 +114,7 @@ class WalletService
             'total_spent' => $this->monetaryInteger((string) $wallet->total_spent) + $amount,
         ])->save();
 
-        $transaction = WalletTransaction::query()->create([
+        $transactionAttributes = [
             'wallet_id' => $wallet->id,
             'type' => 'debit',
             'amount' => $amount,
@@ -117,7 +125,13 @@ class WalletService
             'idempotency_key' => $idempotencyKey,
             'description' => $description,
             'status' => 'success',
-        ]);
+        ];
+
+        if (app(TenantContext::class)->isActive()) {
+            $transactionAttributes['tenant_id'] = $wallet->tenant_id;
+        }
+
+        $transaction = WalletTransaction::query()->create($transactionAttributes);
 
         $wallet = $wallet->refresh();
         $this->broadcastBalanceChanged($user, $wallet, $transaction, -$amount);
@@ -151,6 +165,7 @@ class WalletService
         }
 
         $wallet = Wallet::query()
+            ->withoutGlobalScope(TenantScope::class)
             ->where('user_id', $user->id)
             ->where('type', $type)
             ->lockForUpdate()
@@ -164,7 +179,7 @@ class WalletService
             'total_spent' => max(0, $this->monetaryInteger((string) $wallet->total_spent) - $amount),
         ])->save();
 
-        $transaction = WalletTransaction::query()->create([
+        $transactionAttributes = [
             'wallet_id' => $wallet->id,
             'type' => 'credit',
             'amount' => $amount,
@@ -175,7 +190,13 @@ class WalletService
             'idempotency_key' => $idempotencyKey,
             'description' => $description,
             'status' => 'success',
-        ]);
+        ];
+
+        if (app(TenantContext::class)->isActive()) {
+            $transactionAttributes['tenant_id'] = $wallet->tenant_id;
+        }
+
+        $transaction = WalletTransaction::query()->create($transactionAttributes);
 
         $wallet = $wallet->refresh();
         $this->broadcastBalanceChanged($user, $wallet, $transaction, $amount);
@@ -214,6 +235,7 @@ class WalletService
         }
 
         $transaction = WalletTransaction::query()
+            ->withoutGlobalScope(TenantScope::class)
             ->with('wallet')
             ->where('idempotency_key', $idempotencyKey)
             ->first();

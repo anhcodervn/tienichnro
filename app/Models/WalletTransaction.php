@@ -2,15 +2,18 @@
 
 namespace App\Models;
 
+use App\Models\Concerns\BelongsToTenant;
+use App\Models\Scopes\TenantScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class WalletTransaction extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     protected $fillable = [
+        'tenant_id',
         'wallet_id',
         'type',
         'amount',
@@ -37,6 +40,6 @@ class WalletTransaction extends Model
 
     public function wallet(): BelongsTo
     {
-        return $this->belongsTo(Wallet::class);
+        return $this->belongsTo(Wallet::class)->withoutGlobalScope(TenantScope::class);
     }
 }

@@ -4,6 +4,14 @@
 @section('robots', 'noindex,nofollow')
 
 @section('content')
+@if ($deposit['bonus_amount'] > 0)
+    <section class="client-container pt-5 sm:pt-8">
+        <div class="flex items-start gap-3 rounded-[5px] border border-emerald-200 bg-emerald-50 p-4 text-emerald-900">
+            <i class="bx bx-gift shrink-0 text-2xl text-emerald-600" aria-hidden="true"></i>
+            <p class="text-sm leading-6">Chuyển <strong>{{ number_format($deposit['amount'], 0, ',', '.') }}đ</strong> và nhận <strong>{{ number_format($deposit['credited_amount'], 0, ',', '.') }}đ</strong> vào ví, đã gồm <strong>{{ number_format($deposit['bonus_amount'], 0, ',', '.') }}đ</strong> khuyến mãi.</p>
+        </div>
+    </section>
+@endif
 <x-client.bank-transfer-payment
     eyebrow="Yêu cầu nạp {{ $deposit['code'] }}"
     title="Thanh toán chuyển khoản"

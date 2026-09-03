@@ -1,74 +1,58 @@
 <template>
-    <div class="flex flex-col gap-3 ">
-        <!-- table -->
-        <div
-            class="w-full overflow-x-auto rounded border 
-            border-gray-200 shadow-sm"
-        >
-            <table class="text-sm"
-                :class="props.classCustom">
-                <!-- HEADER -->
+    <div class="flex flex-col gap-3">
+        <div class="w-full overflow-x-auto rounded-[10px] border border-slate-200 bg-white shadow-sm">
+            <table class="w-full text-sm" :class="props.classCustom">
                 <thead class="bg-gray-50">
                     <tr>
                         <th
                             v-for="header in table.getHeaderGroups()[0].headers"
                             :key="header.id"
-                            class="px-5 py-3 text-left font-semibold text-gray-600 uppercase tracking-wider"
+                            class="whitespace-nowrap px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-600"
                         >
                             {{ header.column.columnDef.header }}
                         </th>
                     </tr>
                 </thead>
-    
-                <!-- BODY -->
-                <tbody class="divide-y divide-gray-300 relative">
-                     <!-- loading -->
-                    <Loading :loading="props.loading"/>
-                    <tr
-                        v-for="row in table.getRowModel().rows"
-                        :key="row.id"
-                        class="hover:bg-gray-200 transition cursor-pointer"
-                    >
-                        <td
-                            v-for="cell in row.getVisibleCells()"
-                            :key="cell.id"
-                            class="px-5 py-3 text-gray-700"
-                        >
-                            <!-- custom slot -->
-                            <slot
-                                :name="cell.column.id"
-                                :row="row.original"
-                                :value="cell.getValue()"
-                            >
-                                {{ cell.getValue() }}
-                            </slot>
+
+                <tbody class="divide-y divide-gray-200">
+                    <tr v-if="props.loading">
+                        <td :colspan="columns.length" class="px-5 py-14 text-center text-slate-500">
+                            <span class="inline-flex items-center gap-2 font-semibold">
+                                <span
+                                    class="h-5 w-5 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"
+                                    aria-hidden="true"
+                                ></span>
+                                Đang tải dữ liệu...
+                            </span>
                         </td>
                     </tr>
-    
-                    <!-- EMPTY -->
-                    <tr v-if="!table.getRowModel().rows.length">
-                        <td
-                            :colspan="columns.length"
-                            class="text-center py-6 text-gray-400"
-                        >
-                            No data...
+                    <template v-else>
+                        <tr v-for="row in table.getRowModel().rows" :key="row.id" class="transition hover:bg-slate-50/80">
+                            <td v-for="cell in row.getVisibleCells()" :key="cell.id" class="px-5 py-3 text-gray-700">
+                                <slot :name="cell.column.id" :row="row.original" :value="cell.getValue()">
+                                    {{ cell.getValue() }}
+                                </slot>
+                            </td>
+                        </tr>
+                    </template>
+
+                    <tr v-if="!props.loading && !table.getRowModel().rows.length">
+                        <td :colspan="columns.length" class="px-5 py-14 text-center text-gray-400">
+                            {{ props.emptyText ?? 'Không có dữ liệu phù hợp.' }}
                         </td>
                     </tr>
                 </tbody>
             </table>
         </div>
-        <!-- paginate -->
-        <div>
-            <Paginate :currentPage="props.currentPage" :totalPages="props.totalPages"
-                :goToPage="props.goToPage"/>
+        <div v-if="props.totalPages > 1">
+            <Paginate :current-page="props.currentPage" :total-pages="props.totalPages" :go-to-page="props.goToPage" />
         </div>
     </div>
 </template>
 
 <script setup lang="ts">
-import { useVueTable, getCoreRowModel } from "@tanstack/vue-table";
-import Paginate from "./PaginateComponent.vue";
-import Loading from "./Loading.vue";
+import { getCoreRowModel, useVueTable } from '@tanstack/vue-table';
+import Paginate from './PaginateComponent.vue';
 
 const props = defineProps<{
     data: any[];
@@ -78,6 +62,7 @@ const props = defineProps<{
     currentPage: number;
     loading: boolean;
     classCustom?: string;
+    emptyText?: string;
 }>();
 
 const table = useVueTable({

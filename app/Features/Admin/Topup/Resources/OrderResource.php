@@ -7,6 +7,8 @@ use App\Enums\PaymentStatus;
 use App\Features\Topup\Services\TopupProviderResolver;
 use App\Models\OrderRecipient;
 use App\Models\PaymentTransaction;
+use App\Support\TenantContext;
+use App\Utils\Site;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 
@@ -23,7 +25,12 @@ class OrderResource extends JsonResource
             : null;
 
         return [
-            'id' => $this->id, 'code' => $this->code, 'email' => $this->email,
+            'id' => $this->id, 'tenant_id' => $this->tenant_id, 'code' => $this->code, 'email' => $this->email,
+            'site' => $this->when(app(TenantContext::class)->isActive() && Site::isMain(), fn (): ?array => $this->tenant === null ? null : [
+                'id' => $this->tenant->id,
+                'name' => $this->tenant->name,
+                'slug' => $this->tenant->slug,
+            ]),
             'user_id' => $this->user_id, 'game' => $this->game?->name, 'server' => $this->server?->name,
             'game_account' => $this->game_account, 'game_character' => $this->game_character,
             'package_name' => $this->package_name, 'quantity' => $this->quantity,
@@ -38,10 +45,13 @@ class OrderResource extends JsonResource
             'pricing' => [
                 'sale_unit_price' => (int) ($this->sale_unit_price ?? ($this->quantity > 0 ? (int) $this->total_amount / $this->quantity : 0)),
                 'sale_total' => (int) $this->total_amount,
-                'provider_unit_cost' => $this->provider_unit_cost === null ? null : (int) $this->provider_unit_cost,
-                'provider_total_cost' => $this->provider_total_cost === null ? null : (int) $this->provider_total_cost,
-                'gross_profit' => $this->gross_profit === null ? null : (int) $this->gross_profit,
-                'gross_margin_percent' => $this->gross_profit === null || (int) $this->total_amount <= 0
+                'tenant_cost_unit_price' => $this->tenant_cost_unit_price === null ? null : (int) $this->tenant_cost_unit_price,
+                'tenant_cost_total' => $this->tenant_cost_total === null ? null : (int) $this->tenant_cost_total,
+                'tenant_profit' => $this->tenant_profit === null ? null : (int) $this->tenant_profit,
+                'provider_unit_cost' => Site::isMain() && $this->provider_unit_cost !== null ? (int) $this->provider_unit_cost : null,
+                'provider_total_cost' => Site::isMain() && $this->provider_total_cost !== null ? (int) $this->provider_total_cost : null,
+                'gross_profit' => Site::isMain() && $this->gross_profit !== null ? (int) $this->gross_profit : null,
+                'gross_margin_percent' => ! Site::isMain() || $this->gross_profit === null || (int) $this->total_amount <= 0
                     ? null
                     : round(((int) $this->gross_profit / (int) $this->total_amount) * 100, 1),
             ],
@@ -91,14 +101,17 @@ class OrderResource extends JsonResource
                 ])->all()),
             'total_amount' => $this->total_amount, 'payment_method' => $this->payment_method->value,
             'payment_status' => $this->payment_status->value, 'order_status' => $this->order_status->value,
-            'can_reorder' => $this->payment_status === PaymentStatus::Paid
+            'can_reorder' => Site::isMain()
+                && $this->payment_status === PaymentStatus::Paid
                 && $this->order_status === OrderStatus::Failed
                 && TopupProviderResolver::supportsBalance($this->provider?->slug),
-            'can_sync_provider' => $this->payment_status === PaymentStatus::Paid
+            'can_sync_provider' => Site::isMain()
+                && $this->payment_status === PaymentStatus::Paid
                 && in_array($this->order_status, [OrderStatus::Processing, OrderStatus::Completed], true)
                 && TopupProviderResolver::supportsStatusChecks($this->provider?->slug)
                 && $this->hasQueryableProviderItems(),
-            'can_retry_provider_submission' => $this->payment_status === PaymentStatus::Paid
+            'can_retry_provider_submission' => Site::isMain()
+                && $this->payment_status === PaymentStatus::Paid
                 && $this->order_status === OrderStatus::Processing
                 && TopupProviderResolver::supportsBalance($this->provider?->slug)
                 && ($this->isProviderBalanceManualReview() || str_contains((string) $this->failure_reason, 'Provider không đủ số dư')),

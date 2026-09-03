@@ -11,6 +11,7 @@ use App\Features\Topup\Services\TopupProviderBalanceService;
 use App\Models\AdminAuditLog;
 use App\Models\Order;
 use App\Models\OrderRecipient;
+use App\Models\Scopes\TenantScope;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -43,6 +44,7 @@ class ReorderFailedTopupOrderAction
         /** @var array{order: Order, failed_units: array<int, array<int, int>>} $result */
         $result = DB::transaction(function () use ($order, $admin, $request, $balanceBefore): array {
             $lockedOrder = Order::query()
+                ->withoutGlobalScope(TenantScope::class)
                 ->with('provider')
                 ->lockForUpdate()
                 ->findOrFail($order->id);

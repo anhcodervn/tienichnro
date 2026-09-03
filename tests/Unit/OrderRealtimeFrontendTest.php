@@ -45,29 +45,30 @@ test('pending order pages use Reverb instead of polling', function (): void {
 
     expect($adminOrders)
         ->toContain("import { echo } from '@laravel/echo-vue'")
-        ->toContain("const realtimeChannelName = 'admin.topup.orders'")
+        ->toContain("showSiteFilter.value ? 'admin.platform.topup.orders'")
         ->toContain("const realtimeEventName = '.admin.topup.order.updated'")
         ->toContain('applyRealtimeSnapshot(event)')
         ->toContain('flushRealtimeRefresh()')
         ->toContain('realtimeChannel.subscribed(')
         ->toContain('.stopListening(realtimeEventName, handleRealtimeOrderUpdated)')
-        ->toContain('echo().leave(realtimeChannelName)')
+        ->toContain('echo().leave(realtimeChannelName.value)')
         ->not->toContain('window.setInterval')
         ->and($adminEvent)
         ->toContain('ShouldBroadcastNow')
         ->toContain('ShouldDispatchAfterCommit')
-        ->toContain("new PrivateChannel('admin.topup.orders')")
+        ->toContain('new PrivateChannel("admin.sites.{$this->tenantId}.topup.orders")')
+        ->toContain("new PrivateChannel('admin.platform.topup.orders')")
         ->toContain("return 'admin.topup.order.updated'")
         ->and($channels)
-        ->toContain("Broadcast::channel('admin.topup.orders'")
-        ->toContain('return $user->role === \'admin\'');
+        ->toContain("Broadcast::channel('admin.sites.{tenantId}.topup.orders'")
+        ->toContain("Broadcast::channel('admin.platform.topup.orders'");
 
     expect($adminHome)
-        ->toContain("const realtimeChannelName = 'admin.topup.orders'")
+        ->toContain("? 'admin.platform.topup.orders'")
         ->toContain("const realtimeEventName = '.admin.topup.order.updated'")
         ->toContain('handleRealtimeOrderUpdated')
         ->toContain('realtimeChannel.subscribed(')
         ->toContain('.stopListening(realtimeEventName, handleRealtimeOrderUpdated)')
-        ->toContain('echo().leave(realtimeChannelName)')
+        ->toContain('echo().leave(realtimeChannelName.value)')
         ->not->toContain('window.setInterval');
 });

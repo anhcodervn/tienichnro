@@ -14,6 +14,7 @@
     data-store-url="{{ route('client/wallet.deposit-requests.store') }}"
     data-payment-url-template="{{ url('/nap-tien/__CODE__/thanh-toan') }}"
 >
+    <script type="application/json" data-deposit-bonus-tiers>@json($bonusTiers)</script>
     <header class="mb-4 flex flex-col gap-3 sm:mb-5 sm:flex-row sm:items-end sm:justify-between">
         <div>
             <p class="text-xs font-bold uppercase tracking-[0.16em] text-indigo-600">Ví của bạn</p>
@@ -53,6 +54,25 @@
         </div>
     @endif
 
+    @if ($activeTab === 'deposit' && count($bonusTiers) > 0)
+        <section class="mb-4 rounded-[5px] border border-emerald-200 bg-emerald-50 p-4">
+            <div class="flex items-start gap-3">
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-[5px] bg-emerald-600 text-xl text-white"><i class="bx bx-gift" aria-hidden="true"></i></span>
+                <div class="min-w-0">
+                    <h2 class="font-extrabold text-emerald-950">Khuyến mãi cộng thêm số dư</h2>
+                    <p class="mt-1 text-sm leading-6 text-emerald-800">Nạp càng cao, hệ thống tự chọn mốc ưu đãi cao nhất bạn đạt được.</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        @foreach ($bonusTiers as $tier)
+                            <span class="rounded-[5px] border border-emerald-200 bg-white px-2.5 py-1.5 text-xs font-bold text-emerald-800">
+                                Từ {{ number_format($tier['minimum_amount'], 0, ',', '.') }}đ <strong class="text-emerald-600">+{{ $tier['bonus_percent'] }}%</strong>
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
+        </section>
+    @endif
+
     <div class="client-card overflow-hidden">
         <nav class="flex min-w-0 gap-6 overflow-x-auto border-b border-slate-200 px-4 sm:px-6" aria-label="Nạp tiền">
             <a @class(['inline-flex min-h-12 shrink-0 items-center border-b-2 px-1 text-sm font-bold transition', 'border-indigo-600 text-indigo-600' => $activeTab === 'deposit', 'border-transparent text-slate-500 hover:text-slate-900' => $activeTab !== 'deposit']) href="{{ route('wallet.deposit.index') }}" @if ($activeTab === 'deposit') aria-current="page" @endif>Nạp tiền</a>
@@ -86,6 +106,8 @@
                         <tbody class="divide-y divide-slate-100 bg-white">
                             @forelse ($depositHistory as $transaction)
                                 @php
+                                    $transactionRaw = is_array($transaction->raw_data) ? $transaction->raw_data : [];
+                                    $transactionBonus = (int) ($transactionRaw['bonus_amount'] ?? 0);
                                     $status = match ($transaction->status) {
                                         'success' => ['Đã cộng tiền', 'bg-emerald-50 text-emerald-700'],
                                         'matched' => ['Đang xác nhận', 'bg-blue-50 text-blue-700'],
@@ -96,7 +118,12 @@
                                 @endphp
                                 <tr>
                                     <td class="px-4 py-4 font-extrabold text-slate-950">{{ $transaction->transaction_code }}</td>
-                                    <td class="px-4 py-4 font-bold tabular-nums">{{ number_format((float) $transaction->amount, 0, ',', '.') }}đ</td>
+                                    <td class="px-4 py-4 font-bold tabular-nums">
+                                        {{ number_format((float) $transaction->amount, 0, ',', '.') }}đ
+                                        @if ($transactionBonus > 0)
+                                            <span class="mt-1 block text-xs text-emerald-600">+{{ number_format($transactionBonus, 0, ',', '.') }}đ khuyến mãi</span>
+                                        @endif
+                                    </td>
                                     <td class="px-4 py-4"><span class="inline-flex rounded-[5px] px-2.5 py-1 text-xs font-bold {{ $status[1] }}">{{ $status[0] }}</span></td>
                                     <td class="px-4 py-4 text-slate-500">{{ $transaction->created_at?->format('d/m/Y H:i') }}</td>
                                     <td class="px-4 py-4 text-right"><a class="font-bold text-indigo-600 hover:text-indigo-700" href="{{ route('wallet.deposit.payment', $transaction->transaction_code) }}">Chi tiết</a></td>
@@ -179,6 +206,7 @@
                             <dl class="mt-4 grid gap-3 text-sm">
                                 <div class="flex justify-between gap-3"><dt class="text-slate-500">Phương thức</dt><dd class="max-w-[10rem] truncate text-right font-extrabold text-slate-950" data-deposit-summary-bank>—</dd></div>
                                 <div class="flex justify-between gap-3"><dt class="text-slate-500">Số tiền nạp</dt><dd class="font-extrabold tabular-nums text-slate-950" data-deposit-summary-amount>500.000đ</dd></div>
+                                <div class="flex justify-between gap-3"><dt class="text-slate-500">Khuyến mãi <span data-deposit-summary-rate></span></dt><dd class="font-extrabold tabular-nums text-emerald-600" data-deposit-summary-bonus>0đ</dd></div>
                                 <div class="flex justify-between gap-3"><dt class="text-slate-500">Phí giao dịch</dt><dd class="font-bold text-emerald-600">0đ</dd></div>
                                 <div class="flex justify-between gap-3 border-t border-slate-100 pt-3"><dt class="font-bold text-slate-700">Tổng nhận</dt><dd class="text-base font-extrabold tabular-nums text-emerald-600" data-deposit-summary-total>500.000đ</dd></div>
                             </dl>

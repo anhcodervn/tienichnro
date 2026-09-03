@@ -385,7 +385,12 @@ onMounted(async () => {
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 font-semibold text-slate-900">{{ formatCurrency(item.amount) }}</td>
+                            <td class="px-4 py-3 font-semibold text-slate-900">
+                                <p>{{ formatCurrency(item.amount) }}</p>
+                                <p v-if="item.bonus_amount > 0" class="mt-1 text-xs font-bold text-emerald-600">
+                                    +{{ formatCurrency(item.bonus_amount) }} ({{ item.bonus_percent }}%) · nhận {{ formatCurrency(item.credited_amount) }}
+                                </p>
+                            </td>
                             <td class="px-4 py-3 text-slate-600">{{ item.content || '--' }}</td>
                             <td class="px-4 py-3">
                                 <span class="inline-flex rounded-[8px] px-2.5 py-1 text-xs font-semibold" :class="statusClass(item.status)">

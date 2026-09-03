@@ -4,7 +4,10 @@ namespace App\Features\Recharge\Services;
 
 use App\Models\ConfigRecharge;
 use App\Models\User;
+use App\Utils\Site;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\ValidationException;
 
 class RechargeConfigService
 {
@@ -28,7 +31,7 @@ class RechargeConfigService
 
     public function current(): ?ConfigRecharge
     {
-        return ConfigRecharge::query()
+        return $this->configQuery()
             ->where('is_active', true)
             ->latest('id')
             ->first();
@@ -39,7 +42,7 @@ class RechargeConfigService
      */
     public function all(): Collection
     {
-        return ConfigRecharge::query()
+        return $this->configQuery()
             ->orderByDesc('is_active')
             ->latest('id')
             ->get();
@@ -50,7 +53,7 @@ class RechargeConfigService
      */
     public function active(): Collection
     {
-        return ConfigRecharge::query()
+        return $this->configQuery()
             ->where('is_active', true)
             ->latest('id')
             ->get();
@@ -63,6 +66,8 @@ class RechargeConfigService
 
     public function create(array $payload): ConfigRecharge
     {
+        $this->ensureProviderAllowed((string) ($payload['provider'] ?? 'manual'));
+
         /** @var ConfigRecharge $config */
         $config = ConfigRecharge::query()->create($payload);
 
@@ -71,6 +76,8 @@ class RechargeConfigService
 
     public function update(ConfigRecharge $config, array $payload): ConfigRecharge
     {
+        $this->ensureProviderAllowed((string) ($payload['provider'] ?? $config->provider));
+
         $config->fill($payload);
         $config->save();
 
@@ -79,6 +86,8 @@ class RechargeConfigService
 
     public function toggle(ConfigRecharge $config): ConfigRecharge
     {
+        $this->ensureProviderAllowed((string) $config->provider);
+
         $config->forceFill([
             'is_active' => ! $config->is_active,
         ])->save();
@@ -94,7 +103,7 @@ class RechargeConfigService
     public function resolveActiveById(?int $configId): ?ConfigRecharge
     {
         if ($configId !== null) {
-            return ConfigRecharge::query()
+            return $this->configQuery()
                 ->whereKey($configId)
                 ->where('is_active', true)
                 ->first();
@@ -109,7 +118,7 @@ class RechargeConfigService
             return null;
         }
 
-        return ConfigRecharge::query()->whereKey($configId)->first();
+        return $this->configQuery()->whereKey($configId)->first();
     }
 
     public function transferContentFor(User $user, ConfigRecharge $config): string
@@ -196,5 +205,20 @@ class RechargeConfigService
     public function hasUnresolvedPlaceholders(string $value): bool
     {
         return preg_match('/\{[A-Za-z0-9_]+\}/', $value) === 1;
+    }
+
+    private function configQuery(): Builder
+    {
+        return ConfigRecharge::query()
+            ->when(Site::isChild(), fn (Builder $query) => $query->where('provider', 'apibankvn_api'));
+    }
+
+    private function ensureProviderAllowed(string $provider): void
+    {
+        if (Site::isChild() && $provider !== 'apibankvn_api') {
+            throw ValidationException::withMessages([
+                'provider' => 'Website đại lý chỉ được sử dụng cấu hình nạp tiền ApiBankVn.',
+            ]);
+        }
     }
 }

@@ -8,6 +8,8 @@ use App\Features\Topup\Services\OrderStatusService;
 use App\Features\Topup\Support\OrderRealtimeChannel;
 use App\Models\Order;
 use App\Models\OrderRecipient;
+use App\Models\Tenant;
+use App\Models\TenantDomain;
 use App\Models\User;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\PrivateChannel;
@@ -97,14 +99,17 @@ test('admin order event uses the private admin channel and sends the row snapsho
     ]);
 
     $event = new AdminTopupOrderUpdated($order);
-    $channel = $event->broadcastOn();
+    $channels = $event->broadcastOn();
 
     expect($event)
         ->toBeInstanceOf(ShouldBroadcastNow::class)
         ->toBeInstanceOf(ShouldDispatchAfterCommit::class)
         ->toBeInstanceOf(ShouldRescue::class)
-        ->and($channel)->toBeInstanceOf(PrivateChannel::class)
-        ->and($channel->name)->toBe('private-admin.topup.orders')
+        ->and($channels)->toHaveCount(2)
+        ->and($channels[0])->toBeInstanceOf(PrivateChannel::class)
+        ->and($channels[0]->name)->toBe("private-admin.sites.{$order->tenant_id}.topup.orders")
+        ->and($channels[1])->toBeInstanceOf(PrivateChannel::class)
+        ->and($channels[1]->name)->toBe('private-admin.platform.topup.orders')
         ->and($event->broadcastAs())->toBe('admin.topup.order.updated')
         ->and($event->broadcastWith())->toMatchArray([
             'id' => $order->id,
@@ -117,7 +122,8 @@ test('admin order event uses the private admin channel and sends the row snapsho
 });
 
 test('only admins can authorize the private topup order channel', function (): void {
-    $payload = ['socket_id' => '1234.5678', 'channel_name' => 'private-admin.topup.orders'];
+    $tenantId = Tenant::query()->where('is_main', true)->value('id');
+    $payload = ['socket_id' => '1234.5678', 'channel_name' => "private-admin.sites.{$tenantId}.topup.orders"];
 
     $this->actingAs(User::factory()->create())
         ->postJson('/broadcasting/auth', $payload)
@@ -126,6 +132,20 @@ test('only admins can authorize the private topup order channel', function (): v
     $this->actingAs(User::factory()->create(['role' => 'admin']))
         ->postJson('/broadcasting/auth', $payload)
         ->assertSuccessful();
+
+    $platformPayload = ['socket_id' => '1234.5678', 'channel_name' => 'private-admin.platform.topup.orders'];
+
+    $this->actingAs(User::factory()->create(['role' => 'admin']))
+        ->postJson('/broadcasting/auth', $platformPayload)
+        ->assertSuccessful();
+
+    $child = Tenant::factory()->create();
+    TenantDomain::factory()->for($child)->create(['domain' => 'child-realtime.test']);
+    $childAdmin = User::factory()->create(['tenant_id' => $child->id, 'role' => 'admin']);
+
+    $this->actingAs($childAdmin)
+        ->postJson('http://child-realtime.test/broadcasting/auth', $platformPayload)
+        ->assertForbidden();
 });
 
 test('the realtime event uses an opaque channel and exposes only status data', function (): void {

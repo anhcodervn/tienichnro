@@ -97,6 +97,10 @@ if (file_exists(base_path('app/Features/Client/Profile/web.php'))) {
     require base_path('app/Features/Client/Profile/web.php');
 }
 
+if (file_exists(base_path('app/Features/Client/Agency/routes.php'))) {
+    require base_path('app/Features/Client/Agency/routes.php');
+}
+
 Route::get('/{categorySlug}/{postSlug}', [PublicSeoPageController::class, 'show'])
     ->where([
         'categorySlug' => '[a-z0-9]+(?:-[a-z0-9]+)*',

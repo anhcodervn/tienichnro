@@ -3,6 +3,16 @@ export default {
     component: () => import('@/layouts/AdminLayout.vue'),
     children: [
         {
+            path: 'sites',
+            name: 'admin.sites.index',
+            component: () => import('@/pages/admin/sites/index.vue'),
+        },
+        {
+            path: 'site-prices',
+            name: 'admin.site-prices.index',
+            component: () => import('@/pages/admin/site-prices/index.vue'),
+        },
+        {
             path: '',
             name: 'admin.dashboard',
             component: () => import('@/pages/admin/home/index.vue'),
@@ -59,11 +69,6 @@ export default {
             path: 'topup/orders',
             name: 'admin.topup.orders',
             component: () => import('@/pages/admin/topup/orders/index.vue'),
-        },
-        {
-            path: 'member-levels',
-            name: 'admin.member-levels.index',
-            component: () => import('@/pages/admin/member-levels/index.vue'),
         },
         {
             path: 'users',

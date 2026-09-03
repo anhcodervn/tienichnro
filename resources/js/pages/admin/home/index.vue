@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { adminTopupService } from '@/services/admin-topup.service';
+import { useUserStore } from '@/stores/user.store';
 import { echo } from '@laravel/echo-vue';
 import { BadgeCheck, CircleDollarSign, CircleX, Clock3, Gamepad2, LoaderCircle, ReceiptText, TriangleAlert } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
@@ -7,7 +8,12 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 const games = ref<any[]>([]);
 const orders = ref<any[]>([]);
 const loading = ref(true);
-const realtimeChannelName = 'admin.topup.orders';
+const userStore = useUserStore();
+const realtimeChannelName = computed(() =>
+    userStore.user?.capabilities?.platform_admin && userStore.user?.capabilities?.multi_site
+        ? 'admin.platform.topup.orders'
+        : `admin.sites.${userStore.user?.site?.id}.topup.orders`,
+);
 const realtimeEventName = '.admin.topup.order.updated';
 let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
 const paidRevenue = computed(() =>
@@ -76,23 +82,27 @@ const handleRealtimeOrderUpdated = (event: { code: string; payment_status: strin
 };
 
 onMounted(async () => {
-    const realtimeChannel = echo().private(realtimeChannelName);
+    const realtimeChannel = echo().private(realtimeChannelName.value);
     realtimeChannel.listen(realtimeEventName, handleRealtimeOrderUpdated);
     realtimeChannel.subscribed(() => {
         if (!loading.value) void loadOrders().catch(() => undefined);
     });
 
     try {
-        const [gameResponse] = await Promise.all([adminTopupService.games({ per_page: 100 }), loadOrders()]);
-        games.value = gameResponse.data.data.data;
+        if (userStore.user?.capabilities?.platform_admin) {
+            const [gameResponse] = await Promise.all([adminTopupService.games({ per_page: 100 }), loadOrders()]);
+            games.value = gameResponse.data.data.data;
+        } else {
+            await loadOrders();
+        }
     } finally {
         loading.value = false;
     }
 });
 
 onBeforeUnmount(() => {
-    echo().private(realtimeChannelName).stopListening(realtimeEventName, handleRealtimeOrderUpdated);
-    echo().leave(realtimeChannelName);
+    echo().private(realtimeChannelName.value).stopListening(realtimeEventName, handleRealtimeOrderUpdated);
+    echo().leave(realtimeChannelName.value);
     if (realtimeRefreshTimer) clearTimeout(realtimeRefreshTimer);
 });
 </script>

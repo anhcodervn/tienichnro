@@ -9,6 +9,9 @@ Route::middleware(['auth:sanctum', 'admin'])
     ->controller(UserController::class)
     ->group(function (): void {
         Route::get('/', 'index')->name('index');
+        Route::get('{user}/prices', 'prices')->name('prices.index');
+        Route::put('{user}/prices/{topupPackage}', 'updatePrice')->name('prices.update');
+        Route::delete('{user}/prices/{topupPackage}', 'deletePrice')->name('prices.destroy');
         Route::get('{user}', 'show')->name('show');
         Route::patch('{user}/status', 'updateStatus')->name('status.update');
         Route::post('{user}/reset-password', 'resetPassword')->name('password.reset');

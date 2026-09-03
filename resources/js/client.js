@@ -1358,6 +1358,16 @@ document.querySelectorAll('[data-wallet-deposit]').forEach((container) => {
     const summaryBank = container.querySelector('[data-deposit-summary-bank]');
     const summaryAmount = container.querySelector('[data-deposit-summary-amount]');
     const summaryTotals = Array.from(container.querySelectorAll('[data-deposit-summary-total]'));
+    const summaryBonus = container.querySelector('[data-deposit-summary-bonus]');
+    const summaryRate = container.querySelector('[data-deposit-summary-rate]');
+    const bonusTiersElement = container.querySelector('[data-deposit-bonus-tiers]');
+    let bonusTiers = [];
+
+    try {
+        bonusTiers = JSON.parse(bonusTiersElement?.textContent || '[]');
+    } catch {
+        bonusTiers = [];
+    }
 
     const renderDeposit = (deposit) => {
         const paymentUrlTemplate = container.dataset.paymentUrlTemplate;
@@ -1407,6 +1417,12 @@ document.querySelectorAll('[data-wallet-deposit]').forEach((container) => {
         const selectedConfig = configInputs.find((input) => input.checked);
         const amount = Number(amountInput?.value || 0);
         const formattedAmount = formatMoney(amount);
+        const bonusTier = bonusTiers
+            .filter((tier) => tier.is_active && Number(tier.minimum_amount) <= amount)
+            .sort((left, right) => Number(right.minimum_amount) - Number(left.minimum_amount))[0];
+        const bonusBasisPoints = Number(bonusTier?.bonus_basis_points || 0);
+        const bonusPercent = bonusBasisPoints / 100;
+        const bonusAmount = Math.floor((amount * bonusBasisPoints) / 10_000);
 
         quickAmountButtons.forEach((button) => {
             const isSelected = Number(button.dataset.depositAmount) === amount;
@@ -1418,8 +1434,10 @@ document.querySelectorAll('[data-wallet-deposit]').forEach((container) => {
 
         if (summaryBank) summaryBank.textContent = selectedConfig?.dataset.configBank || '—';
         if (summaryAmount) summaryAmount.textContent = formattedAmount;
+        if (summaryBonus) summaryBonus.textContent = `+${formatMoney(bonusAmount)}`;
+        if (summaryRate) summaryRate.textContent = bonusPercent > 0 ? `(${bonusPercent}%)` : '';
         summaryTotals.forEach((summaryTotal) => {
-            summaryTotal.textContent = formattedAmount;
+            summaryTotal.textContent = formatMoney(amount + bonusAmount);
         });
     };
 

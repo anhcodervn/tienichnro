@@ -106,68 +106,6 @@
                     </form>
 
                     <aside class="grid content-start gap-3">
-                        @if ($memberLevelStatus && $memberLevelStatus['effective_level'])
-                            @php
-                                $effectiveLevel = $memberLevelStatus['effective_level'];
-                                $unlockedLevel = $memberLevelStatus['unlocked_level'];
-                                $nextLevel = $memberLevelStatus['next_level'];
-                                $nextThreshold = max(1, (int) ($nextLevel['lifetime_threshold'] ?? $memberLevelStatus['lifetime_completed_amount']));
-                                $levelProgress = min(100, (int) round(($memberLevelStatus['lifetime_completed_amount'] / $nextThreshold) * 100));
-                            @endphp
-                            <section class="rounded-[5px] border border-amber-200 bg-gradient-to-br from-amber-50 to-white p-4">
-                                <div class="flex items-start justify-between gap-3">
-                                    <div>
-                                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Cấp đại lý đang hưởng</p>
-                                        <h2 class="mt-1 flex items-center gap-2 text-xl font-extrabold text-slate-950">
-                                            <i class="bx bx-crown text-2xl text-amber-500" aria-hidden="true"></i>
-                                            {{ $effectiveLevel['name'] }}
-                                        </h2>
-                                    </div>
-                                    @if ($memberLevelStatus['is_temporarily_downgraded'])
-                                        <span class="rounded-[5px] border border-amber-300 bg-white px-2 py-1 text-xs font-bold text-amber-700">Tạm giảm 1 cấp</span>
-                                    @endif
-                                </div>
-
-                                <dl class="mt-4 grid gap-2 text-sm">
-                                    <div class="flex justify-between gap-3"><dt class="text-slate-500">Cấp đã mở khóa</dt><dd class="font-bold text-slate-900">{{ $unlockedLevel['name'] }}</dd></div>
-                                    <div class="flex justify-between gap-3"><dt class="text-slate-500">Tổng nạp lịch sử</dt><dd class="font-bold text-slate-900">{{ number_format($memberLevelStatus['lifetime_completed_amount'], 0, ',', '.') }}đ</dd></div>
-                                    <div class="flex justify-between gap-3"><dt class="text-slate-500">Nạp trong {{ $unlockedLevel['maintenance_days'] }} ngày</dt><dd class="font-bold text-slate-900">{{ number_format($memberLevelStatus['rolling_completed_amount'], 0, ',', '.') }}đ</dd></div>
-                                </dl>
-
-                                @if ($memberLevelStatus['maintenance_remaining_amount'] > 0)
-                                    <p class="mt-3 rounded-[5px] bg-amber-100 p-3 text-sm font-semibold text-amber-900">
-                                        Nạp thêm {{ number_format($memberLevelStatus['maintenance_remaining_amount'], 0, ',', '.') }}đ để khôi phục {{ $unlockedLevel['name'] }}.
-                                    </p>
-                                @elseif ($memberLevelStatus['maintenance_expires_at'])
-                                    <p class="mt-3 text-xs font-semibold text-emerald-700">Quyền lợi được duy trì đến {{ \Illuminate\Support\Carbon::parse($memberLevelStatus['maintenance_expires_at'])->format('H:i d/m/Y') }}.</p>
-                                @endif
-
-                                @if ($nextLevel)
-                                    <div class="mt-4">
-                                        <div class="mb-1 flex justify-between gap-3 text-xs font-semibold text-slate-500">
-                                            <span>Tiến tới {{ $nextLevel['name'] }}</span>
-                                            <span>Còn {{ number_format($memberLevelStatus['amount_to_next_level'], 0, ',', '.') }}đ</span>
-                                        </div>
-                                        <progress class="h-2 w-full overflow-hidden rounded-full accent-amber-500" value="{{ $levelProgress }}" max="100">{{ $levelProgress }}%</progress>
-                                    </div>
-                                @endif
-
-                                @if ($memberLevelHistories->isNotEmpty())
-                                    <div class="mt-4 border-t border-amber-200 pt-3">
-                                        <p class="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">Thay đổi gần đây</p>
-                                        <ul class="mt-2 grid gap-2 text-xs text-slate-600">
-                                            @foreach ($memberLevelHistories->take(4) as $history)
-                                                <li class="flex items-center justify-between gap-3 rounded-[5px] bg-white/80 p-2">
-                                                    <span class="font-semibold">{{ $history->fromLevel?->name ?? 'Khởi tạo' }} → {{ $history->toLevel?->name ?? 'Tự động' }}</span>
-                                                    <time class="shrink-0 text-slate-400" datetime="{{ $history->created_at?->toISOString() }}">{{ $history->created_at?->format('d/m/Y') }}</time>
-                                                </li>
-                                            @endforeach
-                                        </ul>
-                                    </div>
-                                @endif
-                            </section>
-                        @endif
-
                         <section class="rounded-[5px] border border-slate-200 bg-white p-4">
                             <h2 class="flex items-center gap-2 font-extrabold text-slate-950"><i class="bx bx-envelope text-lg text-emerald-600" aria-hidden="true"></i>Tổng quan xác thực</h2>
                             <dl class="mt-4 grid gap-2 text-sm">

@@ -4,7 +4,6 @@ namespace App\Features\Admin\User\Services;
 
 use App\Features\Admin\User\Resources\AdminUserResource;
 use App\Features\Admin\WalletTransaction\Resources\AdminWalletTransactionResource;
-use App\Features\MemberLevel\Services\MemberLevelService;
 use App\Models\User;
 use App\Models\UserLog;
 use App\Models\Wallet;
@@ -14,8 +13,6 @@ use Illuminate\Pagination\LengthAwarePaginator;
 
 class AdminUserService
 {
-    public function __construct(private readonly MemberLevelService $memberLevelService) {}
-
     /**
      * @param  array<string, mixed>  $filters
      * @return array<string, mixed>
@@ -67,12 +64,6 @@ class AdminUserService
                 'at' => $user->last_login_at?->toISOString(),
                 'ip' => $user->last_login_ip,
             ],
-            'member_level' => $this->memberLevelService->status($user),
-            'member_level_histories' => $user->memberLevelHistories()
-                ->with(['fromLevel:id,name,color', 'toLevel:id,name,color', 'actor:id,full_name,username'])
-                ->latest('id')
-                ->limit(10)
-                ->get(),
         ];
     }
 

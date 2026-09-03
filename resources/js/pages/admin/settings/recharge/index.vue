@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import Modal from '@/components/shared/Modal/index.vue';
 import { adminRechargeConfigService } from '@/services/admin-recharge-config.service';
-import type { ApiBankVnBankAccountOption, RechargeConfigType } from '@/types/recharge-config.type';
+import type { ApiBankVnBankAccountOption, RechargeBonusTierType, RechargeConfigType } from '@/types/recharge-config.type';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { Building2, Pencil, Plus, Power, RefreshCw, ShieldCheck, Trash2 } from 'lucide-vue-next';
+import { BadgePercent, Building2, Check, Copy, Pencil, Plus, Power, RefreshCw, ShieldCheck, Trash2 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 
 type RechargeConfigForm = {
@@ -26,6 +26,12 @@ type LocalBankOption = {
     hint: string;
 };
 
+type RechargeBonusTierForm = {
+    minimum_amount: string;
+    bonus_percent: string;
+    is_active: boolean;
+};
+
 const DEFAULT_QR_TEMPLATE =
     'https://img.vietqr.io/image/{bank_code}-{account_number}-compact2.png?amount={amount}&addInfo={nd}&accountName={account_name}';
 const LOCAL_BANK_OPTIONS: LocalBankOption[] = [
@@ -43,8 +49,17 @@ const verifying = ref(false);
 const showEditorModal = ref(false);
 const verifiedUser = ref<Record<string, unknown> | null>(null);
 const configs = ref<RechargeConfigType[]>([]);
+const bonusTiers = ref<RechargeBonusTierType[]>([]);
+const showBonusModal = ref(false);
+const bonusSaving = ref(false);
+const deletingBonusId = ref<number | null>(null);
+const editingBonusId = ref<number | null>(null);
+const bonusForm = ref<RechargeBonusTierForm>({ minimum_amount: '', bonus_percent: '', is_active: true });
 const bankAccounts = ref<ApiBankVnBankAccountOption[]>([]);
 const editingId = ref<number | null>(null);
+const isMainSite = ref(true);
+const callbackUrl = ref('');
+const callbackCopied = ref(false);
 const form = ref<RechargeConfigForm>(emptyForm());
 
 const isApiProvider = computed(() => form.value.provider === 'apibankvn_api');
@@ -99,15 +114,31 @@ const methodCards = computed(() =>
 );
 
 const activeCount = computed(() => configs.value.filter((config) => config.is_active).length);
+const activeBonusCount = computed(() => bonusTiers.value.filter((tier) => tier.is_active).length);
+const bonusPreview = computed(() => {
+    const amount = Number(bonusForm.value.minimum_amount || 0);
+    const basisPoints = Math.round(Number(bonusForm.value.bonus_percent || 0) * 100);
+
+    return Math.floor((amount * basisPoints) / 10_000);
+});
 
 onMounted(async () => {
     await loadConfigs();
+
+    if (isMainSite.value) {
+        await loadBonusTiers();
+    }
 });
+
+const formatMoney = (value: number): string => `${new Intl.NumberFormat('vi-VN').format(value)}đ`;
 
 async function loadConfigs(): Promise<void> {
     try {
         loading.value = true;
-        configs.value = await adminRechargeConfigService.get();
+        const payload = await adminRechargeConfigService.get();
+        configs.value = payload.configs;
+        isMainSite.value = payload.site.is_main;
+        callbackUrl.value = payload.site.callback_url;
     } catch (error) {
         handleErrorResponse(error);
     } finally {
@@ -115,9 +146,71 @@ async function loadConfigs(): Promise<void> {
     }
 }
 
+async function loadBonusTiers(): Promise<void> {
+    try {
+        bonusTiers.value = await adminRechargeConfigService.getBonusTiers();
+    } catch (error) {
+        handleErrorResponse(error);
+    }
+}
+
+function openCreateBonusModal(): void {
+    editingBonusId.value = null;
+    bonusForm.value = { minimum_amount: '', bonus_percent: '', is_active: true };
+    showBonusModal.value = true;
+}
+
+function openEditBonusModal(tier: RechargeBonusTierType): void {
+    editingBonusId.value = tier.id;
+    bonusForm.value = {
+        minimum_amount: String(tier.minimum_amount),
+        bonus_percent: String(tier.bonus_percent),
+        is_active: tier.is_active,
+    };
+    showBonusModal.value = true;
+}
+
+async function saveBonusTier(): Promise<void> {
+    const payload = {
+        minimum_amount: Number(bonusForm.value.minimum_amount),
+        bonus_percent: Number(bonusForm.value.bonus_percent),
+        is_active: bonusForm.value.is_active,
+    };
+
+    try {
+        bonusSaving.value = true;
+        await (editingBonusId.value
+            ? adminRechargeConfigService.updateBonusTier(editingBonusId.value, payload)
+            : adminRechargeConfigService.createBonusTier(payload));
+        showBonusModal.value = false;
+        await loadBonusTiers();
+        handleSuccessResponse({ data: { status: true, message: editingBonusId.value ? 'Đã cập nhật mốc khuyến mãi.' : 'Đã thêm mốc khuyến mãi.' } });
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        bonusSaving.value = false;
+    }
+}
+
+async function removeBonusTier(tier: RechargeBonusTierType): Promise<void> {
+    if (!window.confirm(`Xóa mốc nạp ${formatMoney(tier.minimum_amount)}?`)) {
+        return;
+    }
+
+    try {
+        deletingBonusId.value = tier.id;
+        await adminRechargeConfigService.removeBonusTier(tier.id);
+        await loadBonusTiers();
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        deletingBonusId.value = null;
+    }
+}
+
 function emptyForm(): RechargeConfigForm {
     return {
-        provider: 'manual',
+        provider: isMainSite.value ? 'manual' : 'apibankvn_api',
         bank_name: '',
         account_name: '',
         account_number: '',
@@ -129,6 +222,18 @@ function emptyForm(): RechargeConfigForm {
         api_bank_id: '',
         is_active: true,
     };
+}
+
+async function copyCallbackUrl(): Promise<void> {
+    if (!callbackUrl.value) {
+        return;
+    }
+
+    await navigator.clipboard.writeText(callbackUrl.value);
+    callbackCopied.value = true;
+    window.setTimeout(() => {
+        callbackCopied.value = false;
+    }, 1800);
 }
 
 function openCreateModal(): void {
@@ -311,7 +416,7 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                     </div>
                     <h1 class="text-[28px] font-black tracking-[-0.04em] text-slate-950">Cấu hình nạp tiền</h1>
                     <p class="max-w-2xl text-sm leading-6 text-slate-500">
-                        Quản lý danh sách bank local hoặc ApiBankVn. Form thêm và sửa được gom vào modal để page gọn hơn.
+                        Quản lý kênh nhận tiền và các mốc phần trăm khuyến mãi được cộng trực tiếp vào số dư.
                     </p>
                 </div>
 
@@ -326,6 +431,108 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                     </div>
                 </div>
             </div>
+        </section>
+
+        <section v-if="!isMainSite" class="rounded-[12px] border-2 border-indigo-200 bg-indigo-50 p-5 shadow-sm">
+            <div class="flex items-start gap-3">
+                <span class="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-indigo-600 text-white">
+                    <ShieldCheck class="h-5 w-5" />
+                </span>
+                <div class="min-w-0 flex-1">
+                    <h2 class="font-black text-indigo-950">Callback bắt buộc cho ApiBankVn</h2>
+                    <p class="mt-1 text-sm leading-6 text-indigo-800">
+                        Sao chép URL này và khai báo làm callback trên tài khoản ApiBankVn của website.
+                    </p>
+                    <div class="mt-3 flex flex-col gap-2 sm:flex-row">
+                        <input
+                            :value="callbackUrl"
+                            readonly
+                            class="min-h-11 min-w-0 flex-1 rounded-[10px] border-2 border-indigo-300 bg-white px-3 font-mono text-sm font-semibold text-slate-900 outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-100"
+                        />
+                        <button
+                            type="button"
+                            class="inline-flex min-h-11 shrink-0 items-center justify-center gap-2 rounded-[10px] bg-indigo-600 px-4 text-sm font-bold text-white transition hover:bg-indigo-500"
+                            @click="copyCallbackUrl"
+                        >
+                            <Check v-if="callbackCopied" class="h-4 w-4" />
+                            <Copy v-else class="h-4 w-4" />
+                            {{ callbackCopied ? 'Đã sao chép' : 'Sao chép callback' }}
+                        </button>
+                    </div>
+                    <p class="mt-2 text-xs font-semibold text-indigo-700">Site con chỉ được tạo cấu hình nạp tiền bằng ApiBankVn.</p>
+                </div>
+            </div>
+        </section>
+
+        <section v-if="isMainSite" class="rounded-[12px] border border-slate-200 bg-white p-4 shadow-sm">
+            <div class="flex flex-col gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <div class="flex items-center gap-2">
+                        <span class="grid h-9 w-9 place-items-center rounded-[10px] bg-emerald-50 text-emerald-600">
+                            <BadgePercent class="h-5 w-5" />
+                        </span>
+                        <div>
+                            <h2 class="text-xl font-black tracking-[-0.03em] text-slate-950">Mốc khuyến mãi số dư</h2>
+                            <p class="text-sm leading-6 text-slate-500">Hệ thống chọn mốc cao nhất mà số tiền nạp đạt được.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <button
+                    type="button"
+                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-[10px] bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-500"
+                    @click="openCreateBonusModal"
+                >
+                    <Plus class="h-4 w-4" /> Thêm mốc
+                </button>
+            </div>
+
+            <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                <article v-for="tier in bonusTiers" :key="tier.id" class="rounded-[10px] border border-slate-200 bg-slate-50 p-4">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-slate-400">Nạp từ</p>
+                            <p class="mt-1 text-xl font-black text-slate-950">{{ formatMoney(tier.minimum_amount) }}</p>
+                        </div>
+                        <span
+                            class="rounded-full px-2.5 py-1 text-xs font-bold"
+                            :class="tier.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'"
+                        >
+                            {{ tier.is_active ? 'Đang áp dụng' : 'Đã tắt' }}
+                        </span>
+                    </div>
+                    <div class="mt-4 rounded-[8px] border border-emerald-200 bg-white p-3">
+                        <p class="text-sm text-slate-500">Cộng thêm vào ví</p>
+                        <p class="mt-1 text-2xl font-black text-emerald-600">+{{ tier.bonus_percent }}%</p>
+                    </div>
+                    <div class="mt-3 grid grid-cols-2 gap-2">
+                        <button
+                            type="button"
+                            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-[8px] border border-slate-300 bg-white text-sm font-semibold text-slate-700 hover:border-indigo-300 hover:text-indigo-600"
+                            @click="openEditBonusModal(tier)"
+                        >
+                            <Pencil class="h-4 w-4" /> Sửa
+                        </button>
+                        <button
+                            type="button"
+                            class="inline-flex min-h-10 items-center justify-center gap-2 rounded-[8px] border border-rose-200 bg-rose-50 text-sm font-semibold text-rose-700 hover:bg-rose-100 disabled:opacity-50"
+                            :disabled="deletingBonusId === tier.id"
+                            @click="removeBonusTier(tier)"
+                        >
+                            <Trash2 class="h-4 w-4" /> Xóa
+                        </button>
+                    </div>
+                </article>
+
+                <div
+                    v-if="bonusTiers.length === 0"
+                    class="rounded-[10px] border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center text-sm text-slate-500 md:col-span-2 xl:col-span-3"
+                >
+                    Chưa có mốc khuyến mãi. Số dư hiện được cộng đúng bằng số tiền người dùng nạp.
+                </div>
+            </div>
+
+            <p class="mt-3 text-xs text-slate-500">{{ activeBonusCount }} mốc đang bật · Mỗi yêu cầu sẽ lưu lại mốc đã áp dụng để đối soát.</p>
         </section>
 
         <section class="rounded-[12px] border border-slate-200 bg-white p-4 shadow-sm">
@@ -420,6 +627,92 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
             </div>
         </section>
 
+        <Modal v-if="isMainSite" v-model="showBonusModal" panel-class="max-w-xl">
+            <template #header>
+                <div class="border-b border-slate-200 px-5 py-4 pr-14">
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-emerald-600">Khuyến mãi số dư</p>
+                    <h2 class="mt-1 text-xl font-black text-slate-950">{{ editingBonusId ? 'Sửa mốc khuyến mãi' : 'Thêm mốc khuyến mãi' }}</h2>
+                </div>
+            </template>
+
+            <form id="recharge-bonus-tier-form" class="grid gap-4 p-5 sm:p-6" @submit.prevent="saveBonusTier">
+                <label class="grid gap-2 text-sm font-semibold text-slate-700">
+                    Mốc nạp tối thiểu
+                    <div
+                        class="flex min-h-12 items-center rounded-[10px] border-2 border-slate-300 bg-slate-50 px-3 focus-within:border-emerald-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100"
+                    >
+                        <input
+                            v-model="bonusForm.minimum_amount"
+                            required
+                            type="number"
+                            min="10000"
+                            max="50000000"
+                            step="1000"
+                            class="min-w-0 flex-1 border-0 bg-transparent p-0 text-base font-bold text-slate-950 outline-none focus:ring-0"
+                            placeholder="500000"
+                        />
+                        <span class="text-sm font-bold text-slate-400">VND</span>
+                    </div>
+                </label>
+
+                <label class="grid gap-2 text-sm font-semibold text-slate-700">
+                    Phần trăm cộng thêm
+                    <div
+                        class="flex min-h-12 items-center rounded-[10px] border-2 border-slate-300 bg-slate-50 px-3 focus-within:border-emerald-500 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-100"
+                    >
+                        <input
+                            v-model="bonusForm.bonus_percent"
+                            required
+                            type="number"
+                            min="0.01"
+                            max="100"
+                            step="0.01"
+                            class="min-w-0 flex-1 border-0 bg-transparent p-0 text-base font-bold text-slate-950 outline-none focus:ring-0"
+                            placeholder="5"
+                        />
+                        <span class="text-sm font-bold text-slate-400">%</span>
+                    </div>
+                </label>
+
+                <div class="rounded-[10px] border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+                    Ví dụ: nạp <strong>{{ formatMoney(Number(bonusForm.minimum_amount || 0)) }}</strong
+                    >, được cộng thêm <strong>{{ formatMoney(bonusPreview) }}</strong
+                    >, tổng nhận <strong>{{ formatMoney(Number(bonusForm.minimum_amount || 0) + bonusPreview) }}</strong
+                    >.
+                </div>
+
+                <label class="flex min-h-12 items-center justify-between gap-3 rounded-[10px] border-2 border-slate-300 bg-slate-50 px-4">
+                    <span class="text-sm font-semibold text-slate-700">Áp dụng mốc này</span>
+                    <input
+                        v-model="bonusForm.is_active"
+                        type="checkbox"
+                        class="h-5 w-5 rounded border-slate-400 text-emerald-600 focus:ring-emerald-500"
+                    />
+                </label>
+            </form>
+
+            <template #footer>
+                <div class="flex w-full justify-end gap-2 border-t border-slate-200 bg-slate-50 px-5 py-4">
+                    <button
+                        type="button"
+                        class="min-h-11 rounded-[10px] border-2 border-slate-300 bg-white px-5 text-sm font-semibold text-slate-700 hover:bg-slate-100"
+                        :disabled="bonusSaving"
+                        @click="showBonusModal = false"
+                    >
+                        Hủy
+                    </button>
+                    <button
+                        form="recharge-bonus-tier-form"
+                        type="submit"
+                        class="min-h-11 rounded-[10px] bg-emerald-600 px-5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+                        :disabled="bonusSaving"
+                    >
+                        {{ bonusSaving ? 'Đang lưu...' : 'Lưu mốc' }}
+                    </button>
+                </div>
+            </template>
+        </Modal>
+
         <Modal v-model="showEditorModal" panel-class="max-w-5xl">
             <template #header>
                 <div class="border-b border-slate-200 px-5 py-4">
@@ -428,7 +721,13 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
                             <h2 class="text-xl font-black tracking-[-0.03em] text-slate-950">
                                 {{ editingId ? 'Sửa cấu hình bank' : 'Thêm cấu hình bank' }}
                             </h2>
-                            <p class="mt-1 text-sm leading-6 text-slate-500">Chọn local hoặc ApiBankVn, nhập thông tin rồi lưu cấu hình.</p>
+                            <p class="mt-1 text-sm leading-6 text-slate-500">
+                                {{
+                                    isMainSite
+                                        ? 'Chọn local hoặc ApiBankVn, nhập thông tin rồi lưu cấu hình.'
+                                        : 'Nhập thông tin ApiBankVn riêng của website rồi lưu cấu hình.'
+                                }}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -436,7 +735,7 @@ async function removeConfig(config: RechargeConfigType): Promise<void> {
 
             <div class="grid gap-4 p-5 xl:grid-cols-[minmax(0,1.6fr)_280px]">
                 <div class="space-y-4">
-                    <div class="grid gap-0 overflow-hidden rounded-[10px] border border-slate-200 bg-slate-50 sm:grid-cols-2">
+                    <div v-if="isMainSite" class="grid gap-0 overflow-hidden rounded-[10px] border border-slate-200 bg-slate-50 sm:grid-cols-2">
                         <button
                             type="button"
                             class="flex items-center justify-center gap-2 px-4 py-3 text-sm font-semibold transition"

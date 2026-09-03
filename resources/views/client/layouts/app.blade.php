@@ -18,6 +18,7 @@
             : $shareImage;
         $gameServiceItems = is_array($settings['game_service_items'] ?? null) ? $settings['game_service_items'] : [];
         $showGameServiceMenu = ($settings['game_service_enabled'] ?? false) === true && $gameServiceItems !== [];
+        $showAgencyWebsite = app(\App\Support\TenantContext::class)->isActive() && \App\Utils\Site::isMain();
         $orderHistoryUrl = auth()->check() ? route('account.orders.index') : route('orders.lookup');
         $orderHistoryActive = request()->routeIs(['orders.*', 'account.orders.*']);
     @endphp
@@ -126,6 +127,10 @@
                                 <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.index') }}"><i class="bx bx-user-circle text-lg" aria-hidden="true"></i>Tổng quan tài khoản</a>
                                 <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('wallet.deposit.index') }}"><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i>Nạp tiền</a>
                                 <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.orders.index') }}"><i class="bx bx-receipt text-lg" aria-hidden="true"></i>Lịch sử đơn hàng</a>
+                                @if ($showAgencyWebsite)
+                                    <a @class(['flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.agency.website'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.agency.website')]) href="{{ route('client.agency.website') }}"><i class="bx bx-store-alt text-lg" aria-hidden="true"></i>Tạo website đại lý</a>
+                                @endif
+                                <a @class(['flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.agency.api'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.agency.api')]) href="{{ route('client.agency.api') }}"><i class="bx bx-code text-lg" aria-hidden="true"></i>Kết nối API</a>
                                 @if ($clientAccount['role'] === 'admin')
                                     <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="/admin"><i class="bx bx-shield text-lg" aria-hidden="true"></i>Trang quản trị</a>
                                 @endif
@@ -230,6 +235,10 @@
                         @if (auth()->user()->role === 'admin')
                             <a class="client-button-secondary w-full bg-white" href="/admin">Trang quản trị</a>
                         @endif
+                        @if ($showAgencyWebsite)
+                            <a class="client-button-secondary w-full justify-start bg-white" href="{{ route('client.agency.website') }}"><i class="bx bx-store-alt text-lg" aria-hidden="true"></i>Tạo website đại lý</a>
+                        @endif
+                        <a class="client-button-secondary w-full justify-start bg-white" href="{{ route('client.agency.api') }}"><i class="bx bx-code text-lg" aria-hidden="true"></i>Kết nối API</a>
                         <a class="client-button-secondary w-full bg-white" href="{{ route('account.index') }}">Tài khoản</a>
                         <form method="POST" action="{{ route('logout') }}">
                             @csrf

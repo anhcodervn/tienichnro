@@ -40,11 +40,14 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
 
     public readonly string $updatedAt;
 
+    public readonly int $tenantId;
+
     public function __construct(Order $order)
     {
         $order->loadMissing('provider:id,slug');
 
         $this->orderId = $order->id;
+        $this->tenantId = (int) $order->tenant_id;
         $this->code = $order->code;
         $this->paymentStatus = $order->payment_status->value;
         $this->orderStatus = $order->order_status->value;
@@ -64,9 +67,13 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
         $this->updatedAt = $order->updated_at?->toISOString() ?? now()->toISOString();
     }
 
-    public function broadcastOn(): PrivateChannel
+    /** @return array<int, PrivateChannel> */
+    public function broadcastOn(): array
     {
-        return new PrivateChannel('admin.topup.orders');
+        return [
+            new PrivateChannel("admin.sites.{$this->tenantId}.topup.orders"),
+            new PrivateChannel('admin.platform.topup.orders'),
+        ];
     }
 
     public function broadcastAs(): string
@@ -79,6 +86,7 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
     {
         return [
             'id' => $this->orderId,
+            'tenant_id' => $this->tenantId,
             'code' => $this->code,
             'payment_status' => $this->paymentStatus,
             'order_status' => $this->orderStatus,

@@ -5,8 +5,6 @@ namespace App\Features\Admin\Topup\Services;
 use App\Features\Topup\Services\GlobalTopupPackageSyncService;
 use App\Models\AdminAuditLog;
 use App\Models\GlobalTopupPackage;
-use App\Models\MemberLevel;
-use App\Models\MemberLevelGlobalPackagePrice;
 use App\Models\TopupProvider;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
@@ -25,15 +23,9 @@ class GlobalTopupPackageAdminService
             'global_packages' => GlobalTopupPackage::query()
                 ->with('provider:id,name,slug')
                 ->withCount('packages')
-                ->with([
-                    'levelPrices' => fn ($query) => $query->orderBy('member_level_id'),
-                ])
                 ->orderBy('sort_order')
                 ->orderBy('id')
                 ->get(),
-            'levels' => MemberLevel::query()
-                ->orderBy('rank')
-                ->get(['id', 'name', 'rank', 'default_discount_bps', 'minimum_profit', 'status']),
             'providers' => TopupProvider::query()
                 ->orderBy('name')
                 ->get(['id', 'name', 'slug']),
@@ -95,43 +87,6 @@ class GlobalTopupPackageAdminService
             $this->audit($admin, 'global_topup_package_deleted', $globalPackage, $old, [], $request);
             $globalPackage->delete();
         }, 3);
-    }
-
-    /** @param array<string, mixed> $payload */
-    public function upsertLevelPrice(
-        GlobalTopupPackage $globalPackage,
-        MemberLevel $level,
-        array $payload,
-        User $admin,
-        Request $request,
-    ): MemberLevelGlobalPackagePrice {
-        $payload['discount_basis_points'] = $payload['pricing_mode'] === 'discount' ? $payload['discount_basis_points'] : null;
-        $payload['fixed_price'] = $payload['pricing_mode'] === 'fixed' ? $payload['fixed_price'] : null;
-        $levelPrice = MemberLevelGlobalPackagePrice::query()->firstOrNew([
-            'member_level_id' => $level->id,
-            'global_topup_package_id' => $globalPackage->id,
-        ]);
-        $old = $levelPrice->exists ? $levelPrice->getAttributes() : [];
-        $levelPrice->fill($payload)->save();
-        $this->audit($admin, 'global_topup_package_level_price_saved', $levelPrice, $old, $levelPrice->getAttributes(), $request);
-
-        return $levelPrice->refresh();
-    }
-
-    public function deleteLevelPrice(GlobalTopupPackage $globalPackage, MemberLevel $level, User $admin, Request $request): void
-    {
-        $levelPrice = MemberLevelGlobalPackagePrice::query()
-            ->whereBelongsTo($globalPackage)
-            ->whereBelongsTo($level)
-            ->first();
-
-        if (! $levelPrice instanceof MemberLevelGlobalPackagePrice) {
-            return;
-        }
-
-        $old = $levelPrice->getAttributes();
-        $this->audit($admin, 'global_topup_package_level_price_deleted', $levelPrice, $old, [], $request);
-        $levelPrice->delete();
     }
 
     /** @param array<string, mixed> $old @param array<string, mixed> $new */

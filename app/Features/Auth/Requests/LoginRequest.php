@@ -3,6 +3,8 @@
 namespace App\Features\Auth\Requests;
 
 use App\Exceptions\ApiException;
+use App\Support\TenantContext;
+use App\Utils\Site;
 use Illuminate\Auth\Events\Lockout;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
@@ -81,10 +83,16 @@ class LoginRequest extends FormRequest
     {
         $login = $this->normalizedLogin();
 
-        return [
+        $credentials = [
             $this->loginField() => $login,
             'password' => $this->string('password')->toString(),
         ];
+
+        if (app(TenantContext::class)->isActive()) {
+            $credentials['tenant_id'] = Site::id();
+        }
+
+        return $credentials;
     }
 
     public function loginField(): string
@@ -131,7 +139,7 @@ class LoginRequest extends FormRequest
 
     public function throttleKey(): string
     {
-        return Str::transliterate(Str::lower($this->normalizedLogin()).'|'.$this->ip());
+        return Str::transliterate(Site::id().'|'.Str::lower($this->normalizedLogin()).'|'.$this->ip());
     }
 
     protected function failedValidation(Validator $validator): void

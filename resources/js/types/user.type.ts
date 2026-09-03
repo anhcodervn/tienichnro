@@ -1,4 +1,4 @@
-import { WalletType } from "./wallet.type";
+import { WalletType } from './wallet.type';
 
 export interface UserType {
     id: number;
@@ -17,4 +17,15 @@ export interface UserType {
     created_at: string;
     updated_at: string;
     wallet: WalletType;
+    site?: {
+        id: number;
+        name: string;
+        slug: string;
+        is_main: boolean;
+    };
+    capabilities?: {
+        platform_admin: boolean;
+        tenant_admin: boolean;
+        multi_site: boolean;
+    };
 }

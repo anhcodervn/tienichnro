@@ -11,8 +11,11 @@ use App\Features\Topup\Services\Payments\OrderBankPaymentService;
 use App\Mail\Orders\OrderCreatedMail;
 use App\Models\Game;
 use App\Models\Order;
+use App\Models\Scopes\TenantScope;
+use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Support\TenantContext;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Mail;
@@ -47,6 +50,13 @@ class OrderService
         $normalizedEmail = Str::lower($email);
         $requestedPaymentMethod = PaymentMethod::from((string) $payload['payment_method']);
         $serverId = (int) $payload['server_id'];
+        $tenant = app(TenantContext::class)->current();
+
+        if ($tenant instanceof Tenant && ! $tenant->is_main && (! $authenticatedUser instanceof User || $requestedPaymentMethod !== PaymentMethod::Wallet)) {
+            throw ValidationException::withMessages([
+                'payment_method' => 'Website đại lý hiện chỉ nhận đơn từ thành viên thanh toán bằng số dư.',
+            ]);
+        }
 
         try {
             $order = DB::transaction(function () use ($payload, $authenticatedUser, $idempotencyKey, $email, $normalizedEmail, $requestedPaymentMethod, $serverId, $ip, $userAgent, $allowWalletFallback): Order {
@@ -84,6 +94,37 @@ class OrderService
                     : null;
                 $canPayWithWallet = $walletBalance !== null && (int) $walletBalance >= $quote['total_amount'];
 
+                $tenant = app(TenantContext::class)->current();
+                $billingUser = $tenant instanceof Tenant && ! $tenant->is_main
+                    ? User::query()->withoutGlobalScope(TenantScope::class)->lockForUpdate()->find($tenant->billing_user_id)
+                    : null;
+                $billingWalletBalance = $billingUser instanceof User
+                    ? Wallet::query()->withoutGlobalScope(TenantScope::class)
+                        ->where('user_id', $billingUser->id)
+                        ->where('type', Wallet::TYPE_MAIN)
+                        ->lockForUpdate()
+                        ->value('balance')
+                    : null;
+
+                if ($tenant instanceof Tenant && ! $tenant->is_main
+                    && (! $billingUser instanceof User || $billingWalletBalance === null || (int) $billingWalletBalance < $quote['tenant_cost_total'])) {
+                    throw ValidationException::withMessages([
+                        'site' => 'Tài khoản thanh toán NapCarot của website không đủ số dư để tạo đơn.',
+                    ]);
+                }
+
+                if ($tenant instanceof Tenant && ! $tenant->is_main && ! $canPayWithWallet) {
+                    throw new ApiException(
+                        'Số dư thành viên không đủ để thanh toán đơn hàng trên website đại lý.',
+                        422,
+                        ['data' => [
+                            'balance' => (int) ($walletBalance ?? 0),
+                            'required_amount' => $quote['total_amount'],
+                            'currency' => 'VND',
+                        ]],
+                    );
+                }
+
                 if ($requestedPaymentMethod === PaymentMethod::Wallet && ! $canPayWithWallet && ! $allowWalletFallback) {
                     throw new ApiException(
                         'Số dư ví không đủ để tạo đơn nạp.',
@@ -100,13 +141,9 @@ class OrderService
                     ? PaymentMethod::Wallet
                     : PaymentMethod::BankTransfer;
 
-                $order = Order::query()->create([
+                $orderAttributes = [
                     'idempotency_key' => $idempotencyKey,
                     'user_id' => $user?->id,
-                    'member_level_id' => $quote['member_level_id'],
-                    'member_level_name' => $quote['member_level_name'],
-                    'member_level_pricing_mode' => $quote['member_level_pricing_mode'],
-                    'member_level_discount_bps' => $quote['member_level_discount_bps'],
                     'email' => $email,
                     'normalized_email' => $normalizedEmail,
                     'game_id' => $package->game_id,
@@ -129,7 +166,6 @@ class OrderService
                     'retail_unit_price' => $quote['retail_unit_price'],
                     'subtotal' => $quote['subtotal'],
                     'discount_amount' => $quote['discount_amount'],
-                    'member_level_discount_amount' => $quote['member_level_discount_amount'],
                     'total_amount' => $quote['total_amount'],
                     'provider_unit_cost' => $quote['provider_unit_cost'],
                     'provider_total_cost' => $quote['provider_total_cost'],
@@ -152,7 +188,20 @@ class OrderService
                             'server_code' => $quote['server']->code,
                         ],
                     ],
-                ]);
+                ];
+
+                if (app(TenantContext::class)->isActive()) {
+                    $orderAttributes = [
+                        ...$orderAttributes,
+                        'tenant_id' => $tenant?->id,
+                        'billing_user_id' => $billingUser?->id,
+                        'tenant_cost_unit_price' => $quote['tenant_cost_unit_price'],
+                        'tenant_cost_total' => $quote['tenant_cost_total'],
+                        'tenant_profit' => $quote['tenant_profit'],
+                    ];
+                }
+
+                $order = Order::query()->create($orderAttributes);
 
                 $order->recipients()->createMany(
                     collect($recipientData['recipients'])
@@ -174,6 +223,17 @@ class OrderService
                         description: "Thanh toán đơn nạp game {$order->code}",
                         idempotencyKey: $idempotencyKey,
                     );
+
+                    if ($billingUser instanceof User) {
+                        $this->walletService->debit(
+                            user: $billingUser,
+                            amount: $quote['tenant_cost_total'],
+                            referenceType: Order::class,
+                            referenceId: $order->id,
+                            description: "Giá vốn website {$tenant?->name} cho đơn {$order->code}",
+                            idempotencyKey: "tenant-billing:{$idempotencyKey}",
+                        );
+                    }
                 }
 
                 return $order;

@@ -2,6 +2,8 @@
 
 namespace App\Events;
 
+use App\Models\User;
+use App\Support\TenantContext;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -13,6 +15,8 @@ class SupportConversationUpdated implements ShouldBroadcast, ShouldDispatchAfter
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
+    public readonly int $tenantId;
+
     /**
      * @param  array<string, mixed>  $conversation
      * @param  array{user_unread:int,admin_unread:int}  $stats
@@ -21,14 +25,18 @@ class SupportConversationUpdated implements ShouldBroadcast, ShouldDispatchAfter
         public readonly int $userId,
         public readonly array $conversation,
         public readonly array $stats,
-    ) {}
+    ) {
+        $this->tenantId = app(TenantContext::class)->isSchemaReady()
+            ? (int) User::query()->withoutGlobalScopes()->whereKey($userId)->value('tenant_id')
+            : 0;
+    }
 
     /** @return array<int, PrivateChannel> */
     public function broadcastOn(): array
     {
         return [
             new PrivateChannel("users.{$this->userId}.support"),
-            new PrivateChannel('admin.support'),
+            new PrivateChannel("admin.sites.{$this->tenantId}.support"),
         ];
     }
 

@@ -35,8 +35,8 @@ export const useSupportStore = defineStore('support', {
             this.adminUnread = stats.admin_unread;
         },
 
-        async start(context: SupportContext, userId: number): Promise<void> {
-            const expectedChannel = context === 'admin' ? 'admin.support' : `users.${userId}.support`;
+        async start(context: SupportContext, userId: number, tenantId?: number): Promise<void> {
+            const expectedChannel = context === 'admin' ? `admin.sites.${tenantId}.support` : `users.${userId}.support`;
 
             if (this.context === context && this.userId === userId && activeChannelName === expectedChannel) {
                 return;

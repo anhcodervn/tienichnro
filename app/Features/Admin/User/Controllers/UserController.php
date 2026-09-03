@@ -14,9 +14,12 @@ use App\Features\Admin\User\Requests\AdminUserIndexRequest;
 use App\Features\Admin\User\Requests\AdminUserRelatedListRequest;
 use App\Features\Admin\User\Requests\AdminUserStatusRequest;
 use App\Features\Admin\User\Requests\AdminWalletAdjustRequest;
+use App\Features\Admin\User\Requests\UpsertUserPackagePriceRequest;
 use App\Features\Admin\User\Resources\AdminUserDetailResource;
 use App\Features\Admin\User\Resources\AdminUserResource;
+use App\Features\Admin\User\Services\UserPackagePriceAdminService;
 use App\Http\Controllers\Controller;
+use App\Models\TopupPackage;
 use App\Models\User;
 use App\Utils\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -67,6 +70,35 @@ class UserController extends Controller
 
         return response()->json(ApiResponse::success(
             'Cấp lại mật khẩu người dùng thành công.',
+        ));
+    }
+
+    public function prices(User $user, UserPackagePriceAdminService $service): JsonResponse
+    {
+        return response()->json(ApiResponse::success(data: ['prices' => $service->catalog($user)]));
+    }
+
+    public function updatePrice(
+        UpsertUserPackagePriceRequest $request,
+        User $user,
+        TopupPackage $topupPackage,
+        UserPackagePriceAdminService $service,
+    ): JsonResponse {
+        $service->save($user, $topupPackage, $request->validated());
+
+        return response()->json(ApiResponse::success(
+            'Đã cập nhật chiết khấu riêng cho thành viên.',
+            ['prices' => $service->catalog($user)],
+        ));
+    }
+
+    public function deletePrice(User $user, TopupPackage $topupPackage, UserPackagePriceAdminService $service): JsonResponse
+    {
+        $service->delete($user, $topupPackage);
+
+        return response()->json(ApiResponse::success(
+            'Đã đưa thành viên về giá mặc định của website.',
+            ['prices' => $service->catalog($user)],
         ));
     }
 

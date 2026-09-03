@@ -34,7 +34,7 @@ watch(
     () => userStore.user?.id ?? null,
     (userId) => {
         if (userId !== null) {
-            void supportStore.start('admin', userId);
+            void supportStore.start('admin', userId, userStore.user?.site?.id);
         }
     },
     { immediate: true },

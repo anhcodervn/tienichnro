@@ -3,7 +3,7 @@
 use App\Features\Admin\Seo\Controllers\SeoController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:sanctum', 'admin'])
+Route::middleware(['auth:sanctum', 'admin', 'platform.admin'])
     ->prefix('admin-api/seo')
     ->name('admin-api.seo.')
     ->group(function (): void {

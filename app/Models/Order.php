@@ -5,6 +5,8 @@ namespace App\Models;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Models\Concerns\BelongsToTenant;
+use App\Models\Scopes\TenantScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -14,7 +16,7 @@ use Illuminate\Support\Str;
 
 class Order extends Model
 {
-    use HasFactory;
+    use BelongsToTenant, HasFactory;
 
     protected $hidden = [
         'topup_provider_id',
@@ -30,12 +32,13 @@ class Order extends Model
     ];
 
     protected $fillable = [
-        'code', 'idempotency_key', 'user_id', 'email', 'normalized_email', 'game_id',
+        'tenant_id', 'code', 'idempotency_key', 'user_id', 'billing_user_id', 'email', 'normalized_email', 'game_id',
         'game_server_id', 'topup_package_id', 'package_source', 'global_topup_package_id',
         'global_topup_package_name', 'topup_provider_id', 'member_level_id', 'member_level_name',
         'member_level_pricing_mode', 'member_level_discount_bps', 'purchase_mode', 'checkout_fields_snapshot',
         'game_account', 'game_character', 'quantity',
-        'package_name', 'denomination', 'carot_amount', 'unit_price', 'sale_unit_price', 'retail_unit_price', 'subtotal',
+        'package_name', 'denomination', 'carot_amount', 'unit_price', 'sale_unit_price', 'retail_unit_price',
+        'tenant_cost_unit_price', 'tenant_cost_total', 'tenant_profit', 'subtotal',
         'discount_amount', 'member_level_discount_amount', 'total_amount', 'provider_unit_cost', 'provider_total_cost', 'gross_profit',
         'payment_method', 'payment_status', 'order_status',
         'provider_reference', 'paid_at', 'processing_at', 'completed_at', 'failed_at',
@@ -58,6 +61,7 @@ class Order extends Model
             'member_level_discount_bps' => 'integer',
             'checkout_fields_snapshot' => 'array',
             'unit_price' => 'decimal:2', 'sale_unit_price' => 'decimal:2', 'retail_unit_price' => 'decimal:2', 'subtotal' => 'decimal:2',
+            'tenant_cost_unit_price' => 'integer', 'tenant_cost_total' => 'integer', 'tenant_profit' => 'integer',
             'discount_amount' => 'decimal:2', 'member_level_discount_amount' => 'decimal:2', 'total_amount' => 'decimal:2',
             'provider_unit_cost' => 'decimal:2', 'provider_total_cost' => 'decimal:2', 'gross_profit' => 'decimal:2',
             'paid_at' => 'datetime', 'processing_at' => 'datetime', 'completed_at' => 'datetime',
@@ -77,7 +81,7 @@ class Order extends Model
     {
         do {
             $code = 'TOP'.now()->format('ymd').Str::upper(Str::random(6));
-        } while (self::query()->where('code', $code)->exists());
+        } while (self::query()->withoutGlobalScope(TenantScope::class)->where('code', $code)->exists());
 
         return $code;
     }
@@ -90,6 +94,11 @@ class Order extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function billingUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'billing_user_id')->withoutGlobalScope(TenantScope::class);
     }
 
     public function game(): BelongsTo

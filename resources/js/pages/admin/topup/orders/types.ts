@@ -60,6 +60,8 @@ export type RecipientRow = {
 
 export type OrderRow = {
     id: number;
+    tenant_id?: number | null;
+    site?: { id: number; name: string; slug: string } | null;
     code: string;
     email: string;
     user_id?: number | null;

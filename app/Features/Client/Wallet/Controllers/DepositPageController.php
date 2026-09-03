@@ -5,7 +5,9 @@ namespace App\Features\Client\Wallet\Controllers;
 use App\Features\Client\Wallet\Resources\ClientRechargeConfigResource;
 use App\Features\Client\Wallet\Services\WalletDepositService;
 use App\Features\Client\Wallet\Services\WalletService;
+use App\Features\Recharge\Services\RechargeBonusService;
 use App\Http\Controllers\Controller;
+use App\Models\RechargeBonusTier;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -15,6 +17,7 @@ class DepositPageController extends Controller
     public function __construct(
         private readonly WalletService $walletService,
         private readonly WalletDepositService $walletDepositService,
+        private readonly RechargeBonusService $rechargeBonusService,
     ) {}
 
     public function __invoke(Request $request): View
@@ -47,6 +50,10 @@ class DepositPageController extends Controller
             'rechargeConfigs' => $rechargeConfigs,
             'depositHistory' => $depositHistory,
             'pendingDeposit' => $this->walletDepositService->latestPendingRequest($user),
+            'bonusTiers' => $this->rechargeBonusService->active()
+                ->map(fn (RechargeBonusTier $tier): array => $this->rechargeBonusService->serialize($tier))
+                ->values()
+                ->all(),
         ]);
     }
 }

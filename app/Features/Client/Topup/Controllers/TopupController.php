@@ -3,8 +3,8 @@
 namespace App\Features\Client\Topup\Controllers;
 
 use App\Features\Client\Topup\Services\TurnstileService;
-use App\Features\MemberLevel\Services\MemberLevelPriceService;
 use App\Features\Topup\Services\GameRewardService;
+use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\User;
@@ -24,7 +24,7 @@ class TopupController extends Controller
         Request $request,
         Game $game,
         TurnstileService $turnstileService,
-        MemberLevelPriceService $memberLevelPriceService,
+        TopupPackagePricingService $topupPackagePricingService,
         GameRewardService $gameRewardService,
     ): View {
         abort_unless($game->status === 'active', 404);
@@ -47,7 +47,7 @@ class TopupController extends Controller
         $user = $request->user();
         $walletBalance = (int) ($user?->wallet()->value('balance') ?? 0);
         $gameRewardService->applyToPackages($game->packages);
-        $memberLevelStatus = $memberLevelPriceService->apply($game->packages, $user);
+        $topupPackagePricingService->apply($game->packages, $user);
         $game->setRelation(
             'packages',
             $game->packages->filter(fn ($package) => $package->is_price_available)->values(),
@@ -56,7 +56,6 @@ class TopupController extends Controller
         return view('client.topup.game', [
             'game' => $game,
             'walletBalance' => $walletBalance,
-            'memberLevelStatus' => $memberLevelStatus,
             'turnstileEnabled' => $turnstileService->isEnabled(),
             'turnstileSiteKey' => $turnstileService->siteKey(),
         ]);

@@ -23,7 +23,6 @@ class GlobalTopupPackageController extends Controller
 
         return response()->json(ApiResponse::success(data: [
             'global_packages' => GlobalTopupPackageResource::collection($catalog['global_packages'])->resolve(),
-            'levels' => $catalog['levels'],
             'providers' => $catalog['providers'],
         ]));
     }

@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Features\Client\Wallet\Observers\WalletTransactionObserver;
 use App\Models\QueueLog;
 use App\Models\WalletTransaction;
+use App\Support\TenantContext;
 use App\Utils\SendMessage;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
@@ -18,6 +19,11 @@ use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
+    public function register(): void
+    {
+        $this->app->scoped(TenantContext::class, fn (): TenantContext => new TenantContext);
+    }
+
     /**
      * Bootstrap any application services.
      */

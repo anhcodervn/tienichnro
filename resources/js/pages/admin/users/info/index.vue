@@ -1,18 +1,31 @@
 <script setup lang="ts">
-import { adminMemberLevelService, type MemberLevel } from '@/services/admin-member-level.service';
 import {
     adminUserService,
     type AdminPaginationMeta,
     type AdminUserDetailResponse,
     type AdminUserLog,
+    type AdminUserPackagePrice,
     type AdminUserWalletTransaction,
 } from '@/services/admin-user.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { ArrowLeft, CheckCheck, Crown, KeyRound, ListChecks, LoaderCircle, Minus, Plus, Save, Wallet } from 'lucide-vue-next';
+import {
+    ArrowLeft,
+    BadgePercent,
+    CheckCheck,
+    History,
+    KeyRound,
+    ListChecks,
+    LoaderCircle,
+    Minus,
+    Plus,
+    RotateCcw,
+    Save,
+    Wallet,
+} from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 
-type TabKey = 'overview' | 'transactions' | 'logs';
+type TabKey = 'overview' | 'pricing' | 'transactions' | 'logs';
 
 type TabState<T> = {
     loading: boolean;
@@ -27,9 +40,11 @@ const userId = Number(route.params.user_id);
 const loading = ref(false);
 const adjustingWallet = ref(false);
 const resettingPassword = ref(false);
-const assigningLevel = ref(false);
+const pricesLoading = ref(false);
+const savingPriceId = ref<number | null>(null);
+const resettingPriceId = ref<number | null>(null);
 const detail = ref<AdminUserDetailResponse | null>(null);
-const levels = ref<MemberLevel[]>([]);
+const priceRows = ref<AdminUserPackagePrice[]>([]);
 const activeTab = ref<TabKey>('overview');
 
 const walletForm = reactive({
@@ -41,12 +56,6 @@ const walletForm = reactive({
 const passwordForm = reactive({
     password: '',
     password_confirmation: '',
-});
-
-const levelForm = reactive({
-    member_level_id: '' as number | '',
-    expires_at: '',
-    reason: '',
 });
 
 const transactionsState = reactive<TabState<AdminUserWalletTransaction>>({
@@ -65,6 +74,7 @@ const logsState = reactive<TabState<AdminUserLog>>({
 
 const tabs = [
     { key: 'overview' as const, label: 'Tổng quan' },
+    { key: 'pricing' as const, label: 'Chiết khấu' },
     { key: 'transactions' as const, label: 'Dòng tiền' },
     { key: 'logs' as const, label: 'Hoạt động' },
 ];
@@ -134,40 +144,10 @@ const loadDetail = async (): Promise<void> => {
 
     try {
         detail.value = await adminUserService.show(userId);
-        levelForm.member_level_id = detail.value.member_level?.is_manual ? (detail.value.member_level.unlocked_level?.id ?? '') : '';
-        levelForm.expires_at = detail.value.member_level?.manual_level_expires_at?.slice(0, 16) ?? '';
     } catch (error) {
         handleErrorResponse(error);
     } finally {
         loading.value = false;
-    }
-};
-
-const loadLevels = async (): Promise<void> => {
-    try {
-        const levelCatalog = await adminMemberLevelService.catalog();
-        levels.value = levelCatalog.levels;
-    } catch (error) {
-        handleErrorResponse(error);
-    }
-};
-
-const submitLevelAssignment = async (): Promise<void> => {
-    assigningLevel.value = true;
-
-    try {
-        await adminMemberLevelService.assignUser(userId, {
-            member_level_id: levelForm.member_level_id === '' ? null : Number(levelForm.member_level_id),
-            expires_at: levelForm.expires_at || null,
-            reason: levelForm.reason || undefined,
-        });
-        levelForm.reason = '';
-        handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật level thủ công.' } });
-        await loadDetail();
-    } catch (error) {
-        handleErrorResponse(error);
-    } finally {
-        assigningLevel.value = false;
     }
 };
 
@@ -203,8 +183,56 @@ const loadLogs = async (page = 1): Promise<void> => {
     }
 };
 
+const loadPrices = async (): Promise<void> => {
+    pricesLoading.value = true;
+
+    try {
+        priceRows.value = await adminUserService.prices(userId);
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        pricesLoading.value = false;
+    }
+};
+
+const savePrice = async (row: AdminUserPackagePrice): Promise<void> => {
+    savingPriceId.value = row.package_id;
+
+    try {
+        priceRows.value = await adminUserService.updatePrice(userId, row.package_id, {
+            pricing_mode: row.pricing_mode,
+            discount_percent: row.pricing_mode === 'discount' ? Number(row.discount_percent) : null,
+            fixed_price: row.pricing_mode === 'fixed' ? Number(row.fixed_price) : null,
+            minimum_profit: Number(row.minimum_profit),
+            is_active: row.is_active,
+        });
+        handleSuccessResponse({ data: { status: true, message: 'Đã lưu giá riêng cho thành viên.' } });
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        savingPriceId.value = null;
+    }
+};
+
+const resetPrice = async (row: AdminUserPackagePrice): Promise<void> => {
+    resettingPriceId.value = row.package_id;
+
+    try {
+        priceRows.value = await adminUserService.deletePrice(userId, row.package_id);
+        handleSuccessResponse({ data: { status: true, message: 'Đã đưa gói về giá mặc định của website.' } });
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        resettingPriceId.value = null;
+    }
+};
+
 const openTab = async (tab: TabKey): Promise<void> => {
     activeTab.value = tab;
+
+    if (tab === 'pricing' && priceRows.value.length === 0) {
+        await loadPrices();
+    }
 
     if (tab === 'transactions' && !transactionsState.loaded) {
         await loadTransactions();
@@ -314,9 +342,7 @@ const goToTabPage = async (tab: TabKey, page: number): Promise<void> => {
     }
 };
 
-onMounted(async () => {
-    await Promise.all([loadDetail(), loadLevels()]);
-});
+onMounted(loadDetail);
 </script>
 
 <template>
@@ -418,92 +444,6 @@ onMounted(async () => {
                                     </div>
                                 </div>
                             </article>
-                        </section>
-
-                        <section
-                            v-if="detail.member_level"
-                            class="grid gap-4 rounded-[10px] border border-amber-200 bg-amber-50 p-4 xl:grid-cols-[minmax(0,1fr)_24rem]"
-                        >
-                            <div>
-                                <div class="flex flex-wrap items-start justify-between gap-3">
-                                    <div>
-                                        <p class="text-xs font-bold uppercase tracking-[0.16em] text-amber-700">Level đại lý</p>
-                                        <h3 class="mt-1 flex items-center gap-2 text-xl font-black text-slate-950">
-                                            <Crown class="h-5 w-5 text-amber-500" />{{ detail.member_level.effective_level?.name || 'Chưa có level' }}
-                                        </h3>
-                                        <p v-if="detail.member_level.is_temporarily_downgraded" class="mt-1 text-sm font-semibold text-amber-800">
-                                            Đang tạm giảm từ {{ detail.member_level.unlocked_level?.name }} vì chưa đủ mức duy trì.
-                                        </p>
-                                    </div>
-                                    <span
-                                        v-if="detail.member_level.is_manual"
-                                        class="rounded-md border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700"
-                                        >Admin khóa level</span
-                                    >
-                                </div>
-                                <dl class="mt-4 grid gap-3 sm:grid-cols-3">
-                                    <div class="rounded-md bg-white p-3">
-                                        <dt class="text-xs font-semibold text-slate-500">Tổng nạp lịch sử</dt>
-                                        <dd class="mt-1 font-black text-slate-950">
-                                            {{ formatCurrency(detail.member_level.lifetime_completed_amount) }}
-                                        </dd>
-                                    </div>
-                                    <div class="rounded-md bg-white p-3">
-                                        <dt class="text-xs font-semibold text-slate-500">Nạp trong kỳ duy trì</dt>
-                                        <dd class="mt-1 font-black text-slate-950">
-                                            {{ formatCurrency(detail.member_level.rolling_completed_amount) }}
-                                        </dd>
-                                    </div>
-                                    <div class="rounded-md bg-white p-3">
-                                        <dt class="text-xs font-semibold text-slate-500">Còn thiếu duy trì</dt>
-                                        <dd class="mt-1 font-black text-amber-700">
-                                            {{ formatCurrency(detail.member_level.maintenance_remaining_amount) }}
-                                        </dd>
-                                    </div>
-                                </dl>
-                                <div v-if="detail.member_level_histories.length" class="mt-4 border-t border-amber-200 pt-3">
-                                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-amber-700">Lịch sử level gần đây</p>
-                                    <ul class="mt-2 grid gap-2 sm:grid-cols-2">
-                                        <li
-                                            v-for="history in detail.member_level_histories.slice(0, 6)"
-                                            :key="history.id"
-                                            class="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2 text-xs"
-                                        >
-                                            <span class="font-semibold text-slate-700"
-                                                >{{ history.from_level?.name || 'Khởi tạo' }} → {{ history.to_level?.name || 'Tự động' }}</span
-                                            >
-                                            <time class="shrink-0 text-slate-400">{{ formatDate(history.created_at) }}</time>
-                                        </li>
-                                    </ul>
-                                </div>
-                            </div>
-
-                            <form class="grid gap-3 rounded-md border border-amber-200 bg-white p-3" @submit.prevent="submitLevelAssignment">
-                                <label class="grid gap-1 text-sm font-semibold text-slate-700"
-                                    >Level thủ công
-                                    <select v-model="levelForm.member_level_id" class="rounded-md border-slate-300">
-                                        <option value="">Tự động theo tổng nạp</option>
-                                        <option v-for="level in levels" :key="level.id" :value="level.id">{{ level.name }}</option>
-                                    </select>
-                                </label>
-                                <label class="grid gap-1 text-sm font-semibold text-slate-700"
-                                    >Khóa đến ngày<input v-model="levelForm.expires_at" class="rounded-md border-slate-300" type="datetime-local"
-                                /></label>
-                                <label class="grid gap-1 text-sm font-semibold text-slate-700"
-                                    >Lý do<input
-                                        v-model="levelForm.reason"
-                                        class="rounded-md border-slate-300"
-                                        maxlength="500"
-                                        placeholder="Tuyển đại lý, ưu đãi riêng..."
-                                /></label>
-                                <button
-                                    class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-amber-500 px-3 font-bold text-slate-950 disabled:opacity-50"
-                                    :disabled="assigningLevel"
-                                    type="submit"
-                                >
-                                    <LoaderCircle v-if="assigningLevel" class="h-4 w-4 animate-spin" /><Save v-else class="h-4 w-4" /> Lưu level
-                                </button>
-                            </form>
                         </section>
 
                         <section class="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
@@ -643,6 +583,135 @@ onMounted(async () => {
                                 </div>
                             </article>
                         </section>
+                    </div>
+
+                    <div v-else-if="activeTab === 'pricing'" class="space-y-4">
+                        <div class="rounded-[10px] border border-indigo-200 bg-indigo-50 px-4 py-4">
+                            <div class="flex items-start gap-3">
+                                <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-[8px] bg-white text-[#465fff] shadow-sm">
+                                    <BadgePercent class="h-4 w-4" />
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-950">Giá riêng theo từng thành viên</h3>
+                                    <p class="mt-1 text-sm leading-6 text-slate-600">
+                                        Giá này áp dụng khi thành viên đặt trên website hoặc qua API. Nếu thành viên là tài khoản thanh toán của
+                                        website đại lý, mức giá này trở thành giá vốn cho tất cả website thuộc thành viên đó.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div v-if="pricesLoading" class="flex items-center justify-center gap-2 py-12 text-sm text-slate-500">
+                            <LoaderCircle class="h-4 w-4 animate-spin" />
+                            Đang tải bảng giá thành viên...
+                        </div>
+
+                        <div v-else class="overflow-x-auto rounded-[10px] border border-slate-300">
+                            <table class="w-full min-w-[1180px]">
+                                <thead class="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
+                                    <tr>
+                                        <th class="px-3 py-3">Game / gói</th>
+                                        <th class="px-3 py-3">Mệnh giá</th>
+                                        <th class="px-3 py-3">Giá chuẩn</th>
+                                        <th class="px-3 py-3">Cách tính</th>
+                                        <th class="px-3 py-3">Mức giá</th>
+                                        <th class="px-3 py-3">Lãi tối thiểu</th>
+                                        <th class="px-3 py-3">Giá thành viên</th>
+                                        <th class="px-3 py-3 text-center">Áp dụng</th>
+                                        <th class="px-3 py-3 text-right">Thao tác</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-if="priceRows.length === 0">
+                                        <td colspan="9" class="px-4 py-12 text-center text-sm text-slate-500">Chưa có gói nạp đang hoạt động.</td>
+                                    </tr>
+                                    <tr v-for="row in priceRows" :key="row.package_id" class="border-t border-slate-200 align-top text-sm">
+                                        <td class="px-3 py-3">
+                                            <p class="font-bold text-slate-900">{{ row.game || 'Chưa phân loại' }}</p>
+                                            <p class="mt-1 text-xs text-slate-500">{{ row.package }}</p>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-3 font-semibold text-slate-700">
+                                            {{ formatCurrency(row.denomination) }}
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-3 font-semibold text-slate-700">{{ formatCurrency(row.base_price) }}</td>
+                                        <td class="px-3 py-3">
+                                            <select
+                                                v-model="row.pricing_mode"
+                                                class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-700 outline-none focus:border-[#465fff]"
+                                            >
+                                                <option value="discount">Giảm theo %</option>
+                                                <option value="fixed">Giá cố định</option>
+                                            </select>
+                                        </td>
+                                        <td class="px-3 py-3">
+                                            <div v-if="row.pricing_mode === 'discount'" class="relative w-28">
+                                                <input
+                                                    v-model.number="row.discount_percent"
+                                                    type="number"
+                                                    min="0"
+                                                    max="100"
+                                                    step="0.01"
+                                                    class="w-full rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 pr-7 text-sm text-slate-700 outline-none focus:border-[#465fff]"
+                                                />
+                                                <span class="pointer-events-none absolute right-3 top-2 text-sm text-slate-400">%</span>
+                                            </div>
+                                            <input
+                                                v-else
+                                                v-model.number="row.fixed_price"
+                                                type="number"
+                                                min="0"
+                                                class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
+                                            />
+                                        </td>
+                                        <td class="px-3 py-3">
+                                            <input
+                                                v-model.number="row.minimum_profit"
+                                                type="number"
+                                                min="0"
+                                                class="w-28 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
+                                            />
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-3">
+                                            <p class="font-black text-[#465fff]">{{ formatCurrency(row.member_price) }}</p>
+                                            <p v-if="row.discount_amount > 0" class="mt-1 text-xs font-semibold text-emerald-600">
+                                                Giảm {{ formatCurrency(row.discount_amount) }}
+                                            </p>
+                                        </td>
+                                        <td class="px-3 py-3 text-center">
+                                            <input
+                                                v-model="row.is_active"
+                                                type="checkbox"
+                                                class="h-5 w-5 rounded border-2 border-slate-400 text-[#465fff] focus:ring-[#465fff]"
+                                            />
+                                        </td>
+                                        <td class="px-3 py-3">
+                                            <div class="flex justify-end gap-2">
+                                                <button
+                                                    type="button"
+                                                    class="inline-flex items-center gap-1.5 rounded-[8px] bg-[#465fff] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                                    :disabled="savingPriceId === row.package_id || resettingPriceId === row.package_id"
+                                                    @click="savePrice(row)"
+                                                >
+                                                    <LoaderCircle v-if="savingPriceId === row.package_id" class="h-3.5 w-3.5 animate-spin" />
+                                                    <Save v-else class="h-3.5 w-3.5" />
+                                                    Lưu
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    title="Xóa giá riêng"
+                                                    class="inline-flex items-center justify-center rounded-[8px] border-2 border-slate-300 bg-white p-2 text-slate-600 hover:border-orange-300 hover:text-orange-600 disabled:cursor-not-allowed disabled:opacity-60"
+                                                    :disabled="savingPriceId === row.package_id || resettingPriceId === row.package_id"
+                                                    @click="resetPrice(row)"
+                                                >
+                                                    <LoaderCircle v-if="resettingPriceId === row.package_id" class="h-3.5 w-3.5 animate-spin" />
+                                                    <RotateCcw v-else class="h-3.5 w-3.5" />
+                                                </button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
 
                     <div v-else-if="activeTab === 'transactions'" class="space-y-4">
