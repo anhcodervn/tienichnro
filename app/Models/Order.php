@@ -150,4 +150,9 @@ class Order extends Model
     {
         return $this->hasOne(MemberLevelOrderCredit::class);
     }
+
+    public function affiliateCommission(): HasOne
+    {
+        return $this->hasOne(AffiliateCommission::class);
+    }
 }

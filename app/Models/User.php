@@ -69,6 +69,8 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
             if (blank($user->username)) {
                 $user->username = $user->generateUniqueUsername();
             }
+
+            $user->referral_code ??= $user->generateUniqueReferralCode();
         });
 
         static::created(function (self $user): void {
@@ -106,6 +108,16 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
     public function referrals(): HasMany
     {
         return $this->hasMany(self::class, 'referred_by');
+    }
+
+    public function affiliateProfile(): HasOne
+    {
+        return $this->hasOne(AffiliateProfile::class);
+    }
+
+    public function affiliateCommissions(): HasMany
+    {
+        return $this->hasMany(AffiliateCommission::class, 'referrer_id');
     }
 
     public function userSessions(): HasMany
@@ -227,6 +239,15 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         }
 
         return $username;
+    }
+
+    protected function generateUniqueReferralCode(): string
+    {
+        do {
+            $code = Str::upper(Str::random(10));
+        } while (static::withTrashed()->withoutGlobalScopes()->where('referral_code', $code)->exists());
+
+        return $code;
     }
 
     public function sendPasswordResetNotification($token): void

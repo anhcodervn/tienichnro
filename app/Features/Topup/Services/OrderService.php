@@ -5,6 +5,7 @@ namespace App\Features\Topup\Services;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Exceptions\ApiException;
+use App\Features\Affiliate\Services\AffiliateCommissionService;
 use App\Features\Client\Wallet\Services\WalletService;
 use App\Features\Topup\Jobs\ProcessTopupOrder;
 use App\Features\Topup\Services\Payments\OrderBankPaymentService;
@@ -30,6 +31,7 @@ class OrderService
         private readonly WalletService $walletService,
         private readonly TopupProviderResolver $providerResolver,
         private readonly OrderBankPaymentService $orderBankPaymentService,
+        private readonly AffiliateCommissionService $affiliateCommissionService,
     ) {}
 
     /** @param array<string, mixed> $payload */
@@ -202,6 +204,7 @@ class OrderService
                 }
 
                 $order = Order::query()->create($orderAttributes);
+                $this->affiliateCommissionService->snapshot($order);
 
                 $order->recipients()->createMany(
                     collect($recipientData['recipients'])

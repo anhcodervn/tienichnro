@@ -2,6 +2,7 @@
 
 use App\Features\Admin\Setting\Controllers\SiteCustomAssetController;
 use App\Features\Auth\Controllers\AuthController;
+use App\Features\Client\Affiliate\Controllers\AffiliatePageController;
 use App\Features\Client\Profile\Controllers\ProfilePageController;
 use App\Http\Controllers\Account\WalletController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\Route;
 Route::get('/site-custom.css', [SiteCustomAssetController::class, 'css'])->name('site_custom.css');
 Route::get('/site-custom.js', [SiteCustomAssetController::class, 'javascript'])->name('site_custom.js');
 Route::get('/community', BioPageController::class)->name('bio.show');
+Route::get('/cong-tac-vien/{any?}', AffiliatePageController::class)
+    ->middleware('site.active')->where('any', '.*')->name('client.affiliate.spa');
 
 Route::middleware(['guest', 'site.active'])->group(function (): void {
     Route::view('/dang-nhap', 'pages.auth.login')->name('auth.login');
@@ -49,7 +52,6 @@ Route::middleware('auth')->group(function (): void {
     Route::get('/verify-email/{id}/{hash}', VerifyEmailController::class)->middleware('signed')->name('verification.verify');
     Route::post('/email/verification-notification', EmailVerificationNotificationController::class)
         ->middleware('throttle:6,1')->name('verification.send');
-
     Route::prefix('tai-khoan')->name('account.')->group(function (): void {
         Route::get('/', ProfilePageController::class)->defaults('tab', 'profile')->name('index');
         Route::get('/so-du', WalletController::class)->name('wallet');

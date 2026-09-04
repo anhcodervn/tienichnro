@@ -79,3 +79,11 @@ if (file_exists(base_path('app/Features/Admin/Reporting/routes.php'))) {
 if (file_exists(base_path('app/Features/Tenant/routes.php'))) {
     require base_path('app/Features/Tenant/routes.php');
 }
+
+if (file_exists(base_path('app/Features/Admin/Affiliate/routes.php'))) {
+    require base_path('app/Features/Admin/Affiliate/routes.php');
+}
+
+if (file_exists(base_path('app/Features/Client/Affiliate/routes.php'))) {
+    require base_path('app/Features/Client/Affiliate/routes.php');
+}

@@ -4,6 +4,7 @@ namespace App\Features\Auth\Controllers;
 
 use App\Actions\RecordUserLogAction;
 use App\Exceptions\ApiException;
+use App\Features\Affiliate\Services\AffiliateReferralService;
 use App\Features\Auth\Requests\ForgotPasswordRequest;
 use App\Features\Auth\Requests\LoginRequest;
 use App\Features\Auth\Requests\RegisterRequest;
@@ -33,6 +34,7 @@ class AuthController extends Controller
         private readonly MailQueue $mailQueue,
         private readonly GoogleAuthService $googleAuthService,
         private readonly DiscordReportService $discordReportService,
+        private readonly AffiliateReferralService $affiliateReferralService,
     ) {}
 
     public function index(): JsonResponse
@@ -105,6 +107,7 @@ class AuthController extends Controller
     public function register(RegisterRequest $request): JsonResponse|RedirectResponse
     {
         $validated = $request->validated();
+        $referrer = $this->affiliateReferralService->referrer($request);
 
         $user = User::create([
             'name' => $validated['name'] ?? $validated['full_name'] ?? null,
@@ -112,7 +115,10 @@ class AuthController extends Controller
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
             'password' => $validated['password'],
+            'referred_by' => $referrer?->id,
         ]);
+
+        $this->affiliateReferralService->forget($request);
 
         $this->walletService->createWallet($user);
         $this->recordUserLogAction->handle($user, 'register', 'Đăng ký tài khoản', $request);
@@ -227,6 +233,7 @@ class AuthController extends Controller
                 ])->save();
             } else {
                 $isNewUser = true;
+                $referrer = $this->affiliateReferralService->referrer($request);
                 $user = User::query()->create([
                     'username' => Str::of($googleUser['email'])->before('@')->slug('')->value() ?: null,
                     'email' => $googleUser['email'],
@@ -237,7 +244,9 @@ class AuthController extends Controller
                     'password' => Str::random(64),
                     'status' => 'active',
                     'role' => 'user',
+                    'referred_by' => $referrer?->id,
                 ]);
+                $this->affiliateReferralService->forget($request);
             }
 
             Auth::guard('web')->login($user, true);

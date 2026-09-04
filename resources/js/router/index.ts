@@ -1,12 +1,14 @@
 import { useUserStore } from '@/stores/user.store';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import adminRouter from './modules/admin';
+import affiliateRouter from './modules/affiliate';
 
-const routes: RouteRecordRaw[] = [adminRouter];
+const routes: RouteRecordRaw[] = [adminRouter, affiliateRouter];
 
 const routeTitles: Record<string, string> = {
     'admin.dashboard': 'Tổng quan quản trị',
     'admin.reports.index': 'Báo cáo tăng trưởng và doanh thu',
+    'admin.affiliate.index': 'Quản lý Affiliate',
     'admin.support.index': 'Tin nhắn hỗ trợ',
     'admin.topup.catalog': 'Danh mục nạp game',
     'admin.topup.games': 'Danh sách game',
@@ -37,6 +39,7 @@ const routeTitles: Record<string, string> = {
     'admin.recharge.config': 'Cấu hình nạp tiền',
     'admin.recharge.history': 'Lịch sử nạp tiền',
     'admin.error.404': 'Trang quản trị không tồn tại',
+    'affiliate.dashboard': 'Dashboard cộng tác viên',
 };
 
 const router = createRouter({
@@ -47,7 +50,7 @@ const router = createRouter({
 router.beforeEach(async (to) => {
     const routeName = typeof to.name === 'string' ? to.name : '';
 
-    if (!routeName.startsWith('admin.')) {
+    if (!routeName.startsWith('admin.') && !routeName.startsWith('affiliate.')) {
         return true;
     }
 
@@ -63,7 +66,7 @@ router.beforeEach(async (to) => {
         };
     }
 
-    if (user.role !== 'admin') {
+    if (routeName.startsWith('admin.') && user.role !== 'admin') {
         return {
             path: '/',
         };

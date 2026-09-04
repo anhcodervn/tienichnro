@@ -3,11 +3,14 @@
 namespace App\Features\Topup\Services;
 
 use App\Enums\OrderStatus;
+use App\Features\Affiliate\Services\AffiliateCommissionService;
 use App\Models\Order;
 use DomainException;
 
 class OrderStatusService
 {
+    public function __construct(private readonly AffiliateCommissionService $affiliateCommissionService) {}
+
     /** @var array<string, array<int, string>> */
     private array $transitions = [
         'pending' => ['processing', 'failed', 'cancelled'],
@@ -54,6 +57,14 @@ class OrderStatusService
                 ->update(['status' => 'cancelled', 'failure_reason' => $reason]),
             default => null,
         };
+
+        if ($target === OrderStatus::Completed) {
+            $this->affiliateCommissionService->markOrderCompleted($order->refresh());
+        }
+
+        if ($target === OrderStatus::Cancelled) {
+            $this->affiliateCommissionService->reverseForOrder($order, 'Đơn hàng đã bị hủy.');
+        }
 
         return $order->refresh();
     }

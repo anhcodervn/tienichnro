@@ -3,6 +3,7 @@
 namespace App\Features\Topup\Observers;
 
 use App\Enums\PaymentStatus;
+use App\Features\Affiliate\Services\AffiliateCommissionService;
 use App\Features\Reporting\Services\TopupDiscordReporterService;
 use App\Features\Topup\Events\AdminTopupOrderUpdated;
 use App\Features\Topup\Events\OrderStatusUpdated;
@@ -12,6 +13,7 @@ class OrderObserver
 {
     public function __construct(
         private readonly TopupDiscordReporterService $discordReporter,
+        private readonly AffiliateCommissionService $affiliateCommissionService,
     ) {}
 
     public function created(Order $order): void
@@ -28,6 +30,20 @@ class OrderObserver
                 PaymentStatus::Refunded => $this->discordReporter->refundIssued($order),
                 default => null,
             };
+
+            if ($order->payment_status === PaymentStatus::Paid) {
+                $this->affiliateCommissionService->markOrderCompleted($order);
+            }
+
+            if (in_array($order->payment_status, [PaymentStatus::Refunded, PaymentStatus::Cancelled, PaymentStatus::Expired], true)) {
+                $reason = match ($order->payment_status) {
+                    PaymentStatus::Refunded => 'Đơn hàng đã được hoàn tiền.',
+                    PaymentStatus::Cancelled => 'Thanh toán đã bị hủy.',
+                    PaymentStatus::Expired => 'Thanh toán đã hết hạn.',
+                    default => 'Thanh toán không còn hợp lệ.',
+                };
+                $this->affiliateCommissionService->reverseForOrder($order, $reason);
+            }
         }
 
         if ($order->wasChanged('order_status')) {

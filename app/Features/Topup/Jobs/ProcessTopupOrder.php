@@ -48,7 +48,7 @@ class ProcessTopupOrder implements ShouldBeUnique, ShouldQueue
             return;
         }
 
-        (new OrderStatusService)->transition($order, OrderStatus::Failed, 'Không thể xử lý topup sau nhiều lần thử.');
+        app(OrderStatusService::class)->transition($order, OrderStatus::Failed, 'Không thể xử lý topup sau nhiều lần thử.');
         Mail::to($order->email)->queue(new OrderFailedMail($order->refresh()));
     }
 }

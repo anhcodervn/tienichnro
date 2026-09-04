@@ -20,3 +20,8 @@ Schedule::command('report:discord-daily-topup')
     ->withoutOverlapping()
     ->onOneServer()
     ->when(static fn (): bool => filled(config('services.discord.channels.daily_report')));
+
+Schedule::command('affiliate:release-commissions')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();

@@ -427,6 +427,34 @@ document.querySelectorAll('[data-page-enter]').forEach((page) => {
     );
 });
 
+const desktopNavMenus = [...document.querySelectorAll('[data-desktop-nav-menu]')];
+
+desktopNavMenus.forEach((menu) => {
+    menu.addEventListener('toggle', () => {
+        if (!menu.open) return;
+
+        desktopNavMenus.forEach((otherMenu) => {
+            if (otherMenu !== menu) otherMenu.open = false;
+        });
+    });
+});
+
+document.addEventListener('click', (event) => {
+    desktopNavMenus.forEach((menu) => {
+        if (!menu.contains(event.target)) menu.open = false;
+    });
+});
+
+document.addEventListener('keydown', (event) => {
+    if (event.key !== 'Escape') return;
+
+    const openMenu = desktopNavMenus.find((menu) => menu.open);
+    if (!openMenu) return;
+
+    openMenu.open = false;
+    openMenu.querySelector('summary')?.focus();
+});
+
 document.querySelectorAll('[data-menu-toggle]').forEach((button) => {
     const menu = document.getElementById(button.getAttribute('aria-controls'));
     const panel = menu?.querySelector('[data-menu-panel]');

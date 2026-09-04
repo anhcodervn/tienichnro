@@ -2,10 +2,12 @@
 
 namespace App\Providers;
 
+use App\Models\AffiliateProgram;
 use App\Models\User;
 use App\Support\SafeNavigationUrl;
 use App\Support\SettingStore;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -85,6 +87,8 @@ class SharedViewServiceProvider extends ServiceProvider
                 'css' => $storedSettings['custom_css_enabled'] === true && $storedSettings['custom_css'] !== '',
                 'js' => $storedSettings['custom_js_enabled'] === true && $storedSettings['custom_js'] !== '',
             ]);
+            $view->with('affiliateEnabled', Schema::hasTable('affiliate_programs')
+                && AffiliateProgram::query()->where('is_enabled', true)->exists());
         });
     }
 

@@ -5,6 +5,7 @@ import {
     ChartNoAxesCombined,
     Gamepad2,
     Globe2,
+    HandCoins,
     LayoutDashboard,
     ListChecks,
     Mail,
@@ -64,6 +65,12 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         label: 'Báo cáo doanh thu',
         icon: ChartNoAxesCombined,
         href: '/admin/reports',
+    },
+    {
+        key: 'affiliate',
+        label: 'Affiliate',
+        icon: HandCoins,
+        href: '/admin/affiliate',
     },
     {
         key: 'support',

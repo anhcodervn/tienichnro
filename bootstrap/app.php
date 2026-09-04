@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CaptureAffiliateReferral;
 use App\Http\Middleware\EnsureAdminUser;
 use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsureSiteIsActive;
@@ -29,6 +30,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToGroup('web', ResolveTenant::class);
         $middleware->prependToGroup('api', ResolveTenant::class);
         $middleware->appendToGroup('web', EnsureTenantSession::class);
+        $middleware->appendToGroup('web', CaptureAffiliateReferral::class);
         $middleware->appendToGroup('api', EnsureTenantSession::class);
         $middleware->statefulApi();
         $middleware->trustProxies(at: '*');
