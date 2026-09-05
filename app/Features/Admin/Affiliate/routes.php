@@ -1,5 +1,6 @@
 <?php
 
+use App\Features\Admin\Affiliate\Controllers\AffiliateAnnouncementController;
 use App\Features\Admin\Affiliate\Controllers\AffiliateCommissionController;
 use App\Features\Admin\Affiliate\Controllers\AffiliateController;
 use App\Features\Admin\Affiliate\Controllers\AffiliatePartnerController;
@@ -9,6 +10,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin-api/affiliate')->name('admin.affiliate.')->group(function (): void {
     Route::get('/', [AffiliateController::class, 'index'])->name('index');
+    Route::get('/announcements', [AffiliateAnnouncementController::class, 'index'])->name('announcements.index');
+    Route::post('/announcements', [AffiliateAnnouncementController::class, 'store'])->name('announcements.store');
+    Route::put('/announcements/{announcement}', [AffiliateAnnouncementController::class, 'update'])->whereNumber('announcement')->name('announcements.update');
+    Route::delete('/announcements/{announcement}', [AffiliateAnnouncementController::class, 'destroy'])->whereNumber('announcement')->name('announcements.destroy');
     Route::get('/configuration', [AffiliateProgramController::class, 'show'])->name('configuration.show');
     Route::put('/configuration', [AffiliateProgramController::class, 'update'])->name('configuration.update');
     Route::put('/global-rates/{globalTopupPackage}', [AffiliateProgramController::class, 'updateGlobalRate'])->name('global-rates.update');

@@ -101,6 +101,25 @@ export type AffiliateWithdrawal = {
     created_at: string;
 };
 
+export type AffiliateAnnouncement = {
+    id: number;
+    tenant_id: number;
+    title: string;
+    content: unknown[];
+    content_html: string;
+    is_pinned: boolean;
+    is_published: boolean;
+    published_at: string | null;
+    updated_at: string | null;
+    admin: { id: number; username: string; full_name: string | null } | null;
+};
+
+export type AffiliateAnnouncementData = {
+    announcements: AffiliateAnnouncement[];
+    sites: Array<{ id: number; name: string }>;
+    selected_site_id: number;
+};
+
 const root = '/api/admin-api/affiliate';
 
 export const adminAffiliateService = {
@@ -121,4 +140,9 @@ export const adminAffiliateService = {
         (await api.get(`${root}/withdrawals`, { params })).data.data,
     withdrawal: async (withdrawalId: number) => (await api.get(`${root}/withdrawals/${withdrawalId}`)).data.data,
     updateWithdrawal: (withdrawalId: number, payload: Record<string, unknown>) => api.patch(`${root}/withdrawals/${withdrawalId}`, payload),
+    announcements: async (siteId?: number): Promise<AffiliateAnnouncementData> =>
+        (await api.get(`${root}/announcements`, { params: siteId ? { site_id: siteId } : {} })).data.data,
+    createAnnouncement: (payload: Record<string, unknown>) => api.post(`${root}/announcements`, payload),
+    updateAnnouncement: (announcementId: number, payload: Record<string, unknown>) => api.put(`${root}/announcements/${announcementId}`, payload),
+    deleteAnnouncement: (announcementId: number) => api.delete(`${root}/announcements/${announcementId}`),
 };

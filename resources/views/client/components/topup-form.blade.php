@@ -3,6 +3,7 @@
     $walletBalance = $walletBalance ?? 0;
     $turnstileEnabled = (bool) ($turnstileEnabled ?? false);
     $turnstileSiteKey = (string) ($turnstileSiteKey ?? '');
+    $showConfirmation = (bool) ($showConfirmation ?? false);
     $requestedGame = old('game_id', $selectedGame?->id ?? $games->first()?->id);
     $initialGame = $games->contains(fn ($game) => (string) $game->id === (string) $requestedGame)
         ? $requestedGame
@@ -195,7 +196,7 @@
                 </div>
 
                 @foreach ($games as $game)
-                    <div class="home-recipient-grid" data-recipient-fields="{{ $game->id }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
+                    <div class="home-recipient-grid" data-recipient-fields="{{ $game->id }}" data-single-confirm-recipient-label="{{ collect($game->checkoutFields())->pluck('label')->implode(' | ') }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
                         @foreach ($game->checkoutFields() as $field)
                             <div class="home-field home-recipient-field" data-field-key="{{ $field['key'] }}">
                                 <label for="recipient-{{ $game->id }}-{{ $field['key'] }}">
@@ -261,7 +262,7 @@
                             ->push('Số lượng thẻ')
                             ->implode('|');
                     @endphp
-                    <p class="home-bulk-schema" data-bulk-schema="{{ $game->id }}" data-bulk-placeholder="{{ $fieldPlaceholders }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
+                    <p class="home-bulk-schema" data-bulk-schema="{{ $game->id }}" data-bulk-placeholder="{{ $fieldPlaceholders }}" data-bulk-confirm-recipient-label="{{ $fieldLabels }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
                         Mỗi dòng theo thứ tự: <strong>{{ $fieldLabels }}</strong>
                     </p>
                 @endforeach
@@ -356,4 +357,53 @@
             <p class="home-checkout-note">Hệ thống không yêu cầu cung cấp mật khẩu game.</p>
         </aside>
     </div>
+
+    @if ($showConfirmation)
+    <div class="fixed inset-0 z-[80]" data-topup-confirmation-modal aria-hidden="true" hidden>
+        <button class="absolute inset-0 bg-slate-950/60 backdrop-blur-[1px]" type="button" data-topup-confirmation-close tabindex="-1" aria-label="Đóng bước xác nhận nạp"></button>
+        <section class="absolute inset-x-3 top-1/2 flex max-h-[calc(100dvh-1.5rem)] -translate-y-1/2 flex-col overflow-hidden rounded-[8px] border border-slate-200 bg-white shadow-2xl sm:inset-x-6 sm:mx-auto sm:max-w-2xl" role="dialog" aria-modal="true" aria-labelledby="topup-confirmation-title" tabindex="-1" data-topup-confirmation-panel>
+            <header class="flex items-center justify-between gap-4 border-b border-slate-200 px-4 py-3 sm:px-5">
+                <div class="min-w-0">
+                    <p class="text-xs font-bold uppercase tracking-[0.14em] text-cyan-700">Kiểm tra trước khi nạp</p>
+                    <h2 class="text-lg font-extrabold text-slate-950" id="topup-confirmation-title">Xác nhận thông tin nạp</h2>
+                </div>
+                <button class="grid h-10 w-10 shrink-0 place-items-center rounded-[5px] border border-slate-300 text-slate-600 transition hover:border-rose-300 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700" type="button" data-topup-confirmation-close aria-label="Đóng"><i class="bx bx-x text-2xl" aria-hidden="true"></i></button>
+            </header>
+
+            <div class="grid gap-4 overflow-y-auto p-4 sm:p-5">
+                <dl class="grid gap-3 rounded-[5px] border border-slate-200 bg-slate-50 p-4 text-sm">
+                    <div class="grid gap-1 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4"><dt class="font-semibold text-slate-500">Game</dt><dd class="break-words font-extrabold text-slate-950" data-confirm-game></dd></div>
+                    <div class="grid gap-1 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4"><dt class="font-semibold text-slate-500">Mệnh giá nạp</dt><dd class="break-words font-extrabold text-slate-950" data-confirm-package></dd></div>
+                    <div class="grid gap-1 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4"><dt class="font-semibold text-slate-500">Máy chủ</dt><dd class="break-words font-extrabold text-slate-950" data-confirm-server></dd></div>
+                    <div class="grid gap-1 border-t border-slate-200 pt-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:gap-4">
+                        <dt class="font-semibold text-slate-500">Tài khoản nạp</dt>
+                        <dd class="grid min-w-0 gap-2">
+                            <p id="topup-confirm-recipient-label" class="break-words text-sm font-semibold text-slate-700" data-confirm-recipient-label></p>
+                            <ul class="grid gap-2 break-words font-mono text-sm font-bold text-slate-950" data-confirm-recipients aria-labelledby="topup-confirm-recipient-label"></ul>
+                        </dd>
+                    </div>
+                    <div class="grid gap-1 border-t border-slate-300 pt-3 sm:grid-cols-[9rem_minmax(0,1fr)] sm:items-center sm:gap-4"><dt class="font-bold text-slate-800">Tổng thanh toán</dt><dd class="text-xl font-extrabold text-cyan-800" data-confirm-total></dd></div>
+                </dl>
+
+                <div class="flex items-start gap-3 rounded-[5px] border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+                    <i class="bx bx-error-circle mt-0.5 shrink-0 text-xl text-amber-700" aria-hidden="true"></i>
+                    <p><strong>Chú ý:</strong> Hãy kiểm tra lại game và tài khoản nạp. Tùy theo game, thông tin này sẽ là tài khoản đăng nhập game hoặc tên nhân vật game. Hãy nhập đúng theo game bạn đang cần nạp.</p>
+                </div>
+
+                <label class="flex cursor-pointer items-start gap-3 rounded-[5px] border border-slate-300 bg-white p-4 text-sm font-bold text-slate-900 transition hover:border-cyan-500">
+                    <input class="mt-0.5 h-5 w-5 shrink-0 rounded border-slate-400 text-cyan-700 focus:ring-cyan-600" type="checkbox" data-topup-confirmation-checkbox>
+                    <span>Tôi đã kiểm tra kỹ thông tin</span>
+                </label>
+            </div>
+
+            <footer class="grid gap-2 border-t border-slate-200 bg-slate-50 p-4 sm:grid-cols-2 sm:px-5">
+                <button class="client-button-secondary min-h-12 bg-white" type="button" data-topup-confirmation-close>Kiểm tra lại</button>
+                <button class="home-checkout-submit m-0 min-h-12" type="button" data-topup-confirmation-submit disabled>
+                    <i class="bx bx-bolt text-xl" aria-hidden="true"></i>
+                    <span data-topup-confirmation-submit-text>NẠP NGAY</span>
+                </button>
+            </footer>
+        </section>
+    </div>
+    @endif
 </form>

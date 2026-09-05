@@ -1,5 +1,17 @@
 import api from '@/config/axios';
 
+export type ClientAffiliateAnnouncement = {
+    id: number;
+    title: string;
+    content_html: string;
+    is_pinned: boolean;
+    published_at: string | null;
+};
+
+export type ClientAffiliateHomeData = {
+    announcements: ClientAffiliateAnnouncement[];
+};
+
 export type ClientAffiliateData = {
     program: { minimum_withdrawal: number; minimum_conversion: number; holding_days: number };
     profile: {
@@ -30,6 +42,7 @@ export type ClientAffiliateData = {
 const root = '/api/client/affiliate';
 
 export const clientAffiliateService = {
+    home: async (): Promise<ClientAffiliateHomeData> => (await api.get(`${root}/home`)).data.data,
     data: async (): Promise<ClientAffiliateData> => (await api.get(root)).data.data,
     updatePayout: (payload: { bank_name: string; bank_account_name: string; bank_account_number: string }) =>
         api.put(`${root}/payout-account`, payload),

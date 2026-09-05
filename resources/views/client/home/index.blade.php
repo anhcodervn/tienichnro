@@ -56,7 +56,7 @@
         </span>
     </a>
 
-    @include('client.components.topup-form', ['games' => $games, 'walletBalance' => $walletBalance])
+    @include('client.components.topup-form', ['games' => $games, 'walletBalance' => $walletBalance, 'showConfirmation' => true])
 
     <div class="home-trust-strip" aria-label="Cam kết dịch vụ">
         <span class="inline-flex items-center gap-2"><i class="bx bx-badge-check text-xl text-emerald-700" aria-hidden="true"></i><span><strong>Rõ giá</strong> trước khi thanh toán</span></span>

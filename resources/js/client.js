@@ -917,6 +917,18 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
     const offerPanels = document.querySelectorAll('[data-game-offer]');
     const rewardPanels = document.querySelectorAll('[data-game-reward]');
     const rewardTabs = Array.from(document.querySelectorAll('[data-game-reward-tab]'));
+    const confirmationModal = form.querySelector('[data-topup-confirmation-modal]');
+    const confirmationCheckbox = form.querySelector('[data-topup-confirmation-checkbox]');
+    const confirmationSubmit = form.querySelector('[data-topup-confirmation-submit]');
+    const confirmationSubmitText = form.querySelector('[data-topup-confirmation-submit-text]');
+    const confirmationGame = form.querySelector('[data-confirm-game]');
+    const confirmationPackage = form.querySelector('[data-confirm-package]');
+    const confirmationServer = form.querySelector('[data-confirm-server]');
+    const confirmationRecipientLabel = form.querySelector('[data-confirm-recipient-label]');
+    const confirmationRecipients = form.querySelector('[data-confirm-recipients]');
+    const confirmationTotal = form.querySelector('[data-confirm-total]');
+    let confirmationGranted = false;
+    let confirmationPreviouslyFocused = null;
 
     const syncGameName = () => {
         const selectedGame = game?.selectedOptions[0];
@@ -1193,6 +1205,81 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         );
     };
 
+    const selectedOptionLabel = (select) => (select?.selectedOptions[0]?.textContent || '').replace(/\s*-\s*ID:\s*\d+\s*$/i, '').trim();
+
+    const currentOrderQuantity = () => {
+        if (purchaseMode?.value === 'bulk') return countBulkRecipients().quantity;
+
+        return Math.max(1, Number(singleQuantity?.value || 1));
+    };
+
+    const closeConfirmationModal = () => {
+        if (!confirmationModal || confirmationModal.hidden) return;
+
+        confirmationModal.hidden = true;
+        confirmationModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('overflow-hidden');
+        confirmationCheckbox.checked = false;
+        confirmationSubmit.disabled = true;
+        confirmationPreviouslyFocused?.focus();
+        confirmationPreviouslyFocused = null;
+    };
+
+    const populateConfirmationModal = () => {
+        const option = topupPackage?.selectedOptions[0];
+        const quantity = currentOrderQuantity();
+        const paymentTotal = Number(option?.dataset.price || 0) * quantity;
+        const packageLabel = option?.dataset.denomination ? formatMoney(Number(option.dataset.denomination)) : option?.dataset.name || 'Chưa chọn';
+
+        confirmationGame.textContent = game?.selectedOptions[0]?.dataset.name || selectedOptionLabel(game) || 'Chưa chọn';
+        confirmationPackage.textContent = `${packageLabel} - Tổng số lượng thẻ: ${quantity}`;
+        confirmationServer.textContent = selectedOptionLabel(server) || 'Chưa chọn';
+        confirmationTotal.textContent = formatMoney(paymentTotal);
+        confirmationSubmitText.textContent = `NẠP NGAY ${formatMoney(paymentTotal)}`;
+        confirmationRecipients.replaceChildren();
+
+        const activeRecipientGroup = recipientFieldGroups.find((group) => !group.hidden);
+        const activeRecipientInputs = Array.from(activeRecipientGroup?.querySelectorAll('[data-recipient-input]') || []).filter(
+            (input) => !input.disabled,
+        );
+        const recipientLines =
+            purchaseMode?.value === 'bulk'
+                ? (bulkRecipients?.value || '')
+                      .split(/\r\n|\r|\n/)
+                      .map((line) => line.trim())
+                      .filter(Boolean)
+                : [activeRecipientInputs.map((input) => input.value.trim()).join(' | ')];
+
+        if (confirmationRecipientLabel) {
+            const recipientLabel =
+                purchaseMode?.value === 'bulk'
+                    ? bulkSchemas.find((schema) => !schema.hidden)?.dataset.bulkConfirmRecipientLabel || 'Tài khoản | Số lượng thẻ'
+                    : activeRecipientGroup?.dataset.singleConfirmRecipientLabel || 'Tài khoản game';
+            confirmationRecipientLabel.textContent = `${recipientLabel.replace(/:\s*$/, '')}:`;
+        }
+
+        recipientLines.forEach((line, index) => {
+            const item = document.createElement('li');
+            item.className = 'rounded-[5px] border border-slate-200 bg-white px-3 py-2';
+            item.textContent = purchaseMode?.value === 'bulk' ? `${index + 1}. ${line}` : line;
+            confirmationRecipients.append(item);
+        });
+    };
+
+    const openConfirmationModal = () => {
+        if (!confirmationModal) return;
+
+        populateConfirmationModal();
+        confirmationGranted = false;
+        confirmationPreviouslyFocused = document.activeElement;
+        confirmationCheckbox.checked = false;
+        confirmationSubmit.disabled = true;
+        confirmationModal.hidden = false;
+        confirmationModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('overflow-hidden');
+        window.setTimeout(() => confirmationCheckbox.focus(), 0);
+    };
+
     const syncPurchaseMode = (nextMode = purchaseMode?.value === 'bulk' ? 'bulk' : 'single') => {
         const mode = nextMode === 'bulk' ? 'bulk' : 'single';
         if (purchaseMode) purchaseMode.value = mode;
@@ -1426,6 +1513,21 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         });
     });
 
+    form.querySelectorAll('[data-topup-confirmation-close]').forEach((button) => button.addEventListener('click', closeConfirmationModal));
+    confirmationCheckbox?.addEventListener('change', () => {
+        confirmationSubmit.disabled = !confirmationCheckbox.checked;
+    });
+    confirmationSubmit?.addEventListener('click', () => {
+        if (!confirmationCheckbox?.checked) return;
+
+        confirmationGranted = true;
+        closeConfirmationModal();
+        form.requestSubmit(submitButton);
+    });
+    confirmationModal?.addEventListener('keydown', (event) => {
+        if (event.key === 'Escape') closeConfirmationModal();
+    });
+
     form.addEventListener('submit', (event) => {
         recipientInputs.forEach(lowercaseRecipientInput);
         if (bulkRecipients) lowercaseRecipientInput(bulkRecipients);
@@ -1439,6 +1541,15 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
 
             return;
         }
+
+        if (confirmationModal && !confirmationGranted) {
+            event.preventDefault();
+            openConfirmationModal();
+
+            return;
+        }
+
+        confirmationGranted = false;
 
         form.setAttribute('aria-busy', 'true');
         if (submitButton) {

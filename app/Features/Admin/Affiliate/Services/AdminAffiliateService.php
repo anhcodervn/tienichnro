@@ -6,6 +6,7 @@ use App\Exceptions\ApiException;
 use App\Features\Affiliate\Services\AffiliateWalletService;
 use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Models\AdminAuditLog;
+use App\Models\AffiliateAnnouncement;
 use App\Models\AffiliateCommission;
 use App\Models\AffiliateGlobalPackageRate;
 use App\Models\AffiliatePackageRate;
@@ -18,6 +19,7 @@ use App\Models\Tenant;
 use App\Models\TopupPackage;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Support\EditorContentRenderer;
 use App\Support\TenantContext;
 use App\Utils\Site;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
@@ -32,6 +34,7 @@ class AdminAffiliateService
         private readonly TenantContext $tenantContext,
         private readonly TopupPackagePricingService $pricingService,
         private readonly AffiliateWalletService $walletService,
+        private readonly EditorContentRenderer $contentRenderer,
     ) {}
 
     /** @param array<string, mixed> $filters @return array<string, mixed> */
@@ -71,6 +74,75 @@ class AdminAffiliateService
             'by_site' => $tenantId === null ? $this->siteOverview() : [],
             'selected_site_id' => $tenantId,
         ];
+    }
+
+    /** @param array<string, mixed> $filters @return array<string, mixed> */
+    public function announcements(array $filters): array
+    {
+        $tenantId = $this->resolveTenantId($filters['site_id'] ?? null);
+
+        return [
+            'announcements' => AffiliateAnnouncement::query()->withoutGlobalScope(TenantScope::class)
+                ->where('tenant_id', $tenantId)
+                ->with(['admin' => fn ($query) => $query->withoutGlobalScope(TenantScope::class)->select(['id', 'username', 'full_name'])])
+                ->orderByDesc('is_pinned')
+                ->latest('published_at')
+                ->latest('id')
+                ->limit(100)
+                ->get()
+                ->map(fn (AffiliateAnnouncement $announcement): array => $this->serializeAnnouncement($announcement))
+                ->all(),
+            'sites' => $this->sites(),
+            'selected_site_id' => $tenantId,
+        ];
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function saveAnnouncement(?int $announcementId, array $payload, User $admin, Request $request): AffiliateAnnouncement
+    {
+        return DB::transaction(function () use ($announcementId, $payload, $admin, $request): AffiliateAnnouncement {
+            $announcement = $announcementId === null
+                ? new AffiliateAnnouncement(['tenant_id' => $this->resolveTenantId($payload['site_id'] ?? null)])
+                : AffiliateAnnouncement::query()->withoutGlobalScope(TenantScope::class)->lockForUpdate()->findOrFail($announcementId);
+
+            if ($announcement->exists) {
+                $this->assertAdminTenant($announcement->tenant_id);
+            }
+
+            $old = $announcement->exists ? $announcement->getAttributes() : [];
+            $wasPublished = (bool) $announcement->is_published;
+            $isPublished = (bool) $payload['is_published'];
+            $announcement->fill([
+                'admin_id' => $admin->id,
+                'title' => trim((string) $payload['title']),
+                'content' => $payload['content'],
+                'is_pinned' => (bool) $payload['is_pinned'],
+                'is_published' => $isPublished,
+                'published_at' => $isPublished && (! $wasPublished || $announcement->published_at === null) ? now() : $announcement->published_at,
+            ])->save();
+            $this->audit(
+                $announcement->tenant_id,
+                $admin,
+                $announcementId === null ? 'affiliate_announcement_created' : 'affiliate_announcement_updated',
+                $announcement,
+                $old,
+                $announcement->getAttributes(),
+                $request,
+            );
+
+            return $announcement->refresh()->load('admin:id,username,full_name');
+        }, 3);
+    }
+
+    public function deleteAnnouncement(int $announcementId, User $admin, Request $request): void
+    {
+        DB::transaction(function () use ($announcementId, $admin, $request): void {
+            $announcement = AffiliateAnnouncement::query()->withoutGlobalScope(TenantScope::class)->lockForUpdate()->findOrFail($announcementId);
+            $this->assertAdminTenant($announcement->tenant_id);
+            $old = $announcement->getAttributes();
+            $this->audit($announcement->tenant_id, $admin, 'affiliate_announcement_deleted', $announcement, $old, [], $request);
+            $announcement->delete();
+        }, 3);
     }
 
     /** @return array<string, mixed> */
@@ -604,6 +676,23 @@ class AdminAffiliateService
             'bank_account_number_masked' => str_repeat('*', max(0, mb_strlen($accountNumber) - 4)).mb_substr($accountNumber, -4),
             'bank_transaction_reference' => $withdrawal->bank_transaction_reference,
             'admin_note' => $withdrawal->admin_note, 'created_at' => $withdrawal->created_at?->toISOString(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    private function serializeAnnouncement(AffiliateAnnouncement $announcement): array
+    {
+        return [
+            'id' => $announcement->id,
+            'tenant_id' => $announcement->tenant_id,
+            'title' => $announcement->title,
+            'content' => $announcement->content,
+            'content_html' => $this->contentRenderer->renderNodes($announcement->content ?? [])->toHtml(),
+            'is_pinned' => $announcement->is_pinned,
+            'is_published' => $announcement->is_published,
+            'published_at' => $announcement->published_at?->toISOString(),
+            'updated_at' => $announcement->updated_at?->toISOString(),
+            'admin' => $announcement->admin?->only(['id', 'username', 'full_name']),
         ];
     }
 

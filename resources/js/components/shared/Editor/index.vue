@@ -561,6 +561,9 @@ export default {
                 target: editorContainer.value,
                 language: 'vi',
                 language_url: '/assets/libs/tinymce/langs/vi.js',
+                convert_urls: false,
+                relative_urls: false,
+                remove_script_host: false,
                 height: props.height,
                 menubar: true,
                 plugins: props.allowImages

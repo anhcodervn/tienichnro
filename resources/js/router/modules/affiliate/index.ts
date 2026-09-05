@@ -4,12 +4,17 @@ export default {
     children: [
         {
             path: '',
+            name: 'affiliate.home',
+            component: () => import('@/pages/affiliate/home.vue'),
+        },
+        {
+            path: 'tong-quan',
             name: 'affiliate.dashboard',
             component: () => import('@/pages/affiliate/index.vue'),
         },
         {
             path: ':pathMatch(.*)*',
-            redirect: { name: 'affiliate.dashboard' },
+            redirect: { name: 'affiliate.home' },
         },
     ],
 };

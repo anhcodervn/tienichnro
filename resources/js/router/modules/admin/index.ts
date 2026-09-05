@@ -28,6 +28,11 @@ export default {
             component: () => import('@/pages/admin/affiliate/index.vue'),
         },
         {
+            path: 'affiliate/announcements',
+            name: 'admin.affiliate.announcements',
+            component: () => import('@/pages/admin/affiliate/announcements.vue'),
+        },
+        {
             path: 'support',
             name: 'admin.support.index',
             component: () => import('@/pages/admin/support/index.vue'),

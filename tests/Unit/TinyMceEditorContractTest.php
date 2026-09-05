@@ -64,6 +64,9 @@ test('tinymce preserves safe links through its json conversion', function (): vo
         ->toContain('next.href = href')
         ->toContain("target?: '_blank' | '_self'")
         ->toContain('const href = normalizeSafeHref(item.href)')
+        ->toContain('convert_urls: false')
+        ->toContain('relative_urls: false')
+        ->toContain('remove_script_host: false')
         ->toContain('rel="noopener noreferrer"')
         ->toContain("href.startsWith('//')")
         ->toContain('/^(?:https?:\\/\\/|mailto:|tel:)/i');

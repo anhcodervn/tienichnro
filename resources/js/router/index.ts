@@ -9,6 +9,7 @@ const routeTitles: Record<string, string> = {
     'admin.dashboard': 'Tổng quan quản trị',
     'admin.reports.index': 'Báo cáo tăng trưởng và doanh thu',
     'admin.affiliate.index': 'Quản lý Affiliate',
+    'admin.affiliate.announcements': 'Thông báo cộng tác viên',
     'admin.support.index': 'Tin nhắn hỗ trợ',
     'admin.topup.catalog': 'Danh mục nạp game',
     'admin.topup.games': 'Danh sách game',
@@ -39,7 +40,8 @@ const routeTitles: Record<string, string> = {
     'admin.recharge.config': 'Cấu hình nạp tiền',
     'admin.recharge.history': 'Lịch sử nạp tiền',
     'admin.error.404': 'Trang quản trị không tồn tại',
-    'affiliate.dashboard': 'Dashboard cộng tác viên',
+    'affiliate.home': 'Trang chủ cộng tác viên',
+    'affiliate.dashboard': 'Tổng quan hoa hồng',
 };
 
 const router = createRouter({

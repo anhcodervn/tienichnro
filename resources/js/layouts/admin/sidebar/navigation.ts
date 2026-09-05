@@ -70,7 +70,16 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         key: 'affiliate',
         label: 'Affiliate',
         icon: HandCoins,
-        href: '/admin/affiliate',
+        children: [
+            {
+                label: 'Tổng quan',
+                href: '/admin/affiliate',
+            },
+            {
+                label: 'Thông báo',
+                href: '/admin/affiliate/announcements',
+            },
+        ],
     },
     {
         key: 'support',

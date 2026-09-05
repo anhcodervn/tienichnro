@@ -1,10 +1,17 @@
 <script setup lang="ts">
 import { useUserStore } from '@/stores/user.store';
-import { HandCoins, Home, LogOut, Menu, WalletCards, X } from 'lucide-vue-next';
-import { ref } from 'vue';
+import { BellRing, HandCoins, Home, LayoutDashboard, LogOut, Menu, X } from 'lucide-vue-next';
+import { computed, ref } from 'vue';
+import { useRoute } from 'vue-router';
 
 const sidebarOpen = ref(false);
 const userStore = useUserStore();
+const route = useRoute();
+const isDashboard = computed(() => route.name === 'affiliate.dashboard');
+const pageTitle = computed(() => (isDashboard.value ? 'Tổng quan hoa hồng' : 'Trang chủ cộng tác viên'));
+const pageDescription = computed(() =>
+    isDashboard.value ? 'Theo dõi hiệu quả giới thiệu và quản lý hoa hồng' : 'Thông báo và thông tin mới nhất từ quản trị viên',
+);
 
 const logout = async (): Promise<void> => {
     const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
@@ -31,8 +38,19 @@ const logout = async (): Promise<void> => {
                 <button class="p-2 lg:hidden" @click="sidebarOpen = false"><X class="size-5" /></button>
             </header>
             <nav class="grid flex-1 content-start gap-2 p-4">
-                <RouterLink to="/cong-tac-vien" class="flex items-center gap-3 rounded-xl bg-emerald-50 px-4 py-3 font-bold text-emerald-700"
-                    ><WalletCards class="size-5" /> Tổng quan hoa hồng</RouterLink
+                <RouterLink
+                    to="/cong-tac-vien"
+                    class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
+                    :class="!isDashboard ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
+                    @click="sidebarOpen = false"
+                    ><BellRing class="size-5" /> Trang chủ</RouterLink
+                >
+                <RouterLink
+                    to="/cong-tac-vien/tong-quan"
+                    class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
+                    :class="isDashboard ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
+                    @click="sidebarOpen = false"
+                    ><LayoutDashboard class="size-5" /> Tổng quan hoa hồng</RouterLink
                 >
                 <a href="/" class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold text-slate-600 hover:bg-slate-50"
                     ><Home class="size-5" /> Về trang chính</a
@@ -53,8 +71,8 @@ const logout = async (): Promise<void> => {
             <header class="sticky top-0 z-30 flex min-h-16 items-center gap-3 border-b border-slate-200 bg-white/90 px-4 backdrop-blur lg:px-6">
                 <button class="rounded-xl border border-slate-200 p-2 lg:hidden" @click="sidebarOpen = true"><Menu class="size-5" /></button>
                 <div>
-                    <p class="font-black text-slate-950">Dashboard cộng tác viên</p>
-                    <p class="text-xs text-slate-500">Hoa hồng được duyệt sau 7 ngày an toàn</p>
+                    <p class="font-black text-slate-950">{{ pageTitle }}</p>
+                    <p class="text-xs text-slate-500">{{ pageDescription }}</p>
                 </div>
             </header>
             <RouterView />
