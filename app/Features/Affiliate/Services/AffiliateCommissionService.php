@@ -23,24 +23,23 @@ class AffiliateCommissionService
 
     public function snapshot(Order $order): ?AffiliateCommission
     {
-        if (! $order->user_id || ! $order->topup_package_id) {
+        if (! $order->topup_package_id) {
             return null;
         }
 
         $program = $this->programService->enabled();
-        $buyer = User::query()->find($order->user_id);
+        $buyer = $order->user_id ? User::query()->find($order->user_id) : null;
+        $referrerId = $order->affiliate_referrer_id ?: $buyer?->referred_by;
 
         if ($program === null
-            || ! $buyer instanceof User
-            || $buyer->tenant_id !== $program->tenant_id
             || $order->tenant_id !== $program->tenant_id
-            || ! $buyer->referred_by
-            || $buyer->referred_by === $buyer->id) {
+            || ! $referrerId
+            || ($buyer instanceof User && ($buyer->tenant_id !== $program->tenant_id || $referrerId === $buyer->id))) {
             return null;
         }
 
         $referrer = User::query()
-            ->whereKey($buyer->referred_by)
+            ->whereKey($referrerId)
             ->where('tenant_id', $program->tenant_id)
             ->where('status', 'active')
             ->first();
@@ -50,7 +49,7 @@ class AffiliateCommissionService
         }
 
         $profile = AffiliateProfile::query()->firstOrCreate(
-            ['user_id' => $buyer->referred_by],
+            ['user_id' => $referrer->id],
             ['tenant_id' => $program->tenant_id, 'status' => 'active'],
         );
         $rate = AffiliatePackageRate::query()
@@ -81,7 +80,7 @@ class AffiliateCommissionService
             [
                 'tenant_id' => $program->tenant_id,
                 'referrer_id' => $referrer->id,
-                'referred_user_id' => $buyer->id,
+                'referred_user_id' => $buyer?->id,
                 'topup_package_id' => $order->topup_package_id,
                 'commission_type' => $rate->commission_type,
                 'rate_value' => $rateValue,

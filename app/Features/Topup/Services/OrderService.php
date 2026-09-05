@@ -6,6 +6,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Exceptions\ApiException;
 use App\Features\Affiliate\Services\AffiliateCommissionService;
+use App\Features\Affiliate\Services\AffiliateReferralService;
 use App\Features\Client\Wallet\Services\WalletService;
 use App\Features\Topup\Jobs\ProcessTopupOrder;
 use App\Features\Topup\Services\Payments\OrderBankPaymentService;
@@ -32,15 +33,20 @@ class OrderService
         private readonly TopupProviderResolver $providerResolver,
         private readonly OrderBankPaymentService $orderBankPaymentService,
         private readonly AffiliateCommissionService $affiliateCommissionService,
+        private readonly AffiliateReferralService $affiliateReferralService,
     ) {}
 
-    /** @param array<string, mixed> $payload */
+    /**
+     * @param  array<string, mixed>  $payload
+     * @param  array{referrer_id: int, referral_code: string, source: string, attributed_at: string}|null  $affiliateAttribution
+     */
     public function create(
         array $payload,
         ?User $authenticatedUser,
         ?string $ip,
         ?string $userAgent,
         bool $allowWalletFallback = true,
+        ?array $affiliateAttribution = null,
     ): Order {
         $idempotencyKey = (string) $payload['idempotency_key'];
         $email = $this->resolveCustomerEmail($payload, $authenticatedUser);
@@ -61,7 +67,7 @@ class OrderService
         }
 
         try {
-            $order = DB::transaction(function () use ($payload, $authenticatedUser, $idempotencyKey, $email, $normalizedEmail, $requestedPaymentMethod, $serverId, $ip, $userAgent, $allowWalletFallback): Order {
+            $order = DB::transaction(function () use ($payload, $authenticatedUser, $idempotencyKey, $email, $normalizedEmail, $requestedPaymentMethod, $serverId, $ip, $userAgent, $allowWalletFallback, $affiliateAttribution): Order {
                 $user = $authenticatedUser instanceof User
                     ? User::query()->lockForUpdate()->findOrFail($authenticatedUser->id)
                     : null;
@@ -139,6 +145,10 @@ class OrderService
                     );
                 }
 
+                $validatedAttribution = $tenant instanceof Tenant
+                    ? $this->affiliateReferralService->validateForOrder($affiliateAttribution, $user, $email, $tenant->id)
+                    : null;
+
                 $paymentMethod = $requestedPaymentMethod === PaymentMethod::Wallet && $canPayWithWallet
                     ? PaymentMethod::Wallet
                     : PaymentMethod::BankTransfer;
@@ -146,6 +156,10 @@ class OrderService
                 $orderAttributes = [
                     'idempotency_key' => $idempotencyKey,
                     'user_id' => $user?->id,
+                    'affiliate_referrer_id' => $validatedAttribution['referrer']->id ?? null,
+                    'affiliate_attribution_source' => $validatedAttribution['source'] ?? null,
+                    'affiliate_referral_code' => $validatedAttribution['referral_code'] ?? null,
+                    'affiliate_attributed_at' => $validatedAttribution['attributed_at'] ?? null,
                     'email' => $email,
                     'normalized_email' => $normalizedEmail,
                     'game_id' => $package->game_id,

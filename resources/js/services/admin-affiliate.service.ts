@@ -2,7 +2,7 @@ import api from '@/config/axios';
 
 export type AffiliateOverview = {
     partners: { total: number; active: number; suspended: number };
-    commissions: { pending: number; available: number; reversed: number; flagged: number; revenue: number };
+    commissions: { orders: number; guest_orders: number; pending: number; available: number; reversed: number; flagged: number; revenue: number };
     withdrawals: { requested: number; approved: number; paid: number };
     by_site: Array<{
         tenant_id: number;

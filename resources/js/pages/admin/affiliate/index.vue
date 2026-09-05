@@ -287,7 +287,9 @@ onMounted(load);
                     <HandCoins class="size-5 text-amber-700" />
                     <p class="mt-4 text-sm font-bold text-amber-800">Hoa hồng đang giữ</p>
                     <p class="text-3xl font-black text-amber-950">{{ money(overview.commissions.pending) }}</p>
-                    <p class="text-xs text-amber-700">Giữ đủ 7 ngày</p>
+                    <p class="text-xs text-amber-700">
+                        {{ overview.commissions.orders }} đơn · {{ overview.commissions.guest_orders }} đơn khách
+                    </p>
                 </article>
                 <article class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
                     <BadgeDollarSign class="size-5 text-emerald-700" />
@@ -369,7 +371,7 @@ onMounted(load);
                                 <p class="font-bold">{{ partner.user.username }}</p>
                                 <p class="text-xs text-slate-500">{{ partner.user.email }} · {{ partner.user.referral_code }}</p>
                             </td>
-                            <td class="px-5 py-4">{{ partner.referrals_count }} người / {{ partner.orders_count }} đơn</td>
+                            <td class="px-5 py-4">{{ partner.referrals_count }} tài khoản / {{ partner.orders_count }} đơn</td>
                             <td class="px-5 py-4 font-bold">{{ money(partner.revenue) }}</td>
                             <td class="px-5 py-4 text-amber-700">{{ money(partner.pending) }}</td>
                             <td class="px-5 py-4 text-emerald-700">{{ money(partner.wallet_balance) }}</td>
@@ -424,7 +426,9 @@ onMounted(load);
                                 <p class="font-bold">{{ commission.order?.code }}</p>
                                 <p class="text-xs text-slate-500">{{ commission.package?.name }}</p>
                             </td>
-                            <td class="px-5 py-4">{{ commission.referrer?.username }} → {{ commission.referred_user?.username }}</td>
+                            <td class="px-5 py-4">
+                                {{ commission.referrer?.username }} → {{ commission.referred_user?.username ?? 'Khách vãng lai' }}
+                            </td>
                             <td class="px-5 py-4">{{ money(commission.base_amount) }}</td>
                             <td class="px-5 py-4 font-bold text-emerald-700">{{ money(commission.amount) }}</td>
                             <td class="px-5 py-4">{{ dateTime(commission.available_at) }}</td>

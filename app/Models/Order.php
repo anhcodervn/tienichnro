@@ -18,6 +18,10 @@ class Order extends Model
 {
     use BelongsToTenant, HasFactory;
 
+    public const AFFILIATE_SOURCE_REGISTERED = 'registered_referral';
+
+    public const AFFILIATE_SOURCE_COOKIE = 'referral_cookie';
+
     protected $hidden = [
         'topup_provider_id',
         'provider',
@@ -32,7 +36,8 @@ class Order extends Model
     ];
 
     protected $fillable = [
-        'tenant_id', 'code', 'idempotency_key', 'user_id', 'billing_user_id', 'email', 'normalized_email', 'game_id',
+        'tenant_id', 'code', 'idempotency_key', 'user_id', 'affiliate_referrer_id', 'affiliate_attribution_source',
+        'affiliate_referral_code', 'affiliate_attributed_at', 'billing_user_id', 'email', 'normalized_email', 'game_id',
         'game_server_id', 'topup_package_id', 'package_source', 'global_topup_package_id',
         'global_topup_package_name', 'topup_provider_id', 'member_level_id', 'member_level_name',
         'member_level_pricing_mode', 'member_level_discount_bps', 'purchase_mode', 'checkout_fields_snapshot',
@@ -65,7 +70,7 @@ class Order extends Model
             'discount_amount' => 'decimal:2', 'member_level_discount_amount' => 'decimal:2', 'total_amount' => 'decimal:2',
             'provider_unit_cost' => 'decimal:2', 'provider_total_cost' => 'decimal:2', 'gross_profit' => 'decimal:2',
             'paid_at' => 'datetime', 'processing_at' => 'datetime', 'completed_at' => 'datetime',
-            'failed_at' => 'datetime', 'cancelled_at' => 'datetime', 'metadata' => 'array',
+            'failed_at' => 'datetime', 'cancelled_at' => 'datetime', 'affiliate_attributed_at' => 'datetime', 'metadata' => 'array',
         ];
     }
 
@@ -94,6 +99,11 @@ class Order extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function affiliateReferrer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'affiliate_referrer_id');
     }
 
     public function billingUser(): BelongsTo

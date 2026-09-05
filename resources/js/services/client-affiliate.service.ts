@@ -9,7 +9,7 @@ export type ClientAffiliateData = {
         bank_account_number_masked: string;
         has_payout_account: boolean;
     };
-    referral: { code: string; url: string; referrals_count: number };
+    referral: { code: string; url: string; referrals_count: number; orders_count: number; guest_orders_count: number };
     wallets: { affiliate: { balance: number; hold_balance: number }; main: { balance: number } };
     stats: { pending: number; available_earned: number; reversed: number; revenue: number };
     commissions: Array<{

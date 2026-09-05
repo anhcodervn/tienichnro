@@ -4,6 +4,7 @@ namespace App\Features\Client\Api\Controllers;
 
 use App\Enums\PaymentMethod;
 use App\Exceptions\ApiException;
+use App\Features\Affiliate\Services\AffiliateReferralService;
 use App\Features\Client\Api\Actions\ResolveTopupPackageAction;
 use App\Features\Client\Api\Requests\CreateTopupOrderRequest;
 use App\Features\Client\Api\Resources\TopupOrderResource;
@@ -22,6 +23,7 @@ class TopupOrderController extends Controller
     public function __construct(
         private readonly OrderService $orderService,
         private readonly ResolveTopupPackageAction $resolveTopupPackage,
+        private readonly AffiliateReferralService $affiliateReferralService,
     ) {}
 
     public function store(CreateTopupOrderRequest $request): JsonResponse
@@ -67,6 +69,7 @@ class TopupOrderController extends Controller
                 ip: $request->ip(),
                 userAgent: $request->userAgent(),
                 allowWalletFallback: false,
+                affiliateAttribution: $this->affiliateReferralService->attribution($request, $user, (string) $user->email),
             );
         } catch (ValidationException $exception) {
             $status = $exception->validator->errors()->has('idempotency_key') ? 409 : 422;

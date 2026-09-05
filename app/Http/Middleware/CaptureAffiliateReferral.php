@@ -19,28 +19,30 @@ class CaptureAffiliateReferral
     public function handle(Request $request, Closure $next): Response
     {
         $referralCode = $request->query('ref');
-        $captured = is_string($referralCode)
-            ? $this->referralService->capture($request, $referralCode)
-            : $this->referralService->restore($request);
+        $canCaptureQuery = in_array($request->method(), ['GET', 'HEAD'], true);
+
+        if ($canCaptureQuery && is_string($referralCode)) {
+            $this->referralService->capture($request, $referralCode);
+        } else {
+            $this->referralService->restore($request);
+        }
+
         $response = $next($request);
 
-        if ($captured) {
-            $payload = $request->session()->get(AffiliateReferralService::SESSION_KEY);
-            $code = is_array($payload) ? ($payload['code'] ?? null) : null;
+        $cookieValue = $this->referralService->cookieValue($request);
 
-            if (is_string($code) && $code !== '') {
-                $response->headers->setCookie(cookie(
-                    AffiliateReferralService::COOKIE_NAME,
-                    $code,
-                    AffiliateReferralService::COOKIE_MINUTES,
-                    '/',
-                    null,
-                    $request->isSecure(),
-                    true,
-                    false,
-                    'lax',
-                ));
-            }
+        if ($this->referralService->shouldPersistCookie($request) && $cookieValue !== null) {
+            $response->headers->setCookie(cookie(
+                AffiliateReferralService::COOKIE_NAME,
+                $cookieValue,
+                AffiliateReferralService::COOKIE_MINUTES,
+                '/',
+                null,
+                $request->isSecure(),
+                true,
+                false,
+                'lax',
+            ));
         }
 
         return $response;

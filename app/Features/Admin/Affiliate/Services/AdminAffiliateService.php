@@ -50,6 +50,8 @@ class AdminAffiliateService
                 'suspended' => (clone $profileQuery)->where('status', 'suspended')->count(),
             ],
             'commissions' => [
+                'orders' => (clone $commissionQuery)->count(),
+                'guest_orders' => (clone $commissionQuery)->whereNull('referred_user_id')->count(),
                 'pending' => (int) (clone $commissionQuery)->where('status', 'pending')->whereNotNull('earned_at')->sum('amount'),
                 'available' => (int) (clone $commissionQuery)->where('status', 'available')->sum('amount'),
                 'reversed' => (int) (clone $commissionQuery)->where('status', 'reversed')->sum('amount'),

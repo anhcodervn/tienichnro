@@ -3,6 +3,7 @@
 namespace App\Features\Client\Topup\Controllers;
 
 use App\Enums\PaymentMethod;
+use App\Features\Affiliate\Services\AffiliateReferralService;
 use App\Features\Client\Topup\Requests\StoreOrderRequest;
 use App\Features\Client\Topup\Services\TurnstileService;
 use App\Features\Topup\Services\OrderService;
@@ -15,11 +16,13 @@ class CheckoutController extends Controller
     public function __construct(
         private readonly OrderService $orderService,
         private readonly TurnstileService $turnstileService,
+        private readonly AffiliateReferralService $affiliateReferralService,
     ) {}
 
     public function store(StoreOrderRequest $request): RedirectResponse
     {
         $user = $request->user();
+        $validated = $request->validated();
 
         if (! $user instanceof User) {
             $this->turnstileService->verifyOrFail(
@@ -30,10 +33,15 @@ class CheckoutController extends Controller
         }
 
         $order = $this->orderService->create(
-            payload: $request->validated(),
+            payload: $validated,
             authenticatedUser: $user instanceof User ? $user : null,
             ip: $request->ip(),
             userAgent: $request->userAgent(),
+            affiliateAttribution: $this->affiliateReferralService->attribution(
+                $request,
+                $user instanceof User ? $user : null,
+                (string) ($validated['email'] ?? $user?->email ?? ''),
+            ),
         );
 
         $request->session()->put("orders.access.{$order->code}", true);

@@ -134,9 +134,11 @@ onMounted(load);
                 </article>
                 <article class="rounded-2xl border border-violet-200 bg-violet-50 p-5 shadow-sm">
                     <Users class="size-5 text-violet-700" />
-                    <p class="mt-4 text-sm font-bold text-violet-800">Khách đã giới thiệu</p>
-                    <p class="text-3xl font-black text-violet-950">{{ data.referral.referrals_count }}</p>
-                    <p class="text-xs text-violet-700">Mã {{ data.referral.code }}</p>
+                    <p class="mt-4 text-sm font-bold text-violet-800">Đơn đã giới thiệu</p>
+                    <p class="text-3xl font-black text-violet-950">{{ data.referral.orders_count }}</p>
+                    <p class="text-xs text-violet-700">
+                        {{ data.referral.referrals_count }} thành viên · {{ data.referral.guest_orders_count }} đơn khách
+                    </p>
                 </article>
             </section>
 
@@ -279,7 +281,7 @@ onMounted(load);
                                     <p class="font-bold">{{ commission.order?.code }}</p>
                                     <p class="text-xs text-slate-500">{{ commission.package?.name }}</p>
                                 </td>
-                                <td class="px-5 py-4">{{ commission.referred_user?.username }}</td>
+                                <td class="px-5 py-4">{{ commission.referred_user?.username ?? 'Khách vãng lai' }}</td>
                                 <td class="px-5 py-4">{{ money(commission.base_amount) }}</td>
                                 <td class="px-5 py-4 font-bold text-emerald-700">{{ money(commission.amount) }}</td>
                                 <td class="px-5 py-4">{{ dateTime(commission.available_at) }}</td>

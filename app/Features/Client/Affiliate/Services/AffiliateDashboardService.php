@@ -51,8 +51,11 @@ class AffiliateDashboardService
             ],
             'referral' => [
                 'code' => $user->referral_code,
-                'url' => url('/dang-ky?ref='.urlencode((string) $user->referral_code)),
+                'url' => url('/?ref='.urlencode((string) $user->referral_code)),
                 'referrals_count' => $user->referrals()->count(),
+                'orders_count' => AffiliateCommission::query()->where('referrer_id', $user->id)->count(),
+                'guest_orders_count' => AffiliateCommission::query()
+                    ->where('referrer_id', $user->id)->whereNull('referred_user_id')->count(),
             ],
             'wallets' => [
                 'affiliate' => ['balance' => (int) $affiliateWallet->balance, 'hold_balance' => (int) $affiliateWallet->hold_balance],
