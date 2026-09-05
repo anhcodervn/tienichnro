@@ -5,9 +5,12 @@ use App\Enums\PaymentStatus;
 use App\Features\Affiliate\Services\AffiliateCommissionService;
 use App\Features\Topup\Services\OrderStatusService;
 use App\Models\AffiliateCommission;
+use App\Models\AffiliateGlobalPackageRate;
 use App\Models\AffiliatePackageRate;
 use App\Models\AffiliateProfile;
 use App\Models\AffiliateProgram;
+use App\Models\Game;
+use App\Models\GlobalTopupPackage;
 use App\Models\Order;
 use App\Models\Tenant;
 use App\Models\TopupPackage;
@@ -271,4 +274,79 @@ test('a completed order starts its hold when a late payment is confirmed', funct
     $commission = AffiliateCommission::query()->withoutGlobalScopes()->where('order_id', $order->id)->firstOrFail();
     expect($commission->earned_at?->equalTo($completedAt))->toBeTrue()
         ->and($commission->available_at?->equalTo($completedAt->copy()->addDays(7)))->toBeTrue();
+});
+
+test('global affiliate rate applies to every game using the shared global package', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $globalPackage = GlobalTopupPackage::factory()->create();
+    $games = Game::factory()->count(2)->create(['package_mode' => 'global']);
+    $packages = $games->map(fn (Game $game) => TopupPackage::factory()->create([
+        'game_id' => $game->id,
+        'global_topup_package_id' => $globalPackage->id,
+    ]));
+    $referrer = User::factory()->create(['tenant_id' => $main->id]);
+    $buyer = User::factory()->create(['tenant_id' => $main->id, 'referred_by' => $referrer->id]);
+    AffiliateProgram::factory()->create(['tenant_id' => $main->id, 'is_enabled' => true]);
+    AffiliateGlobalPackageRate::factory()->create([
+        'tenant_id' => $main->id,
+        'global_topup_package_id' => $globalPackage->id,
+        'fixed_amount' => 2400,
+    ]);
+
+    foreach ($packages as $package) {
+        $order = Order::factory()->create([
+            'tenant_id' => $main->id,
+            'user_id' => $buyer->id,
+            'game_id' => $package->game_id,
+            'topup_package_id' => $package->id,
+            'package_source' => 'global',
+            'global_topup_package_id' => $globalPackage->id,
+            'quantity' => 2,
+        ]);
+
+        Site::for($main, fn () => app(AffiliateCommissionService::class)->snapshot($order));
+
+        expect(AffiliateCommission::query()->withoutGlobalScopes()->where('order_id', $order->id)->value('amount'))->toBe(4800);
+    }
+});
+
+test('package affiliate override wins over global and inactive override suppresses fallback', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $globalPackage = GlobalTopupPackage::factory()->create();
+    $game = Game::factory()->create(['package_mode' => 'global']);
+    $package = TopupPackage::factory()->create([
+        'game_id' => $game->id,
+        'global_topup_package_id' => $globalPackage->id,
+    ]);
+    $referrer = User::factory()->create(['tenant_id' => $main->id]);
+    $buyer = User::factory()->create(['tenant_id' => $main->id, 'referred_by' => $referrer->id]);
+    AffiliateProgram::factory()->create(['tenant_id' => $main->id, 'is_enabled' => true]);
+    AffiliateGlobalPackageRate::factory()->create([
+        'tenant_id' => $main->id,
+        'global_topup_package_id' => $globalPackage->id,
+        'fixed_amount' => 2000,
+    ]);
+    $packageRate = AffiliatePackageRate::factory()->create([
+        'tenant_id' => $main->id,
+        'topup_package_id' => $package->id,
+        'fixed_amount' => 3500,
+    ]);
+    $orderAttributes = [
+        'tenant_id' => $main->id,
+        'user_id' => $buyer->id,
+        'game_id' => $game->id,
+        'topup_package_id' => $package->id,
+        'package_source' => 'global',
+        'global_topup_package_id' => $globalPackage->id,
+    ];
+    $overrideOrder = Order::factory()->create($orderAttributes);
+
+    Site::for($main, fn () => app(AffiliateCommissionService::class)->snapshot($overrideOrder));
+    expect(AffiliateCommission::query()->withoutGlobalScopes()->where('order_id', $overrideOrder->id)->value('amount'))->toBe(3500);
+
+    $packageRate->update(['is_active' => false]);
+    $disabledOrder = Order::factory()->create($orderAttributes);
+    Site::for($main, fn () => app(AffiliateCommissionService::class)->snapshot($disabledOrder));
+
+    expect(AffiliateCommission::query()->withoutGlobalScopes()->where('order_id', $disabledOrder->id)->exists())->toBeFalse();
 });

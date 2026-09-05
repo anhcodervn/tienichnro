@@ -32,4 +32,9 @@ class AffiliateProgram extends Model
     {
         return $this->hasMany(AffiliatePackageRate::class, 'tenant_id', 'tenant_id');
     }
+
+    public function globalRates(): HasMany
+    {
+        return $this->hasMany(AffiliateGlobalPackageRate::class, 'tenant_id', 'tenant_id');
+    }
 }

@@ -11,7 +11,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin-api/affiliate')->nam
     Route::get('/', [AffiliateController::class, 'index'])->name('index');
     Route::get('/configuration', [AffiliateProgramController::class, 'show'])->name('configuration.show');
     Route::put('/configuration', [AffiliateProgramController::class, 'update'])->name('configuration.update');
+    Route::put('/global-rates/{globalTopupPackage}', [AffiliateProgramController::class, 'updateGlobalRate'])->name('global-rates.update');
     Route::put('/rates/{topupPackage}', [AffiliateProgramController::class, 'updateRate'])->name('rates.update');
+    Route::delete('/rates/{topupPackage}', [AffiliateProgramController::class, 'resetRate'])->name('rates.reset');
     Route::get('/partners', [AffiliatePartnerController::class, 'index'])->name('partners.index');
     Route::patch('/partners/{profile}', [AffiliatePartnerController::class, 'update'])->whereNumber('profile')->name('partners.update');
     Route::get('/commissions', [AffiliateCommissionController::class, 'index'])->name('commissions.index');

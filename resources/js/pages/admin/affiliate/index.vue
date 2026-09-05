@@ -103,17 +103,46 @@ const saveProgram = async (): Promise<void> => {
 
 const saveRate = async (index: number): Promise<void> => {
     const rate = configuration.value?.rates[index];
+    if (!rate || !configuration.value || rate.mode === 'none') return;
+    saving.value = true;
+    try {
+        if (rate.mode === 'global') {
+            const response = await adminAffiliateService.resetRate(rate.package_id, configuration.value.site.id);
+            handleSuccessResponse(response, `Gói ${rate.package} đã dùng lại hoa hồng Global.`);
+            await loadConfiguration();
+
+            return;
+        }
+
+        const response = await adminAffiliateService.updateRate(rate.package_id, {
+            site_id: configuration.value.site.id,
+            commission_type: rate.commission_type,
+            fixed_amount: rate.commission_type === 'fixed' ? Number(rate.fixed_amount) : null,
+            percentage: rate.commission_type === 'percentage' ? Number(rate.percentage) : null,
+            is_active: rate.mode === 'override',
+        });
+        handleSuccessResponse(response, `Đã lưu hoa hồng gói ${rate.package}.`);
+        await loadConfiguration();
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        saving.value = false;
+    }
+};
+
+const saveGlobalRate = async (index: number): Promise<void> => {
+    const rate = configuration.value?.global_rates[index];
     if (!rate || !configuration.value) return;
     saving.value = true;
     try {
-        const response = await adminAffiliateService.updateRate(rate.package_id, {
+        const response = await adminAffiliateService.updateGlobalRate(rate.global_package_id, {
             site_id: configuration.value.site.id,
             commission_type: rate.commission_type,
             fixed_amount: rate.commission_type === 'fixed' ? Number(rate.fixed_amount) : null,
             percentage: rate.commission_type === 'percentage' ? Number(rate.percentage) : null,
             is_active: rate.is_active,
         });
-        handleSuccessResponse(response, `Đã lưu hoa hồng gói ${rate.package}.`);
+        handleSuccessResponse(response, `Đã lưu hoa hồng Global ${rate.package}.`);
         await loadConfiguration();
     } catch (error) {
         handleErrorResponse(error);
@@ -287,9 +316,7 @@ onMounted(load);
                     <HandCoins class="size-5 text-amber-700" />
                     <p class="mt-4 text-sm font-bold text-amber-800">Hoa hồng đang giữ</p>
                     <p class="text-3xl font-black text-amber-950">{{ money(overview.commissions.pending) }}</p>
-                    <p class="text-xs text-amber-700">
-                        {{ overview.commissions.orders }} đơn · {{ overview.commissions.guest_orders }} đơn khách
-                    </p>
+                    <p class="text-xs text-amber-700">{{ overview.commissions.orders }} đơn · {{ overview.commissions.guest_orders }} đơn khách</p>
                 </article>
                 <article class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
                     <BadgeDollarSign class="size-5 text-emerald-700" />
@@ -555,18 +582,20 @@ onMounted(load);
                         {{ money(configuration.program.minimum_conversion) }}.
                     </p>
                 </section>
-                <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <header class="border-b border-slate-200 p-5">
-                        <h2 class="font-black">Hoa hồng theo gói game</h2>
-                        <p class="text-sm text-slate-500">Hệ thống chặn cấu hình vượt lợi nhuận hiện tại của gói.</p>
+                <section class="overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm">
+                    <header class="border-b border-emerald-100 bg-emerald-50 p-5">
+                        <h2 class="font-black text-emerald-950">Hoa hồng theo gói Global</h2>
+                        <p class="text-sm text-emerald-700">
+                            Cấu hình một lần và tự áp dụng cho mọi game đang dùng cùng gói Global trên website này.
+                        </p>
                     </header>
-                    <div class="overflow-x-auto">
-                        <table class="w-full min-w-[1050px] text-sm">
+                    <div v-if="configuration.global_rates.length" class="overflow-x-auto">
+                        <table class="w-full min-w-[920px] text-sm">
                             <thead class="bg-slate-50 text-left text-slate-500">
                                 <tr>
-                                    <th class="px-4 py-3">Game / gói</th>
-                                    <th class="px-4 py-3">Giá bán</th>
-                                    <th class="px-4 py-3">Lợi nhuận</th>
+                                    <th class="px-4 py-3">Gói Global</th>
+                                    <th class="px-4 py-3">Game áp dụng</th>
+                                    <th class="px-4 py-3">Lợi nhuận thấp nhất</th>
                                     <th class="px-4 py-3">Kiểu</th>
                                     <th class="px-4 py-3">Mức hoa hồng</th>
                                     <th class="px-4 py-3">Bật</th>
@@ -574,13 +603,13 @@ onMounted(load);
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
-                                <tr v-for="(rate, index) in configuration.rates" :key="rate.package_id">
+                                <tr v-for="(rate, index) in configuration.global_rates" :key="rate.global_package_id">
                                     <td class="px-4 py-4">
-                                        <p class="font-bold">{{ rate.game }}</p>
-                                        <p class="text-xs text-slate-500">{{ rate.package }}</p>
+                                        <p class="font-bold">{{ rate.package }}</p>
+                                        <p class="text-xs text-slate-500">Mệnh giá {{ money(rate.denomination) }}</p>
                                     </td>
-                                    <td class="px-4 py-4">{{ money(rate.selling_price) }}</td>
-                                    <td class="px-4 py-4 font-bold text-emerald-700">{{ money(rate.margin) }}</td>
+                                    <td class="max-w-xs px-4 py-4 text-slate-600">{{ rate.games.join(', ') }}</td>
+                                    <td class="px-4 py-4 font-bold text-emerald-700">{{ money(rate.minimum_margin) }}</td>
                                     <td class="px-4 py-4">
                                         <select v-model="rate.commission_type" class="rounded-lg border px-3 py-2">
                                             <option value="fixed">Cố định</option>
@@ -609,6 +638,93 @@ onMounted(load);
                                     </td>
                                     <td class="px-4 py-4">
                                         <input v-model="rate.is_active" type="checkbox" class="size-5 rounded border-slate-300" />
+                                    </td>
+                                    <td class="px-4 py-4 text-right">
+                                        <button
+                                            type="button"
+                                            :disabled="saving || rate.mode === 'none'"
+                                            class="rounded-lg bg-emerald-700 px-3 py-2 font-bold text-white disabled:opacity-50"
+                                            @click="saveGlobalRate(index)"
+                                        >
+                                            Lưu Global
+                                        </button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <p v-else class="p-5 text-sm text-slate-500">Chưa có game nào sử dụng gói Global.</p>
+                </section>
+                <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+                    <header class="border-b border-slate-200 p-5">
+                        <h2 class="font-black">Hoa hồng theo gói game</h2>
+                        <p class="text-sm text-slate-500">
+                            Gói Global tự kế thừa cấu hình phía trên; chỉ cấu hình riêng khi cần ghi đè hoặc tắt một gói.
+                        </p>
+                    </header>
+                    <div class="overflow-x-auto">
+                        <table class="w-full min-w-[1050px] text-sm">
+                            <thead class="bg-slate-50 text-left text-slate-500">
+                                <tr>
+                                    <th class="px-4 py-3">Game / gói</th>
+                                    <th class="px-4 py-3">Giá bán</th>
+                                    <th class="px-4 py-3">Lợi nhuận</th>
+                                    <th class="px-4 py-3">Áp dụng</th>
+                                    <th class="px-4 py-3">Kiểu</th>
+                                    <th class="px-4 py-3">Mức hoa hồng</th>
+                                    <th class="px-4 py-3"></th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr v-for="(rate, index) in configuration.rates" :key="rate.package_id">
+                                    <td class="px-4 py-4">
+                                        <p class="font-bold">{{ rate.game }}</p>
+                                        <p class="text-xs text-slate-500">{{ rate.package }}</p>
+                                    </td>
+                                    <td class="px-4 py-4">{{ money(rate.selling_price) }}</td>
+                                    <td class="px-4 py-4 font-bold text-emerald-700">{{ money(rate.margin) }}</td>
+                                    <td class="px-4 py-4">
+                                        <select v-model="rate.mode" class="rounded-lg border px-3 py-2">
+                                            <option v-if="rate.is_global" value="global">Dùng Global</option>
+                                            <option value="override">Cấu hình riêng</option>
+                                            <option value="disabled">Tắt riêng</option>
+                                            <option v-if="!rate.is_global && rate.mode === 'none'" value="none" disabled>Chưa cấu hình</option>
+                                        </select>
+                                        <p v-if="rate.effective_source === 'global'" class="mt-1 text-xs font-semibold text-emerald-700">
+                                            Đang kế thừa Global
+                                        </p>
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <select
+                                            v-model="rate.commission_type"
+                                            :disabled="rate.mode !== 'override'"
+                                            class="rounded-lg border px-3 py-2 disabled:bg-slate-100"
+                                        >
+                                            <option value="fixed">Cố định</option>
+                                            <option value="percentage">Phần trăm</option>
+                                        </select>
+                                    </td>
+                                    <td class="px-4 py-4">
+                                        <input
+                                            v-if="rate.commission_type === 'fixed'"
+                                            v-model.number="rate.fixed_amount"
+                                            type="number"
+                                            min="0"
+                                            step="100"
+                                            :disabled="rate.mode !== 'override'"
+                                            class="w-36 rounded-lg border px-3 py-2 disabled:bg-slate-100"
+                                        />
+                                        <div v-else class="flex items-center gap-2">
+                                            <input
+                                                v-model.number="rate.percentage"
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                :disabled="rate.mode !== 'override'"
+                                                class="w-28 rounded-lg border px-3 py-2 disabled:bg-slate-100"
+                                            /><span>%</span>
+                                        </div>
                                     </td>
                                     <td class="px-4 py-4 text-right">
                                         <button

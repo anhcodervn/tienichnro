@@ -5,6 +5,7 @@ namespace App\Features\Affiliate\Services;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Models\AffiliateCommission;
+use App\Models\AffiliateGlobalPackageRate;
 use App\Models\AffiliatePackageRate;
 use App\Models\AffiliateProfile;
 use App\Models\Order;
@@ -52,13 +53,27 @@ class AffiliateCommissionService
             ['user_id' => $referrer->id],
             ['tenant_id' => $program->tenant_id, 'status' => 'active'],
         );
-        $rate = AffiliatePackageRate::query()
+        $packageRate = AffiliatePackageRate::query()
             ->where('tenant_id', $program->tenant_id)
             ->where('topup_package_id', $order->topup_package_id)
-            ->where('is_active', true)
             ->first();
 
-        if ($profile->status === 'suspended' || ! $rate instanceof AffiliatePackageRate) {
+        if ($packageRate instanceof AffiliatePackageRate && ! $packageRate->is_active) {
+            return null;
+        }
+
+        $rate = $packageRate;
+
+        if ($rate === null && $order->package_source === 'global' && $order->global_topup_package_id) {
+            $rate = AffiliateGlobalPackageRate::query()
+                ->where('tenant_id', $program->tenant_id)
+                ->where('global_topup_package_id', $order->global_topup_package_id)
+                ->where('is_active', true)
+                ->first();
+        }
+
+        if ($profile->status === 'suspended'
+            || (! $rate instanceof AffiliatePackageRate && ! $rate instanceof AffiliateGlobalPackageRate)) {
             return null;
         }
 

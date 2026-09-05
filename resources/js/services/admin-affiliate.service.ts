@@ -20,6 +20,10 @@ export type AffiliateOverview = {
 
 export type AffiliateRate = {
     package_id: number;
+    global_package_id: number | null;
+    is_global: boolean;
+    mode: 'global' | 'override' | 'disabled' | 'none';
+    effective_source: 'global' | 'package' | null;
     game: string;
     package: string;
     denomination: number;
@@ -31,9 +35,22 @@ export type AffiliateRate = {
     is_active: boolean;
 };
 
+export type AffiliateGlobalRate = {
+    global_package_id: number;
+    package: string;
+    denomination: number;
+    games: string[];
+    minimum_margin: number;
+    commission_type: 'fixed' | 'percentage';
+    fixed_amount: number;
+    percentage: number;
+    is_active: boolean;
+};
+
 export type AffiliateConfiguration = {
     site: { id: number; name: string; is_main: boolean };
     program: { is_enabled: boolean; minimum_withdrawal: number; holding_days: number; minimum_conversion: number };
+    global_rates: AffiliateGlobalRate[];
     rates: AffiliateRate[];
     sites: Array<{ id: number; name: string }>;
 };
@@ -91,7 +108,9 @@ export const adminAffiliateService = {
     configuration: async (siteId?: number): Promise<AffiliateConfiguration> =>
         (await api.get(`${root}/configuration`, { params: siteId ? { site_id: siteId } : {} })).data.data,
     updateProgram: (payload: Record<string, unknown>) => api.put(`${root}/configuration`, payload),
+    updateGlobalRate: (globalPackageId: number, payload: Record<string, unknown>) => api.put(`${root}/global-rates/${globalPackageId}`, payload),
     updateRate: (packageId: number, payload: Record<string, unknown>) => api.put(`${root}/rates/${packageId}`, payload),
+    resetRate: (packageId: number, siteId: number) => api.delete(`${root}/rates/${packageId}`, { params: { site_id: siteId } }),
     partners: async (params: Record<string, unknown> = {}): Promise<Paginated<AffiliatePartner>> =>
         (await api.get(`${root}/partners`, { params })).data.data,
     updatePartner: (profileId: number, payload: Record<string, unknown>) => api.patch(`${root}/partners/${profileId}`, payload),

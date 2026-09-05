@@ -1,7 +1,10 @@
 <?php
 
+use App\Models\AffiliateGlobalPackageRate;
 use App\Models\AffiliatePackageRate;
 use App\Models\AffiliateProgram;
+use App\Models\Game;
+use App\Models\GlobalTopupPackage;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\TopupPackage;
@@ -71,6 +74,38 @@ test('public affiliate policy only exposes rates from the current site', functio
         ->assertSeeText('Từ 120.000đ')
         ->assertDontSeeText('Gói Riêng Site Chính')
         ->assertDontSeeText('9.000đ / sản phẩm');
+});
+
+test('public affiliate policy shows inherited global rates for every mapped game', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $globalPackage = GlobalTopupPackage::factory()->create();
+    $games = Game::factory()->count(2)->sequence(
+        ['name' => 'Game Global Alpha'],
+        ['name' => 'Game Global Beta'],
+    )->create(['package_mode' => 'global']);
+
+    foreach ($games as $game) {
+        TopupPackage::factory()->create([
+            'game_id' => $game->id,
+            'global_topup_package_id' => $globalPackage->id,
+            'name' => 'Gói chung '.$game->name,
+        ]);
+    }
+
+    AffiliateProgram::factory()->create(['tenant_id' => $main->id, 'is_enabled' => true]);
+    AffiliateGlobalPackageRate::factory()->create([
+        'tenant_id' => $main->id,
+        'global_topup_package_id' => $globalPackage->id,
+        'commission_type' => AffiliatePackageRate::TYPE_PERCENTAGE,
+        'fixed_amount' => null,
+        'percentage_basis_points' => 375,
+    ]);
+
+    $this->get('http://napcarot.com/cong-tac-vien')
+        ->assertSuccessful()
+        ->assertSeeText('Game Global Alpha')
+        ->assertSeeText('Game Global Beta')
+        ->assertSeeText('3.75%');
 });
 
 test('authenticated user still receives the affiliate vue dashboard shell', function (): void {

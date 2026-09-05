@@ -7,10 +7,12 @@ use App\Features\Affiliate\Services\AffiliateWalletService;
 use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Models\AdminAuditLog;
 use App\Models\AffiliateCommission;
+use App\Models\AffiliateGlobalPackageRate;
 use App\Models\AffiliatePackageRate;
 use App\Models\AffiliateProfile;
 use App\Models\AffiliateProgram;
 use App\Models\AffiliateWithdrawal;
+use App\Models\GlobalTopupPackage;
 use App\Models\Scopes\TenantScope;
 use App\Models\Tenant;
 use App\Models\TopupPackage;
@@ -82,11 +84,19 @@ class AdminAffiliateService
             ->where('tenant_id', $tenantId)
             ->get()
             ->keyBy('topup_package_id');
-        $packages = TopupPackage::query()->with('game:id,name')->where('status', 'active')
+        $globalRates = AffiliateGlobalPackageRate::query()->withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $tenantId)
+            ->get()
+            ->keyBy('global_topup_package_id');
+        $packages = TopupPackage::query()->with(['game:id,name,package_mode', 'globalTopupPackage'])
+            ->where('status', 'active')
             ->orderBy('game_id')->orderBy('denomination')->get();
 
-        return $this->tenantContext->run($tenant, function () use ($tenant, $program, $rates, $packages): array {
+        return $this->tenantContext->run($tenant, function () use ($tenant, $program, $rates, $globalRates, $packages): array {
             $this->pricingService->apply($packages);
+            $globalPackages = $packages
+                ->filter(fn (TopupPackage $package): bool => $package->package_source === 'global' && $package->global_topup_package_id !== null)
+                ->groupBy('global_topup_package_id');
 
             return [
                 'site' => ['id' => $tenant->id, 'name' => $tenant->name, 'is_main' => $tenant->is_main],
@@ -96,24 +106,53 @@ class AdminAffiliateService
                     'holding_days' => 7,
                     'minimum_conversion' => AffiliateWalletService::MINIMUM_CONVERSION,
                 ],
-                'rates' => $packages->map(function (TopupPackage $package) use ($tenant, $rates): array {
-                    $rate = $rates->get($package->id);
-                    $sellingPrice = (int) $package->selling_price;
-                    $margin = $tenant->is_main
-                        ? max(0, $sellingPrice - (int) ($package->provider_price ?? 0))
-                        : max(0, (int) $package->tenant_profit);
+                'global_rates' => $globalPackages->map(function ($mappedPackages, int|string $globalPackageId) use ($tenant, $globalRates): array {
+                    /** @var TopupPackage $representative */
+                    $representative = $mappedPackages->first();
+                    $rate = $globalRates->get((int) $globalPackageId);
 
                     return [
-                        'package_id' => $package->id,
-                        'game' => $package->game?->name,
-                        'package' => $package->name,
-                        'denomination' => (int) $package->denomination,
-                        'selling_price' => $sellingPrice,
-                        'margin' => $margin,
+                        'global_package_id' => (int) $globalPackageId,
+                        'package' => $representative->globalTopupPackage?->name,
+                        'denomination' => (int) ($representative->globalTopupPackage?->denomination ?? $representative->denomination),
+                        'games' => $mappedPackages->pluck('game.name')->filter()->unique()->values()->all(),
+                        'minimum_margin' => (int) $mappedPackages->map(fn (TopupPackage $package): int => $this->packageMargin($tenant, $package))->min(),
                         'commission_type' => $rate?->commission_type ?? AffiliatePackageRate::TYPE_FIXED,
                         'fixed_amount' => $rate?->fixed_amount ?? 0,
                         'percentage' => $rate?->percentage_basis_points === null ? 0 : $rate->percentage_basis_points / 100,
                         'is_active' => $rate?->is_active ?? false,
+                    ];
+                })->values()->all(),
+                'rates' => $packages->map(function (TopupPackage $package) use ($tenant, $rates, $globalRates): array {
+                    $rate = $rates->get($package->id);
+                    $globalRate = $package->package_source === 'global'
+                        ? $globalRates->get((int) $package->global_topup_package_id)
+                        : null;
+                    $effectiveRate = $rate?->is_active
+                        ? $rate
+                        : ($rate === null && $globalRate?->is_active ? $globalRate : null);
+                    $sellingPrice = (int) $package->selling_price;
+                    $mode = $rate instanceof AffiliatePackageRate
+                        ? ($rate->is_active ? 'override' : 'disabled')
+                        : ($package->package_source === 'global' ? 'global' : 'none');
+
+                    return [
+                        'package_id' => $package->id,
+                        'global_package_id' => $package->global_topup_package_id,
+                        'is_global' => $package->package_source === 'global',
+                        'mode' => $mode,
+                        'effective_source' => $effectiveRate instanceof AffiliatePackageRate
+                            ? 'package'
+                            : ($effectiveRate instanceof AffiliateGlobalPackageRate ? 'global' : null),
+                        'game' => $package->game?->name,
+                        'package' => $package->name,
+                        'denomination' => (int) $package->denomination,
+                        'selling_price' => $sellingPrice,
+                        'margin' => $this->packageMargin($tenant, $package),
+                        'commission_type' => $effectiveRate?->commission_type ?? AffiliatePackageRate::TYPE_FIXED,
+                        'fixed_amount' => $effectiveRate?->fixed_amount ?? 0,
+                        'percentage' => $effectiveRate?->percentage_basis_points === null ? 0 : $effectiveRate->percentage_basis_points / 100,
+                        'is_active' => $effectiveRate?->is_active ?? false,
                     ];
                 })->values()->all(),
                 'sites' => $this->sites(),
@@ -163,6 +202,53 @@ class AdminAffiliateService
             $this->audit($tenantId, $admin, 'affiliate_package_rate_updated', $rate, $old, $rate->getAttributes(), $request);
 
             return $rate->refresh();
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function updateGlobalRate(GlobalTopupPackage $globalPackage, array $payload, User $admin, Request $request): AffiliateGlobalPackageRate
+    {
+        $tenantId = $this->resolveTenantId($payload['site_id'] ?? null);
+        $percentageBasisPoints = $payload['commission_type'] === AffiliatePackageRate::TYPE_PERCENTAGE
+            ? (int) round((float) $payload['percentage'] * 100)
+            : null;
+        $fixedAmount = $payload['commission_type'] === AffiliatePackageRate::TYPE_FIXED ? (int) $payload['fixed_amount'] : null;
+        $this->assertGlobalWithinMargin($tenantId, $globalPackage, $payload['commission_type'], $fixedAmount, $percentageBasisPoints, (bool) $payload['is_active']);
+
+        return DB::transaction(function () use ($tenantId, $globalPackage, $payload, $fixedAmount, $percentageBasisPoints, $admin, $request): AffiliateGlobalPackageRate {
+            $rate = AffiliateGlobalPackageRate::query()->withoutGlobalScope(TenantScope::class)
+                ->firstOrNew(['tenant_id' => $tenantId, 'global_topup_package_id' => $globalPackage->id]);
+            $old = $rate->exists ? $rate->getAttributes() : [];
+            $rate->fill([
+                'commission_type' => $payload['commission_type'],
+                'fixed_amount' => $fixedAmount,
+                'percentage_basis_points' => $percentageBasisPoints,
+                'is_active' => (bool) $payload['is_active'],
+            ])->save();
+            $this->audit($tenantId, $admin, 'affiliate_global_package_rate_updated', $rate, $old, $rate->getAttributes(), $request);
+
+            return $rate->refresh();
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function resetRate(TopupPackage $package, array $payload, User $admin, Request $request): void
+    {
+        $tenantId = $this->resolveTenantId($payload['site_id'] ?? null);
+
+        DB::transaction(function () use ($tenantId, $package, $admin, $request): void {
+            $rate = AffiliatePackageRate::query()->withoutGlobalScope(TenantScope::class)
+                ->where('tenant_id', $tenantId)
+                ->where('topup_package_id', $package->id)
+                ->first();
+
+            if (! $rate instanceof AffiliatePackageRate) {
+                return;
+            }
+
+            $old = $rate->getAttributes();
+            $this->audit($tenantId, $admin, 'affiliate_package_rate_reset', $rate, $old, [], $request);
+            $rate->delete();
         }, 3);
     }
 
@@ -413,6 +499,55 @@ class AdminAffiliateService
                 'commission' => 'Hoa hồng dự kiến vượt quá lợi nhuận hiện tại của gói trên website này.',
             ]);
         }
+    }
+
+    private function assertGlobalWithinMargin(
+        int $tenantId,
+        GlobalTopupPackage $globalPackage,
+        string $type,
+        ?int $fixedAmount,
+        ?int $basisPoints,
+        bool $active,
+    ): void {
+        if (! $active) {
+            return;
+        }
+
+        $tenant = Tenant::query()->findOrFail($tenantId);
+        $packages = TopupPackage::query()
+            ->with('game:id,package_mode')
+            ->where('global_topup_package_id', $globalPackage->id)
+            ->where('status', 'active')
+            ->whereHas('game', fn (Builder $query) => $query->where('package_mode', 'global'))
+            ->get();
+
+        $invalidPackages = $this->tenantContext->run($tenant, function () use ($tenant, $packages, $type, $fixedAmount, $basisPoints): array {
+            return $packages->filter(function (TopupPackage $package) use ($tenant, $type, $fixedAmount, $basisPoints): bool {
+                $pricing = $this->pricingService->resolve($package);
+                $sellingPrice = (int) $pricing['final_price'];
+                $margin = $tenant->is_main
+                    ? max(0, $sellingPrice - (int) ($pricing['provider_price'] ?? 0))
+                    : max(0, (int) $pricing['tenant_profit']);
+                $commission = $type === AffiliatePackageRate::TYPE_PERCENTAGE
+                    ? intdiv($sellingPrice * (int) $basisPoints, 10000)
+                    : (int) $fixedAmount;
+
+                return $commission > $margin;
+            })->pluck('name')->take(3)->all();
+        });
+
+        if ($invalidPackages !== []) {
+            throw ValidationException::withMessages([
+                'commission' => 'Hoa hồng Global vượt lợi nhuận của một số gói đang sử dụng: '.implode(', ', $invalidPackages).'.',
+            ]);
+        }
+    }
+
+    private function packageMargin(Tenant $tenant, TopupPackage $package): int
+    {
+        return $tenant->is_main
+            ? max(0, (int) $package->selling_price - (int) ($package->provider_price ?? 0))
+            : max(0, (int) $package->tenant_profit);
     }
 
     /** @param array<string, mixed> $payload */

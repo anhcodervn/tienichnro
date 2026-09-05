@@ -2,10 +2,14 @@
 
 use App\Models\AdminAuditLog;
 use App\Models\AffiliateCommission;
+use App\Models\AffiliateGlobalPackageRate;
 use App\Models\AffiliatePackageRate;
 use App\Models\AffiliateProfile;
 use App\Models\AffiliateProgram;
 use App\Models\AffiliateWithdrawal;
+use App\Models\Game;
+use App\Models\GlobalTopupPackage;
+use App\Models\GlobalTopupPackageGameSetting;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\TopupPackage;
@@ -122,6 +126,69 @@ test('admin configures percentage commission per package and changes are audited
             'affiliate_program_updated',
             'affiliate_package_rate_updated',
         ])->count())->toBe(2);
+});
+
+test('admin configures a global rate and can restore a package to global inheritance', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
+    $globalPackage = GlobalTopupPackage::factory()->create([
+        'price' => 100000,
+        'provider_price' => 90000,
+    ]);
+    $game = Game::factory()->create(['package_mode' => 'global']);
+    GlobalTopupPackageGameSetting::factory()->create([
+        'denomination' => $globalPackage->denomination,
+        'game_id' => $game->id,
+    ]);
+    $package = TopupPackage::factory()->create([
+        'game_id' => $game->id,
+        'global_topup_package_id' => $globalPackage->id,
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($admin)->putJson("http://napcarot.com/api/admin-api/affiliate/global-rates/{$globalPackage->id}", [
+        'site_id' => $main->id,
+        'commission_type' => AffiliatePackageRate::TYPE_FIXED,
+        'fixed_amount' => 2500,
+        'percentage' => null,
+        'is_active' => true,
+    ])->assertOk()->assertJsonPath('data.fixed_amount', 2500);
+
+    $this->actingAs($admin)->putJson("http://napcarot.com/api/admin-api/affiliate/rates/{$package->id}", [
+        'site_id' => $main->id,
+        'commission_type' => AffiliatePackageRate::TYPE_FIXED,
+        'fixed_amount' => 0,
+        'percentage' => null,
+        'is_active' => false,
+    ])->assertOk();
+
+    $disabledConfiguration = $this->actingAs($admin)
+        ->getJson("http://napcarot.com/api/admin-api/affiliate/configuration?site_id={$main->id}")
+        ->assertOk()
+        ->json('data');
+    $disabledPackage = collect($disabledConfiguration['rates'])->firstWhere('package_id', $package->id);
+    $configuredGlobalRate = collect($disabledConfiguration['global_rates'])->firstWhere('global_package_id', $globalPackage->id);
+
+    expect($disabledPackage['mode'])->toBe('disabled')
+        ->and($configuredGlobalRate['fixed_amount'])->toBe(2500)
+        ->and($configuredGlobalRate['games'])->toContain($game->name);
+
+    $this->actingAs($admin)
+        ->deleteJson("http://napcarot.com/api/admin-api/affiliate/rates/{$package->id}?site_id={$main->id}")
+        ->assertOk()
+        ->assertJsonPath('data.reset', true);
+
+    $inheritedConfiguration = $this->actingAs($admin)
+        ->getJson("http://napcarot.com/api/admin-api/affiliate/configuration?site_id={$main->id}")
+        ->assertOk()
+        ->json('data');
+    $inheritedPackage = collect($inheritedConfiguration['rates'])->firstWhere('package_id', $package->id);
+
+    expect($inheritedPackage['mode'])->toBe('global')
+        ->and($inheritedPackage['effective_source'])->toBe('global')
+        ->and($inheritedPackage['fixed_amount'])->toBe(2500)
+        ->and(AffiliateGlobalPackageRate::query()->withoutGlobalScopes()->where('tenant_id', $main->id)->count())->toBe(1)
+        ->and(AffiliatePackageRate::query()->withoutGlobalScopes()->where('tenant_id', $main->id)->where('topup_package_id', $package->id)->exists())->toBeFalse();
 });
 
 test('admin can hold and release a pending commission for manual review', function (): void {

@@ -7,6 +7,7 @@ use App\Features\Admin\Affiliate\Requests\UpdateAffiliatePackageRateRequest;
 use App\Features\Admin\Affiliate\Requests\UpdateAffiliateProgramRequest;
 use App\Features\Admin\Affiliate\Services\AdminAffiliateService;
 use App\Http\Controllers\Controller;
+use App\Models\GlobalTopupPackage;
 use App\Models\TopupPackage;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
@@ -35,6 +36,20 @@ class AffiliateProgramController extends Controller
         return response()->json(['status' => true, 'data' => $this->service->updateRate(
             $topupPackage, $request->validated(), $this->admin($request), $request,
         )]);
+    }
+
+    public function updateGlobalRate(UpdateAffiliatePackageRateRequest $request, GlobalTopupPackage $globalTopupPackage): JsonResponse
+    {
+        return response()->json(['status' => true, 'data' => $this->service->updateGlobalRate(
+            $globalTopupPackage, $request->validated(), $this->admin($request), $request,
+        )]);
+    }
+
+    public function resetRate(AffiliateIndexRequest $request, TopupPackage $topupPackage): JsonResponse
+    {
+        $this->service->resetRate($topupPackage, $request->validated(), $this->admin($request), $request);
+
+        return response()->json(['status' => true, 'data' => ['reset' => true]]);
     }
 
     private function admin(Request $request): User
