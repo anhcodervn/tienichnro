@@ -4,10 +4,15 @@ namespace App\Features\Admin\Seo\Services;
 
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
+use App\Support\SitemapUrlService;
 use Illuminate\Support\Collection;
 
 class SeoService
 {
+    public function __construct(
+        protected SitemapUrlService $sitemapUrlService,
+    ) {}
+
     public function overview(): array
     {
         $categoryCount = SeoCategory::query()->count();
@@ -32,7 +37,7 @@ class SeoService
                 'indexed_categories' => $indexedCategoryCount,
                 'total_posts' => $postCount,
                 'published_posts' => $publishedPostCount,
-                'sitemap_files' => 4,
+                'sitemap_files' => 1,
                 'technical_score' => $postCount > 0
                     ? (int) round((($canonicalCount + $schemaReadyCount) / max(1, $postCount * 2)) * 100)
                     : 100,
@@ -132,36 +137,14 @@ class SeoService
 
     public function sitemapSummary(): array
     {
-        $categoryCount = SeoCategory::query()
-            ->where('is_active', true)
-            ->where('robots', 'index,follow')
-            ->count();
-        $publishedPostCount = SeoPost::query()->where('status', 'published')->count();
+        $urlCount = $this->sitemapUrlService->urls()->count();
 
         return [
             [
-                'title' => 'Sitemap index',
+                'title' => 'Sitemap website',
                 'path' => '/sitemap.xml',
-                'description' => 'Tệp tổng hợp để submit trong Search Console và khai báo các sitemap con.',
-                'included_count' => '4 file',
-            ],
-            [
-                'title' => 'Sitemap bài viết',
-                'path' => '/sitemap-posts.xml',
-                'description' => 'Chỉ chứa các bài viết public đã publish và có canonical hợp lệ.',
-                'included_count' => "{$publishedPostCount} URL",
-            ],
-            [
-                'title' => 'Sitemap danh mục',
-                'path' => '/sitemap-categories.xml',
-                'description' => 'Tập trung các trang category index/follow để gom chủ đề nội dung.',
-                'included_count' => "{$categoryCount} URL",
-            ],
-            [
-                'title' => 'Sitemap landing & pháp lý',
-                'path' => '/sitemap-pages.xml',
-                'description' => 'Bao gồm landing, docs public, điều khoản và các trang nội dung tĩnh.',
-                'included_count' => '18 URL',
+                'description' => 'Chỉ chứa URL public, index/follow và trùng với canonical để submit Google Search Console.',
+                'included_count' => "{$urlCount} URL",
             ],
         ];
     }

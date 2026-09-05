@@ -25,6 +25,8 @@ export interface SystemSettingType {
     meta_title: string;
     meta_description: string;
     robots: string;
+    robots_txt?: string;
+    ads_txt?: string;
     gtm_id: string;
     meta_pixel_id: string;
     [key: string]: unknown;
@@ -154,7 +156,9 @@ export interface SecuritySettingType {
 export interface SeoSettingType {
     meta_title: string;
     meta_description: string;
-    robots?: string;
+    robots: string;
+    robots_txt: string;
+    ads_txt: string;
     gtm_id?: string;
     meta_pixel_id?: string;
     meta_keywords?: string;

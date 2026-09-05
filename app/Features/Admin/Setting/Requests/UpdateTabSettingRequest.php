@@ -3,7 +3,9 @@
 namespace App\Features\Admin\Setting\Requests;
 
 use App\Models\User;
+use App\Rules\ValidAdsTxt;
 use App\Rules\ValidHomepageNoticeContent;
+use App\Rules\ValidRobotsTxt;
 use App\Support\SafeNavigationUrl;
 use Closure;
 use Illuminate\Contracts\Validation\Validator;
@@ -102,7 +104,9 @@ class UpdateTabSettingRequest extends FormRequest
             'seo' => [
                 'meta_title' => ['nullable', 'string', 'max:255'],
                 'meta_description' => ['nullable', 'string', 'max:1000'],
-                'robots' => ['nullable', 'string', 'max:100'],
+                'robots' => ['required', Rule::in(['index,follow', 'noindex,follow', 'noindex,nofollow'])],
+                'robots_txt' => ['nullable', 'string', 'max:20000', new ValidRobotsTxt],
+                'ads_txt' => ['nullable', 'string', 'max:100000', new ValidAdsTxt],
                 'gtm_id' => ['nullable', 'string', 'max:100'],
                 'meta_pixel_id' => ['nullable', 'string', 'max:100'],
             ],
@@ -229,6 +233,8 @@ class UpdateTabSettingRequest extends FormRequest
             'meta_title' => 'meta title',
             'meta_description' => 'meta description',
             'robots' => 'robots',
+            'robots_txt' => 'nội dung robots.txt',
+            'ads_txt' => 'nội dung ads.txt',
             'gtm_id' => 'Google Tag Manager ID',
             'meta_pixel_id' => 'Meta Pixel ID',
             'custom_css' => 'CSS tùy chỉnh',
@@ -257,6 +263,15 @@ class UpdateTabSettingRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
+        if ((string) $this->route('tab') === 'seo') {
+            $this->merge([
+                'robots_txt' => $this->normalizeTextFile($this->input('robots_txt')),
+                'ads_txt' => $this->normalizeTextFile($this->input('ads_txt')),
+            ]);
+
+            return;
+        }
+
         if ((string) $this->route('tab') === 'bio') {
             $this->prepareBioSettings();
 
@@ -286,6 +301,11 @@ class UpdateTabSettingRequest extends FormRequest
                 ];
             }, $items),
         ]);
+    }
+
+    private function normalizeTextFile(mixed $value): mixed
+    {
+        return is_string($value) ? trim(str_replace(["\r\n", "\r"], "\n", $value)) : $value;
     }
 
     private function safeServiceUrlRule(): Closure

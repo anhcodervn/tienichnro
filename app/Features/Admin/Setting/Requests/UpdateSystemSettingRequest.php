@@ -2,9 +2,12 @@
 
 namespace App\Features\Admin\Setting\Requests;
 
+use App\Rules\ValidAdsTxt;
+use App\Rules\ValidRobotsTxt;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Http\Exceptions\HttpResponseException;
+use Illuminate\Validation\Rule;
 
 class UpdateSystemSettingRequest extends FormRequest
 {
@@ -39,7 +42,9 @@ class UpdateSystemSettingRequest extends FormRequest
             'youtube' => ['nullable', 'string', 'max:255'],
             'meta_title' => ['nullable', 'string', 'max:255'],
             'meta_description' => ['nullable', 'string', 'max:1000'],
-            'robots' => ['nullable', 'string', 'max:100'],
+            'robots' => ['required', Rule::in(['index,follow', 'noindex,follow', 'noindex,nofollow'])],
+            'robots_txt' => ['nullable', 'string', 'max:20000', new ValidRobotsTxt],
+            'ads_txt' => ['nullable', 'string', 'max:100000', new ValidAdsTxt],
             'gtm_id' => ['nullable', 'string', 'max:100'],
             'meta_pixel_id' => ['nullable', 'string', 'max:100'],
         ];
@@ -68,5 +73,14 @@ class UpdateSystemSettingRequest extends FormRequest
                 'errors' => $validator->errors(),
             ],
         ], 422));
+    }
+
+    protected function prepareForValidation(): void
+    {
+        foreach (['robots_txt', 'ads_txt'] as $field) {
+            if ($this->exists($field) && is_string($this->input($field))) {
+                $this->merge([$field => trim(str_replace(["\r\n", "\r"], "\n", $this->input($field)))]);
+            }
+        }
     }
 }

@@ -11,6 +11,7 @@ use App\Http\Controllers\Auth\NewPasswordController;
 use App\Http\Controllers\Auth\PasswordResetLinkController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\BioPageController;
+use App\Http\Controllers\Client\CrawlerFileController;
 use App\Http\Controllers\Client\SitemapController;
 use App\Http\Controllers\PublicContentPageController;
 use App\Http\Controllers\PublicSeoPageController;
@@ -21,6 +22,8 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/site-custom.css', [SiteCustomAssetController::class, 'css'])->name('site_custom.css');
 Route::get('/site-custom.js', [SiteCustomAssetController::class, 'javascript'])->name('site_custom.js');
+Route::get('/robots.txt', [CrawlerFileController::class, 'robots'])->name('robots');
+Route::get('/ads.txt', [CrawlerFileController::class, 'ads'])->name('ads');
 Route::get('/community', BioPageController::class)->name('bio.show');
 Route::get('/cong-tac-vien/{any?}', AffiliatePageController::class)
     ->middleware('site.active')->where('any', '.*')->name('client.affiliate.spa');

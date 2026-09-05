@@ -7,6 +7,7 @@ use App\Features\Admin\Setting\Requests\UpdateOptionSettingRequest;
 use App\Features\Admin\Setting\Requests\UpdateSystemSettingRequest;
 use App\Features\Admin\Setting\Requests\UpdateTabSettingRequest;
 use App\Http\Controllers\Controller;
+use App\Support\CrawlerFileContent;
 use App\Support\SettingStore;
 use App\Utils\Site;
 use Illuminate\Http\JsonResponse;
@@ -16,6 +17,10 @@ use Illuminate\Validation\ValidationException;
 class SettingController extends Controller
 {
     protected const SYSTEM_TAB = 'system';
+
+    public function __construct(
+        protected CrawlerFileContent $crawlerFileContent,
+    ) {}
 
     /**
      * @return array<string, array<string, mixed>>
@@ -74,6 +79,8 @@ class SettingController extends Controller
                 'meta_title' => '',
                 'meta_description' => '',
                 'robots' => 'index,follow',
+                'robots_txt' => $this->crawlerFileContent->defaultRobots(),
+                'ads_txt' => '',
                 'gtm_id' => '',
                 'meta_pixel_id' => '',
             ],
@@ -244,6 +251,8 @@ class SettingController extends Controller
                 'meta_title' => 'meta_title',
                 'meta_description' => 'meta_description',
                 'robots' => 'robots',
+                'robots_txt' => 'robots_txt',
+                'ads_txt' => 'ads_txt',
                 'gtm_id' => 'gtm_id',
                 'meta_pixel_id' => 'meta_pixel_id',
             ],
@@ -327,13 +336,13 @@ class SettingController extends Controller
         $contact = $this->readTab($settingStore, $this->tabDefaults()['contact'], $this->tabStorageMap()['contact']);
         $seo = $this->readTab($settingStore, $this->tabDefaults()['seo'], $this->tabStorageMap()['seo']);
 
-        return [
+        return $this->withLocalCrawlerFileSettings([
             ...$this->defaultSystem(),
             ...$general,
             ...$branding,
             ...$contact,
             ...$seo,
-        ];
+        ]);
     }
 
     public function show(string $tab, SettingStore $settingStore): JsonResponse
@@ -362,6 +371,9 @@ class SettingController extends Controller
         }
 
         $settings = $this->readTab($settingStore, $this->tabDefaults()[$tab], $this->tabStorageMap()[$tab]);
+        if ($tab === 'seo') {
+            $settings = $this->withLocalCrawlerFileSettings($settings);
+        }
 
         return response()->json([
             'status' => true,
@@ -428,6 +440,9 @@ class SettingController extends Controller
         $storageMap = Arr::only($this->tabStorageMap()[$tab], array_keys($validated));
         $this->writeTab($settingStore, $validated, $storageMap);
         $settings = $this->readTab($settingStore, $this->tabDefaults()[$tab], $this->tabStorageMap()[$tab]);
+        if ($tab === 'seo') {
+            $settings = $this->withLocalCrawlerFileSettings($settings);
+        }
 
         return response()->json([
             'status' => true,
@@ -503,5 +518,18 @@ class SettingController extends Controller
             'system', 'general', 'homepage', 'popup-notice', 'service-articles', 'bio', 'branding',
             'contact', 'seo', 'options', 'content-pages', 'slider-images',
         ], true), 403, 'Website đại lý không được thay đổi cấu hình hệ thống này.');
+    }
+
+    /**
+     * @param  array<string, mixed>  $settings
+     * @return array<string, mixed>
+     */
+    private function withLocalCrawlerFileSettings(array $settings): array
+    {
+        return [
+            ...$settings,
+            'robots_txt' => $this->crawlerFileContent->robotsForEditing(),
+            'ads_txt' => $this->crawlerFileContent->adsForEditing(),
+        ];
     }
 }

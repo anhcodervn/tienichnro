@@ -153,6 +153,8 @@ const seoForm = ref<SeoSettingType>({
     meta_title: '',
     meta_description: '',
     robots: 'index,follow',
+    robots_txt: '',
+    ads_txt: '',
     gtm_id: '',
     meta_pixel_id: '',
 });
@@ -602,14 +604,24 @@ onMounted(async () => {
                             <fieldset class="grid gap-2 rounded-[10px] border border-slate-300 bg-slate-50 p-3">
                                 <legend class="px-1 text-xs font-semibold text-slate-700">Kiểu hiển thị</legend>
                                 <label class="flex cursor-pointer items-start gap-3 rounded-[8px] border border-slate-200 bg-white p-3">
-                                    <input v-model="popupNoticeForm.home_popup_display_mode" type="radio" value="modal" class="mt-0.5 h-4 w-4 border-slate-300" />
+                                    <input
+                                        v-model="popupNoticeForm.home_popup_display_mode"
+                                        type="radio"
+                                        value="modal"
+                                        class="mt-0.5 h-4 w-4 border-slate-300"
+                                    />
                                     <span>
                                         <span class="block text-sm font-semibold text-slate-900">Modal giữa màn hình</span>
                                         <span class="mt-0.5 block text-xs text-slate-500">Có lớp nền tối, phù hợp với thông báo quan trọng.</span>
                                     </span>
                                 </label>
                                 <label class="flex cursor-pointer items-start gap-3 rounded-[8px] border border-slate-200 bg-white p-3">
-                                    <input v-model="popupNoticeForm.home_popup_display_mode" type="radio" value="popup" class="mt-0.5 h-4 w-4 border-slate-300" />
+                                    <input
+                                        v-model="popupNoticeForm.home_popup_display_mode"
+                                        type="radio"
+                                        value="popup"
+                                        class="mt-0.5 h-4 w-4 border-slate-300"
+                                    />
                                     <span>
                                         <span class="block text-sm font-semibold text-slate-900">Popup góc màn hình</span>
                                         <span class="mt-0.5 block text-xs text-slate-500">Gọn hơn và không che toàn bộ nội dung trang.</span>
@@ -617,7 +629,9 @@ onMounted(async () => {
                                 </label>
                             </fieldset>
 
-                            <label class="flex items-center justify-between gap-3 rounded-[10px] border border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                            <label
+                                class="flex items-center justify-between gap-3 rounded-[10px] border border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700"
+                            >
                                 <span>
                                     <span class="block font-semibold text-slate-900">Bật thông báo popup</span>
                                     <span class="mt-1 block text-xs text-slate-500">Tắt để ngừng hiển thị nhưng vẫn giữ nội dung đã soạn.</span>
@@ -625,7 +639,9 @@ onMounted(async () => {
                                 <input v-model="popupNoticeForm.home_popup_is_published" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
                             </label>
 
-                            <label class="flex items-center justify-between gap-3 rounded-[10px] border border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700">
+                            <label
+                                class="flex items-center justify-between gap-3 rounded-[10px] border border-slate-300 bg-slate-50 px-3 py-3 text-sm text-slate-700"
+                            >
                                 <span>
                                     <span class="block font-semibold text-slate-900">Cho phép ghi nhớ khi đóng</span>
                                     <span class="mt-1 block text-xs text-slate-500">Nếu tắt, popup sẽ hiện lại mỗi lần tải trang chủ.</span>
@@ -656,7 +672,8 @@ onMounted(async () => {
                             <p class="font-semibold text-slate-900">{{ popupNoticeForm.home_popup_title || 'Thông báo' }}</p>
                             <p>Popup chỉ xuất hiện tại trang chủ và áp dụng giống nhau cho khách lẫn thành viên.</p>
                             <p v-if="popupNoticeForm.home_popup_allow_dismiss">
-                                Sau khi đóng, trình duyệt sẽ ẩn thông báo trong <strong>{{ popupNoticeForm.home_popup_dismiss_hours || 1 }} giờ</strong>.
+                                Sau khi đóng, trình duyệt sẽ ẩn thông báo trong
+                                <strong>{{ popupNoticeForm.home_popup_dismiss_hours || 1 }} giờ</strong>.
                             </p>
                             <p v-else>Sau khi đóng, thông báo sẽ xuất hiện lại ở lần tải trang chủ tiếp theo.</p>
                             <span
@@ -1118,11 +1135,59 @@ onMounted(async () => {
                                 </label>
                                 <label class="space-y-1">
                                     <span class="text-xs font-semibold text-slate-600">Robots</span>
-                                    <input
+                                    <select
                                         v-model="seoForm.robots"
-                                        type="text"
                                         class="w-full rounded-[10px] border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400"
+                                    >
+                                        <option value="index,follow">index,follow</option>
+                                        <option value="noindex,follow">noindex,follow</option>
+                                        <option value="noindex,nofollow">noindex,nofollow</option>
+                                    </select>
+                                </label>
+                            </div>
+                        </article>
+
+                        <article class="rounded-[10px] border border-slate-200 bg-white p-4">
+                            <div class="mb-4">
+                                <h3 class="text-sm font-semibold text-slate-900">Tệp dành cho crawler và quảng cáo</h3>
+                                <p class="text-sm leading-6 text-slate-500">
+                                    Nội dung được phục vụ trực tiếp tại
+                                    <a class="font-semibold text-indigo-600 hover:text-indigo-700" href="/robots.txt" target="_blank" rel="noreferrer"
+                                        >/robots.txt</a
+                                    >
+                                    và
+                                    <a class="font-semibold text-indigo-600 hover:text-indigo-700" href="/ads.txt" target="_blank" rel="noreferrer"
+                                        >/ads.txt</a
+                                    >.
+                                </p>
+                            </div>
+
+                            <div class="grid gap-4">
+                                <label class="grid gap-1">
+                                    <span class="text-xs font-semibold text-slate-600">robots.txt</span>
+                                    <textarea
+                                        v-model="seoForm.robots_txt"
+                                        rows="11"
+                                        maxlength="20000"
+                                        spellcheck="false"
+                                        class="w-full rounded-[10px] border border-slate-200 bg-slate-950 px-3 py-3 font-mono text-xs leading-6 text-slate-100 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
                                     />
+                                    <span class="text-xs leading-5 text-slate-500"
+                                        >Sitemap phải dùng URL đầy đủ, ví dụ https://napcarot.com/sitemap.xml.</span
+                                    >
+                                </label>
+
+                                <label class="grid gap-1">
+                                    <span class="text-xs font-semibold text-slate-600">ads.txt</span>
+                                    <textarea
+                                        v-model="seoForm.ads_txt"
+                                        rows="7"
+                                        maxlength="100000"
+                                        spellcheck="false"
+                                        placeholder="google.com, pub-0000000000000000, DIRECT, f08c47fec0942fa0"
+                                        class="w-full rounded-[10px] border border-slate-200 bg-slate-950 px-3 py-3 font-mono text-xs leading-6 text-slate-100 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                    />
+                                    <span class="text-xs leading-5 text-slate-500">Để trống nếu website chưa sử dụng mạng quảng cáo.</span>
                                 </label>
                             </div>
                         </article>

@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import Breadcrumb from "@/components/MasterLayouts/Breadcrumb/index.vue";
-import { adminSeoService } from "@/services/admin-seo.service";
-import type { AdminSeoSitemapEntry } from "@/types/admin-seo.type";
-import { handleErrorResponse } from "@/utils/response";
-import { seoReferences } from "../data";
-import { CheckCircle2, Globe, Send } from "lucide-vue-next";
-import { onMounted, ref } from "vue";
+import Breadcrumb from '@/components/MasterLayouts/Breadcrumb/index.vue';
+import { adminSeoService } from '@/services/admin-seo.service';
+import type { AdminSeoSitemapEntry } from '@/types/admin-seo.type';
+import { handleErrorResponse } from '@/utils/response';
+import { CheckCircle2, Globe, Send } from 'lucide-vue-next';
+import { onMounted, ref } from 'vue';
+import { seoReferences } from '../data';
 
 const loading = ref(false);
 const entries = ref<AdminSeoSitemapEntry[]>([]);
@@ -44,12 +44,7 @@ onMounted(async () => {
                     <div v-if="loading" class="rounded-[14px] border border-slate-200 bg-slate-50/70 p-4 text-sm text-slate-500">
                         Đang tải sitemap...
                     </div>
-                    <div
-                        v-for="entry in entries"
-                        v-else
-                        :key="entry.path"
-                        class="rounded-[14px] border border-slate-200 bg-slate-50/70 p-4"
-                    >
+                    <div v-for="entry in entries" v-else :key="entry.path" class="rounded-[14px] border border-slate-200 bg-slate-50/70 p-4">
                         <div class="flex items-start justify-between gap-4">
                             <div>
                                 <p class="font-semibold text-slate-900">{{ entry.title }}</p>
@@ -70,7 +65,7 @@ onMounted(async () => {
                     <div class="mt-5 space-y-3">
                         <div class="flex gap-3 rounded-[12px] border border-slate-200 bg-slate-50/80 px-4 py-3">
                             <CheckCircle2 class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                            <p class="text-sm leading-6 text-slate-600">Sitemap index chỉ nên chứa các sitemap con thật sự public và canonical.</p>
+                            <p class="text-sm leading-6 text-slate-600">Sitemap chỉ chứa URL public, index/follow và trùng với canonical.</p>
                         </div>
                         <div class="flex gap-3 rounded-[12px] border border-slate-200 bg-slate-50/80 px-4 py-3">
                             <CheckCircle2 class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
@@ -78,7 +73,9 @@ onMounted(async () => {
                         </div>
                         <div class="flex gap-3 rounded-[12px] border border-slate-200 bg-slate-50/80 px-4 py-3">
                             <CheckCircle2 class="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" />
-                            <p class="text-sm leading-6 text-slate-600">Sau khi publish thêm nhiều bài, nên submit lại sitemap trong Search Console.</p>
+                            <p class="text-sm leading-6 text-slate-600">
+                                Sau khi publish thêm nhiều bài, nên submit lại sitemap trong Search Console.
+                            </p>
                         </div>
                     </div>
                 </article>

@@ -19,22 +19,25 @@
         $gameServiceItems = is_array($settings['game_service_items'] ?? null) ? $settings['game_service_items'] : [];
         $showGameServiceMenu = ($settings['game_service_enabled'] ?? false) === true && $gameServiceItems !== [];
         $showAgencyWebsite = app(\App\Support\TenantContext::class)->isActive() && \App\Utils\Site::isMain();
+        $documentTitle = $title === $siteName || \Illuminate\Support\Str::endsWith($title, ' | '.$siteName)
+            ? $title
+            : $title.' | '.$siteName;
         $orderHistoryUrl = auth()->check() ? route('account.orders.index') : route('orders.lookup');
         $orderHistoryActive = request()->routeIs(['orders.*', 'account.orders.*']);
         $exploreActive = request()->routeIs(['client.affiliate.spa', 'seo.*', 'content.guide', 'content.contact']);
     @endphp
-    <title>{{ $title }}{{ $title !== $siteName ? ' | '.$siteName : '' }}</title>
+    <title>{{ $documentTitle }}</title>
     <meta name="description" content="{{ $description }}">
     <meta name="robots" content="@yield('robots', $settings['robots'] ?? 'index,follow')">
     <link rel="canonical" href="{{ $canonical }}">
     <meta property="og:locale" content="vi_VN">
     <meta property="og:type" content="@yield('og_type', 'website')">
     <meta property="og:site_name" content="{{ $siteName }}">
-    <meta property="og:title" content="{{ $title }}">
+    <meta property="og:title" content="{{ $documentTitle }}">
     <meta property="og:description" content="{{ $description }}">
     <meta property="og:url" content="{{ $canonical }}">
     <meta name="twitter:card" content="{{ $shareImage !== '' ? 'summary_large_image' : 'summary' }}">
-    <meta name="twitter:title" content="{{ $title }}">
+    <meta name="twitter:title" content="{{ $documentTitle }}">
     <meta name="twitter:description" content="{{ $description }}">
     @if ($shareImage !== '')
         <meta property="og:image" content="{{ $shareImage }}">
