@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Features\Affiliate\Events\AffiliateDashboardUpdated;
 use App\Models\Concerns\BelongsToTenant;
 use App\Notifications\QueuedResetPasswordNotification;
 use App\Notifications\QueuedVerifyEmailNotification;
@@ -87,6 +88,9 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
                 'total_spent' => 0,
             ]);
 
+            if ($user->referred_by) {
+                AffiliateDashboardUpdated::dispatch((int) $user->referred_by);
+            }
         });
     }
 

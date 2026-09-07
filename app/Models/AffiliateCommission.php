@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Features\Affiliate\Events\AffiliateDashboardUpdated;
 use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\AffiliateCommissionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -26,6 +27,11 @@ class AffiliateCommission extends Model
     ];
 
     protected $attributes = ['status' => self::STATUS_PENDING, 'is_flagged' => false];
+
+    protected static function booted(): void
+    {
+        static::saved(fn (self $commission): mixed => AffiliateDashboardUpdated::dispatch((int) $commission->referrer_id));
+    }
 
     protected function casts(): array
     {

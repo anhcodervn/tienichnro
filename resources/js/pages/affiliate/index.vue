@@ -1,12 +1,15 @@
 <script setup lang="ts">
 import { clientAffiliateService, type ClientAffiliateData } from '@/services/client-affiliate.service';
+import { useUserStore } from '@/stores/user.store';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
+import { echo } from '@laravel/echo-vue';
 import { Banknote, Check, Clock3, Copy, HandCoins, LoaderCircle, RefreshCw, ShieldCheck, Users, WalletCards } from 'lucide-vue-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 type Tab = 'commissions' | 'referrals' | 'withdrawals';
 
 const data = ref<ClientAffiliateData | null>(null);
+const userStore = useUserStore();
 const loading = ref(true);
 const submitting = ref(false);
 const copied = ref(false);
@@ -14,6 +17,11 @@ const activeTab = ref<Tab>('commissions');
 const conversionAmount = ref<number | null>(null);
 const withdrawalAmount = ref<number | null>(null);
 const payout = reactive({ bank_name: '', bank_account_name: '', bank_account_number: '' });
+const realtimeEventName = '.affiliate.dashboard.updated';
+let realtimeChannelName: string | null = null;
+let realtimeRefreshTimer: ReturnType<typeof setTimeout> | null = null;
+let realtimeRefreshRunning = false;
+let realtimeRefreshQueued = false;
 const isSuspended = computed(() => data.value?.profile.status === 'suspended');
 const money = (value: number | string | null | undefined): string => `${new Intl.NumberFormat('vi-VN').format(Number(value ?? 0))}đ`;
 const dateTime = (value: string | null | undefined): string => (value ? new Date(value).toLocaleString('vi-VN') : '—');
@@ -31,17 +39,45 @@ const withdrawalStatusLabels: Record<string, string> = {
 };
 const withdrawalStatusLabel = (status: string): string => withdrawalStatusLabels[status] ?? status;
 
-const load = async (): Promise<void> => {
-    loading.value = true;
+const load = async (showLoading = true, syncPayout = true): Promise<void> => {
+    if (showLoading) loading.value = true;
     try {
         data.value = await clientAffiliateService.data();
-        payout.bank_name = data.value.profile.bank_name ?? '';
-        payout.bank_account_name = data.value.profile.bank_account_name ?? '';
+        if (syncPayout) {
+            payout.bank_name = data.value.profile.bank_name ?? '';
+            payout.bank_account_name = data.value.profile.bank_account_name ?? '';
+        }
     } catch (error) {
         handleErrorResponse(error);
     } finally {
-        loading.value = false;
+        if (showLoading) loading.value = false;
     }
+};
+
+const flushRealtimeRefresh = async (): Promise<void> => {
+    if (realtimeRefreshRunning) {
+        realtimeRefreshQueued = true;
+        return;
+    }
+
+    realtimeRefreshRunning = true;
+    realtimeRefreshTimer = null;
+
+    try {
+        await load(false, false);
+    } finally {
+        realtimeRefreshRunning = false;
+
+        if (realtimeRefreshQueued) {
+            realtimeRefreshQueued = false;
+            realtimeRefreshTimer = window.setTimeout(() => void flushRealtimeRefresh(), 250);
+        }
+    }
+};
+
+const scheduleRealtimeRefresh = (): void => {
+    if (realtimeRefreshTimer) window.clearTimeout(realtimeRefreshTimer);
+    realtimeRefreshTimer = window.setTimeout(() => void flushRealtimeRefresh(), 250);
 };
 
 const copyReferral = async (): Promise<void> => {
@@ -95,7 +131,26 @@ const withdraw = async (): Promise<void> => {
     }
 };
 
-onMounted(load);
+onMounted(async () => {
+    await load();
+    const currentUser = userStore.user ?? (await userStore.bootstrap({ silent: true }));
+
+    if (!currentUser) return;
+
+    realtimeChannelName = `users.${currentUser.id}.affiliate`;
+    const realtimeChannel = echo().private(realtimeChannelName);
+    realtimeChannel.listen(realtimeEventName, scheduleRealtimeRefresh);
+    realtimeChannel.subscribed(scheduleRealtimeRefresh);
+});
+
+onBeforeUnmount(() => {
+    if (realtimeChannelName) {
+        echo().private(realtimeChannelName).stopListening(realtimeEventName, scheduleRealtimeRefresh);
+        echo().leave(realtimeChannelName);
+    }
+
+    if (realtimeRefreshTimer) window.clearTimeout(realtimeRefreshTimer);
+});
 </script>
 
 <template>
@@ -322,7 +377,7 @@ onMounted(load);
                 type="button"
                 class="fixed bottom-5 right-5 grid size-12 place-items-center rounded-full bg-white text-emerald-700 shadow-xl ring-1 ring-slate-200"
                 aria-label="Làm mới"
-                @click="load"
+                @click="load()"
             >
                 <RefreshCw class="size-5" />
             </button>

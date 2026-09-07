@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Features\Affiliate\Events\AffiliateDashboardUpdated;
 use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\AffiliateWithdrawalFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -32,6 +33,11 @@ class AffiliateWithdrawal extends Model
     protected $hidden = ['bank_account_name', 'bank_account_number'];
 
     protected $attributes = ['status' => self::STATUS_REQUESTED];
+
+    protected static function booted(): void
+    {
+        static::saved(fn (self $withdrawal): mixed => AffiliateDashboardUpdated::dispatch((int) $withdrawal->user_id));
+    }
 
     protected function casts(): array
     {

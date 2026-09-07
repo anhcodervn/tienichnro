@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Features\Affiliate\Events\AffiliateDashboardUpdated;
 use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\AffiliateConversionFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -16,6 +17,11 @@ class AffiliateConversion extends Model
     protected $fillable = ['tenant_id', 'user_id', 'amount', 'idempotency_key', 'status'];
 
     protected $attributes = ['status' => 'completed'];
+
+    protected static function booted(): void
+    {
+        static::saved(fn (self $conversion): mixed => AffiliateDashboardUpdated::dispatch((int) $conversion->user_id));
+    }
 
     protected function casts(): array
     {

@@ -12,6 +12,10 @@ Broadcast::channel('users.{userId}.support', function (User $user, int $userId):
     return $user->id === $userId;
 });
 
+Broadcast::channel('users.{userId}.affiliate', function (User $user, int $userId): bool {
+    return $user->id === $userId;
+});
+
 Broadcast::channel('admin.sites.{tenantId}.support', function (User $user, int $tenantId): bool {
     return $user->role === 'admin'
         && (! app(TenantContext::class)->isActive() || $user->tenant_id === $tenantId);

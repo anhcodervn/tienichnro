@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Features\Affiliate\Events\AffiliateDashboardUpdated;
 use App\Models\Concerns\BelongsToTenant;
 use Database\Factories\AffiliateProfileFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -20,6 +21,11 @@ class AffiliateProfile extends Model
     protected $hidden = ['bank_account_name', 'bank_account_number'];
 
     protected $attributes = ['status' => 'active'];
+
+    protected static function booted(): void
+    {
+        static::saved(fn (self $profile): mixed => AffiliateDashboardUpdated::dispatch((int) $profile->user_id));
+    }
 
     protected function casts(): array
     {
