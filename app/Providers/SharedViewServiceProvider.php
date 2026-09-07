@@ -38,6 +38,8 @@ class SharedViewServiceProvider extends ServiceProvider
                 'game_service_enabled' => false,
                 'game_service_items' => [],
                 'game_service_url' => '',
+                'gtm_id' => '',
+                'meta_pixel_id' => '',
                 'custom_css' => '',
                 'custom_css_enabled' => false,
                 'custom_js' => '',
@@ -87,6 +89,10 @@ class SharedViewServiceProvider extends ServiceProvider
                 'css' => $storedSettings['custom_css_enabled'] === true && $storedSettings['custom_css'] !== '',
                 'js' => $storedSettings['custom_js_enabled'] === true && $storedSettings['custom_js'] !== '',
             ]);
+            $view->with('clientTracking', [
+                'gtm_id' => $this->normalizeGtmId($storedSettings['gtm_id']),
+                'meta_pixel_id' => $this->normalizeMetaPixelId($storedSettings['meta_pixel_id']),
+            ]);
             $view->with('affiliateEnabled', Schema::hasTable('affiliate_programs')
                 && AffiliateProgram::query()->where('is_enabled', true)->exists());
         });
@@ -122,5 +128,19 @@ class SharedViewServiceProvider extends ServiceProvider
             ])
             ->values()
             ->all();
+    }
+
+    private function normalizeGtmId(mixed $value): string
+    {
+        $gtmId = is_string($value) ? trim($value) : '';
+
+        return preg_match('/\AGTM-[A-Z0-9]+\z/', $gtmId) === 1 ? $gtmId : '';
+    }
+
+    private function normalizeMetaPixelId(mixed $value): string
+    {
+        $metaPixelId = is_string($value) ? trim($value) : '';
+
+        return preg_match('/\A[0-9]+\z/', $metaPixelId) === 1 ? $metaPixelId : '';
     }
 }

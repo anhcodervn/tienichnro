@@ -25,6 +25,9 @@
         $orderHistoryUrl = auth()->check() ? route('account.orders.index') : route('orders.lookup');
         $orderHistoryActive = request()->routeIs(['orders.*', 'account.orders.*']);
         $exploreActive = request()->routeIs(['client.affiliate.spa', 'seo.*', 'content.guide', 'content.contact']);
+        $loadsClientTracking = ! request()->routeIs(['auth.*', 'password.*', 'verification.*']);
+        $gtmId = $loadsClientTracking ? ($clientTracking['gtm_id'] ?? '') : '';
+        $metaPixelId = $loadsClientTracking ? ($clientTracking['meta_pixel_id'] ?? '') : '';
     @endphp
     <title>{{ $documentTitle }}</title>
     <meta name="description" content="{{ $description }}">
@@ -48,6 +51,38 @@
         <link rel="shortcut icon" href="{{ $favicon }}">
         <link rel="apple-touch-icon" href="{{ $favicon }}">
     @endif
+    @if ($gtmId !== '')
+        <script data-site-gtm>
+            (function(w, d, s, l, i) {
+                w[l] = w[l] || [];
+                w[l].push({ 'gtm.start': new Date().getTime(), event: 'gtm.js' });
+                var f = d.getElementsByTagName(s)[0], j = d.createElement(s), dl = l !== 'dataLayer' ? '&l=' + l : '';
+                j.async = true;
+                j.src = 'https://www.googletagmanager.com/gtm.js?id=' + i + dl;
+                f.parentNode.insertBefore(j, f);
+            })(window, document, 'script', 'dataLayer', {{ Illuminate\Support\Js::from($gtmId) }});
+        </script>
+    @endif
+    @if ($metaPixelId !== '')
+        <script data-site-meta-pixel>
+            !function(f, b, e, v, n, t, s) {
+                if (f.fbq) return;
+                n = f.fbq = function() { n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments); };
+                if (!f._fbq) f._fbq = n;
+                n.push = n;
+                n.loaded = true;
+                n.version = '2.0';
+                n.queue = [];
+                t = b.createElement(e);
+                t.async = true;
+                t.src = v;
+                s = b.getElementsByTagName(e)[0];
+                s.parentNode.insertBefore(t, s);
+            }(window, document, 'script', 'https://connect.facebook.net/en_US/fbevents.js');
+            fbq('init', {{ Illuminate\Support\Js::from($metaPixelId) }});
+            fbq('track', 'PageView');
+        </script>
+    @endif
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=be-vietnam-pro:400,500,600,700,800" rel="stylesheet">
     <x-boxicon />
@@ -58,6 +93,12 @@
     @stack('head')
 </head>
 <body data-authenticated="{{ auth()->check() ? 'true' : 'false' }}" data-order-lookup-url="{{ route('orders.lookup') }}" data-order-detail-url-template="{{ route('orders.details', ['order' => '__ORDER__']) }}">
+    @if ($gtmId !== '')
+        <noscript data-site-gtm-noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{ urlencode($gtmId) }}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    @endif
+    @if ($metaPixelId !== '')
+        <noscript data-site-meta-pixel-noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id={{ urlencode($metaPixelId) }}&amp;ev=PageView&amp;noscript=1" alt=""></noscript>
+    @endif
     <a href="#main-content" class="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[5px] focus:bg-slate-950 focus:px-4 focus:py-3 focus:text-white">Bỏ qua điều hướng</a>
     <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
         <div class="client-container flex min-h-[4.5rem] items-center justify-between gap-3 sm:min-h-20">
