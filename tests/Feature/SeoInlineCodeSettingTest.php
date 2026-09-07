@@ -22,7 +22,7 @@ test('admin can save inline SEO code that renders in client view source', functi
     $admin = User::factory()->create(['role' => 'admin']);
     $headTags = <<<'HTML'
 <meta name="google-adsense-account" content="ca-pub-4352299256001618">
-<meta property="og:locale" content="Tiáº¿ng Viá»‡t &amp; English">
+<meta property="og:locale" content="Tiếng Việt &amp; English">
 HTML;
     $script = <<<'HTML'
 <!-- Google tag (gtag.js) -->

@@ -1224,8 +1224,7 @@ onMounted(async () => {
                                         spellcheck="false"
                                     />
                                     <span class="text-xs leading-5 text-slate-500">
-                                        Tá»‘i Ä‘a 20 tháº» meta vá»›i thuá»™c tÃ­nh name hoáº·c property vÃ  content. KhÃ´ng cháº¥p nháº­n script,
-                                        link hay http-equiv.
+                                        Tối đa 20 thẻ meta với thuộc tính name hoặc property và content. Không chấp nhận script, link hay http-equiv.
                                     </span>
                                 </label>
                                 <label class="space-y-1">
@@ -1239,8 +1238,7 @@ onMounted(async () => {
                                         spellcheck="false"
                                     />
                                     <span class="text-xs leading-5 text-amber-700">
-                                        MÃ£ Ä‘Æ°á»£c chÃ¨n nguyÃªn váº¹n trÆ°á»›c tháº» &lt;/body&gt; trÃªn giao diá»‡n client vÃ  hiá»ƒn thá»‹ trong
-                                        View Source.
+                                        Mã được chèn nguyên vẹn trước thẻ &lt;/body&gt; trên giao diện client và hiển thị trong View Source.
                                     </span>
                                 </label>
                             </div>
