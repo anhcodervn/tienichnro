@@ -157,6 +157,8 @@ const seoForm = ref<SeoSettingType>({
     ads_txt: '',
     gtm_id: '',
     meta_pixel_id: '',
+    custom_head_tags: '',
+    custom_script: '',
 });
 
 const monitoringForm = ref<MonitoringSettingType>({
@@ -1210,6 +1212,36 @@ onMounted(async () => {
                                         type="text"
                                         class="w-full rounded-[10px] border border-slate-200 px-3 py-2 text-sm outline-none focus:border-indigo-400"
                                     />
+                                </label>
+                                <label class="space-y-1">
+                                    <span class="text-xs font-semibold text-slate-600">Custom header / meta tags</span>
+                                    <textarea
+                                        v-model="seoForm.custom_head_tags"
+                                        rows="5"
+                                        maxlength="20000"
+                                        class="w-full rounded-[10px] border border-slate-200 px-3 py-3 font-mono text-xs leading-6 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                        placeholder='<meta name="google-adsense-account" content="ca-pub-...">'
+                                        spellcheck="false"
+                                    />
+                                    <span class="text-xs leading-5 text-slate-500">
+                                        Tá»‘i Ä‘a 20 tháº» meta vá»›i thuá»™c tÃ­nh name hoáº·c property vÃ  content. KhÃ´ng cháº¥p nháº­n script,
+                                        link hay http-equiv.
+                                    </span>
+                                </label>
+                                <label class="space-y-1">
+                                    <span class="text-xs font-semibold text-slate-600">Custom script</span>
+                                    <textarea
+                                        v-model="seoForm.custom_script"
+                                        rows="8"
+                                        maxlength="100000"
+                                        class="w-full rounded-[10px] border border-slate-200 bg-slate-950 px-3 py-3 font-mono text-xs leading-6 text-slate-100 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100"
+                                        placeholder="<script>...</script>"
+                                        spellcheck="false"
+                                    />
+                                    <span class="text-xs leading-5 text-amber-700">
+                                        MÃ£ Ä‘Æ°á»£c chÃ¨n nguyÃªn váº¹n trÆ°á»›c tháº» &lt;/body&gt; trÃªn giao diá»‡n client vÃ  hiá»ƒn thá»‹ trong
+                                        View Source.
+                                    </span>
                                 </label>
                             </div>
                         </article>

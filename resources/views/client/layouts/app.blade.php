@@ -28,6 +28,8 @@
         $loadsClientTracking = ! request()->routeIs(['auth.*', 'password.*', 'verification.*']);
         $gtmId = $loadsClientTracking ? ($clientTracking['gtm_id'] ?? '') : '';
         $metaPixelId = $loadsClientTracking ? ($clientTracking['meta_pixel_id'] ?? '') : '';
+        $customHeadTags = $loadsClientTracking ? ($inlineSeoCode['head'] ?? '') : '';
+        $customScript = $loadsClientTracking ? ($inlineSeoCode['script'] ?? '') : '';
     @endphp
     <title>{{ $documentTitle }}</title>
     <meta name="description" content="{{ $description }}">
@@ -82,6 +84,11 @@
             fbq('init', {{ Illuminate\Support\Js::from($metaPixelId) }});
             fbq('track', 'PageView');
         </script>
+    @endif
+    @if ($customHeadTags !== '')
+        <!-- custom-head-tags -->
+        {!! $customHeadTags !!}
+        <!-- /custom-head-tags -->
     @endif
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=be-vietnam-pro:400,500,600,700,800" rel="stylesheet">
@@ -355,6 +362,11 @@
     @vite('resources/js/client.js')
     @if (($customCodeAssets['js'] ?? false) && ! request()->routeIs(['auth.*', 'password.*', 'verification.*']))
         <script src="{{ route('site_custom.js') }}" data-site-custom-js></script>
+    @endif
+    @if ($customScript !== '')
+        <!-- custom-script -->
+        {!! $customScript !!}
+        <!-- /custom-script -->
     @endif
 </body>
 </html>

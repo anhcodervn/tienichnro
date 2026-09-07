@@ -34,7 +34,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('api', EnsureTenantSession::class);
         $middleware->statefulApi();
         $middleware->trustProxies(at: '*');
-        $middleware->trimStrings(except: ['content.*', '*_content.*', 'custom_css', 'custom_js']);
+        $middleware->trimStrings(except: ['content.*', '*_content.*', 'custom_css', 'custom_js', 'custom_head_tags', 'custom_script']);
         $middleware->convertEmptyStringsToNull(except: [
             fn (Request $request): bool => $request->is('api/admin-api/settings/custom-code'),
         ]);

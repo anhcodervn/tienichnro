@@ -83,6 +83,8 @@ class SettingController extends Controller
                 'ads_txt' => '',
                 'gtm_id' => '',
                 'meta_pixel_id' => '',
+                'custom_head_tags' => '',
+                'custom_script' => '',
             ],
             'custom-code' => [
                 'custom_css' => '',
@@ -255,6 +257,8 @@ class SettingController extends Controller
                 'ads_txt' => 'ads_txt',
                 'gtm_id' => 'gtm_id',
                 'meta_pixel_id' => 'meta_pixel_id',
+                'custom_head_tags' => 'custom_head_tags',
+                'custom_script' => 'custom_script',
             ],
             'custom-code' => [
                 'custom_css' => 'custom_css',

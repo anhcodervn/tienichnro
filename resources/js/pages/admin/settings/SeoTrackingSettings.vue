@@ -72,6 +72,28 @@
                             placeholder="1234567890"
                         />
                     </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-700">Custom header / meta tags</label>
+                        <textarea
+                            v-model="formData.custom_head_tags"
+                            rows="5"
+                            maxlength="20000"
+                            class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs outline-none focus:border-slate-900"
+                            placeholder='<meta name="google-adsense-account" content="ca-pub-...">'
+                        />
+                    </div>
+
+                    <div class="space-y-2">
+                        <label class="text-sm font-medium text-slate-700">Custom script</label>
+                        <textarea
+                            v-model="formData.custom_script"
+                            rows="8"
+                            maxlength="100000"
+                            class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs outline-none focus:border-slate-900"
+                            placeholder="<script>...</script>"
+                        />
+                    </div>
                 </div>
             </div>
         </section>
@@ -109,6 +131,8 @@ const formData = ref<SeoSettingType>({
     robots: 'index,follow',
     gtm_id: '',
     meta_pixel_id: '',
+    custom_head_tags: '',
+    custom_script: '',
 });
 
 const loadData = async (): Promise<void> => {

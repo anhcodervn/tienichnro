@@ -29,6 +29,8 @@ export interface SystemSettingType {
     ads_txt?: string;
     gtm_id: string;
     meta_pixel_id: string;
+    custom_head_tags: string;
+    custom_script: string;
     [key: string]: unknown;
 }
 
@@ -161,6 +163,8 @@ export interface SeoSettingType {
     ads_txt: string;
     gtm_id?: string;
     meta_pixel_id?: string;
+    custom_head_tags?: string;
+    custom_script?: string;
     meta_keywords?: string;
     og_image?: string;
     [key: string]: unknown;

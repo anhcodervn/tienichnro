@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Models\AffiliateProgram;
 use App\Models\User;
+use App\Support\CustomHeadTags;
 use App\Support\SafeNavigationUrl;
 use App\Support\SettingStore;
 use Illuminate\Support\Arr;
@@ -18,9 +19,9 @@ class SharedViewServiceProvider extends ServiceProvider
     /**
      * Bootstrap services.
      */
-    public function boot(SettingStore $settingStore): void
+    public function boot(SettingStore $settingStore, CustomHeadTags $customHeadTags): void
     {
-        ViewFacade::composer('client.layouts.app', function (View $view) use ($settingStore): void {
+        ViewFacade::composer('client.layouts.app', function (View $view) use ($customHeadTags, $settingStore): void {
             $storedSettings = $settingStore->getMany([
                 'site_name' => config('app.name', 'Nạp Carot'),
                 'site_domain' => '',
@@ -40,6 +41,8 @@ class SharedViewServiceProvider extends ServiceProvider
                 'game_service_url' => '',
                 'gtm_id' => '',
                 'meta_pixel_id' => '',
+                'custom_head_tags' => '',
+                'custom_script' => '',
                 'custom_css' => '',
                 'custom_css_enabled' => false,
                 'custom_js' => '',
@@ -50,6 +53,8 @@ class SharedViewServiceProvider extends ServiceProvider
                 'custom_css_enabled',
                 'custom_js',
                 'custom_js_enabled',
+                'custom_head_tags',
+                'custom_script',
             ]);
             $gameServiceItems = $this->normalizeGameServiceItems($storedSettings['game_service_items']);
 
@@ -92,6 +97,10 @@ class SharedViewServiceProvider extends ServiceProvider
             $view->with('clientTracking', [
                 'gtm_id' => $this->normalizeGtmId($storedSettings['gtm_id']),
                 'meta_pixel_id' => $this->normalizeMetaPixelId($storedSettings['meta_pixel_id']),
+            ]);
+            $view->with('inlineSeoCode', [
+                'head' => $customHeadTags->sanitize($storedSettings['custom_head_tags']),
+                'script' => is_string($storedSettings['custom_script']) ? $storedSettings['custom_script'] : '',
             ]);
             $view->with('affiliateEnabled', Schema::hasTable('affiliate_programs')
                 && AffiliateProgram::query()->where('is_enabled', true)->exists());

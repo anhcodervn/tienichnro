@@ -3,6 +3,7 @@
 namespace App\Features\Admin\Setting\Requests;
 
 use App\Rules\ValidAdsTxt;
+use App\Rules\ValidCustomHeadTags;
 use App\Rules\ValidRobotsTxt;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -47,6 +48,8 @@ class UpdateSystemSettingRequest extends FormRequest
             'ads_txt' => ['nullable', 'string', 'max:100000', new ValidAdsTxt],
             'gtm_id' => ['nullable', 'string', 'max:100', 'regex:/\AGTM-[A-Z0-9]+\z/'],
             'meta_pixel_id' => ['nullable', 'string', 'max:100', 'regex:/\A[0-9]+\z/'],
+            'custom_head_tags' => ['nullable', 'string', 'max:20000', new ValidCustomHeadTags],
+            'custom_script' => ['nullable', 'string', 'max:100000'],
         ];
     }
 
