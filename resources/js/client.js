@@ -1038,19 +1038,67 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         }
     };
 
+    const compileRecipientRegex = (source) => {
+        if (!source) return null;
+
+        try {
+            return new RegExp(source, 'u');
+        } catch {
+            return false;
+        }
+    };
+
+    const validateRecipientInput = (input) => {
+        const errorElement = input.closest('[data-field-key]')?.querySelector('[data-recipient-format-error]');
+        const regex = compileRecipientRegex(input.dataset.validationRegex || '');
+        const label = input.dataset.validationLabel || 'Trường dữ liệu';
+        const value = input.value.trim();
+        let message = '';
+
+        if (!input.disabled && value !== '' && regex === false) {
+            message = `${label} có cấu hình regex không hợp lệ.`;
+        } else if (!input.disabled && value !== '' && regex && !regex.test(value)) {
+            message = `${label} không đúng định dạng.`;
+        }
+
+        input.setCustomValidity(message);
+        input.setAttribute('aria-invalid', String(message !== ''));
+        if (errorElement) {
+            errorElement.textContent = message;
+            errorElement.hidden = message === '';
+        }
+
+        return message === '';
+    };
+
+    const activeBulkFields = () => {
+        const activeSchema = bulkSchemas.find((schema) => !schema.hidden);
+
+        try {
+            const fields = JSON.parse(activeSchema?.dataset.bulkFields || '[]');
+
+            return Array.isArray(fields) ? fields : [];
+        } catch {
+            return [];
+        }
+    };
+
     const countBulkRecipients = () => {
         const lines = (bulkRecipients?.value || '').split(/\r\n|\r|\n/).filter((line) => line.trim() !== '');
-        const activeSchema = bulkSchemas.find((schema) => !schema.hidden);
-        const maximumColumnCount = (activeSchema?.dataset.bulkPlaceholder || '').split('|').filter(Boolean).length;
+        const fields = activeBulkFields();
+        const maximumColumnCount = fields.length + 1;
         let quantity = 0;
         let validAccountCount = 0;
         let firstInvalidLine = 0;
         let firstInvalidAccount = '';
+        let formatMessage = '';
         const option = topupPackage?.selectedOptions[0];
         const minimumQuantity = Number(option?.dataset.min || 1);
         const maximumQuantity = Number(option?.dataset.max || 10);
 
         lines.forEach((line, index) => {
+            if (firstInvalidLine > 0) return;
+
             const values = line.split('|');
             const account = values[0]?.trim() || '';
             const quantityValue = values[values.length - 1]?.trim() || '';
@@ -1061,13 +1109,52 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
                 /^[1-9]\d*$/.test(quantityValue) &&
                 parsedQuantity >= minimumQuantity &&
                 parsedQuantity <= maximumQuantity &&
-                (maximumColumnCount === 0 || values.length <= maximumColumnCount);
+                values.length <= maximumColumnCount;
 
             if (!hasValidFormat) {
                 if (firstInvalidLine === 0) {
                     firstInvalidLine = index + 1;
                     firstInvalidAccount = account || `ở dòng ${index + 1}`;
+                    formatMessage = `Tài khoản ${firstInvalidAccount} định dạng không hợp lệ. Vui lòng nhập đúng định dạng param|số lượng.`;
                 }
+
+                return;
+            }
+
+            const recipientValues = values.slice(0, -1);
+            const fieldError = fields.find((field, fieldIndex) => {
+                const value = recipientValues[fieldIndex]?.trim() || '';
+                const regex = compileRecipientRegex(field.regex || '');
+
+                if (field.required && value === '') {
+                    formatMessage = `Dòng ${index + 1}, cột ${fieldIndex + 1} (${field.label}): không được để trống.`;
+
+                    return true;
+                }
+
+                if (value.length > 191) {
+                    formatMessage = `Dòng ${index + 1}, cột ${fieldIndex + 1} (${field.label}): không được vượt quá 191 ký tự.`;
+
+                    return true;
+                }
+
+                if (value !== '' && regex === false) {
+                    formatMessage = `Dòng ${index + 1}, cột ${fieldIndex + 1} (${field.label}): cấu hình regex không hợp lệ.`;
+
+                    return true;
+                }
+
+                if (value !== '' && regex && !regex.test(value)) {
+                    formatMessage = `Dòng ${index + 1}, cột ${fieldIndex + 1} (${field.label}): không đúng định dạng.`;
+
+                    return true;
+                }
+
+                return false;
+            });
+
+            if (fieldError) {
+                if (firstInvalidLine === 0) firstInvalidLine = index + 1;
 
                 return;
             }
@@ -1077,9 +1164,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         });
 
         const hasInvalidRows = firstInvalidLine > 0;
-        const formatMessage = hasInvalidRows
-            ? `Tài khoản ${firstInvalidAccount} định dạng không hợp lệ. Vui lòng nhập đúng định dạng param|số lượng.`
-            : '';
+        if (!hasInvalidRows) formatMessage = '';
 
         if (bulkAccountCount) bulkAccountCount.textContent = String(validAccountCount);
         if (bulkCount) bulkCount.textContent = hasInvalidRows ? '—' : String(quantity);
@@ -1313,6 +1398,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
             group.querySelectorAll('[data-recipient-input]').forEach((input) => {
                 input.disabled = !active;
                 input.required = active && input.dataset.required === 'true';
+                validateRecipientInput(input);
             });
         });
 
@@ -1425,11 +1511,21 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
 
     recipientInputs.forEach((input) => {
         lowercaseRecipientInput(input);
+        validateRecipientInput(input);
         input.addEventListener('input', (event) => {
-            if (!event.isComposing) lowercaseRecipientInput(input);
+            if (event.isComposing) return;
+
+            lowercaseRecipientInput(input);
+            validateRecipientInput(input);
         });
-        input.addEventListener('compositionend', () => lowercaseRecipientInput(input));
-        input.addEventListener('blur', () => lowercaseRecipientInput(input));
+        input.addEventListener('compositionend', () => {
+            lowercaseRecipientInput(input);
+            validateRecipientInput(input);
+        });
+        input.addEventListener('blur', () => {
+            lowercaseRecipientInput(input);
+            validateRecipientInput(input);
+        });
     });
     if (bulkRecipients) lowercaseRecipientInput(bulkRecipients);
     bulkRecipients?.addEventListener('input', (event) => {
@@ -1531,6 +1627,8 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
     form.addEventListener('submit', (event) => {
         recipientInputs.forEach(lowercaseRecipientInput);
         if (bulkRecipients) lowercaseRecipientInput(bulkRecipients);
+        recipientInputs.forEach(validateRecipientInput);
+        if (purchaseMode?.value === 'bulk') countBulkRecipients();
 
         if (!form.checkValidity()) return;
 

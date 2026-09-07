@@ -2,6 +2,7 @@
 
 namespace App\Features\Admin\Topup\Requests;
 
+use App\Features\Topup\Support\RecipientFieldPattern;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -20,7 +21,7 @@ class StoreGameRequest extends FormRequest
         return $this->user()?->role === 'admin';
     }
 
-    public function rules(): array
+    public function rules(RecipientFieldPattern $recipientFieldPattern): array
     {
         return [
             'name' => ['required', 'string', 'max:255'],
@@ -36,7 +37,7 @@ class StoreGameRequest extends FormRequest
             'seo_title' => ['nullable', 'string', 'max:255'],
             'seo_description' => ['nullable', 'string'], 'metadata' => ['nullable', 'array'],
             'checkout_fields' => ['required', 'array', 'min:1', 'max:6'],
-            'checkout_fields.*' => ['required', 'array:key,label,placeholder,required'],
+            'checkout_fields.*' => ['required', 'array:key,label,placeholder,required,regex'],
             'checkout_fields.*.key' => [
                 'required', 'string', 'max:40', 'regex:/^[a-z][a-z0-9_]*$/', 'distinct',
                 Rule::notIn([
@@ -47,6 +48,16 @@ class StoreGameRequest extends FormRequest
             'checkout_fields.*.label' => ['required', 'string', 'max:80'],
             'checkout_fields.*.placeholder' => ['nullable', 'string', 'max:120'],
             'checkout_fields.*.required' => ['required', 'boolean'],
+            'checkout_fields.*.regex' => [
+                'nullable',
+                'string',
+                'max:500',
+                function (string $attribute, mixed $value, \Closure $fail) use ($recipientFieldPattern): void {
+                    if (is_string($value) && $value !== '' && ! $recipientFieldPattern->isValid($value)) {
+                        $fail('Regex không hợp lệ. Hãy nhập nội dung pattern và không kèm dấu /.');
+                    }
+                },
+            ],
         ];
     }
 

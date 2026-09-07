@@ -2,6 +2,7 @@
 
 namespace App\Features\Topup\Services;
 
+use App\Features\Topup\Support\RecipientFieldPattern;
 use App\Models\Game;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -12,11 +13,13 @@ class OrderRecipientService
 
     public const MAX_QUANTITY_PER_RECIPIENT = 10;
 
+    public function __construct(private readonly RecipientFieldPattern $recipientFieldPattern) {}
+
     /**
      * @param  array<string, mixed>  $payload
      * @return array{
      *     mode: 'single'|'bulk', quantity: int, quantity_field: string,
-     *     fields: array<int, array{key:string,label:string,placeholder:string,required:bool}>,
+     *     fields: array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string}>,
      *     recipients: array<int, array{data:array<string, string>,quantity:int}>,
      *     game_account: string, game_character: string|null
      * }
@@ -63,7 +66,7 @@ class OrderRecipientService
     }
 
     /**
-     * @param  array<int, array{key:string,label:string,placeholder:string,required:bool}>  $fields
+     * @param  array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string}>  $fields
      * @return array<int, array{data:array<string, string>,quantity:int}>
      */
     private function parseApiRecipients(mixed $input, array $fields): array
@@ -108,7 +111,7 @@ class OrderRecipientService
     }
 
     /**
-     * @param  array<int, array{key:string,label:string,placeholder:string,required:bool}>  $fields
+     * @param  array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string}>  $fields
      * @return array<int, array{data:array<string, string>,quantity:int}>
      */
     private function parseBulkRecipients(string $input, array $fields): array
@@ -186,7 +189,7 @@ class OrderRecipientService
     }
 
     /**
-     * @param  array<int, array{key:string,label:string,placeholder:string,required:bool}>  $fields
+     * @param  array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string}>  $fields
      * @return array<string, string>
      */
     private function normalizeRecipient(mixed $input, array $fields, string $errorKey, ?int $lineNumber = null): array
@@ -201,7 +204,7 @@ class OrderRecipientService
         }
 
         $recipient = [];
-        foreach ($fields as $field) {
+        foreach ($fields as $fieldIndex => $field) {
             $value = Str::lower(trim((string) ($input[$field['key']] ?? '')));
             $location = $lineNumber === null ? '' : ' ở dòng '.$lineNumber;
 
@@ -220,6 +223,18 @@ class OrderRecipientService
             if (preg_match('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', $value) === 1) {
                 throw ValidationException::withMessages([
                     $errorKey => "{$field['label']}{$location} chứa ký tự điều khiển không hợp lệ.",
+                ]);
+            }
+
+            $regex = (string) ($field['regex'] ?? '');
+            if ($value !== '' && $regex !== '' && ! $this->recipientFieldPattern->matches($regex, $value)) {
+                $validationErrorKey = $errorKey === 'bulk_recipients'
+                    ? $errorKey
+                    : $errorKey.'.'.$field['key'];
+                $column = $lineNumber === null ? '' : ', cột '.($fieldIndex + 1);
+
+                throw ValidationException::withMessages([
+                    $validationErrorKey => "{$field['label']}{$location}{$column} không đúng định dạng.",
                 ]);
             }
 

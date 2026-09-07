@@ -640,6 +640,51 @@ test('single checkout validates and stores the selected games custom schema', fu
         ]);
 });
 
+test('single checkout validates recipient fields with the game regex', function (): void {
+    [$game, $server, $package] = topupCatalog();
+    $game->update(['checkout_fields' => [
+        ['key' => 'player_id', 'label' => 'ID người chơi', 'placeholder' => '', 'required' => true, 'regex' => '^[0-9]{6}$'],
+        ['key' => 'zone', 'label' => 'Khu vực', 'placeholder' => '', 'required' => true, 'regex' => '^(asia|europe)$'],
+    ]]);
+
+    $this->from(route('topup.game', $game))
+        ->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+            'recipient_fields' => ['player_id' => 'abc123', 'zone' => 'Asia'],
+        ]))
+        ->assertRedirect(route('topup.game', $game))
+        ->assertSessionHasErrors([
+            'recipient_fields.player_id' => 'ID người chơi không đúng định dạng.',
+        ]);
+
+    expect(Order::query()->count())->toBe(0);
+
+    $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+        'recipient_fields' => ['player_id' => '123456', 'zone' => 'ASIA'],
+    ]))->assertRedirect();
+
+    expect(Order::query()->sole()->checkout_fields_snapshot[0]['regex'])->toBe('^[0-9]{6}$');
+});
+
+test('bulk checkout validates each regex by configured field order', function (): void {
+    [$game, $server, $package] = topupCatalog();
+    $game->update(['checkout_fields' => [
+        ['key' => 'player_id', 'label' => 'ID người chơi', 'placeholder' => '', 'required' => true, 'regex' => '^[0-9]{6}$'],
+        ['key' => 'zone', 'label' => 'Khu vực', 'placeholder' => '', 'required' => true, 'regex' => '^(asia|europe)$'],
+    ]]);
+
+    $this->from(route('topup.game', $game))
+        ->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+            'purchase_mode' => 'bulk',
+            'bulk_recipients' => "123456|asia|1\n654321|invalid-zone|2",
+        ]))
+        ->assertRedirect(route('topup.game', $game))
+        ->assertSessionHasErrors([
+            'bulk_recipients' => 'Khu vực ở dòng 2, cột 2 không đúng định dạng.',
+        ]);
+
+    expect(Order::query()->count())->toBe(0);
+});
+
 test('order transitions keep recipient processing statuses in sync', function (): void {
     $order = Order::factory()->create();
     $recipient = OrderRecipient::factory()->for($order)->create();

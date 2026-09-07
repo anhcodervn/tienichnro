@@ -13,11 +13,11 @@ type OptionRow = {
 };
 type CatalogRow = Record<string, any> & { id: number; name: string; status: 'active' | 'inactive' };
 type PaginationMeta = { current_page: number; last_page: number; per_page: number; total: number; from: number | null; to: number | null };
-type CheckoutField = { key: string; label: string; placeholder: string; required: boolean };
+type CheckoutField = { key: string; label: string; placeholder: string; required: boolean; regex: string };
 
 const defaultCheckoutFields = (): CheckoutField[] => [
-    { key: 'game_account', label: 'Tài khoản game', placeholder: 'Tài khoản đăng nhập game', required: true },
-    { key: 'game_character', label: 'Tên nhân vật', placeholder: 'Không bắt buộc', required: false },
+    { key: 'game_account', label: 'Tài khoản game', placeholder: 'Tài khoản đăng nhập game', required: true, regex: '' },
+    { key: 'game_character', label: 'Tên nhân vật', placeholder: 'Không bắt buộc', required: false, regex: '' },
 ];
 
 const props = defineProps<{ catalogType: CatalogType }>();
@@ -244,7 +244,7 @@ const edit = (row: CatalogRow): void => {
     });
     if (props.catalogType === 'games') {
         form.checkout_fields = (row.checkout_fields?.length ? row.checkout_fields : defaultCheckoutFields()).map(
-            (field: CheckoutField): CheckoutField => ({ ...field }),
+            (field: CheckoutField): CheckoutField => ({ ...field, regex: field.regex || '' }),
         );
     }
 };
@@ -254,7 +254,7 @@ const addCheckoutField = (): void => {
         return;
     }
 
-    form.checkout_fields.push({ key: '', label: '', placeholder: '', required: false });
+    form.checkout_fields.push({ key: '', label: '', placeholder: '', required: false, regex: '' });
 };
 
 const removeCheckoutField = (index: number): void => {
@@ -287,6 +287,7 @@ const payload = (): Record<string, unknown> => {
                 label: field.label.trim(),
                 placeholder: field.placeholder?.trim() || null,
                 required: Boolean(field.required),
+                regex: field.regex?.trim() || null,
             })),
         };
     }
@@ -694,6 +695,18 @@ watch(() => props.catalogType, load, { immediate: true });
                                             maxlength="120"
                                             class="mt-1 min-h-10 w-full rounded-md border border-slate-300 px-3 font-normal"
                                         />
+                                    </label>
+                                    <label class="mt-3 block text-xs font-semibold text-slate-600">
+                                        Regex kiểm tra định dạng
+                                        <input
+                                            v-model.trim="field.regex"
+                                            maxlength="500"
+                                            placeholder="Ví dụ: ^[a-z0-9_]{4,20}$"
+                                            class="mt-1 min-h-10 w-full rounded-md border border-slate-300 px-3 font-mono font-normal"
+                                        />
+                                        <span class="mt-1 block font-normal leading-5 text-slate-500">
+                                            Chỉ nhập nội dung pattern, không kèm dấu /. Để trống nếu không cần kiểm tra.
+                                        </span>
                                     </label>
                                     <div class="mt-3 flex items-center justify-between gap-3">
                                         <label class="flex items-center gap-2 text-xs font-semibold text-slate-700">

@@ -11,10 +11,10 @@ class Game extends Model
 {
     use HasFactory;
 
-    /** @var array<int, array{key:string,label:string,placeholder:string,required:bool}> */
+    /** @var array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string}> */
     public const DEFAULT_CHECKOUT_FIELDS = [
-        ['key' => 'game_account', 'label' => 'Tài khoản game', 'placeholder' => 'Tài khoản đăng nhập game', 'required' => true],
-        ['key' => 'game_character', 'label' => 'Tên nhân vật', 'placeholder' => 'Không bắt buộc', 'required' => false],
+        ['key' => 'game_account', 'label' => 'Tài khoản game', 'placeholder' => 'Tài khoản đăng nhập game', 'required' => true, 'regex' => ''],
+        ['key' => 'game_character', 'label' => 'Tên nhân vật', 'placeholder' => 'Không bắt buộc', 'required' => false, 'regex' => ''],
     ];
 
     protected $fillable = [
@@ -29,7 +29,7 @@ class Game extends Model
         return ['metadata' => 'array', 'checkout_fields' => 'array', 'sort_order' => 'integer'];
     }
 
-    /** @return array<int, array{key:string,label:string,placeholder:string,required:bool}> */
+    /** @return array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string}> */
     public function checkoutFields(): array
     {
         $fields = is_array($this->checkout_fields) && $this->checkout_fields !== []
@@ -43,6 +43,7 @@ class Game extends Model
                 'label' => (string) $field['label'],
                 'placeholder' => (string) ($field['placeholder'] ?? ''),
                 'required' => (bool) ($field['required'] ?? false),
+                'regex' => (string) ($field['regex'] ?? ''),
             ])
             ->values()
             ->all();

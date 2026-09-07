@@ -216,10 +216,13 @@
                                     spellcheck="false"
                                     data-recipient-input
                                     data-required="{{ $field['required'] ? 'true' : 'false' }}"
+                                    data-validation-regex="{{ $field['regex'] }}"
+                                    data-validation-label="{{ $field['label'] }}"
                                     @disabled((string) $initialGame !== (string) $game->id || $initialPurchaseMode !== 'single')
                                     @if ($field['required'] && (string) $initialGame === (string) $game->id && $initialPurchaseMode === 'single') required @endif
                                 >
                                 @if ($loop->first)<p class="home-field-help">Nhập đúng thông tin để hệ thống xử lý tự động.</p>@endif
+                                <p class="home-field-error" data-recipient-format-error role="alert" aria-live="polite" hidden></p>
                                 @error('recipient_fields.'.$field['key'])<p class="home-field-error">{{ $message }}</p>@enderror
                             </div>
                         @endforeach
@@ -263,7 +266,7 @@
                             ->push('Số lượng thẻ')
                             ->implode('|');
                     @endphp
-                    <p class="home-bulk-schema" data-bulk-schema="{{ $game->id }}" data-bulk-placeholder="{{ $fieldPlaceholders }}" data-bulk-confirm-recipient-label="{{ $fieldLabels }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
+                    <p class="home-bulk-schema" data-bulk-schema="{{ $game->id }}" data-bulk-placeholder="{{ $fieldPlaceholders }}" data-bulk-confirm-recipient-label="{{ $fieldLabels }}" data-bulk-fields="{{ $checkoutFields->map(fn ($field) => ['label' => $field['label'], 'required' => $field['required'], 'regex' => $field['regex']])->values()->toJson() }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
                         Mỗi dòng theo thứ tự: <strong>{{ $fieldLabels }}</strong>
                     </p>
                 @endforeach

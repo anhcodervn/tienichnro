@@ -393,7 +393,7 @@ test('admin can create update and delete an empty game with audit logs', functio
         'reward_label' => 'Xu',
         'provider_service_code' => 'nso',
         'checkout_fields' => [
-            ['key' => 'account_id', 'label' => 'ID tài khoản', 'placeholder' => 'Nhập ID', 'required' => true],
+            ['key' => 'account_id', 'label' => 'ID tài khoản', 'placeholder' => 'Nhập ID', 'required' => true, 'regex' => '^[0-9]{6,12}$'],
             ['key' => 'character_name', 'label' => 'Tên nhân vật', 'placeholder' => null, 'required' => false],
         ],
         'status' => 'active',
@@ -406,7 +406,8 @@ test('admin can create update and delete an empty game with audit logs', functio
     expect($game->reward_label)->toBe('Xu')
         ->and($game->provider_service_code)->toBe('nso')
         ->and($game->checkout_fields)->toHaveCount(2)
-        ->and($game->checkout_fields[0]['key'])->toBe('account_id');
+        ->and($game->checkout_fields[0]['key'])->toBe('account_id')
+        ->and($game->checkout_fields[0]['regex'])->toBe('^[0-9]{6,12}$');
 
     $this->actingAs($admin)->patchJson("/api/admin-api/games/{$game->id}", [
         'name' => 'Ninja School',
@@ -456,6 +457,13 @@ test('game checkout field schema rejects unsafe and ambiguous definitions', func
             ['key' => 'amount', 'label' => 'Ghi đè số lượng API', 'placeholder' => '', 'required' => true],
         ],
     ])->assertUnprocessable()->assertJsonValidationErrors('checkout_fields.0.key');
+
+    $this->actingAs($admin)->postJson('/api/admin-api/games', [
+        ...$basePayload,
+        'checkout_fields' => [
+            ['key' => 'account', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true, 'regex' => '[a-z'],
+        ],
+    ])->assertUnprocessable()->assertJsonValidationErrors('checkout_fields.0.regex');
 });
 
 test('admin stores provider field names directly in the game checkout schema', function (): void {
