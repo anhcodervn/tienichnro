@@ -84,6 +84,7 @@ test('guest home renders the purchase layout reward table and seo content withou
         ->assertSee('data-topup-confirmation-modal', false)
         ->assertSee('data-topup-confirmation-checkbox', false)
         ->assertSee('data-confirm-recipients', false)
+        ->assertDontSee('data-affiliate-referrer', false)
         ->assertSee('Xác nhận thông tin nạp')
         ->assertSee('Tôi đã kiểm tra kỹ thông tin')
         ->assertSee('data-purchase-tab="single"', false)

@@ -2,6 +2,7 @@
 
 namespace App\Features\Client\Topup\Controllers;
 
+use App\Features\Affiliate\Services\AffiliateReferralService;
 use App\Features\Client\Topup\Services\TurnstileService;
 use App\Features\Topup\Services\GameRewardService;
 use App\Features\Topup\Services\TopupPackagePricingService;
@@ -17,6 +18,7 @@ class HomeController extends Controller
 {
     public function __invoke(
         Request $request,
+        AffiliateReferralService $affiliateReferralService,
         SettingStore $settingStore,
         EditorContentRenderer $contentRenderer,
         TurnstileService $turnstileService,
@@ -51,6 +53,7 @@ class HomeController extends Controller
 
         /** @var User|null $user */
         $user = $request->user();
+        $affiliateReferrerUsername = $affiliateReferralService->referrer($request)?->username;
         $walletBalance = (int) ($user?->wallet()->value('balance') ?? 0);
         $gameRewardService->applyToPackages(
             $games->flatMap(fn (Game $game) => $game->packages),
@@ -84,6 +87,7 @@ class HomeController extends Controller
         return view('client.home.index', [
             'games' => $games,
             'walletBalance' => $walletBalance,
+            'affiliateReferrerUsername' => $affiliateReferrerUsername,
             'systemSettings' => $systemSettings,
             'homeNoticeTitle' => (string) $systemSettings['home_notice_title'],
             'homeNoticeHtml' => $contentRenderer->renderNodes($homeNoticeContent),

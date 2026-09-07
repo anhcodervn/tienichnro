@@ -4,6 +4,7 @@
     $turnstileEnabled = (bool) ($turnstileEnabled ?? false);
     $turnstileSiteKey = (string) ($turnstileSiteKey ?? '');
     $showConfirmation = (bool) ($showConfirmation ?? false);
+    $affiliateReferrerUsername = (string) ($affiliateReferrerUsername ?? '');
     $requestedGame = old('game_id', $selectedGame?->id ?? $games->first()?->id);
     $initialGame = $games->contains(fn ($game) => (string) $game->id === (string) $requestedGame)
         ? $requestedGame
@@ -387,7 +388,12 @@
 
                 <div class="flex items-start gap-3 rounded-[5px] border border-amber-300 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
                     <i class="bx bx-error-circle mt-0.5 shrink-0 text-xl text-amber-700" aria-hidden="true"></i>
-                    <p><strong>Chú ý:</strong> Hãy kiểm tra lại game và tài khoản nạp. Tùy theo game, thông tin này sẽ là tài khoản đăng nhập game hoặc tên nhân vật game. Hãy nhập đúng theo game bạn đang cần nạp.</p>
+                    <div class="grid gap-2">
+                        <p><strong>Chú ý:</strong> Hãy kiểm tra lại game và tài khoản nạp. Tùy theo game, thông tin này sẽ là tài khoản đăng nhập game hoặc tên nhân vật game. Hãy nhập đúng theo game bạn đang cần nạp.</p>
+                        @if ($affiliateReferrerUsername !== '')
+                            <p data-affiliate-referrer><strong>Người giới thiệu:</strong> <span class="font-extrabold text-cyan-800">{{ '@'.$affiliateReferrerUsername }}</span></p>
+                        @endif
+                    </div>
                 </div>
 
                 <label class="flex cursor-pointer items-start gap-3 rounded-[5px] border border-slate-300 bg-white p-4 text-sm font-bold text-slate-900 transition hover:border-cyan-500">

@@ -97,11 +97,17 @@ test('guest checkout snapshots attribution and creates a commission without a us
     enableGuestAffiliate($main, $package, 3000);
     $referrer = User::factory()->create([
         'tenant_id' => $main->id,
+        'username' => 'partner<script>',
         'email' => 'partner@example.test',
         'referral_code' => 'GUESTREF01',
     ]);
 
-    $this->get('http://napcarot.com/?ref=GUESTREF01')->assertSuccessful();
+    $this->get('http://napcarot.com/?ref=GUESTREF01')
+        ->assertSuccessful()
+        ->assertSee('data-affiliate-referrer', false)
+        ->assertSee('Người giới thiệu:')
+        ->assertSee('@partner&lt;script&gt;', false)
+        ->assertDontSee('@partner<script>', false);
     $this->post(route('checkout.store'), guestAffiliateCheckoutPayload($game, $server, $package))->assertRedirect();
 
     $order = Order::query()->sole();
