@@ -30,14 +30,6 @@
 @endif
 
 <section class="client-container py-5 sm:py-7">
-    <header class="mb-5 rounded-[10px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 px-5 py-6 shadow-sm sm:px-7 sm:py-8">
-        <p class="text-sm font-extrabold uppercase tracking-[0.14em] text-emerald-700">NapCarot · Nạp game Teamobi</p>
-        <h1 class="mt-2 max-w-4xl text-3xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-4xl">Nạp Carot Game Teamobi Nhanh Chóng, Giá Tốt</h1>
-        <p class="mt-4 max-w-5xl text-base leading-7 text-slate-700">
-            NapCarot là website hỗ trợ nạp Carot cho các game Teamobi theo quy trình rõ ràng, từ lúc chọn game, máy chủ và gói nạp đến khi theo dõi trạng thái đơn. Người dùng có thể xem giá đang áp dụng trước khi thanh toán, kiểm tra mức thực nhận theo dữ liệu hiện có và tra cứu lại giao dịch bằng thông tin đơn hàng. Hệ thống hướng tới nhiều tựa game quen thuộc như Ngọc Rồng Online, Ninja School Online, Avatar, Avatar Musik, Hải Tặc Tí Hon và Hiệp Sĩ Online; game hoặc gói chưa mở bán sẽ không được hiển thị như một lựa chọn đặt hàng. Bạn có thể xem tổng quan về <a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ $mainSeoLandings->firstWhere('slug', 'nap-carot')['url'] }}">nạp Carot</a>, tìm hiểu cách <a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ $mainSeoLandings->firstWhere('slug', 'nap-game-teamobi')['url'] }}">nạp game Teamobi</a>, rồi sử dụng biểu mẫu bên dưới để bắt đầu.
-        </p>
-    </header>
-
     @if ($homeNoticeIsPublished && $homeNoticeHtml->isNotEmpty())
         <div class="home-notice-banner" role="note" aria-labelledby="home-notice-title">
             <div class="home-notice-header">
@@ -79,6 +71,14 @@
         <span class="inline-flex items-center gap-2"><i class="bx bx-bolt text-xl text-cyan-700" aria-hidden="true"></i><span><strong>Tự động</strong> đối soát chuyển khoản</span></span>
         <span class="inline-flex items-center gap-2"><i class="bx bx-search text-xl text-sky-700" aria-hidden="true"></i><span><strong>Dễ tra cứu</strong> bằng mã đơn và email</span></span>
     </div>
+
+    <header class="mt-5 rounded-[10px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 px-5 py-6 shadow-sm sm:px-7 sm:py-8">
+        <p class="text-sm font-extrabold uppercase tracking-[0.14em] text-emerald-700">NapCarot · Nạp game Teamobi</p>
+        <h1 class="mt-2 max-w-4xl text-3xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-4xl">Nạp Carot Game Teamobi Nhanh Chóng, Giá Tốt</h1>
+        <p class="mt-4 max-w-5xl text-base leading-7 text-slate-700">
+            NapCarot là website hỗ trợ nạp Carot cho các game Teamobi theo quy trình rõ ràng, từ lúc chọn game, máy chủ và gói nạp đến khi theo dõi trạng thái đơn. Người dùng có thể xem giá đang áp dụng trước khi thanh toán, kiểm tra mức thực nhận theo dữ liệu hiện có và tra cứu lại giao dịch bằng thông tin đơn hàng. Hệ thống hướng tới nhiều tựa game quen thuộc như Ngọc Rồng Online, Ninja School Online, Avatar, Avatar Musik, Hải Tặc Tí Hon và Hiệp Sĩ Online; game hoặc gói chưa mở bán sẽ không được hiển thị như một lựa chọn đặt hàng. Bạn có thể xem tổng quan về <a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ $mainSeoLandings->firstWhere('slug', 'nap-carot')['url'] }}">nạp Carot</a>, tìm hiểu cách <a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ $mainSeoLandings->firstWhere('slug', 'nap-game-teamobi')['url'] }}">nạp game Teamobi</a>, rồi sử dụng biểu mẫu bên dưới để bắt đầu.
+        </p>
+    </header>
 
     <section class="mt-8" aria-labelledby="teamobi-games-title">
         <div class="max-w-3xl">

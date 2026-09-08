@@ -22,7 +22,14 @@ test('homepage targets carot and exposes visible seo sections with matching sche
         ->assertSee('Kiến thức và hướng dẫn nạp game')
         ->assertSee('FAQPage')
         ->assertSee('WebSite')
-        ->assertSee('Organization');
+        ->assertSee('Organization')
+        ->assertSeeInOrder([
+            'Rõ giá',
+            'Tự động',
+            'Dễ tra cứu',
+            'NapCarot · Nạp game Teamobi',
+            'Nạp Carot Game Teamobi Nhanh Chóng, Giá Tốt',
+        ]);
 
     expect(substr_count($response->getContent(), '<h1'))->toBe(1);
 
