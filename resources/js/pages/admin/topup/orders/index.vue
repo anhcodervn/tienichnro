@@ -51,6 +51,7 @@ type AdminTopupOrderUpdatedEvent = Pick<
     OrderRow,
     | 'id'
     | 'code'
+    | 'topup_id'
     | 'payment_status'
     | 'order_status'
     | 'can_reorder'
@@ -214,6 +215,7 @@ const applyRealtimeSnapshot = (event: AdminTopupOrderUpdatedEvent): void => {
     const snapshot: Partial<OrderRow> = {
         payment_status: event.payment_status,
         order_status: event.order_status,
+        topup_id: event.topup_id,
         can_reorder: event.can_reorder,
         can_sync_provider: event.can_sync_provider,
         can_retry_provider_submission: event.can_retry_provider_submission,
@@ -523,7 +525,7 @@ onBeforeUnmount(() => {
                         ><Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input
                             v-model.trim="filters.search"
                             class="min-h-11 w-full rounded-xl border-slate-200 bg-slate-50 pl-9 pr-3 font-normal outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-indigo-100"
-                            placeholder="Mã đơn hoặc email..." /></span
+                            placeholder="Mã đơn, Topup ID hoặc email..." /></span
                 ></label>
                 <label v-if="showSiteFilter" class="text-sm font-bold text-slate-700"
                     >Website<select

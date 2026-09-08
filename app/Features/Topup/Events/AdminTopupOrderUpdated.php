@@ -22,6 +22,8 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
 
     public readonly string $code;
 
+    public readonly ?string $topupId;
+
     public readonly string $paymentStatus;
 
     public readonly string $orderStatus;
@@ -49,6 +51,7 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
         $this->orderId = $order->id;
         $this->tenantId = (int) $order->tenant_id;
         $this->code = $order->code;
+        $this->topupId = $order->topup_id;
         $this->paymentStatus = $order->payment_status->value;
         $this->orderStatus = $order->order_status->value;
         $this->canReorder = $order->payment_status === PaymentStatus::Paid
@@ -88,6 +91,7 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
             'id' => $this->orderId,
             'tenant_id' => $this->tenantId,
             'code' => $this->code,
+            'topup_id' => $this->topupId,
             'payment_status' => $this->paymentStatus,
             'order_status' => $this->orderStatus,
             'can_reorder' => $this->canReorder,

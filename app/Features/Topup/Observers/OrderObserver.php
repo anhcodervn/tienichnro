@@ -53,6 +53,7 @@ class OrderObserver
         $publicStatusChanged = $order->wasChanged([
             'payment_status',
             'order_status',
+            'topup_id',
             'paid_at',
             'processing_at',
             'completed_at',
@@ -62,6 +63,7 @@ class OrderObserver
         $adminVisibleStateChanged = $order->wasChanged([
             'payment_status',
             'order_status',
+            'topup_id',
             'provider_reference',
             'failure_reason',
             'paid_at',

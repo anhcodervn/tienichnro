@@ -11,9 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::table('user_proxies', function (Blueprint $table): void {
-            $table->text('provider_code')->nullable()->after('provider_proxy_id');
-            $table->longText('response')->nullable()->after('password');
+        Schema::table('orders', function (Blueprint $table): void {
+            $table->ulid('topup_id')->nullable()->unique()->after('code');
         });
     }
 
@@ -22,8 +21,9 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::table('user_proxies', function (Blueprint $table): void {
-            $table->dropColumn(['provider_code', 'response']);
+        Schema::table('orders', function (Blueprint $table): void {
+            $table->dropUnique(['topup_id']);
+            $table->dropColumn('topup_id');
         });
     }
 };

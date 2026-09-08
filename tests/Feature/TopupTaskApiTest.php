@@ -166,6 +166,7 @@ test('api creates a multi recipient wallet order with per-recipient amounts and 
         ->assertJsonPath('status', true)
         ->assertJsonPath('data.request_id', $payload['request_id'])
         ->assertJsonPath('data.status', 'pending')
+        ->assertJsonPath('data.topup_id', null)
         ->assertJsonPath('data.payment_status', 'paid')
         ->assertJsonPath('data.total', 270000)
         ->assertJsonPath('data.currency', 'VND')

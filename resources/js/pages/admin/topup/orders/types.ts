@@ -63,6 +63,7 @@ export type OrderRow = {
     tenant_id?: number | null;
     site?: { id: number; name: string; slug: string } | null;
     code: string;
+    topup_id?: string | null;
     email: string;
     user_id?: number | null;
     game?: string | null;

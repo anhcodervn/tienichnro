@@ -15,6 +15,7 @@ class TopupOrderResource extends JsonResource
     {
         return [
             'order_id' => $this->code,
+            'topup_id' => $this->topup_id,
             'request_id' => $this->idempotency_key,
             'status' => $this->order_status->value,
             'payment_status' => $this->payment_status->value,

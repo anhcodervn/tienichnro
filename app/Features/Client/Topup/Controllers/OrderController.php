@@ -126,6 +126,7 @@ class OrderController extends Controller
         return response()->json([
             'payment_status' => $order->payment_status->value,
             'order_status' => $order->order_status->value,
+            'topup_id' => $order->topup_id,
             'updated_at' => $order->updated_at?->toISOString(),
         ]);
     }

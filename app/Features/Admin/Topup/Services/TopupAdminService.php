@@ -127,7 +127,10 @@ class TopupAdminService
             ->with($relations)
             ->when($request->filled('search'), function (Builder $query) use ($request): void {
                 $search = trim($request->string('search')->toString());
-                $query->where(fn (Builder $nested) => $nested->where('code', 'like', "%{$search}%")->orWhere('email', 'like', "%{$search}%"));
+                $query->where(fn (Builder $nested) => $nested
+                    ->where('code', 'like', "%{$search}%")
+                    ->orWhere('topup_id', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%"));
             })
             ->when($request->filled('payment_status'), fn (Builder $query) => $query->where('payment_status', $request->string('payment_status')))
             ->when($request->filled('order_status'), fn (Builder $query) => $query->where('order_status', $request->string('order_status')))

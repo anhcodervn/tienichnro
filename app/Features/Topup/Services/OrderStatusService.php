@@ -25,7 +25,11 @@ class OrderStatusService
         $current = $order->order_status->value;
 
         if ($current === $target->value) {
-            return $order;
+            if ($target === OrderStatus::Completed && $order->topup_id === null) {
+                $order->forceFill(['topup_id' => Order::generateTopupId()])->save();
+            }
+
+            return $order->refresh();
         }
 
         if (! in_array($target->value, $this->transitions[$current] ?? [], true)) {
@@ -34,7 +38,11 @@ class OrderStatusService
 
         $timestamps = match ($target) {
             OrderStatus::Processing => ['processing_at' => $order->processing_at ?? now(), 'failure_reason' => null],
-            OrderStatus::Completed => ['completed_at' => now(), 'failure_reason' => null],
+            OrderStatus::Completed => [
+                'topup_id' => $order->topup_id ?? Order::generateTopupId(),
+                'completed_at' => now(),
+                'failure_reason' => null,
+            ],
             OrderStatus::Failed => ['failed_at' => now(), 'failure_reason' => $reason],
             OrderStatus::Cancelled => ['cancelled_at' => now(), 'failure_reason' => $reason],
             default => [],

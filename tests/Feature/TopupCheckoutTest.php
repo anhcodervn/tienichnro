@@ -694,7 +694,56 @@ test('order transitions keep recipient processing statuses in sync', function ()
     expect($recipient->refresh()->status)->toBe('processing');
 
     $statusService->transition($order->refresh(), OrderStatus::Completed);
-    expect($recipient->refresh()->status)->toBe('completed');
+    $completedOrder = $order->refresh();
+    $topupId = $completedOrder->topup_id;
+
+    expect($recipient->refresh()->status)->toBe('completed')
+        ->and($topupId)->not->toBeNull()
+        ->and(Str::isUlid($topupId))->toBeTrue();
+
+    $statusService->transition($completedOrder, OrderStatus::Completed);
+
+    expect($order->refresh()->topup_id)->toBe($topupId)
+        ->and(Order::factory()->create()->topup_id)->toBeNull();
+});
+
+test('completed orders receive unique topup ids and legacy completed orders are backfilled', function (): void {
+    $statusService = app(OrderStatusService::class);
+    $firstOrder = Order::factory()->create();
+    $secondOrder = Order::factory()->create();
+
+    foreach ([$firstOrder, $secondOrder] as $order) {
+        $statusService->transition($order, OrderStatus::Processing);
+        $statusService->transition($order->refresh(), OrderStatus::Completed);
+    }
+
+    expect($firstOrder->refresh()->topup_id)
+        ->not->toBe($secondOrder->refresh()->topup_id)
+        ->and(Order::query()->whereNotNull('topup_id')->distinct()->count('topup_id'))->toBe(2);
+
+    $legacyOrder = Order::factory()->create([
+        'order_status' => OrderStatus::Completed,
+        'completed_at' => now()->subDay(),
+        'topup_id' => null,
+    ]);
+    $migration = require database_path('migrations/2026_09_08_091317_backfill_topup_id_for_completed_orders.php');
+    $migration->up();
+
+    expect(Str::isUlid($legacyOrder->refresh()->topup_id))->toBeTrue();
+});
+
+test('order status endpoint returns the topup id after completion', function (): void {
+    $user = User::factory()->create();
+    $order = Order::factory()->create(['user_id' => $user->id]);
+    $statusService = app(OrderStatusService::class);
+    $statusService->transition($order, OrderStatus::Processing);
+    $completedOrder = $statusService->transition($order->refresh(), OrderStatus::Completed);
+
+    $this->actingAs($user)
+        ->getJson(route('orders.status', $completedOrder))
+        ->assertOk()
+        ->assertJsonPath('order_status', 'completed')
+        ->assertJsonPath('topup_id', $completedOrder->topup_id);
 });
 
 test('guest email is required and disabled packages are rejected', function (): void {

@@ -73,6 +73,23 @@ test('admin card statistics sum quantities from orders created today', function 
         ->assertJsonPath('data.meta.total', 2);
 });
 
+test('admin can find a completed order by topup id', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $order = Order::factory()->create([
+        'order_status' => OrderStatus::Completed,
+        'completed_at' => now(),
+        'topup_id' => Order::generateTopupId(),
+    ]);
+    Order::factory()->create();
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/orders?search='.$order->topup_id)
+        ->assertOk()
+        ->assertJsonPath('data.meta.total', 1)
+        ->assertJsonPath('data.data.0.code', $order->code)
+        ->assertJsonPath('data.data.0.topup_id', $order->topup_id);
+});
+
 test('admin order detail exposes QR reconciliation fields without raw callback payload', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $order = Order::factory()->create([
@@ -100,6 +117,7 @@ test('admin order detail exposes QR reconciliation fields without raw callback p
     $response = $this->actingAs($admin)
         ->getJson("/api/admin-api/orders/{$order->code}")
         ->assertOk()
+        ->assertJsonPath('data.topup_id', null)
         ->assertJsonPath('data.pricing.sale_unit_price', 90000)
         ->assertJsonPath('data.pricing.provider_total_cost', 75000)
         ->assertJsonPath('data.pricing.gross_profit', 15000)

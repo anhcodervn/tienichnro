@@ -47,6 +47,17 @@ test('a status transition dispatches a realtime order event', function (): void 
     Event::assertDispatched(AdminTopupOrderUpdated::class, fn (AdminTopupOrderUpdated $event): bool => $event->code === $order->code);
 });
 
+test('completion realtime events expose the generated topup id', function (): void {
+    $order = Order::factory()->create(['payment_status' => PaymentStatus::Paid]);
+    app(OrderStatusService::class)->transition($order, OrderStatus::Processing);
+    Event::fake([OrderStatusUpdated::class, AdminTopupOrderUpdated::class]);
+
+    $completedOrder = app(OrderStatusService::class)->transition($order->refresh(), OrderStatus::Completed);
+
+    Event::assertDispatched(OrderStatusUpdated::class, fn (OrderStatusUpdated $event): bool => $event->topupId === $completedOrder->topup_id);
+    Event::assertDispatched(AdminTopupOrderUpdated::class, fn (AdminTopupOrderUpdated $event): bool => $event->topupId === $completedOrder->topup_id);
+});
+
 test('provider reference updates only dispatch the private admin realtime event', function (): void {
     $order = Order::factory()->create();
 
@@ -114,6 +125,7 @@ test('admin order event uses the private admin channel and sends the row snapsho
         ->and($event->broadcastWith())->toMatchArray([
             'id' => $order->id,
             'code' => $order->code,
+            'topup_id' => null,
             'payment_status' => 'paid',
             'order_status' => 'failed',
             'provider_reference' => 'THE9P-REF',
@@ -178,6 +190,7 @@ test('the realtime event uses an opaque channel and exposes only status data', f
         ->and(array_keys($payload))->toBe([
             'payment_status',
             'order_status',
+            'topup_id',
             'paid_at',
             'processing_at',
             'completed_at',

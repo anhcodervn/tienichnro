@@ -22,6 +22,8 @@ class OrderStatusUpdated implements ShouldBroadcastNow, ShouldDispatchAfterCommi
 
     public readonly string $orderStatus;
 
+    public readonly ?string $topupId;
+
     public readonly ?string $paidAt;
 
     public readonly ?string $processingAt;
@@ -42,6 +44,7 @@ class OrderStatusUpdated implements ShouldBroadcastNow, ShouldDispatchAfterCommi
         $this->channelName = OrderRealtimeChannel::for($order);
         $this->paymentStatus = $order->payment_status->value;
         $this->orderStatus = $order->order_status->value;
+        $this->topupId = $order->topup_id;
         $this->paidAt = $order->paid_at?->toISOString();
         $this->processingAt = $order->processing_at?->toISOString();
         $this->completedAt = $order->completed_at?->toISOString();
@@ -78,6 +81,7 @@ class OrderStatusUpdated implements ShouldBroadcastNow, ShouldDispatchAfterCommi
         return [
             'payment_status' => $this->paymentStatus,
             'order_status' => $this->orderStatus,
+            'topup_id' => $this->topupId,
             'paid_at' => $this->paidAt,
             'processing_at' => $this->processingAt,
             'completed_at' => $this->completedAt,

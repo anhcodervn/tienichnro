@@ -25,7 +25,7 @@ class OrderResource extends JsonResource
             : null;
 
         return [
-            'id' => $this->id, 'tenant_id' => $this->tenant_id, 'code' => $this->code, 'email' => $this->email,
+            'id' => $this->id, 'tenant_id' => $this->tenant_id, 'code' => $this->code, 'topup_id' => $this->topup_id, 'email' => $this->email,
             'site' => $this->when(app(TenantContext::class)->isActive() && Site::isMain(), fn (): ?array => $this->tenant === null ? null : [
                 'id' => $this->tenant->id,
                 'name' => $this->tenant->name,
