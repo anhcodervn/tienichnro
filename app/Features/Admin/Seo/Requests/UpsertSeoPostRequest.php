@@ -29,6 +29,14 @@ class UpsertSeoPostRequest extends FormRequest
         $postId = $this->route('seoPost')?->id ?? $this->route('seoPost');
 
         return [
+            'type' => ['required', Rule::in(['knowledge', 'guide', 'price'])],
+            'service_id' => [
+                Rule::requiredIf($this->input('type') === 'price'),
+                'nullable',
+                'integer',
+                'exists:games,id',
+                Rule::prohibitedIf($this->input('type') !== 'price'),
+            ],
             'seo_category_id' => [
                 Rule::requiredIf(in_array($this->input('status'), ['published', 'scheduled'], true)),
                 'nullable',
@@ -44,6 +52,9 @@ class UpsertSeoPostRequest extends FormRequest
             ],
             'excerpt' => ['nullable', 'string'],
             'content' => ['nullable', 'array', new ValidSeoPostContent],
+            'faq' => ['nullable', 'array', 'max:20'],
+            'faq.*.question' => ['required', 'string', 'max:255'],
+            'faq.*.answer' => ['required', 'string', 'max:2000'],
             'cover_image' => ['nullable', 'string', 'max:2048', $this->safeCoverImageRule()],
             'seo_title' => ['nullable', 'string', 'max:255'],
             'seo_description' => ['nullable', 'string', 'max:320'],
@@ -63,17 +74,24 @@ class UpsertSeoPostRequest extends FormRequest
     {
         return [
             'slug.regex' => 'Slug chỉ được chứa chữ thường, số và dấu gạch nối.',
+            'service_id.required' => 'Page bảng giá phải được liên kết với một dịch vụ.',
+            'service_id.prohibited' => 'Chỉ page bảng giá mới được liên kết với dịch vụ.',
         ];
     }
 
     public function attributes(): array
     {
         return [
+            'type' => 'loại page SEO',
+            'service_id' => 'dịch vụ',
             'seo_category_id' => 'danh mục SEO',
             'title' => 'tiêu đề bài viết',
             'slug' => 'slug',
             'excerpt' => 'mô tả ngắn',
             'content' => 'nội dung chính',
+            'faq' => 'câu hỏi thường gặp',
+            'faq.*.question' => 'câu hỏi FAQ',
+            'faq.*.answer' => 'câu trả lời FAQ',
             'cover_image' => 'ảnh đại diện',
             'seo_title' => 'SEO title',
             'seo_description' => 'SEO description',
@@ -96,7 +114,9 @@ class UpsertSeoPostRequest extends FormRequest
 
     protected function prepareForValidation(): void
     {
-        $normalized = [];
+        $normalized = [
+            'type' => $this->input('type', 'knowledge'),
+        ];
 
         foreach (['title', 'slug', 'excerpt', 'cover_image', 'cover_alt', 'seo_title', 'seo_description', 'canonical_url', 'focus_keyword'] as $field) {
             if (! $this->exists($field) || ! is_string($this->input($field))) {

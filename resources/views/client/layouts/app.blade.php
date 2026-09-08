@@ -9,6 +9,7 @@
         $siteName = $settings['site_name'] ?? config('app.name', 'Nạp Carot');
         $title = trim($__env->yieldContent('title')) ?: ($settings['meta_title'] ?? $siteName);
         $description = trim($__env->yieldContent('description')) ?: ($settings['meta_description'] ?? $settings['site_description'] ?? 'Nạp Carot game Teamobi nhanh chóng, minh bạch.');
+        $keywords = trim($__env->yieldContent('keywords'));
         $canonical = trim($__env->yieldContent('canonical')) ?: url()->current();
         $favicon = trim((string) ($settings['favicon'] ?? ''));
         $headerLogo = trim((string) ($settings['dark_logo'] ?? '')) ?: trim((string) ($settings['light_logo'] ?? ''));
@@ -36,6 +37,9 @@
     @endphp
     <title>{{ $documentTitle }}</title>
     <meta name="description" content="{{ $description }}">
+    @if ($keywords !== '')
+        <meta name="keywords" content="{{ $keywords }}">
+    @endif
     <meta name="robots" content="@yield('robots', $settings['robots'] ?? 'index,follow')">
     <link rel="canonical" href="{{ $canonical }}">
     <meta property="og:locale" content="vi_VN">

@@ -94,6 +94,14 @@ class SeoController extends Controller
         ]);
     }
 
+    public function postOptions(): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'data' => $this->seoService->postOptions(),
+        ]);
+    }
+
     public function storePost(UpsertSeoPostRequest $request): JsonResponse
     {
         $post = $this->seoService->upsertPost($request->validated());
@@ -109,7 +117,7 @@ class SeoController extends Controller
     {
         return response()->json([
             'status' => true,
-            'data' => $seoPost->load('category:id,name'),
+            'data' => $seoPost->load(['category:id,name', 'service:id,name,slug,status']),
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace Database\Seeders;
 
+use App\Models\Game;
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use App\Models\SeoRedirect;
@@ -195,6 +196,11 @@ class SeoContentSeeder extends Seeder
     /** @param array<string, SeoCategory> $categories */
     private function seedDraftPosts(array $categories): void
     {
+        $priceServiceSlugs = $this->priceServiceSlugs();
+        $serviceIds = Game::query()
+            ->whereIn('slug', collect($priceServiceSlugs)->flatten()->all())
+            ->pluck('id', 'slug');
+
         foreach ($this->postDefinitions() as $definition) {
             $post = SeoPost::query()
                 ->with('category:id,slug')
@@ -219,7 +225,16 @@ class SeoContentSeeder extends Seeder
             ]);
 
             if ($isNew) {
+                $serviceId = collect($priceServiceSlugs[$definition['slug']] ?? [])
+                    ->map(fn (string $slug): mixed => $serviceIds->get($slug))
+                    ->first(fn (mixed $id): bool => $id !== null);
+                $type = $serviceId !== null
+                    ? 'price'
+                    : (str_starts_with($definition['slug'], 'cach-') ? 'guide' : 'knowledge');
+
                 $post->fill([
+                    'type' => $type,
+                    'service_id' => $serviceId,
                     'content' => $this->skeleton($definition['title'], $definition['money_path']),
                     'canonical_url' => null,
                     'robots' => 'noindex,follow',
@@ -282,6 +297,17 @@ class SeoContentSeeder extends Seeder
             ['title' => 'Bảng giá nạp Hải Tặc Tí Hon mới nhất', 'slug' => 'bang-gia-nap-hai-tac-ti-hon', 'keyword' => 'bảng giá htth', 'category' => 'hai-tac-ti-hon', 'excerpt' => 'Cách xem bảng giá Hải Tặc Tí Hon từ các gói đang hoạt động trong hệ thống.', 'money_path' => '/nap-game-hai-tac-ti-hon'],
             ['title' => 'Cách nạp Hiệp Sĩ Online bằng Carot', 'slug' => 'cach-nap-hiep-si-online', 'keyword' => 'nạp game hiệp sĩ online', 'category' => 'hiep-si-online', 'excerpt' => 'Hướng dẫn nạp Hiệp Sĩ Online bằng Carot và kiểm tra đúng thông tin nhận hàng.', 'money_path' => '/nap-game-hiep-si-online'],
             ['title' => 'Bảng giá nạp Hiệp Sĩ Online mới nhất', 'slug' => 'bang-gia-nap-hiep-si-online', 'keyword' => 'bảng giá hso', 'category' => 'hiep-si-online', 'excerpt' => 'Cách xem bảng giá Hiệp Sĩ Online theo gói nạp đang hỗ trợ.', 'money_path' => '/nap-game-hiep-si-online'],
+        ];
+    }
+
+    /** @return array<string, array<int, string>> */
+    private function priceServiceSlugs(): array
+    {
+        return [
+            'bang-gia-nap-ngoc-rong-online' => ['ngoc-rong-online'],
+            'bang-gia-nap-ninja-school-online' => ['ninja-school-online', 'ninja-school'],
+            'bang-gia-nap-hai-tac-ti-hon' => ['hai-tac-ti-hon'],
+            'bang-gia-nap-hiep-si-online' => ['hiep-si-online'],
         ];
     }
 

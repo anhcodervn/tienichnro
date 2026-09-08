@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Features\Topup\Services\SeoPricePageService;
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use App\Models\SeoRedirect;
@@ -18,6 +19,7 @@ class PublicSeoPageController extends Controller
 {
     public function __construct(
         protected EditorContentRenderer $contentRenderer,
+        protected SeoPricePageService $pricePageService,
     ) {}
 
     public function index(Request $request, SettingStore $settingStore): View
@@ -256,7 +258,7 @@ class PublicSeoPageController extends Controller
             ->get();
 
         $systemSettings = $this->systemSettings($settingStore);
-        $content = is_array($post->content) ? $post->content : [];
+        $content = $this->normalizeContentHeadings(is_array($post->content) ? $post->content : []);
         $contentHtml = $this->contentRenderer->renderNodes($content);
         $coverImage = $post->cover_image ?: $this->contentRenderer->firstImage($content);
         $headingIndex = $this->contentRenderer->headingIndex($content);
@@ -264,6 +266,24 @@ class PublicSeoPageController extends Controller
         $siteName = $systemSettings['site_name'] ?: config('app.name', 'Nạp Carot');
         $absoluteCoverImage = $coverImage && ! Str::startsWith($coverImage, ['http://', 'https://']) ? url($coverImage) : $coverImage;
         $canonicalUrl = $this->canonicalUrl($post, $request, $postUrl);
+        $pricePage = $this->pricePageService->resolve($post, $request->user());
+        $displayUpdatedAt = $post->type === 'price' ? $pricePage['updated_at'] : $post->updated_at;
+        $pageSchema = $post->article_schema ? array_filter([
+            '@context' => 'https://schema.org',
+            '@type' => $post->type === 'price' ? 'WebPage' : 'Article',
+            'name' => $post->type === 'price' ? $post->title : null,
+            'headline' => $post->type !== 'price' ? $post->title : null,
+            'description' => $post->seo_description ?: $post->excerpt,
+            'image' => $absoluteCoverImage,
+            'datePublished' => $post->published_at?->toAtomString(),
+            'dateModified' => $displayUpdatedAt?->toAtomString(),
+            'url' => $post->type === 'price' ? $canonicalUrl : null,
+            'mainEntityOfPage' => $post->type !== 'price' ? $canonicalUrl : null,
+            'publisher' => ['@type' => 'Organization', 'name' => $siteName],
+        ]) : null;
+        $faq = collect($post->faq ?? [])
+            ->filter(fn (mixed $item): bool => is_array($item) && filled($item['question'] ?? null) && filled($item['answer'] ?? null))
+            ->values();
 
         return view('pages.seo.show', [
             'systemSettings' => $systemSettings,
@@ -279,17 +299,25 @@ class PublicSeoPageController extends Controller
             'pageMetaCanonical' => $canonicalUrl,
             'pageMetaUrl' => $postUrl,
             'pageMetaImage' => $coverImage,
-            'articleSchema' => $post->article_schema ? array_filter([
+            'pageOgType' => $post->type === 'price' ? 'website' : 'article',
+            'pageSchema' => $pageSchema,
+            'faq' => $faq,
+            'faqSchema' => $faq->isNotEmpty() ? [
                 '@context' => 'https://schema.org',
-                '@type' => 'Article',
-                'headline' => $post->title,
-                'description' => $post->seo_description ?: $post->excerpt,
-                'image' => $absoluteCoverImage,
-                'datePublished' => $post->published_at?->toAtomString(),
-                'dateModified' => $post->updated_at?->toAtomString(),
-                'mainEntityOfPage' => $canonicalUrl,
-                'publisher' => ['@type' => 'Organization', 'name' => $siteName],
-            ]) : null,
+                '@type' => 'FAQPage',
+                'mainEntity' => $faq->map(fn (array $item): array => [
+                    '@type' => 'Question',
+                    'name' => $item['question'],
+                    'acceptedAnswer' => [
+                        '@type' => 'Answer',
+                        'text' => $item['answer'],
+                    ],
+                ])->all(),
+            ] : null,
+            'priceService' => $pricePage['service'],
+            'pricePackages' => $pricePage['packages'],
+            'priceUpdatedAt' => $pricePage['updated_at'],
+            'displayUpdatedAt' => $displayUpdatedAt,
             'breadcrumbSchema' => $post->breadcrumb_schema ? [
                 '@context' => 'https://schema.org',
                 '@type' => 'BreadcrumbList',
@@ -410,5 +438,30 @@ class PublicSeoPageController extends Controller
             : 301;
 
         return redirect()->to(url($redirect->to_path), $statusCode);
+    }
+
+    /**
+     * @param  array<int, mixed>  $nodes
+     * @return array<int, mixed>
+     */
+    private function normalizeContentHeadings(array $nodes): array
+    {
+        return collect($nodes)
+            ->map(function (mixed $node): mixed {
+                if (! is_array($node)) {
+                    return $node;
+                }
+
+                if (($node['type'] ?? null) === 'heading') {
+                    $node['level'] = max(2, (int) ($node['level'] ?? 2));
+                }
+
+                if (($node['type'] ?? null) === 'container' && is_array($node['children'] ?? null)) {
+                    $node['children'] = $this->normalizeContentHeadings($node['children']);
+                }
+
+                return $node;
+            })
+            ->all();
     }
 }

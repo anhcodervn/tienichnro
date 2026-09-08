@@ -2,6 +2,7 @@
 
 namespace App\Features\Admin\Seo\Services;
 
+use App\Models\Game;
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use App\Support\SitemapUrlService;
@@ -88,7 +89,7 @@ class SeoService
         $status = trim((string) ($filters['status'] ?? ''));
 
         return SeoPost::query()
-            ->with('category:id,name')
+            ->with(['category:id,name', 'service:id,name,slug,status'])
             ->when($search !== '', function ($builder) use ($search): void {
                 $builder->where(function ($query) use ($search): void {
                     $query
@@ -108,10 +109,13 @@ class SeoService
 
         $post->fill([
             'seo_category_id' => $payload['seo_category_id'] ?? null,
+            'type' => $payload['type'],
+            'service_id' => $payload['type'] === 'price' ? $payload['service_id'] : null,
             'title' => $payload['title'],
             'slug' => $payload['slug'],
             'excerpt' => $payload['excerpt'] ?? null,
             'content' => $payload['content'] ?? [],
+            'faq' => $payload['faq'] ?? [],
             'cover_image' => $payload['cover_image'] ?? null,
             'seo_title' => $payload['seo_title'] ?? null,
             'seo_description' => $payload['seo_description'] ?? null,
@@ -132,7 +136,21 @@ class SeoService
 
         $post->save();
 
-        return $post->fresh()->load('category:id,name');
+        return $post->fresh()->load(['category:id,name', 'service:id,name,slug,status']);
+    }
+
+    public function postOptions(): array
+    {
+        return [
+            'categories' => SeoCategory::query()
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug']),
+            'services' => Game::query()
+                ->orderBy('sort_order')
+                ->orderBy('name')
+                ->get(['id', 'name', 'slug', 'status']),
+        ];
     }
 
     public function sitemapSummary(): array

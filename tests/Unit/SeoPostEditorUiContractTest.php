@@ -15,7 +15,16 @@ test('seo post editor exposes direct cover upload and clear canonical controls',
         ->toContain('Canonical tự động')
         ->toContain('Canonical tùy chỉnh')
         ->toContain('Xem trước kết quả Google')
+        ->toContain('v-model="form.type"')
+        ->toContain('v-model="form.service_id"')
+        ->toContain('Không nhập giá vào nội dung')
+        ->toContain('Preview URL:')
+        ->toContain('v-model="item.question"')
+        ->toContain('v-model="item.answer"')
         ->and($types)
         ->toContain('cover_image: string | null')
-        ->toContain('cover_image?: string | null');
+        ->toContain('cover_image?: string | null')
+        ->toContain("export type SeoPageType = 'knowledge' | 'guide' | 'price'")
+        ->toContain('service_id?: number | null')
+        ->toContain('faq?: SeoFaqItem[]');
 });

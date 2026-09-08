@@ -7,12 +7,19 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class SeoPost extends Model
 {
+    protected $attributes = [
+        'type' => 'knowledge',
+    ];
+
     protected $fillable = [
         'seo_category_id',
+        'type',
+        'service_id',
         'title',
         'slug',
         'excerpt',
         'content',
+        'faq',
         'cover_image',
         'seo_title',
         'seo_description',
@@ -31,6 +38,7 @@ class SeoPost extends Model
     {
         return [
             'content' => 'array',
+            'faq' => 'array',
             'article_schema' => 'boolean',
             'breadcrumb_schema' => 'boolean',
             'published_at' => 'datetime',
@@ -41,5 +49,10 @@ class SeoPost extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(SeoCategory::class, 'seo_category_id');
+    }
+
+    public function service(): BelongsTo
+    {
+        return $this->belongsTo(Game::class, 'service_id');
     }
 }

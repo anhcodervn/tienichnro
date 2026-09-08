@@ -16,6 +16,7 @@ Route::middleware(['auth:sanctum', 'admin', 'platform.admin'])
         Route::delete('/categories/{seoCategory}', [SeoController::class, 'destroyCategory'])->name('categories.destroy');
 
         Route::get('/posts', [SeoController::class, 'posts'])->name('posts.index');
+        Route::get('/post-options', [SeoController::class, 'postOptions'])->name('posts.options');
         Route::post('/posts', [SeoController::class, 'storePost'])->name('posts.store');
         Route::get('/posts/{seoPost}', [SeoController::class, 'showPost'])->name('posts.show');
         Route::patch('/posts/{seoPost}', [SeoController::class, 'updatePost'])->name('posts.update');

@@ -3,10 +3,10 @@ import Breadcrumb from '@/components/MasterLayouts/Breadcrumb/index.vue';
 import Editor from '@/components/shared/Editor/index.vue';
 import UploadImage from '@/components/shared/UpladImage/index.vue';
 import { adminSeoService } from '@/services/admin-seo.service';
-import type { AdminSeoPostPayload, SeoPostStatus, SeoRobotsValue } from '@/types/admin-seo.type';
+import type { AdminSeoPostPayload, SeoPostStatus, SeoRobotsValue, SeoServiceOption } from '@/types/admin-seo.type';
 import { uploadEditorImages } from '@/utils/editor-image-upload';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink, Eye, ImageIcon, Link2, Save, Search, Trash2 } from 'lucide-vue-next';
+import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink, Eye, ImageIcon, Link2, Plus, Save, Search, Trash2 } from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 
@@ -17,6 +17,7 @@ const loading = ref(false);
 const slugManuallyEdited = ref(false);
 const canonicalMode = ref<'auto' | 'custom'>('auto');
 const categories = ref<Array<{ id: number; name: string; slug: string }>>([]);
+const services = ref<SeoServiceOption[]>([]);
 
 const editingId = computed(() => {
     const raw = Number(route.params.seo_post_id);
@@ -24,11 +25,14 @@ const editingId = computed(() => {
 });
 
 const form = reactive<AdminSeoPostPayload>({
+    type: 'knowledge',
+    service_id: null,
     title: '',
     slug: '',
     seo_category_id: null,
     excerpt: '',
     content: [],
+    faq: [],
     cover_image: null,
     cover_alt: '',
     seo_title: '',
@@ -44,12 +48,13 @@ const form = reactive<AdminSeoPostPayload>({
 });
 
 const pageTitle = computed(() => (editingId.value ? 'Cập nhật bài viết SEO' : 'Tạo bài viết SEO'));
-const selectedCategorySlug = computed(
-    () => categories.value.find((category) => category.id === form.seo_category_id)?.slug || 'danh-muc',
-);
-const publicUrl = computed(
-    () => `${window.location.origin}/${selectedCategorySlug.value}/${form.slug.trim() || 'duong-dan-bai-viet'}`,
-);
+const selectedCategorySlug = computed(() => categories.value.find((category) => category.id === form.seo_category_id)?.slug ?? null);
+const publicUrl = computed(() => {
+    const slug = form.slug.trim() || 'duong-dan-bai-viet';
+    const path = selectedCategorySlug.value ? `/${selectedCategorySlug.value}/${slug}` : `/bai-viet/${slug}`;
+
+    return `${window.location.origin}${path}`;
+});
 const generatedCanonicalUrl = computed(() => publicUrl.value);
 const effectiveCanonicalUrl = computed(() =>
     canonicalMode.value === 'custom' && form.canonical_url?.trim() ? form.canonical_url.trim() : generatedCanonicalUrl.value,
@@ -130,8 +135,9 @@ const toLocalDatetime = (value: string | null): string | null => {
 };
 
 const fetchMeta = async (): Promise<void> => {
-    const response = await adminSeoService.listCategories();
-    categories.value = response.map((category) => ({ id: category.id, name: category.name, slug: category.slug }));
+    const response = await adminSeoService.postOptions();
+    categories.value = response.categories;
+    services.value = response.services;
 };
 
 const fetchPost = async (): Promise<void> => {
@@ -142,10 +148,13 @@ const fetchPost = async (): Promise<void> => {
     const post = await adminSeoService.getPost(editingId.value);
 
     form.title = post.title;
+    form.type = post.type;
+    form.service_id = post.service_id;
     form.slug = post.slug;
     form.seo_category_id = post.seo_category_id;
     form.excerpt = post.excerpt ?? '';
     form.content = Array.isArray(post.content) ? post.content : [];
+    form.faq = Array.isArray(post.faq) ? post.faq : [];
     form.cover_image = post.cover_image ?? null;
     form.cover_alt = post.cover_alt ?? '';
     form.seo_title = post.seo_title ?? '';
@@ -167,6 +176,15 @@ const clearCoverImage = (): void => {
     form.cover_alt = '';
 };
 
+const addFaq = (): void => {
+    form.faq ??= [];
+    form.faq.push({ question: '', answer: '' });
+};
+
+const removeFaq = (index: number): void => {
+    form.faq?.splice(index, 1);
+};
+
 const handleSave = async (): Promise<void> => {
     saving.value = true;
 
@@ -184,6 +202,10 @@ const handleSave = async (): Promise<void> => {
             focus_keyword: form.focus_keyword?.trim() ?? '',
             canonical_url: canonicalMode.value === 'custom' ? form.canonical_url?.trim() || null : null,
             content: form.content ?? [],
+            service_id: form.type === 'price' ? form.service_id : null,
+            faq: (form.faq ?? [])
+                .map((item) => ({ question: item.question.trim(), answer: item.answer.trim() }))
+                .filter((item) => item.question || item.answer),
             published_at: form.status === 'published' ? form.published_at : null,
             scheduled_at: form.status === 'scheduled' ? form.scheduled_at : null,
         };
@@ -258,6 +280,31 @@ onMounted(async () => {
                     </div>
 
                     <div class="grid gap-4 pt-5 md:grid-cols-2">
+                        <label class="grid gap-2">
+                            <span class="text-sm font-semibold text-slate-700">Loại page SEO <span class="text-rose-500">*</span></span>
+                            <select
+                                v-model="form.type"
+                                class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                            >
+                                <option value="knowledge">Knowledge — Kiến thức</option>
+                                <option value="guide">Guide — Hướng dẫn</option>
+                                <option value="price">Price — Bảng giá động</option>
+                            </select>
+                        </label>
+
+                        <label v-if="form.type === 'price'" class="grid gap-2">
+                            <span class="text-sm font-semibold text-slate-700">Dịch vụ lấy bảng giá <span class="text-rose-500">*</span></span>
+                            <select
+                                v-model="form.service_id"
+                                class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                            >
+                                <option :value="null">Chọn dịch vụ</option>
+                                <option v-for="service in services" :key="service.id" :value="service.id">
+                                    {{ service.name }}{{ service.status !== 'active' ? ' (đang tắt)' : '' }}
+                                </option>
+                            </select>
+                        </label>
+
                         <label class="grid gap-2 md:col-span-2">
                             <span class="text-sm font-semibold text-slate-700">Tiêu đề bài viết <span class="text-rose-500">*</span></span>
                             <input
@@ -280,11 +327,27 @@ onMounted(async () => {
                                 placeholder="huong-dan-nap-ngoc-rong"
                                 @change="markSlugAsEdited"
                             />
-                            <span class="truncate text-xs text-slate-400">/{{ selectedCategorySlug }}/{{ form.slug || 'duong-dan-bai-viet' }}</span>
+                            <span class="truncate text-xs text-slate-400">
+                                {{
+                                    selectedCategorySlug
+                                        ? `/${selectedCategorySlug}/${form.slug || 'duong-dan-bai-viet'}`
+                                        : `/bai-viet/${form.slug || 'duong-dan-bai-viet'}`
+                                }}
+                            </span>
+                            <a
+                                :href="publicUrl"
+                                target="_blank"
+                                rel="noreferrer"
+                                class="truncate text-xs font-semibold text-violet-700 hover:underline"
+                            >
+                                Preview URL: {{ publicUrl }}
+                            </a>
                         </label>
 
                         <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Danh mục <span v-if="form.status !== 'draft'" class="text-rose-500">*</span></span>
+                            <span class="text-sm font-semibold text-slate-700"
+                                >Danh mục <span v-if="form.status !== 'draft'" class="text-rose-500">*</span></span
+                            >
                             <select
                                 v-model="form.seo_category_id"
                                 class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
@@ -296,14 +359,14 @@ onMounted(async () => {
 
                         <label class="grid gap-2 md:col-span-2">
                             <span class="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
-                                <span>Mô tả ngắn</span>
+                                <span>Nội dung mở đầu (intro)</span>
                                 <span class="text-xs font-normal text-slate-400">{{ (form.excerpt ?? '').length }} ký tự</span>
                             </span>
                             <textarea
                                 v-model="form.excerpt"
                                 rows="3"
                                 class="w-full resize-y rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                                placeholder="Tóm tắt nội dung để hiển thị ở danh sách bài viết..."
+                                placeholder="Đoạn giới thiệu hiển thị đầu page và dùng làm mô tả mặc định..."
                             />
                         </label>
                     </div>
@@ -359,10 +422,56 @@ onMounted(async () => {
                         <p class="mt-1 text-sm text-slate-500">
                             Có thể kéo-thả ảnh trực tiếp vào trình soạn thảo; ảnh sẽ được upload và chuyển WebP.
                         </p>
+                        <p v-if="form.type === 'price'" class="mt-2 rounded-[8px] bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
+                            Không nhập giá vào nội dung. Bảng giá được hệ thống tự động lấy từ các package đang hoạt động của dịch vụ đã chọn.
+                        </p>
                     </div>
                     <div class="min-w-0 pt-5">
                         <Editor v-model="form.content" />
                     </div>
+                </article>
+
+                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
+                    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                        <div>
+                            <h2 class="text-lg font-semibold text-slate-950">Câu hỏi thường gặp (FAQ)</h2>
+                            <p class="mt-1 text-sm text-slate-500">FAQ được hiển thị trên page và tự động tạo schema FAQPage.</p>
+                        </div>
+                        <button
+                            type="button"
+                            class="inline-flex items-center gap-2 rounded-[8px] border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
+                            @click="addFaq"
+                        >
+                            <Plus class="h-3.5 w-3.5" /> Thêm câu hỏi
+                        </button>
+                    </div>
+                    <div v-if="form.faq?.length" class="grid gap-4 pt-5">
+                        <div v-for="(item, index) in form.faq" :key="index" class="rounded-[10px] border border-slate-200 p-4">
+                            <div class="mb-3 flex items-center justify-between gap-3">
+                                <span class="text-sm font-bold text-slate-700">FAQ {{ index + 1 }}</span>
+                                <button type="button" class="text-rose-600 hover:text-rose-700" aria-label="Xóa câu hỏi" @click="removeFaq(index)">
+                                    <Trash2 class="h-4 w-4" />
+                                </button>
+                            </div>
+                            <div class="grid gap-3">
+                                <input
+                                    v-model="item.question"
+                                    type="text"
+                                    maxlength="255"
+                                    class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
+                                    placeholder="Câu hỏi"
+                                />
+                                <textarea
+                                    v-model="item.answer"
+                                    rows="3"
+                                    maxlength="2000"
+                                    class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
+                                    placeholder="Câu trả lời"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <p v-else class="pt-5 text-sm text-slate-500">Chưa có câu hỏi thường gặp.</p>
                 </article>
             </section>
 
@@ -449,13 +558,13 @@ onMounted(async () => {
                             />
                         </label>
                         <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Focus keyword</span>
+                            <span class="text-sm font-semibold text-slate-700">Keywords</span>
                             <input
                                 v-model="form.focus_keyword"
                                 type="text"
                                 maxlength="255"
                                 class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                placeholder="nạp ngọc rồng online"
+                                placeholder="nạp ngọc rồng online, bảng giá nạp game"
                             />
                         </label>
                     </div>
@@ -535,8 +644,8 @@ onMounted(async () => {
                         </label>
                         <label class="flex items-center justify-between gap-3 rounded-[10px] border border-slate-200 px-3 py-3">
                             <span
-                                ><span class="block text-sm font-semibold text-slate-800">Article schema</span
-                                ><span class="text-xs text-slate-500">Đánh dấu nội dung dạng bài viết.</span></span
+                                ><span class="block text-sm font-semibold text-slate-800">Article / WebPage schema</span
+                                ><span class="text-xs text-slate-500">Tự chọn schema phù hợp với loại page.</span></span
                             >
                             <input v-model="form.article_schema" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-violet-600" />
                         </label>

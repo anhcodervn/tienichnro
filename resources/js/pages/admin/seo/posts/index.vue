@@ -1,17 +1,17 @@
 <script setup lang="ts">
-import Breadcrumb from "@/components/MasterLayouts/Breadcrumb/index.vue";
-import { adminSeoService } from "@/services/admin-seo.service";
-import type { AdminSeoPostItem } from "@/types/admin-seo.type";
-import { handleErrorResponse, handleSuccessResponse } from "@/utils/response";
-import { BookOpenText, Plus, Search, Trash2 } from "lucide-vue-next";
-import { computed, onMounted, reactive, ref } from "vue";
-import { RouterLink } from "vue-router";
+import Breadcrumb from '@/components/MasterLayouts/Breadcrumb/index.vue';
+import { adminSeoService } from '@/services/admin-seo.service';
+import type { AdminSeoPostItem } from '@/types/admin-seo.type';
+import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
+import { BookOpenText, Plus, Search, Trash2 } from 'lucide-vue-next';
+import { computed, onMounted, reactive, ref } from 'vue';
+import { RouterLink } from 'vue-router';
 
 const loading = ref(false);
 const rows = ref<AdminSeoPostItem[]>([]);
 const filters = reactive({
-    search: "",
-    status: "",
+    search: '',
+    status: '',
 });
 
 const filteredRows = computed(() => rows.value);
@@ -48,10 +48,7 @@ onMounted(async () => {
 
 <template>
     <div class="space-y-4">
-        <Breadcrumb
-            title="Bài viết SEO"
-            description="Quản trị danh sách bài viết, canonical, điểm SEO và trạng thái index/publish."
-        >
+        <Breadcrumb title="Bài viết SEO" description="Quản trị danh sách bài viết, canonical, điểm SEO và trạng thái index/publish.">
             <template #actions>
                 <RouterLink
                     to="/admin/seo/posts/create"
@@ -93,7 +90,7 @@ onMounted(async () => {
                     <thead class="bg-slate-50 text-left text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                         <tr>
                             <th class="px-4 py-3">Bài viết</th>
-                            <th class="px-4 py-3">Danh mục</th>
+                            <th class="px-4 py-3">Loại / danh mục</th>
                             <th class="px-4 py-3">Canonical</th>
                             <th class="px-4 py-3">SEO score</th>
                             <th class="px-4 py-3">Trạng thái</th>
@@ -120,7 +117,13 @@ onMounted(async () => {
                                     </div>
                                 </div>
                             </td>
-                            <td class="px-4 py-3 text-sm text-slate-600">{{ row.category?.name || "-" }}</td>
+                            <td class="px-4 py-3 text-sm text-slate-600">
+                                <span class="rounded-full bg-violet-50 px-2 py-1 text-xs font-bold uppercase text-violet-700">{{ row.type }}</span>
+                                <p class="mt-2">{{ row.category?.name || '-' }}</p>
+                                <p v-if="row.type === 'price'" class="mt-1 text-xs text-emerald-700">
+                                    {{ row.service?.name || 'Chưa chọn dịch vụ' }}
+                                </p>
+                            </td>
                             <td class="px-4 py-3 text-sm text-slate-600">
                                 <a
                                     v-if="row.canonical_url"
@@ -168,7 +171,7 @@ onMounted(async () => {
                                 </span>
                             </td>
                             <td class="px-4 py-3 text-sm text-slate-600">
-                                {{ new Date(row.updated_at).toLocaleString("vi-VN") }}
+                                {{ new Date(row.updated_at).toLocaleString('vi-VN') }}
                             </td>
                             <td class="px-4 py-3">
                                 <div class="flex items-center gap-2">

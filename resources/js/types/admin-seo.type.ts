@@ -1,5 +1,18 @@
 export type SeoRobotsValue = 'index,follow' | 'noindex,follow';
 export type SeoPostStatus = 'draft' | 'published' | 'scheduled';
+export type SeoPageType = 'knowledge' | 'guide' | 'price';
+
+export interface SeoFaqItem {
+    question: string;
+    answer: string;
+}
+
+export interface SeoServiceOption {
+    id: number;
+    name: string;
+    slug: string;
+    status: string;
+}
 
 export interface AdminSeoOverviewSummary {
     total_categories: number;
@@ -33,10 +46,13 @@ export interface AdminSeoCategoryItem {
 export interface AdminSeoPostItem {
     id: number;
     seo_category_id: number | null;
+    type: SeoPageType;
+    service_id: number | null;
     title: string;
     slug: string;
     excerpt: string | null;
     content: unknown[];
+    faq: SeoFaqItem[] | null;
     cover_image: string | null;
     seo_title: string | null;
     seo_description: string | null;
@@ -54,6 +70,7 @@ export interface AdminSeoPostItem {
         id: number;
         name: string;
     } | null;
+    service?: SeoServiceOption | null;
 }
 
 export interface AdminSeoCategoryPayload {
@@ -68,10 +85,13 @@ export interface AdminSeoCategoryPayload {
 
 export interface AdminSeoPostPayload {
     seo_category_id?: number | null;
+    type: SeoPageType;
+    service_id?: number | null;
     title: string;
     slug: string;
     excerpt?: string;
     content?: unknown[];
+    faq?: SeoFaqItem[];
     cover_image?: string | null;
     seo_title?: string;
     seo_description?: string;

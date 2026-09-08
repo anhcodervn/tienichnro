@@ -1,4 +1,4 @@
-import api from "@/config/axios";
+import api from '@/config/axios';
 import type {
     AdminSeoCategoryItem,
     AdminSeoCategoryPayload,
@@ -6,23 +6,24 @@ import type {
     AdminSeoPostItem,
     AdminSeoPostPayload,
     AdminSeoSitemapEntry,
-} from "@/types/admin-seo.type";
+    SeoServiceOption,
+} from '@/types/admin-seo.type';
 
 export const adminSeoService = {
     async overview(): Promise<{ summary: AdminSeoOverviewSummary; sitemaps: AdminSeoSitemapEntry[] }> {
-        const response = await api.get("/api/admin-api/seo/overview");
+        const response = await api.get('/api/admin-api/seo/overview');
 
         return response.data.data as { summary: AdminSeoOverviewSummary; sitemaps: AdminSeoSitemapEntry[] };
     },
 
     async listCategories(params: Record<string, unknown> = {}): Promise<AdminSeoCategoryItem[]> {
-        const response = await api.get("/api/admin-api/seo/categories", { params });
+        const response = await api.get('/api/admin-api/seo/categories', { params });
 
         return response.data.data.categories as AdminSeoCategoryItem[];
     },
 
     async createCategory(payload: AdminSeoCategoryPayload) {
-        return api.post("/api/admin-api/seo/categories", payload);
+        return api.post('/api/admin-api/seo/categories', payload);
     },
 
     async updateCategory(id: number | string, payload: Partial<AdminSeoCategoryPayload>) {
@@ -37,7 +38,7 @@ export const adminSeoService = {
         posts: AdminSeoPostItem[];
         categories: Array<{ id: number; name: string }>;
     }> {
-        const response = await api.get("/api/admin-api/seo/posts", { params });
+        const response = await api.get('/api/admin-api/seo/posts', { params });
 
         return response.data.data as {
             posts: AdminSeoPostItem[];
@@ -51,8 +52,20 @@ export const adminSeoService = {
         return response.data.data as AdminSeoPostItem;
     },
 
+    async postOptions(): Promise<{
+        categories: Array<{ id: number; name: string; slug: string }>;
+        services: SeoServiceOption[];
+    }> {
+        const response = await api.get('/api/admin-api/seo/post-options');
+
+        return response.data.data as {
+            categories: Array<{ id: number; name: string; slug: string }>;
+            services: SeoServiceOption[];
+        };
+    },
+
     async createPost(payload: AdminSeoPostPayload) {
-        return api.post("/api/admin-api/seo/posts", payload);
+        return api.post('/api/admin-api/seo/posts', payload);
     },
 
     async updatePost(id: number | string, payload: Partial<AdminSeoPostPayload>) {
@@ -64,7 +77,7 @@ export const adminSeoService = {
     },
 
     async sitemaps(): Promise<AdminSeoSitemapEntry[]> {
-        const response = await api.get("/api/admin-api/seo/sitemaps");
+        const response = await api.get('/api/admin-api/seo/sitemaps');
 
         return response.data.data.entries as AdminSeoSitemapEntry[];
     },
