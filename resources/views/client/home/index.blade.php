@@ -1,7 +1,14 @@
 @extends('client.layouts.app')
 
-@section('title', 'Nạp Carot game Teamobi nhanh chóng')
-@section('description', 'Mua Carot và nạp game Teamobi với bảng giá chiết khấu rõ ràng, thanh toán thuận tiện và theo dõi lịch sử đơn hàng minh bạch.')
+@section('document_title', config('seo.homepage.title'))
+@section('description', config('seo.homepage.description'))
+@section('canonical', $homeCanonicalUrl)
+
+@push('head')
+    @foreach ($homeSchemas as $schema)
+        <script type="application/ld+json">{!! json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
+    @endforeach
+@endpush
 
 @section('content')
 @php
@@ -23,6 +30,13 @@
 @endif
 
 <section class="client-container py-5 sm:py-7">
+    <header class="mb-5 rounded-[10px] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-cyan-50 px-5 py-6 shadow-sm sm:px-7 sm:py-8">
+        <p class="text-sm font-extrabold uppercase tracking-[0.14em] text-emerald-700">NapCarot · Nạp game Teamobi</p>
+        <h1 class="mt-2 max-w-4xl text-3xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-4xl">Nạp Carot Game Teamobi Nhanh Chóng, Giá Tốt</h1>
+        <p class="mt-4 max-w-5xl text-base leading-7 text-slate-700">
+            NapCarot là website hỗ trợ nạp Carot cho các game Teamobi theo quy trình rõ ràng, từ lúc chọn game, máy chủ và gói nạp đến khi theo dõi trạng thái đơn. Người dùng có thể xem giá đang áp dụng trước khi thanh toán, kiểm tra mức thực nhận theo dữ liệu hiện có và tra cứu lại giao dịch bằng thông tin đơn hàng. Hệ thống hướng tới nhiều tựa game quen thuộc như Ngọc Rồng Online, Ninja School Online, Avatar, Avatar Musik, Hải Tặc Tí Hon và Hiệp Sĩ Online; game hoặc gói chưa mở bán sẽ không được hiển thị như một lựa chọn đặt hàng. Bạn có thể xem tổng quan về <a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ $mainSeoLandings->firstWhere('slug', 'nap-carot')['url'] }}">nạp Carot</a>, tìm hiểu cách <a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ $mainSeoLandings->firstWhere('slug', 'nap-game-teamobi')['url'] }}">nạp game Teamobi</a>, rồi sử dụng biểu mẫu bên dưới để bắt đầu.
+        </p>
+    </header>
 
     @if ($homeNoticeIsPublished && $homeNoticeHtml->isNotEmpty())
         <div class="home-notice-banner" role="note" aria-labelledby="home-notice-title">
@@ -56,7 +70,9 @@
         </span>
     </a>
 
-    @include('client.components.topup-form', ['games' => $games, 'walletBalance' => $walletBalance, 'showConfirmation' => true])
+    <div id="nap-game" class="scroll-mt-20">
+        @include('client.components.topup-form', ['games' => $games, 'walletBalance' => $walletBalance, 'showConfirmation' => true, 'useH1' => false])
+    </div>
 
     <div class="home-trust-strip" aria-label="Cam kết dịch vụ">
         <span class="inline-flex items-center gap-2"><i class="bx bx-badge-check text-xl text-emerald-700" aria-hidden="true"></i><span><strong>Rõ giá</strong> trước khi thanh toán</span></span>
@@ -64,12 +80,51 @@
         <span class="inline-flex items-center gap-2"><i class="bx bx-search text-xl text-sky-700" aria-hidden="true"></i><span><strong>Dễ tra cứu</strong> bằng mã đơn và email</span></span>
     </div>
 
-    @if ($games->isNotEmpty())
+    <section class="mt-8" aria-labelledby="teamobi-games-title">
+        <div class="max-w-3xl">
+            <p class="text-sm font-bold text-emerald-700">Danh mục nạp game</p>
+            <h2 id="teamobi-games-title" class="mt-1 text-2xl font-extrabold text-slate-950 sm:text-3xl">Nạp Carot cho các game Teamobi</h2>
+            <p class="mt-3 leading-7 text-slate-600">Mỗi trang tập trung vào một nhu cầu nạp riêng. Tùy chọn đặt hàng chỉ xuất hiện khi game và gói tương ứng đang hoạt động.</p>
+        </div>
+        <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            @foreach ($homeGameLandings as $gameLanding)
+                <a class="client-card group flex min-w-0 items-center gap-4 p-5 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md" href="{{ $gameLanding['url'] }}">
+                    <span class="grid h-11 w-11 shrink-0 place-items-center rounded-[8px] bg-emerald-50 text-2xl text-emerald-700"><i class="bx bx-joystick" aria-hidden="true"></i></span>
+                    <span class="min-w-0 flex-1"><strong class="block text-slate-950">{{ $gameLanding['name'] }}</strong><small class="mt-1 block line-clamp-2 leading-5 text-slate-500">Xem thông tin và gói đang hỗ trợ</small></span>
+                    <i class="bx bx-right-arrow-alt text-xl text-emerald-700 transition group-hover:translate-x-1" aria-hidden="true"></i>
+                </a>
+            @endforeach
+        </div>
+    </section>
+
+    <section class="mt-10 grid gap-5 lg:grid-cols-2" aria-labelledby="why-napcarot-title">
+        <div class="client-card p-5 sm:p-7">
+            <p class="text-sm font-bold text-cyan-700">Thông tin minh bạch</p>
+            <h2 id="why-napcarot-title" class="mt-1 text-2xl font-extrabold text-slate-950">Tại sao nên nạp Carot tại NapCarot?</h2>
+            <ul class="mt-5 grid gap-4 text-sm leading-6 text-slate-700">
+                <li class="flex gap-3"><i class="bx bx-check-circle mt-0.5 text-xl text-emerald-700" aria-hidden="true"></i><span><strong>Rõ giá trước khi thanh toán:</strong> gói đang mở bán và số tiền cần trả được hiển thị trong biểu mẫu.</span></li>
+                <li class="flex gap-3"><i class="bx bx-check-circle mt-0.5 text-xl text-emerald-700" aria-hidden="true"></i><span><strong>Đối soát chuyển khoản:</strong> hệ thống theo dõi giao dịch và cập nhật trạng thái đơn.</span></li>
+                <li class="flex gap-3"><i class="bx bx-check-circle mt-0.5 text-xl text-emerald-700" aria-hidden="true"></i><span><strong>Có thể tra cứu:</strong> tài khoản đã đăng nhập xem lịch sử; khách dùng mã đơn và email.</span></li>
+                <li class="flex gap-3"><i class="bx bx-check-circle mt-0.5 text-xl text-emerald-700" aria-hidden="true"></i><span><strong>Dữ liệu theo game:</strong> trường nhận hàng, máy chủ và gói nạp thay đổi theo cấu hình thực tế.</span></li>
+            </ul>
+        </div>
+        <div class="client-card p-5 sm:p-7">
+            <p class="text-sm font-bold text-cyan-700">Quy trình ngắn gọn</p>
+            <h2 class="mt-1 text-2xl font-extrabold text-slate-950">Cách nạp Carot tại NapCarot</h2>
+            <ol class="mt-5 grid gap-4">
+                <li class="home-seo-step"><span>01</span><div><strong>Chọn game và máy chủ</strong><p>Chọn đúng trò chơi, máy chủ và gói đang mở bán.</p></div></li>
+                <li class="home-seo-step"><span>02</span><div><strong>Nhập thông tin nhận hàng</strong><p>Điền đúng tài khoản hoặc trường dữ liệu mà game yêu cầu.</p></div></li>
+                <li class="home-seo-step"><span>03</span><div><strong>Kiểm tra và thanh toán</strong><p>Xác nhận giá, thông tin nhận hàng và phương thức thanh toán.</p></div></li>
+                <li class="home-seo-step"><span>04</span><div><strong>Theo dõi đơn</strong><p>Xem lịch sử tài khoản hoặc tra cứu bằng mã đơn và email.</p></div></li>
+            </ol>
+        </div>
+    </section>
+
         <section class="home-reward-card mt-5" aria-labelledby="reward-table-title">
             <header class="border-b border-slate-200 bg-white p-4 sm:p-5">
                 <p class="inline-flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.14em] text-cyan-700"><i class="bx bx-gift text-base" aria-hidden="true"></i>Giá trị nhận trong game</p>
-                <h2 id="reward-table-title" class="mt-1 text-xl font-extrabold text-slate-950">Bảng thực nhận theo từng game</h2>
-                <p id="reward-table-description" class="mt-2 text-sm leading-6 text-slate-600">Chọn game để xem số vật phẩm thực nhận tương ứng với từng mệnh giá.</p>
+                <h2 id="reward-table-title" class="mt-1 text-xl font-extrabold text-slate-950">Bảng giá nạp Carot</h2>
+                <p id="reward-table-description" class="mt-2 text-sm leading-6 text-slate-600">Giá gói đang bán hiển thị trong biểu mẫu; bảng dưới đây dùng dữ liệu hệ thống để đối chiếu mệnh giá và mức thực nhận theo game.</p>
 
                 <div class="home-game-tabs mt-4" role="tablist" aria-label="Chọn bảng giá theo game">
                     @foreach ($games as $game)
@@ -155,44 +210,47 @@
                 </div>
             @endforeach
         </section>
-    @endif
 </section>
 
-@guest
-    <section class="bg-white">
-        <div class="client-container py-6 sm:py-8">
-            <article class="home-seo-article">
-                <header class="border-b border-slate-200 bg-cyan-50 px-5 py-5 sm:px-6">
-                    <p class="inline-flex items-center gap-1.5 text-sm font-bold text-red-600"><i class="bx bx-book-open text-lg" aria-hidden="true"></i>Hướng dẫn nạp game</p>
-                    <h2 class="mt-1 max-w-4xl text-xl font-bold leading-tight text-slate-950">Nạp Carot game Teamobi nhanh, rõ giá và dễ tra cứu</h2>
-                    <p class="mt-4 max-w-4xl leading-7 text-slate-600">Nạp Carot giúp bạn bổ sung vật phẩm và tiện ích trong các game Teamobi đang hỗ trợ. Tại Nạp Carot, bảng giá được công khai theo từng game và từng gói để bạn dễ so sánh trước khi đặt mua.</p>
-                </header>
+<section class="border-y border-slate-200 bg-white">
+    <div class="client-container grid gap-10 py-8 lg:grid-cols-2 lg:py-12">
+        <section aria-labelledby="home-faq-title">
+            <p class="text-sm font-bold text-emerald-700">Giải đáp trước khi nạp</p>
+            <h2 id="home-faq-title" class="mt-1 text-2xl font-extrabold text-slate-950 sm:text-3xl">Các câu hỏi thường gặp về nạp Carot</h2>
+            <div class="mt-5 grid gap-3">
+                @foreach ($homeFaqs as $faq)
+                    <details class="group rounded-[8px] border border-slate-200 bg-slate-50 p-4 open:border-emerald-200 open:bg-emerald-50/40">
+                        <summary class="flex cursor-pointer list-none items-center justify-between gap-3 font-bold text-slate-950 [&::-webkit-details-marker]:hidden">
+                            <span>{{ $faq['question'] }}</span><i class="bx bx-chevron-down shrink-0 text-xl text-emerald-700 transition group-open:rotate-180" aria-hidden="true"></i>
+                        </summary>
+                        <p class="mt-3 pr-7 text-sm leading-6 text-slate-600">{{ $faq['answer'] }}</p>
+                    </details>
+                @endforeach
+            </div>
+        </section>
 
-                <div class="grid gap-8 px-5 py-7 sm:px-8 lg:grid-cols-[1.15fr_0.85fr] lg:gap-12 lg:py-9">
-                    <div>
-                        <h3 class="flex items-center gap-2 text-xl font-extrabold text-slate-950"><i class="bx bx-checks text-2xl text-emerald-700" aria-hidden="true"></i>Cách mua Carot trong 3 bước</h3>
-                        <ol class="mt-5 grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
-                            <li class="home-seo-step"><span>01</span><div><strong>Chọn thông tin</strong><p>Chọn game, máy chủ, gói nạp và nhập chính xác tài khoản nhận Carot.</p></div></li>
-                            <li class="home-seo-step"><span>02</span><div><strong>Thanh toán</strong><p>Thanh toán bằng chuyển khoản hoặc số dư ví nếu bạn đã đăng nhập.</p></div></li>
-                            <li class="home-seo-step"><span>03</span><div><strong>Theo dõi đơn</strong><p>Dùng mã đơn và email để kiểm tra tiến độ từ lúc thanh toán đến khi hoàn tất.</p></div></li>
-                        </ol>
-                    </div>
-
-                    <div>
-                        <h3 class="flex items-center gap-2 text-xl font-extrabold text-slate-950"><i class="bx bx-joystick text-2xl text-cyan-700" aria-hidden="true"></i>Game đang hỗ trợ</h3>
-                        <div class="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
-                            @foreach ($games as $game)
-                                <a class="home-game-link" href="{{ route('topup.game', $game) }}">
-                                    <span class="grid h-10 w-10 place-items-center rounded-[5px] bg-emerald-50 text-xs font-extrabold text-emerald-700">{{ mb_substr($game->short_name ?: $game->name, 0, 3) }}</span>
-                                    <span><strong class="block text-slate-900">Nạp {{ $game->name }}</strong><small class="mt-1 block text-slate-500">{{ $game->packages->count() }} gói đang mở bán</small></span>
-                                    <span class="ml-auto text-emerald-700" aria-hidden="true">→</span>
-                                </a>
-                            @endforeach
-                        </div>
-                    </div>
+        <section aria-labelledby="latest-guides-title">
+            <p class="text-sm font-bold text-emerald-700">Bài viết mới</p>
+            <div class="flex items-end justify-between gap-3">
+                <h2 id="latest-guides-title" class="mt-1 text-2xl font-extrabold text-slate-950 sm:text-3xl">Kiến thức và hướng dẫn nạp game</h2>
+                <a class="shrink-0 text-sm font-bold text-emerald-700 hover:text-emerald-800" href="{{ route('seo.index') }}">Xem tất cả</a>
+            </div>
+            @if ($latestSeoPosts->isNotEmpty())
+                <div class="mt-5 grid gap-3">
+                    @foreach ($latestSeoPosts as $post)
+                        <article class="rounded-[8px] border border-slate-200 p-4 transition hover:border-emerald-300">
+                            <p class="text-xs font-bold uppercase tracking-wide text-emerald-700">{{ $post['category'] }}</p>
+                            <h3 class="mt-1 font-extrabold leading-6 text-slate-950"><a class="hover:text-emerald-700" href="{{ $post['url'] }}">{{ $post['title'] }}</a></h3>
+                            @if ($post['excerpt'])
+                                <p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{{ $post['excerpt'] }}</p>
+                            @endif
+                        </article>
+                    @endforeach
                 </div>
-            </article>
-        </div>
-    </section>
-@endguest
+            @else
+                <div class="client-card mt-5 p-6 text-sm leading-6 text-slate-600">Các bài hướng dẫn đang được biên tập. Chỉ nội dung đã xuất bản mới hiển thị tại đây.</div>
+            @endif
+        </section>
+    </div>
+</section>
 @endsection

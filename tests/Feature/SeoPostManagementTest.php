@@ -244,7 +244,7 @@ test('seo category page paginates and filters only published posts from its cate
         ->assertSee('Hướng dẫn tìm kiếm đặc biệt')
         ->assertSee('<meta name="robots" content="noindex,follow">', false);
 
-    $this->get(route('sitemap'))
+    $this->get(route('sitemap.categories'))
         ->assertOk()
         ->assertSee(route('seo.category', $category->slug));
 });

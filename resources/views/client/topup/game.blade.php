@@ -1,6 +1,9 @@
 @extends('client.layouts.app')
 @section('title', 'Nạp Carot '.$game->name)
 @section('description', $game->seo_description ?: $game->description)
+@if ($seoLandingSlug)
+    @section('canonical', route('seo.landing', ['landingSlug' => $seoLandingSlug]))
+@endif
 @section('content')
 <section class="client-container py-8 sm:py-10 lg:py-12">
     <div class="mb-6 min-w-0">

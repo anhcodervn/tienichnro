@@ -19,9 +19,12 @@
         $gameServiceItems = is_array($settings['game_service_items'] ?? null) ? $settings['game_service_items'] : [];
         $showGameServiceMenu = ($settings['game_service_enabled'] ?? false) === true && $gameServiceItems !== [];
         $showAgencyWebsite = app(\App\Support\TenantContext::class)->isActive() && \App\Utils\Site::isMain();
-        $documentTitle = $title === $siteName || \Illuminate\Support\Str::endsWith($title, ' | '.$siteName)
-            ? $title
-            : $title.' | '.$siteName;
+        $explicitDocumentTitle = trim($__env->yieldContent('document_title'));
+        $documentTitle = $explicitDocumentTitle !== ''
+            ? $explicitDocumentTitle
+            : ($title === $siteName || \Illuminate\Support\Str::endsWith($title, ' | '.$siteName)
+                ? $title
+                : $title.' | '.$siteName);
         $orderHistoryUrl = auth()->check() ? route('account.orders.index') : route('orders.lookup');
         $orderHistoryActive = request()->routeIs(['orders.*', 'account.orders.*']);
         $exploreActive = request()->routeIs(['client.affiliate.spa', 'seo.*', 'content.guide', 'content.contact']);

@@ -4,6 +4,10 @@
 @section('canonical', $pageMetaCanonical)
 @section('robots', $pageMetaRobots)
 
+@push('head')
+    <script type="application/ld+json">{!! json_encode($breadcrumbSchema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
+@endpush
+
 @section('content')
 <section class="border-b border-slate-200 bg-gradient-to-b from-emerald-50/70 to-white">
     <div class="client-container py-8 sm:py-12">

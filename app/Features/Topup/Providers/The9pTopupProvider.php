@@ -236,6 +236,9 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
         $data = is_array($body['data'] ?? null) ? $body['data'] : [];
         $transactionStatus = strtolower(trim((string) ($data['status'] ?? '')));
         $envelopeStatus = strtolower(trim((string) ($body['status'] ?? '')));
+        $providerTopupId = is_scalar($data['topup_id'] ?? null) && filled($data['topup_id'])
+            ? trim((string) $data['topup_id'])
+            : null;
         $status = match ($transactionStatus) {
             'success', 'completed', 'complete', 'done', '1' => TopupProviderStatus::Completed,
             'failed', 'fail', 'error', 'cancelled', 'canceled', '-1' => TopupProviderStatus::Failed,
@@ -273,6 +276,7 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
                 'provider_status' => $transactionStatus !== '' ? $transactionStatus : null,
                 'envelope_status' => $envelopeStatus !== '' ? $envelopeStatus : null,
                 'provider_code' => is_scalar($body['code'] ?? null) ? $body['code'] : null,
+                'provider_topup_id' => $providerTopupId,
             ],
             request: $requestSnapshot,
             providerResponse: $providerResponse,

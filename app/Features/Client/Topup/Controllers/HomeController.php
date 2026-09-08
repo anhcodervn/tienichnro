@@ -8,10 +8,12 @@ use App\Features\Topup\Services\GameRewardService;
 use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
+use App\Models\SeoPost;
 use App\Models\User;
 use App\Support\EditorContentRenderer;
 use App\Support\SettingStore;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 
 class HomeController extends Controller
@@ -67,6 +69,7 @@ class HomeController extends Controller
 
         $systemSettings = $settingStore->getMany([
             'site_name' => config('app.name', 'Nạp Carot'),
+            'site_domain' => '',
             'site_description' => 'Nạp Carot game Teamobi nhanh chóng và minh bạch.',
             'support_email' => '', 'hotline' => '', 'light_logo' => '', 'favicon' => '',
             'meta_title' => '', 'meta_description' => '',
@@ -83,6 +86,38 @@ class HomeController extends Controller
         $homeNoticeContent = is_array($systemSettings['home_notice_content'])
             ? $systemSettings['home_notice_content']
             : [];
+        $homeGameLandings = collect(config('seo.home_game_landings', []))
+            ->map(fn (string $slug): array => [
+                'slug' => $slug,
+                'name' => config("seo.landings.{$slug}.name", $slug),
+                'description' => config("seo.landings.{$slug}.description", ''),
+                'url' => route('seo.landing', ['landingSlug' => $slug]),
+            ]);
+        $latestSeoPosts = SeoPost::query()
+            ->with('category:id,name,slug,is_active')
+            ->where('status', 'published')
+            ->where('robots', 'index,follow')
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->whereHas('category', fn (Builder $query) => $query->where('is_active', true))
+            ->orderByDesc('published_at')
+            ->orderByDesc('id')
+            ->take(6)
+            ->get()
+            ->map(fn (SeoPost $post): array => [
+                'title' => $post->title,
+                'excerpt' => $post->excerpt,
+                'category' => $post->category->name,
+                'url' => route('seo.show', [
+                    'categorySlug' => $post->category->slug,
+                    'postSlug' => $post->slug,
+                ]),
+            ]);
+        $homeFaqs = collect(config('seo.faqs', []));
+        $configuredSiteDomain = trim((string) $systemSettings['site_domain']);
+        $homeCanonicalUrl = filter_var($configuredSiteDomain, FILTER_VALIDATE_URL)
+            ? rtrim($configuredSiteDomain, '/').'/'
+            : rtrim(route('home'), '/').'/';
 
         return view('client.home.index', [
             'games' => $games,
@@ -95,6 +130,41 @@ class HomeController extends Controller
             ...$this->homePopupData($systemSettings, $contentRenderer),
             'turnstileEnabled' => $turnstileService->isEnabled(),
             'turnstileSiteKey' => $turnstileService->siteKey(),
+            'homeGameLandings' => $homeGameLandings,
+            'mainSeoLandings' => collect(['nap-carot', 'nap-game-teamobi'])->map(fn (string $slug): array => [
+                'slug' => $slug,
+                'name' => config("seo.landings.{$slug}.name", $slug),
+                'url' => route('seo.landing', ['landingSlug' => $slug]),
+            ]),
+            'latestSeoPosts' => $latestSeoPosts,
+            'homeFaqs' => $homeFaqs,
+            'homeCanonicalUrl' => $homeCanonicalUrl,
+            'homeSchemas' => [
+                [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'WebSite',
+                    'name' => config('seo.brand_name', 'NapCarot'),
+                    'url' => $homeCanonicalUrl,
+                ],
+                [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'Organization',
+                    'name' => config('seo.brand_name', 'NapCarot'),
+                    'url' => $homeCanonicalUrl,
+                ],
+                [
+                    '@context' => 'https://schema.org',
+                    '@type' => 'FAQPage',
+                    'mainEntity' => $homeFaqs->map(fn (array $faq): array => [
+                        '@type' => 'Question',
+                        'name' => $faq['question'],
+                        'acceptedAnswer' => [
+                            '@type' => 'Answer',
+                            'text' => $faq['answer'],
+                        ],
+                    ])->all(),
+                ],
+            ],
         ]);
     }
 

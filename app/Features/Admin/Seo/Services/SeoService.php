@@ -37,7 +37,7 @@ class SeoService
                 'indexed_categories' => $indexedCategoryCount,
                 'total_posts' => $postCount,
                 'published_posts' => $publishedPostCount,
-                'sitemap_files' => 1,
+                'sitemap_files' => 5,
                 'technical_score' => $postCount > 0
                     ? (int) round((($canonicalCount + $schemaReadyCount) / max(1, $postCount * 2)) * 100)
                     : 100,
@@ -137,14 +137,36 @@ class SeoService
 
     public function sitemapSummary(): array
     {
-        $urlCount = $this->sitemapUrlService->urls()->count();
-
         return [
             [
-                'title' => 'Sitemap website',
+                'title' => 'Sitemap index',
                 'path' => '/sitemap.xml',
-                'description' => 'Chỉ chứa URL public, index/follow và trùng với canonical để submit Google Search Console.',
-                'included_count' => "{$urlCount} URL",
+                'description' => 'Tệp index để submit Google Search Console, liên kết tới bốn sitemap nội dung.',
+                'included_count' => '4 sitemap',
+            ],
+            [
+                'title' => 'Trang public',
+                'path' => '/sitemap-pages.xml',
+                'description' => 'Trang tĩnh và money page public có canonical riêng.',
+                'included_count' => $this->sitemapUrlService->pageUrls()->count().' URL',
+            ],
+            [
+                'title' => 'Bài viết',
+                'path' => '/sitemap-articles.xml',
+                'description' => 'Chỉ chứa bài published, index/follow và đúng canonical.',
+                'included_count' => $this->sitemapUrlService->articleUrls()->count().' URL',
+            ],
+            [
+                'title' => 'Danh mục',
+                'path' => '/sitemap-categories.xml',
+                'description' => 'Chỉ chứa danh mục đang hoạt động và index/follow.',
+                'included_count' => $this->sitemapUrlService->categoryUrls()->count().' URL',
+            ],
+            [
+                'title' => 'Game landing',
+                'path' => '/sitemap-games.xml',
+                'description' => 'Các money page nạp game Teamobi có canonical riêng.',
+                'included_count' => $this->sitemapUrlService->gameUrls()->count().' URL',
             ],
         ];
     }

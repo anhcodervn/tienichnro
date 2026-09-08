@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
+use App\Models\SeoRedirect;
 use App\Support\EditorContentRenderer;
 use App\Support\SettingStore;
 use Illuminate\Contracts\View\View;
@@ -91,6 +92,30 @@ class PublicSeoPageController extends Controller
             'pageMetaDescription' => $pageDescription,
             'pageMetaCanonical' => $search !== '' ? $categoryUrl : $canonicalUrl,
             'pageMetaRobots' => $search !== '' ? 'noindex,follow' : ($category->robots ?: 'index,follow'),
+            'breadcrumbSchema' => [
+                '@context' => 'https://schema.org',
+                '@type' => 'BreadcrumbList',
+                'itemListElement' => [
+                    [
+                        '@type' => 'ListItem',
+                        'position' => 1,
+                        'name' => 'Trang chủ',
+                        'item' => route('home'),
+                    ],
+                    [
+                        '@type' => 'ListItem',
+                        'position' => 2,
+                        'name' => 'Bài viết',
+                        'item' => route('seo.index'),
+                    ],
+                    [
+                        '@type' => 'ListItem',
+                        'position' => 3,
+                        'name' => $category->name,
+                        'item' => $canonicalUrl,
+                    ],
+                ],
+            ],
         ]);
     }
 
@@ -99,7 +124,11 @@ class PublicSeoPageController extends Controller
         $post = $this->publishedPosts()
             ->with('category:id,name,slug,is_active')
             ->where('slug', $slug)
-            ->firstOrFail();
+            ->first();
+
+        if (! $post instanceof SeoPost) {
+            return $this->storedRedirect($request) ?? abort(404);
+        }
 
         if ($post->category?->is_active) {
             return redirect()->to($this->postUrl($post), 301);
@@ -108,7 +137,7 @@ class PublicSeoPageController extends Controller
         return $this->renderPost($post, $request, $settingStore);
     }
 
-    public function show(string $categorySlug, string $postSlug, Request $request, SettingStore $settingStore): View
+    public function show(string $categorySlug, string $postSlug, Request $request, SettingStore $settingStore): View|RedirectResponse
     {
         $post = $this->publishedPosts()
             ->with('category:id,name,slug,is_active')
@@ -116,7 +145,11 @@ class PublicSeoPageController extends Controller
             ->whereHas('category', function (Builder $query) use ($categorySlug): void {
                 $query->where('slug', $categorySlug)->where('is_active', true);
             })
-            ->firstOrFail();
+            ->first();
+
+        if (! $post instanceof SeoPost) {
+            return $this->storedRedirect($request) ?? abort(404);
+        }
 
         return $this->renderPost($post, $request, $settingStore);
     }
@@ -359,5 +392,23 @@ class PublicSeoPageController extends Controller
             'reading_minutes' => $this->contentRenderer->estimateReadingMinutes($content),
             'url' => $this->postUrl($post),
         ];
+    }
+
+    private function storedRedirect(Request $request): ?RedirectResponse
+    {
+        $path = '/'.ltrim($request->path(), '/');
+        $redirect = SeoRedirect::query()->where('from_path', $path)->first();
+
+        if (! $redirect instanceof SeoRedirect
+            || ! Str::startsWith($redirect->to_path, '/')
+            || Str::startsWith($redirect->to_path, '//')) {
+            return null;
+        }
+
+        $statusCode = in_array($redirect->status_code, [301, 302, 307, 308], true)
+            ? $redirect->status_code
+            : 301;
+
+        return redirect()->to(url($redirect->to_path), $statusCode);
     }
 }

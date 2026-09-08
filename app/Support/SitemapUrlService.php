@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\Game;
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use Illuminate\Database\Eloquent\Builder;
@@ -19,30 +18,54 @@ class SitemapUrlService
      */
     public function urls(): Collection
     {
-        return $this->staticUrls()
-            ->concat($this->contentPageUrls())
-            ->concat(
-                Game::query()
-                    ->active()
-                    ->get(['slug', 'updated_at'])
-                    ->map(fn (Game $game): array => [
-                        'loc' => route('topup.game', $game),
-                        'lastmod' => $game->updated_at,
-                    ]),
-            )
-            ->concat(
-                SeoCategory::query()
-                    ->where('is_active', true)
-                    ->where('robots', 'index,follow')
-                    ->get(['slug', 'updated_at'])
-                    ->map(fn (SeoCategory $category): array => [
-                        'loc' => route('seo.category', $category->slug),
-                        'lastmod' => $category->updated_at,
-                    ]),
-            )
-            ->concat($this->postUrls())
+        return $this->pageUrls()
+            ->concat($this->gameUrls())
+            ->concat($this->categoryUrls())
+            ->concat($this->articleUrls())
             ->unique('loc')
             ->values();
+    }
+
+    /** @return Collection<int, array{loc: string, lastmod: mixed}> */
+    public function pageUrls(): Collection
+    {
+        $gameLandings = config('seo.home_game_landings', []);
+        $landingUrls = collect(array_keys(config('seo.landings', [])))
+            ->reject(fn (string $slug): bool => in_array($slug, $gameLandings, true))
+            ->map(fn (string $slug): array => [
+                'loc' => route('seo.landing', ['landingSlug' => $slug]),
+                'lastmod' => null,
+            ]);
+
+        return $this->staticUrls()
+            ->concat($this->contentPageUrls())
+            ->concat($landingUrls)
+            ->unique('loc')
+            ->values();
+    }
+
+    /** @return Collection<int, array{loc: string, lastmod: null}> */
+    public function gameUrls(): Collection
+    {
+        return collect(config('seo.home_game_landings', []))
+            ->map(fn (string $slug): array => [
+                'loc' => route('seo.landing', ['landingSlug' => $slug]),
+                'lastmod' => null,
+            ])
+            ->values();
+    }
+
+    /** @return Collection<int, array{loc: string, lastmod: mixed}> */
+    public function categoryUrls(): Collection
+    {
+        return SeoCategory::query()
+            ->where('is_active', true)
+            ->where('robots', 'index,follow')
+            ->get(['slug', 'updated_at'])
+            ->map(fn (SeoCategory $category): array => [
+                'loc' => route('seo.category', $category->slug),
+                'lastmod' => $category->updated_at,
+            ]);
     }
 
     /**
@@ -84,7 +107,7 @@ class SitemapUrlService
     /**
      * @return Collection<int, array{loc: string, lastmod: mixed}>
      */
-    private function postUrls(): Collection
+    public function articleUrls(): Collection
     {
         return SeoPost::query()
             ->with('category:id,slug,is_active,robots')

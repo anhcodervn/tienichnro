@@ -108,7 +108,7 @@ test('guest home renders the purchase layout reward table and seo content withou
         ->assertSee($game->name)
         ->assertSee($package->name)
         ->assertSee('90.000đ')
-        ->assertSee('Bảng thực nhận theo từng game')
+        ->assertSee('Bảng giá nạp Carot')
         ->assertSee('100.000đ')
         ->assertSee('20.000đ')
         ->assertSee('Thực nhận độc lập')
@@ -121,7 +121,7 @@ test('guest home renders the purchase layout reward table and seo content withou
         ->assertSee('390')
         ->assertDontSee('76543')
         ->assertDontSee($inactivePackage->name)
-        ->assertSee('Cách mua Carot trong 3 bước')
+        ->assertSee('Cách nạp Carot tại NapCarot')
         ->assertDontSee('Lịch sử nạp game gần đây')
         ->assertDontSee('id="app"', false);
 });
@@ -155,7 +155,7 @@ test('authenticated home keeps order history on its dedicated page', function ()
         ->assertDontSee('Lịch sử nạp game gần đây')
         ->assertDontSee($order->code)
         ->assertDontSee($otherOrder->code)
-        ->assertDontSee('Cách mua Carot trong 3 bước')
+        ->assertSee('Cách nạp Carot tại NapCarot')
         ->assertViewMissing('userOrders');
 });
 
@@ -695,49 +695,68 @@ test('order transitions keep recipient processing statuses in sync', function ()
 
     $statusService->transition($order->refresh(), OrderStatus::Completed);
     $completedOrder = $order->refresh();
-    $topupId = $completedOrder->topup_id;
 
     expect($recipient->refresh()->status)->toBe('completed')
-        ->and($topupId)->not->toBeNull()
-        ->and(Str::isUlid($topupId))->toBeTrue();
+        ->and($completedOrder->topup_id)->toBeNull();
 
     $statusService->transition($completedOrder, OrderStatus::Completed);
 
-    expect($order->refresh()->topup_id)->toBe($topupId)
+    expect($order->refresh()->topup_id)->toBeNull()
         ->and(Order::factory()->create()->topup_id)->toBeNull();
 });
 
-test('completed orders receive unique topup ids and legacy completed orders are backfilled', function (): void {
-    $statusService = app(OrderStatusService::class);
-    $firstOrder = Order::factory()->create();
-    $secondOrder = Order::factory()->create();
-
-    foreach ([$firstOrder, $secondOrder] as $order) {
-        $statusService->transition($order, OrderStatus::Processing);
-        $statusService->transition($order->refresh(), OrderStatus::Completed);
-    }
-
-    expect($firstOrder->refresh()->topup_id)
-        ->not->toBe($secondOrder->refresh()->topup_id)
-        ->and(Order::query()->whereNotNull('topup_id')->distinct()->count('topup_id'))->toBe(2);
-
-    $legacyOrder = Order::factory()->create([
+test('provider topup ids are backfilled only for completed single unit orders', function (): void {
+    $singleOrder = Order::factory()->create([
         'order_status' => OrderStatus::Completed,
         'completed_at' => now()->subDay(),
-        'topup_id' => null,
+        'topup_id' => (string) Str::ulid(),
     ]);
-    $migration = require database_path('migrations/2026_09_08_091317_backfill_topup_id_for_completed_orders.php');
+    OrderRecipient::factory()->for($singleOrder)->create([
+        'quantity' => 1,
+        'provider_response' => [
+            'items' => [
+                1 => ['response' => ['provider_topup_id' => '1205643']],
+            ],
+        ],
+    ]);
+    $multiOrder = Order::factory()->create([
+        'order_status' => OrderStatus::Completed,
+        'completed_at' => now()->subDay(),
+        'topup_id' => (string) Str::ulid(),
+    ]);
+    OrderRecipient::factory()->for($multiOrder)->create([
+        'position' => 1,
+        'quantity' => 2,
+        'provider_response' => [
+            'items' => [
+                1 => ['response' => ['provider_topup_id' => '1205644']],
+                2 => ['response' => ['provider_topup_id' => '1205645']],
+            ],
+        ],
+    ]);
+    $manualOrder = Order::factory()->create([
+        'order_status' => OrderStatus::Completed,
+        'completed_at' => now()->subDay(),
+        'topup_id' => (string) Str::ulid(),
+    ]);
+    OrderRecipient::factory()->for($manualOrder)->create(['quantity' => 1]);
+
+    $migration = require database_path('migrations/2026_09_08_094928_backfill_order_provider_topup_ids.php');
     $migration->up();
 
-    expect(Str::isUlid($legacyOrder->refresh()->topup_id))->toBeTrue();
+    expect($singleOrder->refresh()->topup_id)->toBe('1205643')
+        ->and($multiOrder->refresh()->topup_id)->toBeNull()
+        ->and($manualOrder->refresh()->topup_id)->toBeNull();
 });
 
 test('order status endpoint returns the topup id after completion', function (): void {
     $user = User::factory()->create();
-    $order = Order::factory()->create(['user_id' => $user->id]);
-    $statusService = app(OrderStatusService::class);
-    $statusService->transition($order, OrderStatus::Processing);
-    $completedOrder = $statusService->transition($order->refresh(), OrderStatus::Completed);
+    $completedOrder = Order::factory()->create([
+        'user_id' => $user->id,
+        'order_status' => OrderStatus::Completed,
+        'completed_at' => now(),
+        'topup_id' => '1205643',
+    ]);
 
     $this->actingAs($user)
         ->getJson(route('orders.status', $completedOrder))

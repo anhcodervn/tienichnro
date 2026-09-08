@@ -19,8 +19,9 @@ test('admin seo settings expose robots and ads editors', function (): void {
         ->and($sitemapPage)
         ->toContain('Sitemap chỉ chứa URL public, index/follow và trùng với canonical.')
         ->and($seoService)
-        ->toContain("'sitemap_files' => 1")
-        ->not->toContain('/sitemap-posts.xml')
-        ->not->toContain('/sitemap-categories.xml')
-        ->not->toContain('/sitemap-pages.xml');
+        ->toContain("'sitemap_files' => 5")
+        ->toContain('/sitemap-articles.xml')
+        ->toContain('/sitemap-categories.xml')
+        ->toContain('/sitemap-pages.xml')
+        ->toContain('/sitemap-games.xml');
 });

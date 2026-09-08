@@ -4,6 +4,7 @@
     $turnstileEnabled = (bool) ($turnstileEnabled ?? false);
     $turnstileSiteKey = (string) ($turnstileSiteKey ?? '');
     $showConfirmation = (bool) ($showConfirmation ?? false);
+    $useH1 = (bool) ($useH1 ?? ! $selectedGame);
     $affiliateReferrerUsername = (string) ($affiliateReferrerUsername ?? '');
     $requestedGame = old('game_id', $selectedGame?->id ?? $games->first()?->id);
     $initialGame = $games->contains(fn ($game) => (string) $game->id === (string) $requestedGame)
@@ -67,7 +68,7 @@
     <header class="home-checkout-header">
         <div>
             <p class="home-checkout-eyebrow inline-flex items-center gap-1.5"><i class="bx bx-bolt text-base" aria-hidden="true"></i>Nạp game tự động</p>
-            @if ($selectedGame)
+            @if ($selectedGame || ! $useH1)
                 <h2>Nạp Carot <span data-selected-game-name>{{ $initialGameModel?->name ?? 'game Teamobi' }}</span></h2>
             @else
                 <h1>Nạp Carot <span data-selected-game-name>{{ $initialGameModel?->name ?? 'game Teamobi' }}</span></h1>

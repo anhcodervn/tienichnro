@@ -9,7 +9,7 @@ test('client reward table is configurable and synchronized with the topup form',
     $adminCatalog = file_get_contents($projectRoot.'/resources/js/pages/admin/topup/catalog/index.vue');
 
     expect($home)
-        ->toContain('Bảng thực nhận theo từng game')
+        ->toContain('Bảng giá nạp Carot')
         ->toContain('data-game-reward-tab="{{ $game->id }}"')
         ->toContain('data-game-reward="{{ $game->id }}"')
         ->toContain('<th scope="col">Mệnh giá</th>')

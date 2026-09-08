@@ -15,6 +15,7 @@ use App\Http\Controllers\Client\CrawlerFileController;
 use App\Http\Controllers\Client\SitemapController;
 use App\Http\Controllers\PublicContentPageController;
 use App\Http\Controllers\PublicSeoPageController;
+use App\Http\Controllers\SeoLandingPageController;
 use App\Models\User;
 use App\Support\SettingStore;
 use Illuminate\Http\Request;
@@ -78,7 +79,15 @@ Route::controller(PublicSeoPageController::class)->group(function (): void {
     Route::get('/bai-viet/{slug}', 'legacyShow')->where('slug', '[a-z0-9-]+')->name('seo.legacy.show');
 });
 
-Route::get('/sitemap.xml', SitemapController::class)->name('sitemap');
+Route::get('/sitemap.xml', [SitemapController::class, 'index'])->name('sitemap');
+Route::get('/sitemap-pages.xml', [SitemapController::class, 'pages'])->name('sitemap.pages');
+Route::get('/sitemap-articles.xml', [SitemapController::class, 'articles'])->name('sitemap.articles');
+Route::get('/sitemap-categories.xml', [SitemapController::class, 'categories'])->name('sitemap.categories');
+Route::get('/sitemap-games.xml', [SitemapController::class, 'games'])->name('sitemap.games');
+
+Route::get('/{landingSlug}', SeoLandingPageController::class)
+    ->whereIn('landingSlug', array_keys(config('seo.landings', [])))
+    ->name('seo.landing');
 
 Route::get('/admin/{any?}', function (Request $request, SettingStore $settingStore) {
     $user = $request->user();

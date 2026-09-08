@@ -202,6 +202,43 @@ test('accnrovn create response completes only with success and a non empty topup
     'success with topup id completes' => ['TOPUP-CREATE-001', 'completed'],
 ]);
 
+test('multi unit orders keep provider topup ids on their individual items', function (): void {
+    [$order, $recipient] = accNroVnOrderFixture(['quantity' => 2]);
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::sequence()
+            ->push([
+                'success' => true,
+                'message' => 'OK',
+                'data' => [
+                    'order_id' => 'ACC-MULTI-1',
+                    'status' => 'success',
+                    'status_code' => 'SUCCESS',
+                    'topup_id' => '1205644',
+                ],
+            ])
+            ->push([
+                'success' => true,
+                'message' => 'OK',
+                'data' => [
+                    'order_id' => 'ACC-MULTI-2',
+                    'status' => 'success',
+                    'status_code' => 'SUCCESS',
+                    'topup_id' => '1205645',
+                ],
+            ]),
+    ]);
+
+    $fulfillmentService = app(RecipientFulfillmentService::class);
+    $fulfillmentService->submit($recipient->id, 1);
+    $fulfillmentService->submit($recipient->id, 2);
+
+    $items = $recipient->refresh()->provider_response['items'];
+    expect($items[1]['response']['provider_topup_id'])->toBe('1205644')
+        ->and($items[2]['response']['provider_topup_id'])->toBe('1205645')
+        ->and($order->refresh()->order_status)->toBe(OrderStatus::Completed)
+        ->and($order->topup_id)->toBeNull();
+});
+
 test('accnrovn omits server when the game server has no provider code', function (): void {
     [$order, $recipient, $provider] = accNroVnOrderFixture();
     $order->server()->update(['code' => '']);
@@ -521,7 +558,8 @@ test('accnrovn queries an order by request id and completes fulfillment', functi
     expect($recipient->refresh()->status)->toBe('completed')
         ->and($recipient->provider_status)->toBe('completed')
         ->and($recipient->provider_response['items'][1]['response']['provider_topup_id'])->toBe('1148567')
-        ->and($order->refresh()->order_status)->toBe(OrderStatus::Completed);
+        ->and($order->refresh()->order_status)->toBe(OrderStatus::Completed)
+        ->and($order->topup_id)->toBe('1148567');
     Queue::assertNotPushed(SyncTopupRecipientStatus::class);
 
     Http::assertSent(function (Request $request): bool {

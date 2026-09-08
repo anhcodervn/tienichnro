@@ -78,7 +78,7 @@ test('admin can find a completed order by topup id', function (): void {
     $order = Order::factory()->create([
         'order_status' => OrderStatus::Completed,
         'completed_at' => now(),
-        'topup_id' => Order::generateTopupId(),
+        'topup_id' => '1205643',
     ]);
     Order::factory()->create();
 

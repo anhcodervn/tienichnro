@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\CaptureAffiliateReferral;
 use App\Jobs\SaveUserLogJob;
 use App\Models\User;
 use Illuminate\Support\Facades\Queue;
@@ -47,6 +48,7 @@ beforeEach(function () {
 
 test('authenticated user can logout through json endpoint', function () {
     Queue::fake();
+    $this->withoutMiddleware(CaptureAffiliateReferral::class);
 
     $user = User::factory()->create([
         'username' => 'demo_user',

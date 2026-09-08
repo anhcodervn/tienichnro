@@ -52,12 +52,15 @@ class TopupController extends Controller
             'packages',
             $game->packages->filter(fn ($package) => $package->is_price_available)->values(),
         );
+        $seoLandingSlug = collect(config('seo.landings', []))
+            ->search(fn (array $landing): bool => in_array($game->slug, $landing['game_slugs'] ?? [], true));
 
         return view('client.topup.game', [
             'game' => $game,
             'walletBalance' => $walletBalance,
             'turnstileEnabled' => $turnstileService->isEnabled(),
             'turnstileSiteKey' => $turnstileService->siteKey(),
+            'seoLandingSlug' => is_string($seoLandingSlug) ? $seoLandingSlug : null,
         ]);
     }
 }

@@ -91,11 +91,6 @@ class Order extends Model
         return $code;
     }
 
-    public static function generateTopupId(): string
-    {
-        return (string) Str::ulid();
-    }
-
     public function getRouteKeyName(): string
     {
         return 'code';

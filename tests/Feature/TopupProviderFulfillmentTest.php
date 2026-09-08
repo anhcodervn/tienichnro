@@ -163,7 +163,7 @@ test('provider status completion updates recipient and parent order then queues 
     Http::fake([
         'https://the9p.com/api/rechargews' => Http::response([
             'status' => 'success',
-            'data' => ['order_code' => 'THE9P-2002', 'status' => 'completed'],
+            'data' => ['order_code' => 'THE9P-2002', 'status' => 'completed', 'topup_id' => 'THE9P-TOPUP-2002'],
         ]),
     ]);
     Event::fake([OrderStatusUpdated::class]);
@@ -174,6 +174,7 @@ test('provider status completion updates recipient and parent order then queues 
         ->and($recipient->provider_status)->toBe('completed')
         ->and($recipient->completed_at)->not->toBeNull()
         ->and($order->refresh()->order_status)->toBe(OrderStatus::Completed)
+        ->and($order->topup_id)->toBe('THE9P-TOPUP-2002')
         ->and($order->completed_at)->not->toBeNull();
     Mail::assertQueued(OrderCompletedMail::class, 1);
     Queue::assertNotPushed(SyncTopupRecipientStatus::class);

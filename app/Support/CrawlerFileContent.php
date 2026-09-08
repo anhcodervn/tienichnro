@@ -28,8 +28,9 @@ class CrawlerFileContent
     public function robotsForEditing(): string
     {
         $storedContent = $this->localString('robots_txt');
+        $content = filled($storedContent) ? $storedContent : $this->defaultRobots();
 
-        return $this->normalize(filled($storedContent) ? $storedContent : $this->defaultRobots());
+        return $this->normalize($this->ensureSitemapDirective($content));
     }
 
     public function adsForEditing(): string
@@ -70,5 +71,17 @@ class CrawlerFileContent
         $normalized = trim(str_replace(["\r\n", "\r"], "\n", $content));
 
         return $normalized === '' ? '' : $normalized."\n";
+    }
+
+    private function ensureSitemapDirective(string $content): string
+    {
+        $directive = 'Sitemap: '.route('sitemap');
+        $lines = preg_split('/\R/u', trim($content)) ?: [];
+
+        if (in_array($directive, $lines, true)) {
+            return $content;
+        }
+
+        return rtrim($content)."\n\n".$directive;
     }
 }

@@ -320,11 +320,21 @@ class RecipientFulfillmentService
                 'failed_at' => $preserveCompleted ? $recipient->failed_at : ($recipientStatus === 'failed' ? now() : null),
             ])->save();
 
-            if ($recipient->quantity === 1 && $result->reference !== null && $recipient->order()->firstOrFail()->recipients()->count() === 1) {
-                Order::query()
-                    ->whereKey($recipient->order_id)
-                    ->whereNull('provider_reference')
-                    ->update(['provider_reference' => $result->reference]);
+            if ($recipient->quantity === 1 && $recipient->order()->firstOrFail()->recipients()->count() === 1) {
+                if ($result->reference !== null) {
+                    Order::query()
+                        ->whereKey($recipient->order_id)
+                        ->whereNull('provider_reference')
+                        ->update(['provider_reference' => $result->reference]);
+                }
+
+                $providerTopupId = $this->providerTopupId($result);
+                if ($providerTopupId !== null) {
+                    Order::query()
+                        ->whereKey($recipient->order_id)
+                        ->whereNull('topup_id')
+                        ->update(['topup_id' => $providerTopupId]);
+                }
             }
         }, 3);
     }
@@ -422,6 +432,19 @@ class RecipientFulfillmentService
         $item = data_get($recipient->provider_response, 'items.'.$unit, []);
 
         return is_array($item) ? $item : [];
+    }
+
+    private function providerTopupId(TopupProviderResultDto $result): ?string
+    {
+        $value = $result->response['provider_topup_id'] ?? null;
+
+        if (! is_scalar($value)) {
+            return null;
+        }
+
+        $topupId = trim((string) $value);
+
+        return $topupId !== '' ? mb_substr($topupId, 0, 100) : null;
     }
 
     private function unitRequestId(OrderRecipient $recipient, int $unit): string

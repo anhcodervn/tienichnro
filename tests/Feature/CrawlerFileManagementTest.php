@@ -83,6 +83,19 @@ test('disabled site tells crawlers not to crawl', function (): void {
         ->assertDontSee('Sitemap:');
 });
 
+test('robots output always advertises the canonical sitemap index', function (): void {
+    Setting::query()->updateOrCreate([
+        'key' => 'robots_txt',
+    ], [
+        'value' => "User-agent: *\nAllow: /",
+        'type' => 'string',
+    ]);
+
+    $this->get(route('robots'))
+        ->assertOk()
+        ->assertSee('Sitemap: '.route('sitemap'));
+});
+
 test('child sites do not inherit crawler advertising records from the main site', function (): void {
     Setting::query()->updateOrCreate([
         'key' => 'ads_txt',
@@ -158,11 +171,28 @@ test('sitemap only contains published indexable canonical urls', function (): vo
     $this->get(route('sitemap'))
         ->assertOk()
         ->assertHeader('Content-Type', 'application/xml; charset=UTF-8')
-        ->assertSee(route('seo.category', $indexableCategory->slug))
-        ->assertSee(route('seo.show', ['categorySlug' => $indexableCategory->slug, 'postSlug' => $indexablePost->slug]))
-        ->assertDontSee(route('seo.category', $hiddenCategory->slug))
+        ->assertSee('<sitemapindex', false)
+        ->assertSee(route('sitemap.pages'))
+        ->assertSee(route('sitemap.articles'))
+        ->assertSee(route('sitemap.categories'))
+        ->assertSee(route('sitemap.games'))
         ->assertDontSee($noindexPost->slug)
-        ->assertDontSee($externalCanonicalPost->slug)
+        ->assertDontSee($externalCanonicalPost->slug);
+
+    $this->get(route('sitemap.categories'))
+        ->assertOk()
+        ->assertHeader('Content-Type', 'application/xml; charset=UTF-8')
+        ->assertSee(route('seo.category', $indexableCategory->slug))
+        ->assertDontSee(route('seo.category', $hiddenCategory->slug));
+
+    $this->get(route('sitemap.articles'))
+        ->assertOk()
+        ->assertSee(route('seo.show', ['categorySlug' => $indexableCategory->slug, 'postSlug' => $indexablePost->slug]))
+        ->assertDontSee($noindexPost->slug)
+        ->assertDontSee($externalCanonicalPost->slug);
+
+    $this->get(route('sitemap.pages'))
+        ->assertOk()
         ->assertDontSee(route('content.guide'))
         ->assertSee(route('content.privacy'));
 });
