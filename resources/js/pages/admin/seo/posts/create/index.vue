@@ -7,7 +7,7 @@ import type { AdminSeoPostPayload, SeoPostStatus, SeoRobotsValue, SeoServiceOpti
 import { uploadEditorImages } from '@/utils/editor-image-upload';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink, Eye, ImageIcon, Link2, Plus, Save, Search, Trash2 } from 'lucide-vue-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
 
 const route = useRoute();
@@ -16,6 +16,7 @@ const saving = ref(false);
 const loading = ref(false);
 const slugManuallyEdited = ref(false);
 const canonicalMode = ref<'auto' | 'custom'>('auto');
+const contentEditor = ref<{ flush: () => unknown[] | string } | null>(null);
 const categories = ref<Array<{ id: number; name: string; slug: string }>>([]);
 const services = ref<SeoServiceOption[]>([]);
 
@@ -189,6 +190,12 @@ const handleSave = async (): Promise<void> => {
     saving.value = true;
 
     try {
+        const latestContent = contentEditor.value?.flush();
+        if (Array.isArray(latestContent)) {
+            form.content = latestContent;
+        }
+        await nextTick();
+
         form.content = await uploadEditorImages(form.content ?? []);
 
         const payload: AdminSeoPostPayload = {
@@ -427,7 +434,7 @@ onMounted(async () => {
                         </p>
                     </div>
                     <div class="min-w-0 pt-5">
-                        <Editor v-model="form.content" />
+                        <Editor ref="contentEditor" v-model="form.content" />
                     </div>
                 </article>
 

@@ -42,6 +42,8 @@ type EditorContentNode = {
     items?: EditorInlineNode[][];
 };
 
+type EditorValue = EditorContentNode[] | string;
+
 type TinyMceBlobInfo = {
     blob: () => Blob;
     filename: () => string;
@@ -98,7 +100,13 @@ export default {
             height: number;
             allowImages: boolean;
         },
-        { emit }: { emit: (event: 'update:value' | 'update:modelValue', value: EditorContentNode[] | string) => void },
+        {
+            emit,
+            expose,
+        }: {
+            emit: (event: 'update:value' | 'update:modelValue', value: EditorValue) => void;
+            expose: (exposed: { flush: () => EditorValue }) => void;
+        },
     ) {
         const editorContainer = ref<HTMLElement | null>(null);
         const useFallback = ref(false);
@@ -130,16 +138,21 @@ export default {
             }
         };
 
-        const emitValue = (value: EditorContentNode[] | string) => {
+        const emitValue = (value: EditorValue) => {
             lastEmittedFingerprint = valueFingerprint(value);
             emit('update:value', value);
             emit('update:modelValue', value);
         };
 
-        const emitDebounced = (value: EditorContentNode[] | string) => {
+        const clearSaveTimer = (): void => {
             if (saveTimer) {
                 clearTimeout(saveTimer);
+                saveTimer = null;
             }
+        };
+
+        const emitDebounced = (value: EditorValue) => {
+            clearSaveTimer();
 
             if (props.debounce <= 0) {
                 emitValue(value);
@@ -147,6 +160,7 @@ export default {
             }
 
             saveTimer = setTimeout(() => {
+                saveTimer = null;
                 emitValue(value);
             }, props.debounce);
         };
@@ -238,7 +252,20 @@ export default {
             const normalizedValue = normalizeValue(value);
             return normalizedValue.length > 0 ? jsonToHtml(normalizedValue) : '';
         };
-        const htmlToValue = (html: string): EditorContentNode[] | string => (props.format === 'html' ? html : htmlToJson(html));
+        const htmlToValue = (html: string): EditorValue => (props.format === 'html' ? html : htmlToJson(html));
+
+        const flush = (): EditorValue => {
+            clearSaveTimer();
+
+            const html = useFallback.value ? fallbackContent.value : (editorInstance?.getContent() ?? valueToHtml(currentValue()));
+            const value = htmlToValue(html);
+
+            emitValue(value);
+
+            return value;
+        };
+
+        expose({ flush });
 
         function htmlToJson(html: string): EditorContentNode[] {
             const root = document.createElement('div');
@@ -421,6 +448,8 @@ export default {
         }
 
         function applyEditorValue(value: unknown): void {
+            clearSaveTimer();
+
             const nextHtml = valueToHtml(value);
 
             if (useFallback.value) {
@@ -623,9 +652,7 @@ export default {
         });
 
         onBeforeUnmount(() => {
-            if (saveTimer) {
-                clearTimeout(saveTimer);
-            }
+            clearSaveTimer();
 
             if (uploadedImageSyncTimer) {
                 clearTimeout(uploadedImageSyncTimer);

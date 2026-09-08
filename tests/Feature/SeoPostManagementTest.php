@@ -43,6 +43,46 @@ test('admin can save a dedicated cover image and custom canonical for an seo pos
         ->and($post->canonical_url)->toBe('https://napcarot.com/tin-tuc/nap-ngoc-rong-online');
 });
 
+test('admin can update seo content and the public page renders the saved body', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $category = SeoCategory::query()->create([
+        'name' => 'HÆ°á»›ng dáº«n náº¡p game',
+        'slug' => 'huong-dan-nap-game',
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
+    $post = SeoPost::query()->create([
+        'seo_category_id' => $category->id,
+        'title' => 'BÃ i hÆ°á»›ng dáº«n cáº§n cáº­p nháº­t',
+        'slug' => 'bai-huong-dan-can-cap-nhat',
+        'content' => [],
+        'robots' => 'index,follow',
+        'status' => 'draft',
+    ]);
+    $content = [
+        ['type' => 'paragraph', 'children' => [['text' => 'Ná»™i dung vá»«a nháº­p pháº£i Ä‘Æ°á»£c lÆ°u ngay.']]],
+    ];
+
+    $this->actingAs($admin)
+        ->patchJson('/api/admin-api/seo/posts/'.$post->id, [
+            'seo_category_id' => $category->id,
+            'title' => $post->title,
+            'slug' => $post->slug,
+            'content' => $content,
+            'robots' => 'index,follow',
+            'status' => 'published',
+            'published_at' => now()->toISOString(),
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.content.0.children.0.text', 'Ná»™i dung vá»«a nháº­p pháº£i Ä‘Æ°á»£c lÆ°u ngay.');
+
+    expect($post->fresh()->content)->toBe($content);
+
+    $this->get(route('seo.show', ['categorySlug' => $category->slug, 'postSlug' => $post->slug]))
+        ->assertOk()
+        ->assertSee('Ná»™i dung vá»«a nháº­p pháº£i Ä‘Æ°á»£c lÆ°u ngay.');
+});
+
 test('seo post cover image and canonical values are validated', function (array $overrides): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $payload = [

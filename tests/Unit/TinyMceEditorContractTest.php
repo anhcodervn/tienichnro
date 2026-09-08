@@ -13,6 +13,24 @@ test('tinymce ignores the controlled prop echo from its own input event', functi
         ->toBeLessThan(strpos($source, "emit('update:value', value);"));
 });
 
+test('tinymce cancels stale updates and flushes the latest content before saving', function (): void {
+    $editorPath = dirname(__DIR__, 2).'/resources/js/components/shared/Editor/index.vue';
+    $source = file_get_contents($editorPath);
+    $applyEditorValue = substr($source, strpos($source, 'function applyEditorValue'), strpos($source, 'function renderNode') - strpos($source, 'function applyEditorValue'));
+    $flush = substr($source, strpos($source, 'const flush ='), strpos($source, 'expose({ flush });') - strpos($source, 'const flush ='));
+
+    expect($source)
+        ->toContain('const clearSaveTimer = (): void =>')
+        ->toContain('saveTimer = null;')
+        ->toContain('expose({ flush });')
+        ->and($applyEditorValue)->toContain('clearSaveTimer();')
+        ->and($flush)
+        ->toContain('clearSaveTimer();')
+        ->toContain('editorInstance?.getContent()')
+        ->toContain('emitValue(value);')
+        ->toContain('return value;');
+});
+
 test('admin shell loads the complete local tinymce distribution', function (): void {
     $projectRoot = dirname(__DIR__, 2);
     $layout = file_get_contents($projectRoot.'/resources/views/app.blade.php');
