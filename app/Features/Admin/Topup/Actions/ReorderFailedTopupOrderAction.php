@@ -27,7 +27,8 @@ class ReorderFailedTopupOrderAction
 
     public function handle(Order $order, User $admin, Request $request): Order
     {
-        $this->assertEligible($order->loadMissing(['provider', 'recipients']));
+        $forceReorder = $request->boolean('force_reorder');
+        $this->assertEligible($order->loadMissing(['provider', 'recipients']), $forceReorder);
 
         try {
             $balanceBefore = $this->providerBalanceService->forOrder($order);
@@ -42,7 +43,7 @@ class ReorderFailedTopupOrderAction
         }
 
         /** @var array{order: Order, failed_units: array<int, array<int, int>>} $result */
-        $result = DB::transaction(function () use ($order, $admin, $request, $balanceBefore): array {
+        $result = DB::transaction(function () use ($order, $admin, $request, $balanceBefore, $forceReorder): array {
             $lockedOrder = Order::query()
                 ->withoutGlobalScope(TenantScope::class)
                 ->with('provider')
@@ -51,7 +52,7 @@ class ReorderFailedTopupOrderAction
             $recipients = $lockedOrder->recipients()->lockForUpdate()->get();
             $lockedOrder->setRelation('recipients', $recipients);
 
-            $failedUnits = $this->assertEligible($lockedOrder);
+            $failedUnits = $this->assertEligible($lockedOrder, $forceReorder);
             $metadata = is_array($lockedOrder->metadata) ? $lockedOrder->metadata : [];
             $previousReorder = is_array($metadata['reorder'] ?? null) ? $metadata['reorder'] : null;
             $attempt = max((int) ($previousReorder['attempt'] ?? 0), 0) + 1;
@@ -76,7 +77,7 @@ class ReorderFailedTopupOrderAction
                     }
                 }
 
-                if ($recipient->status !== 'failed') {
+                if ($recipient->status !== 'failed' || ! isset($failedUnits[$recipient->id])) {
                     continue;
                 }
 
@@ -87,8 +88,11 @@ class ReorderFailedTopupOrderAction
                 $reorderHistory[] = [
                     'attempt' => $attempt,
                     'reordered_at' => now()->toISOString(),
-                    'items' => collect($items)
-                        ->filter(fn (mixed $item): bool => is_array($item) && ($item['status'] ?? null) === TopupProviderStatus::Failed->value)
+                    'forced' => $forceReorder,
+                    'items' => collect($failedUnits[$recipient->id])
+                        ->map(fn (int $unit): array => is_array($items[(string) $unit] ?? null)
+                            ? $items[(string) $unit]
+                            : ['unit' => $unit])
                         ->values()
                         ->all(),
                 ];
@@ -133,6 +137,7 @@ class ReorderFailedTopupOrderAction
                 'balance_before' => $balanceBefore->balance,
                 'currency' => $balanceBefore->currency,
                 'status' => 'queued',
+                'duplicate_check_overridden' => $forceReorder,
             ];
 
             $lockedOrder->forceFill([
@@ -159,6 +164,7 @@ class ReorderFailedTopupOrderAction
                     'failed_units' => collect($failedUnits)->flatten()->count(),
                     'provider_balance_before' => $balanceBefore->balance,
                     'provider_currency' => $balanceBefore->currency,
+                    'duplicate_check_overridden' => $forceReorder,
                 ],
                 'ip' => $request->ip(),
                 'user_agent' => $request->userAgent(),
@@ -180,7 +186,7 @@ class ReorderFailedTopupOrderAction
     }
 
     /** @return array<int, array<int, int>> */
-    private function assertEligible(Order $order): array
+    private function assertEligible(Order $order, bool $forceReorder = false): array
     {
         if ($order->payment_status !== PaymentStatus::Paid || $order->order_status !== OrderStatus::Failed) {
             throw ValidationException::withMessages([
@@ -204,22 +210,30 @@ class ReorderFailedTopupOrderAction
             $items = data_get($recipient->provider_response, 'items');
 
             if (! is_array($items)) {
-                $this->throwAmbiguousState();
+                if (! $forceReorder) {
+                    $this->throwAmbiguousState();
+                }
+
+                $failedUnits[$recipient->id] = range(1, $recipient->quantity);
+
+                continue;
             }
 
             foreach (range(1, $recipient->quantity) as $unit) {
                 $status = data_get($items, $unit.'.status');
 
-                if (! in_array($status, [TopupProviderStatus::Completed->value, TopupProviderStatus::Failed->value], true)) {
+                if ($status === TopupProviderStatus::Completed->value) {
+                    continue;
+                }
+
+                if ($status !== TopupProviderStatus::Failed->value && ! $forceReorder) {
                     $this->throwAmbiguousState();
                 }
 
-                if ($status === TopupProviderStatus::Failed->value) {
-                    $failedUnits[$recipient->id][] = $unit;
-                }
+                $failedUnits[$recipient->id][] = $unit;
             }
 
-            if (! isset($failedUnits[$recipient->id])) {
+            if (! isset($failedUnits[$recipient->id]) && ! $forceReorder) {
                 $this->throwAmbiguousState();
             }
         }
@@ -237,6 +251,7 @@ class ReorderFailedTopupOrderAction
     {
         throw ValidationException::withMessages([
             'reorder' => 'Trạng thái provider chưa xác định rõ. Hãy đối soát thủ công để tránh nạp trùng.',
+            'force_reorder' => 'Provider chưa xác nhận thất bại. Tiếp tục đẩy lại có thể khiến tài khoản nhận trùng vật phẩm.',
         ]);
     }
 

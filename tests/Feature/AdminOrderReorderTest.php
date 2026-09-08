@@ -154,10 +154,70 @@ test('reorder rejects unpaid manual and ambiguous provider states without dispat
     $this->actingAs($admin)
         ->putJson("/api/admin-api/orders/{$ambiguousOrder->code}", ['action' => 'reorder'])
         ->assertUnprocessable()
-        ->assertJsonValidationErrors('reorder');
+        ->assertJsonValidationErrors(['reorder', 'force_reorder']);
 
     Queue::assertNotPushed(ProcessTopupRecipient::class);
     Http::assertNothingSent();
+});
+
+test('admin can confirm an ambiguous provider reorder while completed units stay protected', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    Queue::fake();
+    Http::preventStrayRequests();
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::response([
+            'status' => 'success',
+            'data' => ['balance' => 5_000_000, 'currency' => 'VND'],
+        ]),
+    ]);
+
+    [$order, $recipient] = reorderableOrderFixture();
+    $recipient->forceFill([
+        'provider_response' => ['items' => [
+            1 => [
+                'unit' => 1,
+                'request_id' => $order->code.'-OLD-R001-U001',
+                'reference' => $order->code.'-THE9P-OLD',
+                'status' => 'completed',
+            ],
+            2 => [
+                'unit' => 2,
+                'request_id' => $order->code.'-OLD-R001-U002',
+                'status' => 'processing',
+            ],
+        ]],
+    ])->save();
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/orders/{$order->code}", [
+            'action' => 'reorder',
+            'force_reorder' => true,
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.order_status', 'processing');
+
+    $order->refresh();
+    $recipient->refresh();
+
+    expect(data_get($order->metadata, 'reorder.duplicate_check_overridden'))->toBeTrue()
+        ->and(data_get($recipient->provider_response, 'reorder_history.0.forced'))->toBeTrue()
+        ->and(data_get($recipient->provider_response, 'items.1.status'))->toBe('completed')
+        ->and(data_get($recipient->provider_response, 'items.1.request_id'))->toBe($order->code.'-OLD-R001-U001')
+        ->and(data_get($recipient->provider_response, 'items.2.status'))->toBe('pending')
+        ->and(data_get($recipient->provider_response, 'items.2.request_id'))->toBe($order->code.'-R001-A001-U002');
+
+    Queue::assertPushed(ProcessTopupRecipient::class, 1);
+    Queue::assertPushed(
+        ProcessTopupRecipient::class,
+        fn (ProcessTopupRecipient $job): bool => $job->recipientId === $recipient->id && $job->unit === 2,
+    );
+    Queue::assertNotPushed(
+        ProcessTopupRecipient::class,
+        fn (ProcessTopupRecipient $job): bool => $job->recipientId === $recipient->id && $job->unit === 1,
+    );
+
+    $audit = AdminAuditLog::query()->where('action', 'order_reorder')->latest('id')->firstOrFail();
+    expect(data_get($audit->new_values, 'duplicate_check_overridden'))->toBeTrue();
 });
 
 /**

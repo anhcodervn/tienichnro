@@ -25,6 +25,9 @@ test('admin order page provides responsive table actions dropdown and detail mod
         ->toContain('Hiển thị {{ pagination.from || 0 }}')
         ->toContain('Đẩy lại thẻ lỗi')
         ->toContain('Chỉ các lượt provider đã xác nhận thất bại')
+        ->toContain('Cảnh báo nguy cơ nạp trùng')
+        ->toContain('Tiếp tục đẩy lại')
+        ->toContain('forceReorderWarning(error)')
         ->toContain('Kiểm tra lại trạng thái')
         ->not->toContain("if (order.can_sync_provider) return { action: 'sync_provider'")
         ->toContain('Hoàn thành thủ công')
@@ -70,5 +73,6 @@ test('admin order page provides responsive table actions dropdown and detail mod
         ->and($service)
         ->toContain('order: (code: string)')
         ->toContain('updateOrder: (code: string')
+        ->toContain('force_reorder: forceReorder || undefined')
         ->toContain('`${root}/orders/${code}`');
 });

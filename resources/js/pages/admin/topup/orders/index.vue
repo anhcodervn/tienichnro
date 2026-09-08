@@ -137,6 +137,13 @@ const errorMessage = (error: unknown, fallback: string): string => {
     return candidate.response?.data?.message || candidate.message || fallback;
 };
 
+const forceReorderWarning = (error: unknown): string | null => {
+    const candidate = error as { response?: { status?: number; data?: { errors?: Record<string, string[]> } } };
+    const messages = candidate.response?.data?.errors?.force_reorder;
+
+    return candidate.response?.status === 422 && Array.isArray(messages) ? messages[0] || null : null;
+};
+
 const primaryActionFor = (order: OrderRow): ActionOption => {
     if (order.payment_status === 'pending' && !['completed', 'cancelled'].includes(order.order_status)) {
         return { action: 'mark_paid', label: 'Đã nhận tiền', tone: 'primary' };
@@ -372,6 +379,27 @@ const confirmationFor = (order: OrderRow, action: Exclude<OrderAction, 'detail'>
         cancel: { title: 'Hủy đơn?', text: `Thao tác này sẽ hủy đơn ${order.code}.`, confirm: 'Hủy đơn' },
     })[action];
 
+type OrderActionResponse = { data: { data: OrderRow; message?: string } };
+
+const finishOrderAction = async (order: OrderRow, response: OrderActionResponse): Promise<void> => {
+    const updatedOrder = response.data.data;
+    delete orderDetails.value[order.code];
+
+    if (detailModalOpen.value && selectedOrder.value?.code === order.code) {
+        orderDetails.value[order.code] = updatedOrder;
+        selectedOrder.value = updatedOrder;
+    }
+
+    await load();
+    await Swal.fire({
+        icon: 'success',
+        title: 'Thao tác thành công',
+        text: response.data.message || `Đã cập nhật đơn ${order.code}.`,
+        timer: 1800,
+        showConfirmButton: false,
+    });
+};
+
 const act = async (order: OrderRow, action: OrderAction): Promise<void> => {
     closeMenu();
     if (action === 'detail') return openDetailModal(order);
@@ -396,24 +424,35 @@ const act = async (order: OrderRow, action: OrderAction): Promise<void> => {
     actingCode.value = order.code;
     try {
         const response = await adminTopupService.updateOrder(order.code, action, needsReason ? String(result.value).trim() : undefined);
-        const updatedOrder = response.data.data as OrderRow;
-        delete orderDetails.value[order.code];
+        await finishOrderAction(order, response);
+    } catch (error) {
+        const warning = action === 'reorder' ? forceReorderWarning(error) : null;
 
-        if (detailModalOpen.value && selectedOrder.value?.code === order.code) {
-            orderDetails.value[order.code] = updatedOrder;
-            selectedOrder.value = updatedOrder;
+        if (warning === null) {
+            handleErrorResponse(error as Parameters<typeof handleErrorResponse>[0]);
+
+            return;
         }
 
-        await load();
-        await Swal.fire({
-            icon: 'success',
-            title: 'Thao tác thành công',
-            text: response.data?.message || `Đã cập nhật đơn ${order.code}.`,
-            timer: 1800,
-            showConfirmButton: false,
+        const forceResult = await Swal.fire({
+            icon: 'warning',
+            title: 'Cảnh báo nguy cơ nạp trùng',
+            text: warning,
+            showCancelButton: true,
+            confirmButtonText: 'Tiếp tục đẩy lại',
+            cancelButtonText: 'Đóng',
+            confirmButtonColor: '#be123c',
+            reverseButtons: true,
         });
-    } catch (error) {
-        handleErrorResponse(error as Parameters<typeof handleErrorResponse>[0]);
+
+        if (!forceResult.isConfirmed) return;
+
+        try {
+            const response = await adminTopupService.updateOrder(order.code, action, undefined, true);
+            await finishOrderAction(order, response);
+        } catch (forceError) {
+            handleErrorResponse(forceError as Parameters<typeof handleErrorResponse>[0]);
+        }
     } finally {
         actingCode.value = null;
     }
