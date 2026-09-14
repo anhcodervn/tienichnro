@@ -368,7 +368,7 @@ watch(() => props.catalogType, load, { immediate: true });
             <p class="mt-1 text-sm text-slate-500">{{ pageContent.description }}</p>
         </header>
 
-        <div class="grid items-start gap-5 2xl:grid-cols-[minmax(0,1fr)_390px]">
+        <div class="grid items-start gap-5 min-[1800px]:grid-cols-[minmax(0,1fr)_390px]">
             <div class="min-w-0 space-y-4">
                 <form class="rounded-md border border-slate-200 bg-white p-4 shadow-sm" @submit.prevent="applyFilters">
                     <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -468,14 +468,22 @@ watch(() => props.catalogType, load, { immediate: true });
                                     <th class="p-4">Máy chủ</th>
                                     <th class="p-4">Gói nạp</th>
                                     <th class="p-4">Trạng thái</th>
-                                    <th class="p-4 text-right">Thao tác</th>
+                                    <th
+                                        class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 p-4 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]"
+                                    >
+                                        Thao tác
+                                    </th>
                                 </tr>
                                 <tr v-else-if="catalogType === 'servers'">
                                     <th class="p-4">Máy chủ</th>
                                     <th class="p-4">Game</th>
                                     <th class="p-4">Mã</th>
                                     <th class="p-4">Trạng thái</th>
-                                    <th class="p-4 text-right">Thao tác</th>
+                                    <th
+                                        class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 p-4 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]"
+                                    >
+                                        Thao tác
+                                    </th>
                                 </tr>
                                 <tr v-else>
                                     <th class="p-4">Tên</th>
@@ -484,11 +492,15 @@ watch(() => props.catalogType, load, { immediate: true });
                                     <th class="p-4">Giá gốc riêng</th>
                                     <th class="p-4">Giá áp dụng</th>
                                     <th class="p-4">Trạng thái</th>
-                                    <th class="p-4 text-right">Thao tác</th>
+                                    <th
+                                        class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 p-4 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]"
+                                    >
+                                        Thao tác
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
-                                <tr v-for="row in rows" :key="row.id" class="hover:bg-slate-50/70">
+                                <tr v-for="row in rows" :key="row.id" class="group hover:bg-slate-50/70">
                                     <template v-if="catalogType === 'games'">
                                         <td class="p-4 font-semibold text-slate-950">
                                             {{ row.name }}
@@ -535,7 +547,9 @@ watch(() => props.catalogType, load, { immediate: true });
                                             >{{ row.status === 'active' ? 'Hoạt động' : 'Tạm tắt' }}</span
                                         >
                                     </td>
-                                    <td class="whitespace-nowrap p-4 text-right">
+                                    <td
+                                        class="sticky right-0 z-10 whitespace-nowrap bg-white p-4 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] transition-colors group-hover:bg-slate-50"
+                                    >
                                         <button type="button" class="mr-3 font-semibold text-emerald-700" @click="edit(row)">Sửa</button
                                         ><button type="button" class="font-semibold text-rose-600" @click="remove(row)">Xóa</button>
                                     </td>

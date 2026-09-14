@@ -67,7 +67,7 @@ onBeforeUnmount(() => {
                 <Header :page-title="currentPageTitle" @open-sidebar="isSidebarOpen = true" />
 
                 <main :class="isSupportRoute ? 'px-3 py-3 sm:px-4' : 'px-4 pb-8 pt-6 sm:px-6 xl:px-8'">
-                    <div class="mx-auto w-full min-w-0 max-w-[1200px]">
+                    <div class="mx-auto w-full min-w-0 max-w-[1800px]">
                         <router-view />
                     </div>
                 </main>

@@ -207,7 +207,7 @@ onMounted(load);
                 {{ refreshingBalances ? 'Đang kiểm tra số dư...' : 'Cập nhật số dư' }}
             </button>
         </header>
-        <div class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div class="grid items-start gap-5 min-[1800px]:grid-cols-[minmax(0,1fr)_400px]">
             <div class="min-w-0 space-y-4">
                 <form class="rounded-md border border-slate-200 bg-white p-4 shadow-sm" @submit.prevent="applyFilters">
                     <div class="grid gap-3 sm:grid-cols-[minmax(0,1fr)_140px_auto] sm:items-end">
@@ -252,11 +252,15 @@ onMounted(load);
                                     <th class="p-4">Kết nối</th>
                                     <th class="p-4">Số dư provider</th>
                                     <th class="p-4">Gói nạp</th>
-                                    <th class="p-4 text-right">Thao tác</th>
+                                    <th
+                                        class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 p-4 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]"
+                                    >
+                                        Thao tác
+                                    </th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
-                                <tr v-for="provider in providers" :key="provider.id" class="hover:bg-slate-50/70">
+                                <tr v-for="provider in providers" :key="provider.id" class="group hover:bg-slate-50/70">
                                     <td class="p-4 font-semibold text-slate-950">{{ provider.name }}</td>
                                     <td class="p-4 font-mono text-xs text-slate-600">{{ provider.slug }}</td>
                                     <td class="p-4">
@@ -309,7 +313,9 @@ onMounted(load);
                                         </div>
                                     </td>
                                     <td class="p-4 font-semibold">{{ provider.packages_count || 0 }}</td>
-                                    <td class="p-4 text-right">
+                                    <td
+                                        class="sticky right-0 z-10 whitespace-nowrap bg-white p-4 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] transition-colors group-hover:bg-slate-50"
+                                    >
                                         <button type="button" class="mr-3 font-semibold text-emerald-700" @click="edit(provider)">Sửa</button
                                         ><button type="button" class="font-semibold text-rose-600" @click="remove(provider)">Xóa</button>
                                     </td>

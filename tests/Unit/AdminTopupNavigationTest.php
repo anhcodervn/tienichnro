@@ -57,3 +57,22 @@ test('provider editor is separated from catalog while package provider lookup re
         ->toContain('filters.search')
         ->toContain('pagination.current_page');
 });
+
+test('topup tables keep actions visible and only split editors on wide screens', function (): void {
+    $projectRoot = dirname(__DIR__, 2);
+    $catalog = file_get_contents($projectRoot.'/resources/js/pages/admin/topup/catalog/index.vue');
+    $providers = file_get_contents($projectRoot.'/resources/js/pages/admin/topup/providers/index.vue');
+    $orders = file_get_contents($projectRoot.'/resources/js/pages/admin/topup/orders/index.vue');
+
+    expect($catalog)
+        ->toContain('min-[1800px]:grid-cols-[minmax(0,1fr)_390px]')
+        ->toContain('sticky right-0 z-10 whitespace-nowrap bg-slate-50')
+        ->toContain('sticky right-0 z-10 whitespace-nowrap bg-white')
+        ->and($providers)
+        ->toContain('min-[1800px]:grid-cols-[minmax(0,1fr)_400px]')
+        ->toContain('sticky right-0 z-10 whitespace-nowrap bg-slate-50')
+        ->toContain('sticky right-0 z-10 whitespace-nowrap bg-white')
+        ->and($orders)
+        ->toContain('sticky right-0 z-10 whitespace-nowrap bg-slate-50')
+        ->toContain('sticky right-0 z-10 bg-white');
+});

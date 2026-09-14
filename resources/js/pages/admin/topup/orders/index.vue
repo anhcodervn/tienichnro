@@ -670,14 +670,18 @@ onBeforeUnmount(() => {
                                 <th class="w-[190px] px-4 py-3.5">Gói nạp</th>
                                 <th class="w-[175px] px-4 py-3.5">Thanh toán</th>
                                 <th class="w-[190px] px-4 py-3.5">Xử lý provider</th>
-                                <th class="px-4 py-3.5 text-right">Thao tác</th>
+                                <th
+                                    class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3.5 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]"
+                                >
+                                    Thao tác
+                                </th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             <tr
                                 v-for="order in orders"
                                 :key="order.id"
-                                class="cursor-pointer align-top transition-colors focus-within:bg-indigo-50/35 hover:bg-indigo-50/35"
+                                class="group cursor-pointer align-top transition-colors focus-within:bg-indigo-50/35 hover:bg-indigo-50/35"
                                 tabindex="0"
                                 @click="openDetailModal(order)"
                                 @keydown.enter="openDetailModal(order)"
@@ -737,7 +741,9 @@ onBeforeUnmount(() => {
                                         {{ order.failure_reason }}
                                     </p>
                                 </td>
-                                <td class="px-4 py-4">
+                                <td
+                                    class="sticky right-0 z-10 bg-white px-4 py-4 shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)] transition-colors group-focus-within:bg-indigo-50 group-hover:bg-indigo-50"
+                                >
                                     <div class="flex items-center justify-end gap-2">
                                         <button
                                             type="button"
