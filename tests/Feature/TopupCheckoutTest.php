@@ -97,6 +97,7 @@ test('guest home renders the purchase layout reward table and seo content withou
             'required',
         ], false)
         ->assertSee('data-package-button="'.$package->id.'"', false)
+        ->assertSee('class="home-package-discount">-10%</span>', false)
         ->assertSee('data-order-total', false)
         ->assertSee('data-summary-reward', false)
         ->assertSee('name="email"', false)
@@ -191,7 +192,7 @@ test('home renders the checkout fields configured for each game', function (): v
         ->assertOk()
         ->assertSee('name="recipient_fields[player_id]"', false)
         ->assertSee('name="recipient_fields[zone]"', false)
-        ->assertSee('Mỗi dòng theo thứ tự:', false)
+        ->assertSee('Mỗi dòng 1 tài khoản theo đúng định dạng:', false)
         ->assertSee('ID người chơi | Khu vực | Số lượng thẻ')
         ->assertSee('data-bulk-placeholder="Nhập ID số|Ví dụ: Asia|Số lượng thẻ"', false);
 });

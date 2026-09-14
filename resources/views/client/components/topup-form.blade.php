@@ -135,14 +135,18 @@
                                 aria-pressed="{{ (string) $requestedPackage === (string) $package->id ? 'true' : 'false' }}"
                             >
                                 <span class="home-package-check" aria-hidden="true">✓</span>
-                                <strong>{{ $package->denomination ? number_format($package->denomination, 0, ',', '.') : $package->name }}</strong>
-                                <span>{{ number_format((int) $package->price, 0, ',', '.') }}đ</span>
-                                @if ((int) ($package->retail_price ?? $package->price) > (int) $package->price)
-                                    <small class="line-through opacity-70">{{ number_format((int) $package->retail_price, 0, ',', '.') }}đ</small>
-                                @endif
                                 @if ((float) $package->discount_percent > 0)
-                                    <small>-{{ number_format((float) $package->discount_percent, 0, ',', '.') }}%</small>
+                                    <span class="home-package-discount">-{{ number_format((float) $package->discount_percent, 0, ',', '.') }}%</span>
                                 @endif
+                                <strong class="home-package-name">{{ $package->name }}</strong>
+                                <span class="home-package-original-price">
+                                    <span>Giá gốc</span>
+                                    <del>{{ number_format((int) ($package->original_price ?? $package->price), 0, ',', '.') }}đ</del>
+                                </span>
+                                <span class="home-package-payment-price">
+                                    <span>Thanh toán</span>
+                                    <span>{{ number_format((int) $package->price, 0, ',', '.') }}đ</span>
+                                </span>
                             </button>
                         @empty
                             <p class="home-package-empty">Bảng giá đang được cập nhật.</p>
@@ -268,7 +272,7 @@
                             ->implode('|');
                     @endphp
                     <p class="home-bulk-schema" data-bulk-schema="{{ $game->id }}" data-bulk-placeholder="{{ $fieldPlaceholders }}" data-bulk-confirm-recipient-label="{{ $fieldLabels }}" data-bulk-fields="{{ $checkoutFields->map(fn ($field) => ['label' => $field['label'], 'required' => $field['required'], 'regex' => $field['regex']])->values()->toJson() }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
-                        Mỗi dòng theo thứ tự: <strong>{{ $fieldLabels }}</strong>
+                        Mỗi dòng 1 tài khoản theo đúng định dạng: <strong>{{ $fieldLabels }}</strong>
                     </p>
                 @endforeach
                 <textarea

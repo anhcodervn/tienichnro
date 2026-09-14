@@ -1527,7 +1527,26 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
             validateRecipientInput(input);
         });
     });
+    const completeBulkLineOnEnter = (event) => {
+        if (!bulkRecipients || event.key !== 'Enter' || event.shiftKey || event.isComposing) return;
+
+        const selectionStart = bulkRecipients.selectionStart ?? bulkRecipients.value.length;
+        const selectionEnd = bulkRecipients.selectionEnd ?? selectionStart;
+        const lineStart = bulkRecipients.value.lastIndexOf('\n', selectionStart - 1) + 1;
+        const nextLineBreak = bulkRecipients.value.indexOf('\n', selectionStart);
+        const lineEnd = nextLineBreak === -1 ? bulkRecipients.value.length : nextLineBreak;
+        const currentLine = bulkRecipients.value.slice(lineStart, selectionStart);
+
+        if (selectionStart !== selectionEnd || selectionStart !== lineEnd || currentLine.trim() === '' || /\|\s*\d+\s*$/.test(currentLine)) return;
+
+        event.preventDefault();
+        const quantityPrefix = /\|\s*$/.test(currentLine) ? '' : '|';
+        bulkRecipients.setRangeText(`${quantityPrefix}1\n`, selectionStart, selectionEnd, 'end');
+        bulkRecipients.dispatchEvent(new Event('input', { bubbles: true }));
+    };
+
     if (bulkRecipients) lowercaseRecipientInput(bulkRecipients);
+    bulkRecipients?.addEventListener('keydown', completeBulkLineOnEnter);
     bulkRecipients?.addEventListener('input', (event) => {
         if (event.isComposing) return;
         lowercaseRecipientInput(bulkRecipients);

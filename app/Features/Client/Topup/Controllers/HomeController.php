@@ -94,6 +94,7 @@ class HomeController extends Controller
                 'url' => route('seo.landing', ['landingSlug' => $slug]),
             ]);
         $latestSeoPosts = SeoPost::query()
+            ->select(['id', 'seo_category_id', 'title', 'slug', 'excerpt', 'published_at'])
             ->with('category:id,name,slug,is_active')
             ->where('status', 'published')
             ->where('robots', 'index,follow')
@@ -102,7 +103,7 @@ class HomeController extends Controller
             ->whereHas('category', fn (Builder $query) => $query->where('is_active', true))
             ->orderByDesc('published_at')
             ->orderByDesc('id')
-            ->take(6)
+            ->take(3)
             ->get()
             ->map(fn (SeoPost $post): array => [
                 'title' => $post->title,

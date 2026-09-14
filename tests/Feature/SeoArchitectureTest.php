@@ -38,6 +38,35 @@ test('homepage targets carot and exposes visible seo sections with matching sche
     }
 });
 
+test('homepage shows the three latest seo posts followed by the all posts card', function (): void {
+    $category = SeoCategory::query()->create([
+        'name' => 'Hướng dẫn',
+        'slug' => 'huong-dan-moi',
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
+
+    foreach (range(1, 4) as $position) {
+        SeoPost::query()->create([
+            'seo_category_id' => $category->id,
+            'title' => "Bài viết mới {$position}",
+            'slug' => "bai-viet-moi-{$position}",
+            'content' => [],
+            'robots' => 'index,follow',
+            'status' => 'published',
+            'published_at' => now()->subMinutes($position),
+        ]);
+    }
+
+    $response = $this->get(route('home'))
+        ->assertOk()
+        ->assertSeeInOrder(['Bài viết mới 1', 'Bài viết mới 2', 'Bài viết mới 3', 'Xem tất cả bài viết'])
+        ->assertDontSee('Bài viết mới 4')
+        ->assertSee('href="'.route('seo.index').'" data-home-all-posts', false);
+
+    expect(substr_count($response->getContent(), 'data-home-latest-post'))->toBe(3);
+});
+
 test('all configured money pages are indexable and self canonical', function (): void {
     foreach (array_keys(config('seo.landings')) as $landingSlug) {
         $url = route('seo.landing', ['landingSlug' => $landingSlug]);

@@ -356,7 +356,7 @@
         <div class="client-container grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
             <div class="sm:col-span-2">
                 @if ($headerLogo !== '')
-                    <img src="{{ $headerLogo }}" alt="{{ $siteName }}" class="h-auto w-32 object-contain object-left sm:w-36">
+                    <img src="{{ $headerLogo }}" alt="{{ $siteName }}" class="h-auto w-[15rem] object-contain object-left sm:w-36">
                 @else
                     <p class="font-extrabold text-slate-950">{{ $siteName }}</p>
                 @endif
