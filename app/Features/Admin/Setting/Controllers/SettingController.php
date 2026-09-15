@@ -51,6 +51,7 @@ class SettingController extends Controller
             'service-articles' => [
                 'game_service_enabled' => false,
                 'game_service_items' => [],
+                'footer_game_links' => [],
             ],
             'bio' => [
                 'bio_title' => '',
@@ -225,6 +226,7 @@ class SettingController extends Controller
             'service-articles' => [
                 'game_service_enabled' => 'game_service_enabled',
                 'game_service_items' => 'game_service_items',
+                'footer_game_links' => 'footer_game_links',
             ],
             'bio' => [
                 'bio_title' => 'bio_title',

@@ -192,6 +192,8 @@ test('home renders the checkout fields configured for each game', function (): v
         ->assertOk()
         ->assertSee('name="recipient_fields[player_id]"', false)
         ->assertSee('name="recipient_fields[zone]"', false)
+        ->assertSee('class="home-field home-recipient-field sm:col-span-2" data-field-key="player_id"', false)
+        ->assertSee('class="home-field home-recipient-field sm:col-span-2" data-field-key="zone"', false)
         ->assertSee('Mỗi dòng 1 tài khoản theo đúng định dạng:', false)
         ->assertSee('ID người chơi | Khu vực | Số lượng thẻ')
         ->assertSee('data-bulk-placeholder="Nhập ID số|Ví dụ: Asia|Số lượng thẻ"', false);

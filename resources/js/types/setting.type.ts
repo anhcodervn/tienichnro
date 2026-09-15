@@ -66,6 +66,7 @@ export interface GameServiceMenuItem {
 export interface ServiceArticlesSettingType {
     game_service_enabled: boolean;
     game_service_items: GameServiceMenuItem[];
+    footer_game_links: GameServiceMenuItem[];
 }
 
 export interface BioLinkItemType {

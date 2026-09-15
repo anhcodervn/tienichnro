@@ -16,10 +16,14 @@ test('general settings exposes a repeatable service submenu editor and guarded c
         ->toContain('v-model="item.url"')
         ->toContain('@click="addServiceArticleItem"')
         ->toContain('@click="removeServiceArticleItem(index)"')
+        ->toContain('v-for="(item, index) in serviceArticlesForm.footer_game_links"')
+        ->toContain('@click="addFooterGameLink"')
+        ->toContain('@click="removeFooterGameLink(index)"')
         ->toContain('@click="saveServiceArticles"')
         ->and($settingTypes)
         ->toContain('export interface GameServiceMenuItem')
         ->toContain('game_service_items: GameServiceMenuItem[]')
+        ->toContain('footer_game_links: GameServiceMenuItem[]')
         ->and($settingService)
         ->toContain("getTab<ServiceArticlesSettingType>('service-articles')")
         ->toContain("updateTab<ServiceArticlesSettingType>('service-articles', payload)")
@@ -27,5 +31,7 @@ test('general settings exposes a repeatable service submenu editor and guarded c
         ->toContain('$showGameServiceMenu')
         ->toContain('data-game-service-menu')
         ->toContain('data-game-service-link')
+        ->toContain('data-footer-game-links')
+        ->toContain('data-footer-game-link')
         ->toContain('@foreach ($gameServiceItems as $gameServiceItem)');
 });

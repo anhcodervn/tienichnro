@@ -35,6 +35,9 @@ test('authenticated client header shows the account dropdown and current wallet 
         ->assertSee('data-account-menu', false)
         ->assertSee('data-account-menu-toggle', false)
         ->assertSee('data-account-menu-panel', false)
+        ->assertSee('data-mobile-account-menu', false)
+        ->assertSee('data-mobile-sidebar-toggle', false)
+        ->assertSee('client-mobile-account-menu', false)
         ->assertSee('data-header-wallet-balance', false)
         ->assertSee('player@example.com')
         ->assertSee('101.925.579đ')
@@ -46,7 +49,8 @@ test('authenticated client header shows the account dropdown and current wallet 
 test('guest client header does not render an account dropdown', function (): void {
     $this->get(route('home'))
         ->assertOk()
-        ->assertDontSee('data-account-menu', false);
+        ->assertDontSee('data-account-menu', false)
+        ->assertSee('data-mobile-sidebar-toggle', false);
 });
 
 test('user can register login and logout through clean client routes', function (): void {

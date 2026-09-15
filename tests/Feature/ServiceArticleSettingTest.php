@@ -21,11 +21,13 @@ test('game service navigation defaults to a hidden empty submenu', function (): 
         ->getJson('/api/admin-api/settings/service-articles')
         ->assertOk()
         ->assertJsonPath('data.settings.game_service_enabled', false)
-        ->assertJsonPath('data.settings.game_service_items', []);
+        ->assertJsonPath('data.settings.game_service_items', [])
+        ->assertJsonPath('data.settings.footer_game_links', []);
 
     $this->get(route('home'))
         ->assertOk()
-        ->assertDontSee('data-game-service-menu', false);
+        ->assertDontSee('data-game-service-menu', false)
+        ->assertDontSee('data-footer-game-links', false);
 });
 
 test('admin can configure multiple links in the game service submenu', function (): void {
@@ -83,6 +85,51 @@ test('game service submenu disappears when disabled but keeps its configured ite
     $this->get(route('home'))
         ->assertOk()
         ->assertDontSee('data-game-service-menu', false);
+});
+
+test('admin can configure safe footer links to other game topup pages', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $footerLinks = [
+        ['label' => '  Nạp FC Online  ', 'url' => '  https://games.example.com/nap-fc-online  '],
+        ['label' => 'Nạp Liên Quân', 'url' => '/nap-lien-quan'],
+    ];
+
+    $this->actingAs($admin)
+        ->patchJson('/api/admin-api/settings/service-articles', [
+            'game_service_enabled' => false,
+            'game_service_items' => [],
+            'footer_game_links' => $footerLinks,
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.settings.footer_game_links.0.label', 'Nạp FC Online')
+        ->assertJsonPath('data.settings.footer_game_links.0.url', 'https://games.example.com/nap-fc-online')
+        ->assertJsonPath('data.settings.footer_game_links.1.url', '/nap-lien-quan');
+
+    $stored = Setting::query()->where('key', 'footer_game_links')->firstOrFail();
+
+    expect($stored->type)->toBe('json');
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('data-footer-game-links', false)
+        ->assertSee('Nạp game khác')
+        ->assertSee('href="https://games.example.com/nap-fc-online"', false)
+        ->assertSee('href="/nap-lien-quan"', false);
+});
+
+test('footer game links reject unsafe redirect urls', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $this->actingAs($admin)
+        ->patchJson('/api/admin-api/settings/service-articles', [
+            'game_service_enabled' => false,
+            'game_service_items' => [],
+            'footer_game_links' => [
+                ['label' => 'Game xấu', 'url' => 'javascript:alert(1)'],
+            ],
+        ])
+        ->assertUnprocessable()
+        ->assertJsonStructure(['data' => ['errors' => ['footer_game_links.0.url']]]);
 });
 
 test('enabled game service submenu requires at least one item', function (): void {

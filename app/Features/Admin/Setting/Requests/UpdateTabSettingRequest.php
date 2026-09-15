@@ -73,6 +73,10 @@ class UpdateTabSettingRequest extends FormRequest
                 'game_service_items.*' => ['required', 'array:label,url'],
                 'game_service_items.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
                 'game_service_items.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeServiceUrlRule()],
+                'footer_game_links' => ['sometimes', 'array', 'max:20'],
+                'footer_game_links.*' => ['required', 'array:label,url'],
+                'footer_game_links.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
+                'footer_game_links.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeServiceUrlRule()],
             ],
             'bio' => [
                 'bio_title' => ['required', 'string', 'max:120', 'not_regex:/[\x00-\x1F\x7F]/u'],
@@ -193,6 +197,11 @@ class UpdateTabSettingRequest extends FormRequest
             'game_service_items.*.label.max' => 'Tên dịch vụ không được vượt quá 80 ký tự.',
             'game_service_items.*.url.required' => 'Vui lòng nhập liên kết dịch vụ.',
             'game_service_items.*.url.distinct' => 'Liên kết dịch vụ không được trùng nhau.',
+            'footer_game_links.max' => 'Chỉ được cấu hình tối đa 20 liên kết game ở footer.',
+            'footer_game_links.*.label.required' => 'Vui lòng nhập tên game ở footer.',
+            'footer_game_links.*.label.max' => 'Tên game ở footer không được vượt quá 80 ký tự.',
+            'footer_game_links.*.url.required' => 'Vui lòng nhập liên kết chuyển hướng ở footer.',
+            'footer_game_links.*.url.distinct' => 'Liên kết chuyển hướng ở footer không được trùng nhau.',
             'bio_links.max' => 'Chỉ được cấu hình tối đa 20 liên kết bio.',
             'bio_links.*.label.required' => 'Vui lòng nhập tên liên kết bio.',
             'bio_links.*.url.required' => 'Vui lòng nhập URL liên kết bio.',
@@ -215,6 +224,9 @@ class UpdateTabSettingRequest extends FormRequest
             'game_service_items' => 'danh sách dịch vụ game',
             'game_service_items.*.label' => 'tên dịch vụ',
             'game_service_items.*.url' => 'liên kết dịch vụ',
+            'footer_game_links' => 'danh sách game khác ở footer',
+            'footer_game_links.*.label' => 'tên game ở footer',
+            'footer_game_links.*.url' => 'liên kết game ở footer',
             'bio_title' => 'tiêu đề trang bio',
             'bio_description' => 'mô tả trang bio',
             'bio_avatar_url' => 'ảnh đại diện trang bio',
@@ -283,29 +295,44 @@ class UpdateTabSettingRequest extends FormRequest
             return;
         }
 
-        if ((string) $this->route('tab') !== 'service-articles' || ! $this->exists('game_service_items')) {
+        if ((string) $this->route('tab') !== 'service-articles') {
             return;
         }
 
-        $items = $this->input('game_service_items');
+        $normalized = [];
 
-        if (! is_array($items)) {
-            return;
+        foreach (['game_service_items', 'footer_game_links'] as $field) {
+            if (! $this->exists($field)) {
+                continue;
+            }
+
+            $items = $this->input($field);
+
+            if (is_array($items)) {
+                $normalized[$field] = $this->normalizeNavigationItems($items);
+            }
         }
 
-        $this->merge([
-            'game_service_items' => array_map(static function (mixed $item): mixed {
-                if (! is_array($item)) {
-                    return $item;
-                }
+        $this->merge($normalized);
+    }
 
-                return [
-                    ...$item,
-                    'label' => is_string($item['label'] ?? null) ? trim($item['label']) : ($item['label'] ?? null),
-                    'url' => is_string($item['url'] ?? null) ? trim($item['url']) : ($item['url'] ?? null),
-                ];
-            }, $items),
-        ]);
+    /**
+     * @param  array<int, mixed>  $items
+     * @return array<int, mixed>
+     */
+    private function normalizeNavigationItems(array $items): array
+    {
+        return array_map(static function (mixed $item): mixed {
+            if (! is_array($item)) {
+                return $item;
+            }
+
+            return [
+                ...$item,
+                'label' => is_string($item['label'] ?? null) ? trim($item['label']) : ($item['label'] ?? null),
+                'url' => is_string($item['url'] ?? null) ? trim($item['url']) : ($item['url'] ?? null),
+            ];
+        }, $items);
     }
 
     private function normalizeTextFile(mixed $value): mixed

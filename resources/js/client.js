@@ -911,6 +911,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
     const submitText = form.querySelector('[data-submit-text]');
     const paymentMethod = form.querySelector('[data-payment-method]');
     const walletOption = paymentMethod?.querySelector('option[value="wallet"]');
+    const paymentButtons = Array.from(form.querySelectorAll('[data-payment-option]'));
     const paymentHelp = form.querySelector('[data-payment-help]');
     let preferredPaymentMethod = paymentMethod?.value || 'bank_transfer';
     let paymentChoiceTouched = paymentMethod?.dataset.paymentExplicit === 'true';
@@ -1178,6 +1179,17 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         return { quantity, hasInvalidRows, firstInvalidLine };
     };
 
+    const syncPaymentButtons = () => {
+        paymentButtons.forEach((button) => {
+            const isSelected = paymentMethod?.value === button.dataset.paymentOption;
+            const isWalletUnavailable = button.dataset.paymentOption === 'wallet' && (!walletOption || walletOption.disabled);
+
+            button.disabled = isWalletUnavailable;
+            button.setAttribute('aria-checked', String(isSelected));
+            button.tabIndex = isSelected ? 0 : -1;
+        });
+    };
+
     const syncPaymentMethod = (paymentTotal, hasPackage) => {
         const walletBalance = Number(walletOption?.dataset.walletBalance || 0);
         const canPayWithWallet = Boolean(walletOption) && hasPackage && walletBalance >= paymentTotal;
@@ -1186,6 +1198,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         if (paymentMethod) {
             paymentMethod.value = canPayWithWallet && (!paymentChoiceTouched || preferredPaymentMethod === 'wallet') ? 'wallet' : 'bank_transfer';
         }
+        syncPaymentButtons();
 
         if (paymentHelp) {
             paymentHelp.textContent =
@@ -1560,6 +1573,31 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
         preferredPaymentMethod = paymentMethod.value;
         paymentChoiceTouched = true;
         updateTotal();
+    });
+    paymentButtons.forEach((button) => {
+        button.addEventListener('click', () => {
+            if (!paymentMethod || button.disabled || !button.dataset.paymentOption) return;
+
+            paymentMethod.value = button.dataset.paymentOption;
+            paymentMethod.dispatchEvent(new Event('change', { bubbles: true }));
+        });
+
+        button.addEventListener('keydown', (event) => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
+
+            event.preventDefault();
+            const enabledButtons = paymentButtons.filter((paymentButton) => !paymentButton.disabled);
+            const enabledIndex = enabledButtons.indexOf(button);
+            let nextIndex = enabledIndex;
+
+            if (event.key === 'ArrowLeft') nextIndex = (enabledIndex - 1 + enabledButtons.length) % enabledButtons.length;
+            if (event.key === 'ArrowRight') nextIndex = (enabledIndex + 1) % enabledButtons.length;
+            if (event.key === 'Home') nextIndex = 0;
+            if (event.key === 'End') nextIndex = enabledButtons.length - 1;
+
+            enabledButtons[nextIndex]?.focus();
+            enabledButtons[nextIndex]?.click();
+        });
     });
     purchaseTabs.forEach((tab, tabIndex) => {
         tab.addEventListener('click', () => {

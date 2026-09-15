@@ -52,7 +52,7 @@ const tabs: Array<{ key: TabKey; label: string; description: string }> = [
     {
         key: 'service-articles',
         label: 'Bài viết dịch vụ',
-        description: 'Bật liên kết dịch vụ game và cấu hình địa chỉ chuyển hướng trên menu client.',
+        description: 'Quản lý liên kết dịch vụ trên menu và các trang nạp game khác ở footer.',
     },
     {
         key: 'branding',
@@ -128,6 +128,7 @@ const popupNoticeForm = ref<PopupNoticeSettingType>({
 const serviceArticlesForm = ref<ServiceArticlesSettingType>({
     game_service_enabled: false,
     game_service_items: [],
+    footer_game_links: [],
 });
 
 const brandingForm = ref<BrandingSettingType>({
@@ -214,6 +215,12 @@ const loadData = async (): Promise<void> => {
                       url: String(item.url ?? ''),
                   }))
                 : [],
+            footer_game_links: Array.isArray(serviceArticles.settings.footer_game_links)
+                ? serviceArticles.settings.footer_game_links.map((item) => ({
+                      label: String(item.label ?? ''),
+                      url: String(item.url ?? ''),
+                  }))
+                : [],
         };
         brandingForm.value = { ...brandingForm.value, ...branding.settings };
         contactForm.value = { ...contactForm.value, ...contact.settings };
@@ -288,13 +295,18 @@ const saveServiceArticles = async (): Promise<void> => {
                 label: item.label.trim(),
                 url: item.url.trim(),
             })),
+            footer_game_links: serviceArticlesForm.value.footer_game_links.map((item) => ({
+                label: item.label.trim(),
+                url: item.url.trim(),
+            })),
         });
         serviceArticlesForm.value = {
             ...serviceArticlesForm.value,
             ...response.settings,
             game_service_items: Array.isArray(response.settings.game_service_items) ? response.settings.game_service_items : [],
+            footer_game_links: Array.isArray(response.settings.footer_game_links) ? response.settings.footer_game_links : [],
         };
-        handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật submenu dịch vụ game.' } });
+        handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật liên kết dịch vụ và footer.' } });
     });
 };
 
@@ -311,6 +323,21 @@ const addServiceArticleItem = (): void => {
 
 const removeServiceArticleItem = (index: number): void => {
     serviceArticlesForm.value.game_service_items.splice(index, 1);
+};
+
+const addFooterGameLink = (): void => {
+    if (serviceArticlesForm.value.footer_game_links.length >= 20) {
+        return;
+    }
+
+    serviceArticlesForm.value.footer_game_links.push({
+        label: '',
+        url: '',
+    });
+};
+
+const removeFooterGameLink = (index: number): void => {
+    serviceArticlesForm.value.footer_game_links.splice(index, 1);
 };
 
 const saveBranding = async (): Promise<void> => {
@@ -712,7 +739,7 @@ onMounted(async () => {
                                     :disabled="saving['service-articles']"
                                     @click="saveServiceArticles"
                                 >
-                                    {{ saving['service-articles'] ? 'Đang lưu...' : 'Lưu submenu' }}
+                                    {{ saving['service-articles'] ? 'Đang lưu...' : 'Lưu liên kết' }}
                                 </button>
                             </div>
                         </div>
@@ -792,6 +819,75 @@ onMounted(async () => {
                                 Tối đa 20 mục. Nên trỏ link nội bộ đến bài dịch vụ đã xuất bản với title, meta description, H1 và nội dung riêng để hỗ
                                 trợ SEO.
                             </p>
+
+                            <section class="grid gap-4 border-t border-slate-200 pt-5" aria-labelledby="footer-game-links-title">
+                                <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                    <div>
+                                        <h4 id="footer-game-links-title" class="text-sm font-semibold text-slate-900">Footer “Nạp game khác”</h4>
+                                        <p class="mt-1 text-xs leading-5 text-slate-500">
+                                            Thêm link chuyển hướng đến các website hoặc trang nạp game khác. Danh sách trống sẽ tự ẩn khỏi footer.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="inline-flex shrink-0 items-center gap-2 rounded-[10px] border border-cyan-200 bg-cyan-50 px-4 py-2 text-sm font-semibold text-cyan-700 transition hover:border-cyan-300 hover:bg-cyan-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                        :disabled="serviceArticlesForm.footer_game_links.length >= 20"
+                                        @click="addFooterGameLink"
+                                    >
+                                        <Plus class="h-4 w-4" aria-hidden="true" />
+                                        Thêm link footer
+                                    </button>
+                                </div>
+
+                                <div
+                                    v-if="serviceArticlesForm.footer_game_links.length === 0"
+                                    class="rounded-[10px] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500"
+                                >
+                                    Chưa có link nạp game khác.
+                                </div>
+
+                                <div v-else class="grid gap-3">
+                                    <div
+                                        v-for="(item, index) in serviceArticlesForm.footer_game_links"
+                                        :key="`footer-game-${index}`"
+                                        class="rounded-[10px] border border-slate-200 bg-slate-50 p-3"
+                                    >
+                                        <div class="mb-3 flex items-center justify-between gap-3">
+                                            <span class="text-xs font-bold text-cyan-700">Link {{ index + 1 }}</span>
+                                            <button
+                                                type="button"
+                                                class="inline-flex h-8 w-8 items-center justify-center rounded-[8px] text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                                                :aria-label="`Xóa link footer ${index + 1}`"
+                                                @click="removeFooterGameLink(index)"
+                                            >
+                                                <Trash2 class="h-4 w-4" aria-hidden="true" />
+                                            </button>
+                                        </div>
+                                        <div class="grid gap-3 md:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+                                            <label class="grid gap-1">
+                                                <span class="text-xs font-semibold text-slate-600">Tên game</span>
+                                                <input
+                                                    v-model="item.label"
+                                                    type="text"
+                                                    maxlength="80"
+                                                    class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-cyan-400"
+                                                    placeholder="Ví dụ: Nạp FC Online"
+                                                />
+                                            </label>
+                                            <label class="grid gap-1">
+                                                <span class="text-xs font-semibold text-slate-600">Link chuyển hướng</span>
+                                                <input
+                                                    v-model="item.url"
+                                                    type="text"
+                                                    maxlength="2048"
+                                                    class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm outline-none focus:border-cyan-400"
+                                                    placeholder="https://example.com/nap-game"
+                                                />
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
                         </div>
                     </article>
 
@@ -831,6 +927,20 @@ onMounted(async () => {
                                         : 'Đang ẩn'
                                 }}
                             </span>
+
+                            <div class="mt-4 border-t border-slate-200 pt-4">
+                                <p class="text-xs font-semibold text-slate-900">Nạp game khác</p>
+                                <div v-if="serviceArticlesForm.footer_game_links.length > 0" class="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                                    <span
+                                        v-for="(item, index) in serviceArticlesForm.footer_game_links"
+                                        :key="`footer-preview-${index}`"
+                                        class="text-xs text-cyan-700"
+                                    >
+                                        {{ item.label.trim() || `Game ${index + 1}` }}
+                                    </span>
+                                </div>
+                                <p v-else class="mt-2 text-xs text-slate-400">Đang ẩn vì chưa có link.</p>
+                            </div>
                         </div>
                     </aside>
                 </div>

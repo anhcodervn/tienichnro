@@ -481,6 +481,14 @@
         @apply mt-5;
     }
 
+    .home-payment-option {
+        @apply flex min-h-[4.5rem] min-w-0 items-center justify-center gap-2 rounded-[5px] border border-slate-300 bg-white px-3 py-2 text-left text-xs text-slate-600 transition hover:border-cyan-400 hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70;
+    }
+
+    .home-payment-option[aria-checked='true'] {
+        @apply border-cyan-700 bg-cyan-50 text-cyan-900 shadow-sm ring-1 ring-cyan-700;
+    }
+
     .home-checkout-submit {
         @apply mt-4 inline-flex min-h-[3.25rem] w-full items-center justify-center gap-2 rounded-[5px] bg-cyan-700 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600;
     }
@@ -490,19 +498,24 @@
     }
 
     .home-trust-strip {
-        @apply mt-4 grid gap-2 rounded-[5px] border border-slate-200 bg-white px-4 py-3 text-xs text-slate-600 sm:grid-cols-3 sm:text-center;
+        @apply mt-4 grid grid-cols-3 rounded-[5px] border border-slate-200 bg-white px-2 py-3.5 text-center text-xs text-slate-600 sm:px-4 sm:text-sm;
     }
 
     .home-trust-strip > span {
-        @apply justify-center;
+        @apply inline-flex min-w-0 items-center justify-center gap-1 overflow-hidden whitespace-nowrap px-1 sm:px-2;
     }
 
-    .home-trust-strip span {
-        @apply min-w-0;
+    .home-trust-strip > span > i,
+    .home-trust-strip > span > strong {
+        @apply shrink-0;
+    }
+
+    .home-trust-strip > span > span {
+        @apply min-w-0 truncate;
     }
 
     .home-trust-strip strong {
-        @apply text-slate-900;
+        @apply font-extrabold tabular-nums text-slate-900;
     }
 
     .home-pricing-card,

@@ -39,6 +39,7 @@ class SharedViewServiceProvider extends ServiceProvider
                 'game_service_enabled' => false,
                 'game_service_items' => [],
                 'game_service_url' => '',
+                'footer_game_links' => [],
                 'gtm_id' => '',
                 'meta_pixel_id' => '',
                 'custom_head_tags' => '',
@@ -56,7 +57,8 @@ class SharedViewServiceProvider extends ServiceProvider
                 'custom_head_tags',
                 'custom_script',
             ]);
-            $gameServiceItems = $this->normalizeGameServiceItems($storedSettings['game_service_items']);
+            $gameServiceItems = $this->normalizeNavigationItems($storedSettings['game_service_items']);
+            $footerGameLinks = $this->normalizeNavigationItems($storedSettings['footer_game_links']);
 
             if ($gameServiceItems === [] && SafeNavigationUrl::passes($storedSettings['game_service_url'])) {
                 $gameServiceItems = [[
@@ -89,6 +91,7 @@ class SharedViewServiceProvider extends ServiceProvider
                 ...$sharedSettings,
                 ...(is_array($viewSettings) ? $viewSettings : []),
                 'game_service_items' => $gameServiceItems,
+                'footer_game_links' => $footerGameLinks,
             ]);
             $view->with('customCodeAssets', [
                 'css' => $storedSettings['custom_css_enabled'] === true && $storedSettings['custom_css'] !== '',
@@ -110,7 +113,7 @@ class SharedViewServiceProvider extends ServiceProvider
     /**
      * @return array<int, array{label: string, url: string}>
      */
-    private function normalizeGameServiceItems(mixed $items): array
+    private function normalizeNavigationItems(mixed $items): array
     {
         if (! is_array($items)) {
             return [];

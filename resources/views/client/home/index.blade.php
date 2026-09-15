@@ -70,41 +70,27 @@
             ])
         </div>
 
-        <div class="home-trust-strip" aria-label="Cam kết dịch vụ">
-            <span class="inline-flex items-center gap-2"><i class="bx bx-badge-check text-xl text-emerald-700"
-                    aria-hidden="true"></i><span><strong>Rõ giá</strong> trước khi thanh toán</span></span>
-            <span class="inline-flex items-center gap-2"><i class="bx bx-bolt text-xl text-cyan-700"
-                    aria-hidden="true"></i><span><strong>Tự động</strong> đối soát chuyển khoản</span></span>
-            <span class="inline-flex items-center gap-2"><i class="bx bx-search text-xl text-sky-700"
-                    aria-hidden="true"></i><span><strong>Dễ tra cứu</strong> bằng mã đơn và email</span></span>
+        <div class="home-trust-strip" aria-label="Thống kê nền tảng">
+            <span data-home-stat="games">
+                <i class="bx bx-joystick text-lg text-sky-700" aria-hidden="true"></i>
+                <strong>{{ number_format($homeStatistics['games'], 0, ',', '.') }}</strong>
+                <span>Game</span>
+            </span>
+            <span data-home-stat="members">
+                <i class="bx bx-group text-lg text-emerald-700" aria-hidden="true"></i>
+                <strong>{{ number_format($homeStatistics['members'], 0, ',', '.') }}</strong>
+                <span>Thành viên</span>
+            </span>
+            <span data-home-stat="orders">
+                <i class="bx bx-receipt text-lg text-cyan-700" aria-hidden="true"></i>
+                <strong>{{ number_format($homeStatistics['orders'], 0, ',', '.') }}</strong>
+                <span>Đơn hàng</span>
+            </span>
         </div>
 
 
 
-        <section class="mt-8" aria-labelledby="teamobi-games-title">
-            <div class="max-w-3xl">
-                <p class="text-sm font-bold text-emerald-700">Danh mục nạp game</p>
-                <h2 id="teamobi-games-title" class="mt-1 text-2xl font-extrabold text-slate-950 sm:text-3xl">Nạp Carot cho các game Teamobi</h2>
-                <p class="mt-3 leading-7 text-slate-600">Mỗi trang tập trung vào một nhu cầu nạp riêng. Tùy chọn đặt hàng
-                    chỉ xuất hiện khi game và gói tương ứng đang hoạt động.</p>
-            </div>
-            <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                @foreach ($homeGameLandings as $gameLanding)
-                    <a class="client-card group flex min-w-0 items-center gap-4 p-5 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
-                        href="{{ $gameLanding['url'] }}">
-                        <span
-                            class="grid h-11 w-11 shrink-0 place-items-center rounded-[8px] bg-emerald-50 text-2xl text-emerald-700"><i
-                                class="bx bx-joystick" aria-hidden="true"></i></span>
-                        <span class="min-w-0 flex-1"><strong
-                                class="block text-slate-950">{{ $gameLanding['name'] }}</strong><small
-                                class="mt-1 block line-clamp-2 leading-5 text-slate-500">Xem thông tin và gói đang hỗ
-                                trợ</small></span>
-                        <i class="bx bx-arrow-right text-xl text-emerald-700 transition group-hover:translate-x-1"
-                            aria-hidden="true"></i>
-                    </a>
-                @endforeach
-            </div>
-        </section>
+
 
         <section class="home-reward-card mt-5" aria-labelledby="reward-table-title">
             <header class="border-b border-slate-200 bg-white p-4 sm:p-5">
@@ -212,6 +198,31 @@
                 sử dụng biểu mẫu bên dưới để bắt đầu.
             </p>
         </header>
+
+        <section class="mt-8" aria-labelledby="teamobi-games-title">
+            <div class="max-w-3xl">
+                <p class="text-sm font-bold text-emerald-700">Danh mục nạp game</p>
+                <h2 id="teamobi-games-title" class="mt-1 text-2xl font-extrabold text-slate-950 sm:text-3xl">Nạp Carot cho các game Teamobi</h2>
+                <p class="mt-3 leading-7 text-slate-600">Mỗi trang tập trung vào một nhu cầu nạp riêng. Tùy chọn đặt hàng
+                    chỉ xuất hiện khi game và gói tương ứng đang hoạt động.</p>
+            </div>
+            <div class="mt-5 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                @foreach ($homeGameLandings as $gameLanding)
+                    <a class="client-card group flex min-w-0 items-center gap-4 p-5 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:shadow-md"
+                        href="{{ $gameLanding['url'] }}">
+                        <span
+                            class="grid h-11 w-11 shrink-0 place-items-center rounded-[8px] bg-emerald-50 text-2xl text-emerald-700"><i
+                                class="bx bx-joystick" aria-hidden="true"></i></span>
+                        <span class="min-w-0 flex-1"><strong
+                                class="block text-slate-950">{{ $gameLanding['name'] }}</strong><small
+                                class="mt-1 block line-clamp-2 leading-5 text-slate-500">Xem thông tin và gói đang hỗ
+                                trợ</small></span>
+                        <i class="bx bx-arrow-right text-xl text-emerald-700 transition group-hover:translate-x-1"
+                            aria-hidden="true"></i>
+                    </a>
+                @endforeach
+            </div>
+        </section>
 
         <section class="mt-10 grid gap-5 lg:grid-cols-2" aria-labelledby="why-napcarot-title">
             <div class="client-card p-5 sm:p-7">

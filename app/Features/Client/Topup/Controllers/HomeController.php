@@ -8,6 +8,7 @@ use App\Features\Topup\Services\GameRewardService;
 use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
+use App\Models\Order;
 use App\Models\SeoPost;
 use App\Models\User;
 use App\Support\EditorContentRenderer;
@@ -122,6 +123,11 @@ class HomeController extends Controller
 
         return view('client.home.index', [
             'games' => $games,
+            'homeStatistics' => [
+                'members' => User::query()->count(),
+                'orders' => Order::query()->count(),
+                'games' => $games->count(),
+            ],
             'walletBalance' => $walletBalance,
             'affiliateReferrerUsername' => $affiliateReferrerUsername,
             'systemSettings' => $systemSettings,

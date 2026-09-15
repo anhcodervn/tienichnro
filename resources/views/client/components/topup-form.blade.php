@@ -174,7 +174,7 @@
                     aria-controls="purchase-panel-single"
                     aria-selected="{{ $initialPurchaseMode === 'single' ? 'true' : 'false' }}"
                     tabindex="{{ $initialPurchaseMode === 'single' ? '0' : '-1' }}"
-                ><i class="bx bx-user text-lg" aria-hidden="true"></i><span>Nạp 1 tài khoản</span></button>
+                ><i class="bx bx-user text-lg" aria-hidden="true"></i><span>Nạp 1 acc</span></button>
                 <button
                     id="purchase-tab-bulk"
                     type="button"
@@ -183,7 +183,7 @@
                     aria-controls="purchase-panel-bulk"
                     aria-selected="{{ $initialPurchaseMode === 'bulk' ? 'true' : 'false' }}"
                     tabindex="{{ $initialPurchaseMode === 'bulk' ? '0' : '-1' }}"
-                ><i class="bx bx-group text-lg" aria-hidden="true"></i><span>Nạp nhiều tài khoản</span></button>
+                ><i class="bx bx-group text-lg" aria-hidden="true"></i><span>Nạp nhiều acc</span></button>
             </div>
             @error('purchase_mode')<p class="home-field-error">{{ $message }}</p>@enderror
 
@@ -204,7 +204,7 @@
                 @foreach ($games as $game)
                     <div class="home-recipient-grid" data-recipient-fields="{{ $game->id }}" data-single-confirm-recipient-label="{{ collect($game->checkoutFields())->pluck('label')->implode(' | ') }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
                         @foreach ($game->checkoutFields() as $field)
-                            <div class="home-field home-recipient-field" data-field-key="{{ $field['key'] }}">
+                            <div class="home-field home-recipient-field sm:col-span-2" data-field-key="{{ $field['key'] }}">
                                 <label for="recipient-{{ $game->id }}-{{ $field['key'] }}">
                                     {{ $field['label'] }} @if ($field['required'])<span aria-hidden="true">*</span>@endif
                                 </label>
@@ -324,14 +324,51 @@
                 <span data-summary-reward-x3 @if ($initialPackage?->rewardDisplay('reward_x3_amount', $initialQuantity, $initialGameModel?->reward_label) === null) hidden @endif>KM X3: {{ $initialPackage?->rewardDisplay('reward_x3_amount', $initialQuantity, $initialGameModel?->reward_label) }}</span>
             </div>
 
-            <div class="home-field home-payment-field">
-                <label class="inline-flex items-center gap-1.5" for="topup-payment"><i class="bx bx-credit-card text-lg text-cyan-700" aria-hidden="true"></i>Phương thức thanh toán</label>
-                <select id="topup-payment" name="payment_method" class="client-input" data-payment-method data-payment-explicit="{{ old('payment_method') ? 'true' : 'false' }}" aria-describedby="topup-payment-help">
+            <fieldset class="home-field home-payment-field">
+                <legend id="topup-payment-label" class="inline-flex items-center gap-1.5"><i class="bx bx-credit-card text-lg text-cyan-700" aria-hidden="true"></i>Phương thức thanh toán</legend>
+                <select id="topup-payment" name="payment_method" data-payment-method data-payment-explicit="{{ old('payment_method') ? 'true' : 'false' }}" aria-hidden="true" tabindex="-1" hidden>
                     <option value="bank_transfer" @selected($initialPaymentMethod === 'bank_transfer')>Chuyển khoản ngân hàng / QR tự động</option>
                     @auth
                         <option value="wallet" data-wallet-balance="{{ (int) $walletBalance }}" @selected($initialPaymentMethod === 'wallet') @disabled(! $initialCanPayWithWallet)>Số dư ví · {{ number_format((int) $walletBalance, 0, ',', '.') }}đ</option>
                     @endauth
                 </select>
+                <div class="grid grid-cols-2 gap-2" role="radiogroup" aria-labelledby="topup-payment-label" aria-describedby="topup-payment-help" data-payment-options>
+                    <button
+                        type="button"
+                        class="home-payment-option"
+                        role="radio"
+                        aria-checked="{{ $initialPaymentMethod === 'wallet' ? 'true' : 'false' }}"
+                        tabindex="{{ $initialPaymentMethod === 'wallet' ? '0' : '-1' }}"
+                        data-payment-option="wallet"
+                        @disabled(! $initialCanPayWithWallet)
+                    >
+                        <i class="bx bx-wallet-alt text-xl" aria-hidden="true"></i>
+                        <span class="min-w-0">
+                            <strong class="block truncate">Số dư tài khoản</strong>
+                            <small class="block truncate font-semibold opacity-75">
+                                @auth
+                                    {{ number_format((int) $walletBalance, 0, ',', '.') }}đ
+                                @else
+                                    Cần đăng nhập
+                                @endauth
+                            </small>
+                        </span>
+                    </button>
+                    <button
+                        type="button"
+                        class="home-payment-option"
+                        role="radio"
+                        aria-checked="{{ $initialPaymentMethod === 'bank_transfer' ? 'true' : 'false' }}"
+                        tabindex="{{ $initialPaymentMethod === 'bank_transfer' ? '0' : '-1' }}"
+                        data-payment-option="bank_transfer"
+                    >
+                        <i class="bx bx-qr-scan text-xl" aria-hidden="true"></i>
+                        <span class="min-w-0">
+                            <strong class="block truncate">QR thanh toán</strong>
+                            <small class="block truncate font-semibold opacity-75">Chuyển khoản tự động</small>
+                        </span>
+                    </button>
+                </div>
                 <p id="topup-payment-help" class="home-field-help" data-payment-help aria-live="polite">
                     @if ($initialCanPayWithWallet && $initialPaymentMethod === 'wallet')
                         Số dư ví đủ nên hệ thống đang ưu tiên thanh toán bằng ví. Bạn vẫn có thể chọn ATM.
@@ -344,7 +381,7 @@
                     @endif
                 </p>
                 @error('payment_method')<p class="home-field-error">{{ $message }}</p>@enderror
-            </div>
+            </fieldset>
 
             @guest
                 @if ($turnstileEnabled && $turnstileSiteKey !== '')
