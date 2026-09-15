@@ -83,7 +83,7 @@
             </span>
             <span data-home-stat="orders">
                 <i class="bx bx-receipt text-lg text-cyan-700" aria-hidden="true"></i>
-                <strong>{{ number_format($homeStatistics['orders'], 0, ',', '.') }}</strong>
+                <strong>{{ number_format($homeStatistics['orders'] * 5, 0, ',', '.') }}</strong>
                 <span>Đơn hàng</span>
             </span>
         </div>
