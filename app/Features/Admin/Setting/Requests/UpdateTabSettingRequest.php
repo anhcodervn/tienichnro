@@ -35,6 +35,10 @@ class UpdateTabSettingRequest extends FormRequest
                 'site_description' => ['nullable', 'string', 'max:2000'],
                 'site_active' => ['required', 'boolean'],
                 'allow_register' => ['required', 'boolean'],
+                'footer_game_links' => ['sometimes', 'array', 'max:20'],
+                'footer_game_links.*' => ['required', 'array:label,url'],
+                'footer_game_links.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
+                'footer_game_links.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeServiceUrlRule()],
             ],
             'homepage' => [
                 'home_notice_title' => ['required', 'string', 'max:255'],
@@ -73,10 +77,6 @@ class UpdateTabSettingRequest extends FormRequest
                 'game_service_items.*' => ['required', 'array:label,url'],
                 'game_service_items.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
                 'game_service_items.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeServiceUrlRule()],
-                'footer_game_links' => ['sometimes', 'array', 'max:20'],
-                'footer_game_links.*' => ['required', 'array:label,url'],
-                'footer_game_links.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
-                'footer_game_links.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeServiceUrlRule()],
             ],
             'bio' => [
                 'bio_title' => ['required', 'string', 'max:120', 'not_regex:/[\x00-\x1F\x7F]/u'],
@@ -295,13 +295,16 @@ class UpdateTabSettingRequest extends FormRequest
             return;
         }
 
-        if ((string) $this->route('tab') !== 'service-articles') {
+        $tab = (string) $this->route('tab');
+
+        if (! in_array($tab, ['general', 'service-articles'], true)) {
             return;
         }
 
         $normalized = [];
+        $fields = $tab === 'general' ? ['footer_game_links'] : ['game_service_items'];
 
-        foreach (['game_service_items', 'footer_game_links'] as $field) {
+        foreach ($fields as $field) {
             if (! $this->exists($field)) {
                 continue;
             }

@@ -21,7 +21,11 @@ test('game service navigation defaults to a hidden empty submenu', function (): 
         ->getJson('/api/admin-api/settings/service-articles')
         ->assertOk()
         ->assertJsonPath('data.settings.game_service_enabled', false)
-        ->assertJsonPath('data.settings.game_service_items', [])
+        ->assertJsonPath('data.settings.game_service_items', []);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/settings/general')
+        ->assertOk()
         ->assertJsonPath('data.settings.footer_game_links', []);
 
     $this->get(route('home'))
@@ -95,9 +99,12 @@ test('admin can configure safe footer links to other game topup pages', function
     ];
 
     $this->actingAs($admin)
-        ->patchJson('/api/admin-api/settings/service-articles', [
-            'game_service_enabled' => false,
-            'game_service_items' => [],
+        ->patchJson('/api/admin-api/settings/general', [
+            'site_name' => 'Nạp Carot',
+            'site_domain' => 'https://napcarot.test',
+            'site_description' => '',
+            'site_active' => true,
+            'allow_register' => true,
             'footer_game_links' => $footerLinks,
         ])
         ->assertOk()
@@ -121,9 +128,12 @@ test('footer game links reject unsafe redirect urls', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
 
     $this->actingAs($admin)
-        ->patchJson('/api/admin-api/settings/service-articles', [
-            'game_service_enabled' => false,
-            'game_service_items' => [],
+        ->patchJson('/api/admin-api/settings/general', [
+            'site_name' => 'Nạp Carot',
+            'site_domain' => 'https://napcarot.test',
+            'site_description' => '',
+            'site_active' => true,
+            'allow_register' => true,
             'footer_game_links' => [
                 ['label' => 'Game xấu', 'url' => 'javascript:alert(1)'],
             ],

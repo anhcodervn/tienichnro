@@ -1,6 +1,6 @@
 <?php
 
-test('general settings exposes a repeatable service submenu editor and guarded client links', function (): void {
+test('settings expose repeatable service and footer editors with guarded client links', function (): void {
     $projectRoot = dirname(__DIR__, 2);
     $settingsPage = file_get_contents($projectRoot.'/resources/js/pages/admin/settings/index.vue');
     $settingTypes = file_get_contents($projectRoot.'/resources/js/types/setting.type.ts');
@@ -16,7 +16,7 @@ test('general settings exposes a repeatable service submenu editor and guarded c
         ->toContain('v-model="item.url"')
         ->toContain('@click="addServiceArticleItem"')
         ->toContain('@click="removeServiceArticleItem(index)"')
-        ->toContain('v-for="(item, index) in serviceArticlesForm.footer_game_links"')
+        ->toContain('v-for="(item, index) in generalForm.footer_game_links"')
         ->toContain('@click="addFooterGameLink"')
         ->toContain('@click="removeFooterGameLink(index)"')
         ->toContain('@click="saveServiceArticles"')
@@ -33,5 +33,6 @@ test('general settings exposes a repeatable service submenu editor and guarded c
         ->toContain('data-game-service-link')
         ->toContain('data-footer-game-links')
         ->toContain('data-footer-game-link')
+        ->toContain("'lg:grid-cols-5' => \$footerGameLinks !== []")
         ->toContain('@foreach ($gameServiceItems as $gameServiceItem)');
 });

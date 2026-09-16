@@ -34,6 +34,7 @@ class SettingController extends Controller
                 'site_description' => '',
                 'site_active' => true,
                 'allow_register' => false,
+                'footer_game_links' => [],
             ],
             'homepage' => [
                 'home_notice_title' => 'Thông báo quan trọng',
@@ -51,7 +52,6 @@ class SettingController extends Controller
             'service-articles' => [
                 'game_service_enabled' => false,
                 'game_service_items' => [],
-                'footer_game_links' => [],
             ],
             'bio' => [
                 'bio_title' => '',
@@ -209,6 +209,7 @@ class SettingController extends Controller
                 'site_description' => 'site_description',
                 'site_active' => 'site_active',
                 'allow_register' => 'allow_register',
+                'footer_game_links' => 'footer_game_links',
             ],
             'homepage' => [
                 'home_notice_title' => 'home_notice_title',
@@ -226,7 +227,6 @@ class SettingController extends Controller
             'service-articles' => [
                 'game_service_enabled' => 'game_service_enabled',
                 'game_service_items' => 'game_service_items',
-                'footer_game_links' => 'footer_game_links',
             ],
             'bio' => [
                 'bio_title' => 'bio_title',

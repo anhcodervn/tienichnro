@@ -380,7 +380,11 @@
     @endunless
 
     <footer class="mt-16 border-t border-slate-200 bg-white">
-        <div class="client-container grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
+        <div @class([
+            'client-container grid gap-8 py-10 sm:grid-cols-2',
+            'lg:grid-cols-5' => $footerGameLinks !== [],
+            'lg:grid-cols-4' => $footerGameLinks === [],
+        ])>
             <div class="sm:col-span-2">
                 @if ($headerLogo !== '')
                     <img src="{{ $headerLogo }}" alt="{{ $siteName }}" class="h-auto w-[15rem] object-contain object-left sm:w-36">
@@ -391,19 +395,17 @@
             </div>
             <div><p class="font-bold">Dịch vụ</p><div class="mt-3 grid gap-2 text-sm text-slate-600"><a href="{{ route('home') }}">Nạp game</a><a href="{{ route('wallet.deposit.index') }}">Nạp tiền</a><a href="{{ $orderHistoryUrl }}">Lịch sử đơn hàng</a></div></div>
             <div><p class="font-bold">Hỗ trợ</p><div class="mt-3 grid gap-2 text-sm text-slate-600"><a href="{{ route('content.guide') }}">Hướng dẫn</a><a href="{{ route('content.contact') }}">Liên hệ</a></div></div>
-        </div>
-        @if ($footerGameLinks !== [])
-            <div class="client-container border-t border-slate-200 py-5" data-footer-game-links>
-                <div class="flex flex-col gap-3 sm:flex-row sm:items-center">
-                    <p class="shrink-0 text-sm font-bold text-slate-950">Nạp game khác</p>
-                    <nav class="flex flex-wrap gap-x-5 gap-y-2 text-sm text-slate-600" aria-label="Nạp game khác">
+            @if ($footerGameLinks !== [])
+                <div data-footer-game-links>
+                    <p class="font-bold">Nạp game khác</p>
+                    <nav class="mt-3 grid gap-2 text-sm text-slate-600" aria-label="Nạp game khác">
                         @foreach ($footerGameLinks as $footerGameLink)
                             <a class="transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ $footerGameLink['url'] }}" data-footer-game-link>{{ $footerGameLink['label'] }}</a>
                         @endforeach
                     </nav>
                 </div>
-            </div>
-        @endif
+            @endif
+        </div>
     </footer>
     @vite('resources/js/client.js')
     @if (($customCodeAssets['js'] ?? false) && ! request()->routeIs(['auth.*', 'password.*', 'verification.*']))
