@@ -48,7 +48,9 @@ class RecipientFulfillmentService
         try {
             $result = $adapter->submit($order, $recipient, $order->provider, $requestId);
         } catch (TopupProviderConnectionException $exception) {
-            $this->storeProviderException($recipient->id, $unit, $requestId, $exception, true);
+            if ($this->storeProviderException($recipient->id, $unit, $requestId, $exception, true)) {
+                return;
+            }
 
             throw $exception;
         }
@@ -347,18 +349,32 @@ class RecipientFulfillmentService
         bool $submitted,
         int $attempt = 0,
         bool $preserveCompleted = false,
-    ): void {
+    ): bool {
         if ($exception->debugContext === []) {
-            return;
+            return false;
         }
 
-        DB::transaction(function () use ($recipientId, $unit, $requestId, $exception, $submitted, $attempt, $preserveCompleted): void {
+        $httpStatus = data_get($exception->debugContext, 'response.http_status');
+        $failedSubmission = $submitted
+            && is_numeric($httpStatus)
+            && ((int) $httpStatus < 200 || (int) $httpStatus >= 300);
+
+        $orderId = DB::transaction(function () use (
+            $recipientId,
+            $unit,
+            $requestId,
+            $exception,
+            $submitted,
+            $attempt,
+            $preserveCompleted,
+            $failedSubmission,
+        ): ?int {
             $recipient = OrderRecipient::query()->lockForUpdate()->find($recipientId);
 
             if (! $recipient instanceof OrderRecipient
                 || $recipient->status === 'cancelled'
                 || ($recipient->status === 'completed' && ! $preserveCompleted)) {
-                return;
+                return null;
             }
 
             $providerResponse = $recipient->provider_response ?? [];
@@ -366,6 +382,9 @@ class RecipientFulfillmentService
             $previousItem = is_array($items[(string) $unit] ?? null) ? $items[(string) $unit] : [];
             $recordedAt = now()->toISOString();
             $message = '['.$exception->errorCode.'] '.$exception->getMessage();
+            $itemStatus = $preserveCompleted
+                ? ($previousItem['status'] ?? TopupProviderStatus::Completed->value)
+                : ($failedSubmission ? TopupProviderStatus::Failed->value : TopupProviderStatus::Processing->value);
             $exchange = [
                 'request' => is_array($exception->debugContext['request'] ?? null)
                     ? $exception->debugContext['request']
@@ -373,7 +392,7 @@ class RecipientFulfillmentService
                 'response' => is_array($exception->debugContext['response'] ?? null)
                     ? $exception->debugContext['response']
                     : [],
-                'status' => $preserveCompleted ? ($previousItem['status'] ?? 'completed') : TopupProviderStatus::Processing->value,
+                'status' => $itemStatus,
                 'message' => $message,
                 'attempt' => $submitted ? 0 : $attempt,
                 'recorded_at' => $recordedAt,
@@ -383,7 +402,7 @@ class RecipientFulfillmentService
                 ...$previousItem,
                 'unit' => $unit,
                 'request_id' => $requestId,
-                'status' => $preserveCompleted ? ($previousItem['status'] ?? 'completed') : TopupProviderStatus::Processing->value,
+                'status' => $itemStatus,
                 'message' => $message,
                 'submission' => $submitted ? $exchange : ($previousItem['submission'] ?? null),
                 'last_status_check' => $submitted ? ($previousItem['last_status_check'] ?? null) : $exchange,
@@ -396,17 +415,33 @@ class RecipientFulfillmentService
             ];
             $providerResponse['schema_version'] = 2;
             $providerResponse['items'] = $items;
+            $recipientStatus = $preserveCompleted ? $recipient->status : $this->recipientStatus($recipient->quantity, $items);
 
             $recipient->forceFill([
-                'status' => $preserveCompleted ? $recipient->status : 'processing',
-                'provider_status' => $preserveCompleted ? $recipient->provider_status : TopupProviderStatus::Processing->value,
+                'status' => $recipientStatus,
+                'provider_status' => $preserveCompleted ? $recipient->provider_status : match ($recipientStatus) {
+                    'completed' => TopupProviderStatus::Completed->value,
+                    'failed' => TopupProviderStatus::Failed->value,
+                    default => TopupProviderStatus::Processing->value,
+                },
                 'provider_response' => $providerResponse,
                 'status_check_attempts' => max($recipient->status_check_attempts, $attempt),
                 'failure_reason' => $preserveCompleted ? $recipient->failure_reason : $message,
                 'submitted_at' => $submitted ? ($recipient->submitted_at ?? now()) : $recipient->submitted_at,
                 'last_checked_at' => $submitted ? $recipient->last_checked_at : now(),
+                'failed_at' => $preserveCompleted ? $recipient->failed_at : ($recipientStatus === 'failed' ? now() : null),
             ])->save();
+
+            return $recipient->order_id;
         }, 3);
+
+        if ($failedSubmission && $orderId !== null) {
+            $this->aggregateOrder($orderId);
+
+            return true;
+        }
+
+        return false;
     }
 
     /** @param array<int|string, mixed> $items */

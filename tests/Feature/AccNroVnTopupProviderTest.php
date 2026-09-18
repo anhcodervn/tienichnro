@@ -4,6 +4,7 @@ use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
+use App\Features\Topup\Jobs\ProcessTopupRecipient;
 use App\Features\Topup\Jobs\SyncTopupRecipientStatus;
 use App\Features\Topup\Providers\AccNroVnTopupProvider;
 use App\Features\Topup\Services\RecipientFulfillmentService;
@@ -460,7 +461,7 @@ test('admin does not invent a server field for a historical request that never s
         ->assertJsonMissingPath('data.recipients.0.provider_items.0.submission.request.payload.server');
 });
 
-test('accnrovn stores a full retryable provider error before rethrowing it', function (): void {
+test('accnrovn marks a rejected submission as failed with a retry action and clear diagnostics', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     [$order, $recipient] = accNroVnOrderFixture();
     Http::fake([
@@ -472,14 +473,23 @@ test('accnrovn stores a full retryable provider error before rethrowing it', fun
                 'X-Provider-Trace' => 'acc-error-503',
             ],
         ),
+        'https://accnro.vn/api/v1/partner/recharge/balance' => Http::response([
+            'success' => true,
+            'data' => ['balance' => 1_000_000],
+        ]),
     ]);
 
-    expect(fn () => app(RecipientFulfillmentService::class)->submit($recipient->id))
-        ->toThrow(TopupProviderConnectionException::class);
+    app(RecipientFulfillmentService::class)->submit($recipient->id);
 
     $item = $recipient->refresh()->provider_response['items'][1];
+    $expectedMessage = '[provider_unavailable] Provider đang lỗi hoặc bảo trì (HTTP 503).';
 
-    expect($recipient->status)->toBe('processing')
+    expect($recipient->status)->toBe('failed')
+        ->and($recipient->provider_status)->toBe('failed')
+        ->and($recipient->failure_reason)->toBe($expectedMessage)
+        ->and($order->refresh()->order_status)->toBe(OrderStatus::Failed)
+        ->and($order->failure_reason)->toBe($expectedMessage)
+        ->and($item['status'])->toBe('failed')
         ->and($item['last_error']['request']['url'])->toBe('https://accnro.vn/api/v1/partner/recharge/create')
         ->and($item['last_error']['request']['headers']['Content-Type'])->toBe(['application/json'])
         ->and($item['last_error']['request']['payload']['secret_key'])
@@ -491,17 +501,65 @@ test('accnrovn stores a full retryable provider error before rethrowing it', fun
         ->and($item['last_error']['response']['headers']['X-Provider-Trace'])->toBe(['acc-error-503'])
         ->and($item['last_error']['response']['body'])->toBe('<html>provider maintenance</html>')
         ->and($item['last_error']['response']['raw_body'])->toBe('<html>provider maintenance</html>')
-        ->and($item['last_error']['message'])->toContain('[provider_unavailable]');
+        ->and($item['last_error']['message'])->toBe($expectedMessage);
 
     $this->actingAs($admin)
         ->getJson("/api/admin-api/orders/{$order->code}")
         ->assertSuccessful()
         ->assertHeader('Cache-Control', 'no-store, private')
+        ->assertJsonPath('data.order_status', 'failed')
+        ->assertJsonPath('data.failure_reason', $expectedMessage)
+        ->assertJsonPath('data.can_reorder', true)
+        ->assertJsonPath('data.recipients.0.provider_items.0.current_step', 'failed')
         ->assertJsonPath('data.recipients.0.provider_items.0.last_error.request.payload.secret_key', 'sk_secret_key')
         ->assertJsonMissingPath('data.recipients.0.provider_items.0.last_error.request.payload.sign')
         ->assertJsonPath('data.recipients.0.provider_items.0.last_error.response.http_status', 503)
         ->assertJsonPath('data.recipients.0.provider_items.0.last_error.response.headers.Retry-After.0', '30')
         ->assertJsonPath('data.recipients.0.provider_items.0.last_error.response.raw_body', '<html>provider maintenance</html>');
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'reorder'])
+        ->assertSuccessful()
+        ->assertJsonPath('data.order_status', 'processing')
+        ->assertJsonPath('data.can_reorder', false);
+
+    expect($recipient->refresh()->failure_reason)->toBeNull()
+        ->and(data_get($recipient->provider_response, 'items.1.status'))->toBe('pending');
+    Queue::assertPushed(ProcessTopupRecipient::class, fn (ProcessTopupRecipient $job): bool => $job->recipientId === $recipient->id && $job->unit === 1);
+});
+
+test('accnrovn keeps a status check HTTP error pending to avoid duplicate topups', function (): void {
+    [$order, $recipient] = accNroVnOrderFixture([
+        'provider_request_id' => 'LOCAL-STATUS-503',
+        'provider_reference' => 'ACC-NRO-STATUS-503',
+        'provider_status' => 'pending',
+        'status' => 'processing',
+        'provider_response' => [
+            'items' => [
+                1 => [
+                    'unit' => 1,
+                    'request_id' => 'LOCAL-STATUS-503',
+                    'reference' => 'ACC-NRO-STATUS-503',
+                    'status' => 'pending',
+                ],
+            ],
+        ],
+    ]);
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/query' => Http::response('provider maintenance', 503),
+    ]);
+
+    expect(fn () => app(RecipientFulfillmentService::class)->syncStatus($recipient->id, 1, 1))
+        ->toThrow(TopupProviderConnectionException::class);
+
+    $item = $recipient->refresh()->provider_response['items'][1];
+
+    expect($recipient->status)->toBe('processing')
+        ->and($recipient->provider_status)->toBe('processing')
+        ->and($recipient->failure_reason)->toBe('[provider_unavailable] Provider đang lỗi hoặc bảo trì (HTTP 503).')
+        ->and($order->refresh()->order_status)->toBe(OrderStatus::Processing)
+        ->and($item['status'])->toBe('processing')
+        ->and($item['last_error']['response']['http_status'])->toBe(503);
 });
 
 test('accnrovn queries an order by request id and completes fulfillment', function (): void {
