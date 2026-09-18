@@ -117,20 +117,34 @@ class TopupAdminService
 
     public function orders(Request $request): LengthAwarePaginator
     {
-        $relations = ['game:id,name', 'server:id,name', 'provider:id,name,slug'];
+        $isPlatformView = $this->tenantContext->isActive() && $this->tenantContext->isMain();
+        $relations = ['game:id,name', 'server:id,name', 'provider:id,name,slug', 'latestPaymentTransaction', 'legacyPaymentTransaction'];
 
-        if ($this->tenantContext->isActive() && $this->tenantContext->isMain()) {
+        if ($isPlatformView) {
             $relations[] = 'tenant:id,name,slug';
         }
 
         return $this->orderQuery($request->integer('tenant_id') ?: null)
             ->with($relations)
-            ->when($request->filled('search'), function (Builder $query) use ($request): void {
+            ->when($request->filled('search'), function (Builder $query) use ($request, $isPlatformView): void {
                 $search = trim($request->string('search')->toString());
                 $query->where(fn (Builder $nested) => $nested
                     ->where('code', 'like', "%{$search}%")
                     ->orWhere('topup_id', 'like', "%{$search}%")
-                    ->orWhere('email', 'like', "%{$search}%"));
+                    ->orWhere('email', 'like', "%{$search}%")
+                    ->orWhereHas('paymentTransactions', function (Builder $paymentQuery) use ($search, $isPlatformView): void {
+                        if ($isPlatformView) {
+                            $paymentQuery->withoutGlobalScope(TenantScope::class);
+                        }
+
+                        $paymentQuery->where(fn (Builder $paymentCodeQuery) => $paymentCodeQuery
+                            ->where('transfer_reference', 'like', "%{$search}%")
+                            ->orWhere('content', 'like', "%{$search}%"));
+                    })
+                    ->orWhereHas('legacyPaymentTransaction', fn (Builder $legacyPaymentQuery) => $legacyPaymentQuery
+                        ->where(fn (Builder $paymentCodeQuery) => $paymentCodeQuery
+                            ->where('transfer_reference', 'like', "%{$search}%")
+                            ->orWhere('content', 'like', "%{$search}%"))));
             })
             ->when($request->filled('payment_status'), fn (Builder $query) => $query->where('payment_status', $request->string('payment_status')))
             ->when($request->filled('order_status'), fn (Builder $query) => $query->where('order_status', $request->string('order_status')))

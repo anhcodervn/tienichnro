@@ -26,6 +26,11 @@ const displayOrder = computed(() => props.order);
 const formatMoney = (value: number | string): string => `${new Intl.NumberFormat('vi-VN').format(Number(value || 0))}đ`;
 const formatDateTime = (value?: string | null): string =>
     value ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : '—';
+const paymentMethodLabels: Record<string, string> = {
+    bank_transfer: 'Chuyển khoản',
+    wallet: 'Số dư ví',
+};
+const paymentMethodLabel = (value?: string | null): string => paymentMethodLabels[value || ''] || '—';
 
 const recipientData = (recipient: RecipientRow): string =>
     Object.entries(recipient.data || {})
@@ -193,6 +198,8 @@ const formatDebug = (value: unknown): string => {
                         <dl class="mt-3 grid grid-cols-[120px_1fr] gap-x-3 gap-y-3 text-sm">
                             <dt class="text-slate-500">Email</dt>
                             <dd class="break-all font-medium text-slate-800">{{ displayOrder.email }}</dd>
+                            <dt class="text-slate-500">Phương thức thanh toán</dt>
+                            <dd class="font-bold text-slate-900">{{ paymentMethodLabel(displayOrder.payment_method) }}</dd>
                             <dt class="text-slate-500">Game</dt>
                             <dd class="font-medium text-slate-800">{{ displayOrder.game || '—' }}</dd>
                             <dt class="text-slate-500">Máy chủ</dt>

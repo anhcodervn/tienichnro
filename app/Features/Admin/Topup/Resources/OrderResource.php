@@ -18,6 +18,12 @@ class OrderResource extends JsonResource
     {
         /** @var PaymentTransaction|null $paymentTransaction */
         $paymentTransaction = $this->whenLoaded('latestPaymentTransaction');
+        $legacyPaymentTransaction = $this->whenLoaded('legacyPaymentTransaction');
+
+        if (! $paymentTransaction instanceof PaymentTransaction && $legacyPaymentTransaction instanceof PaymentTransaction) {
+            $paymentTransaction = $legacyPaymentTransaction;
+        }
+
         $paymentTransferContent = $paymentTransaction instanceof PaymentTransaction
             ? ($paymentTransaction->transfer_reference
                 ?: data_get($paymentTransaction->raw_data, 'transfer_content')

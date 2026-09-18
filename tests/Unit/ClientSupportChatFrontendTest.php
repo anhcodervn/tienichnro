@@ -33,3 +33,12 @@ test('client support chat page exposes realtime messaging controls', function ()
         ->toContain('echo.leave(chat.dataset.channel)')
         ->not->toContain('innerHTML');
 });
+
+test('admin support conversation header displays the user email', function (): void {
+    $projectRoot = dirname(__DIR__, 2);
+    $page = file_get_contents($projectRoot.'/resources/js/pages/admin/support/index.vue');
+
+    expect($page)
+        ->toContain('{{ selectedConversation.user.email }} · ID {{ selectedConversation.user.id }}')
+        ->not->toContain('@{{ selectedConversation.user.username }} · ID {{ selectedConversation.user.id }}');
+});

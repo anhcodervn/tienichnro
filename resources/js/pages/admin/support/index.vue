@@ -518,7 +518,7 @@ onBeforeUnmount(() => {
                         <div class="min-w-0">
                             <h2 class="truncate text-sm font-bold text-slate-950">{{ selectedConversation.user.name }}</h2>
                             <p class="truncate text-xs text-slate-500">
-                                @{{ selectedConversation.user.username }} · ID {{ selectedConversation.user.id }}
+                                {{ selectedConversation.user.email }} · ID {{ selectedConversation.user.id }}
                             </p>
                         </div>
                     </div>

@@ -90,6 +90,43 @@ test('admin can find a completed order by topup id', function (): void {
         ->assertJsonPath('data.data.0.topup_id', $order->topup_id);
 });
 
+test('admin order list exposes and searches bank transfer payment codes', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $targetOrder = Order::factory()->create(['payment_method' => 'bank_transfer']);
+    $legacyOrder = Order::factory()->create(['payment_method' => 'bank_transfer']);
+    PaymentTransaction::query()->create([
+        'order_id' => $targetOrder->id,
+        'transaction_code' => $targetOrder->code,
+        'amount' => $targetOrder->total_amount,
+        'content' => 'NAPSEARCH001',
+        'transfer_reference' => 'NAPSEARCH001',
+        'status' => 'pending',
+    ]);
+    PaymentTransaction::query()->create([
+        'order_id' => null,
+        'transaction_code' => $legacyOrder->code,
+        'amount' => $legacyOrder->total_amount,
+        'content' => 'NAPLEGACYSEARCH',
+        'transfer_reference' => 'NAPLEGACYSEARCH',
+        'status' => 'pending',
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/orders?search=NAPSEARCH001')
+        ->assertSuccessful()
+        ->assertJsonPath('data.meta.total', 1)
+        ->assertJsonPath('data.data.0.code', $targetOrder->code)
+        ->assertJsonPath('data.data.0.payment_method', 'bank_transfer')
+        ->assertJsonPath('data.data.0.payment_transfer_content', 'NAPSEARCH001');
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/orders?search=NAPLEGACYSEARCH')
+        ->assertSuccessful()
+        ->assertJsonPath('data.meta.total', 1)
+        ->assertJsonPath('data.data.0.code', $legacyOrder->code)
+        ->assertJsonPath('data.data.0.payment_transfer_content', 'NAPLEGACYSEARCH');
+});
+
 test('admin order detail exposes QR reconciliation fields without raw callback payload', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $order = Order::factory()->create([

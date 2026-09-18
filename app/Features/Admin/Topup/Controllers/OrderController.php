@@ -2,14 +2,11 @@
 
 namespace App\Features\Admin\Topup\Controllers;
 
-use App\Enums\PaymentMethod;
 use App\Features\Admin\Topup\Requests\UpdateOrderStatusRequest;
 use App\Features\Admin\Topup\Resources\OrderResource;
 use App\Features\Admin\Topup\Services\TopupAdminService;
 use App\Http\Controllers\Controller;
 use App\Models\Order;
-use App\Models\PaymentTransaction;
-use App\Models\Scopes\TenantScope;
 use App\Models\User;
 use App\Support\TenantContext;
 use Illuminate\Http\JsonResponse;
@@ -49,29 +46,17 @@ class OrderController extends Controller
 
     private function sensitiveOrderResponse(Order $order): JsonResponse
     {
-        $relations = ['game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients', 'latestPaymentTransaction'];
+        $isPlatformView = app(TenantContext::class)->isActive() && app(TenantContext::class)->isMain();
+        $relations = [
+            'game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients',
+            'latestPaymentTransaction', 'legacyPaymentTransaction',
+        ];
 
-        if (app(TenantContext::class)->isActive() && app(TenantContext::class)->isMain()) {
+        if ($isPlatformView) {
             $relations[] = 'tenant:id,name,slug';
         }
 
         $order->load($relations);
-
-        if ($order->payment_method === PaymentMethod::BankTransfer && $order->latestPaymentTransaction === null) {
-            $legacyTransactionQuery = PaymentTransaction::query();
-
-            if (app(TenantContext::class)->isActive() && app(TenantContext::class)->isMain()) {
-                $legacyTransactionQuery->withoutGlobalScope(TenantScope::class)->where('tenant_id', $order->tenant_id);
-            }
-
-            $legacyTransaction = $legacyTransactionQuery
-                ->whereNull('order_id')
-                ->where('transaction_code', $order->code)
-                ->latest('id')
-                ->first();
-
-            $order->setRelation('latestPaymentTransaction', $legacyTransaction);
-        }
 
         return OrderResource::make($order)->response()->header('Cache-Control', 'private, no-store');
     }

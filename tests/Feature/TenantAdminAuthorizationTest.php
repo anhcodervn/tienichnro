@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\Order;
+use App\Models\PaymentTransaction;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\User;
@@ -200,6 +201,15 @@ test('platform admin can monitor child orders while child admins remain isolated
     $childAdmin = User::factory()->create(['tenant_id' => $child->id, 'role' => 'admin']);
     $mainOrder = Order::factory()->create(['tenant_id' => $main->id]);
     $childOrder = Order::factory()->create(['tenant_id' => $child->id]);
+    PaymentTransaction::query()->create([
+        'tenant_id' => $child->id,
+        'order_id' => $childOrder->id,
+        'transaction_code' => $childOrder->code,
+        'amount' => $childOrder->total_amount,
+        'content' => 'CHILDPAY001',
+        'transfer_reference' => 'CHILDPAY001',
+        'status' => 'pending',
+    ]);
 
     $this->actingAs($platformAdmin)
         ->getJson('http://napcarot.com/api/admin-api/orders')
@@ -212,11 +222,20 @@ test('platform admin can monitor child orders while child admins remain isolated
         ->getJson("http://napcarot.com/api/admin-api/orders?tenant_id={$child->id}")
         ->assertSuccessful()
         ->assertJsonFragment(['code' => $childOrder->code])
+        ->assertJsonFragment(['payment_transfer_content' => 'CHILDPAY001'])
         ->assertJsonMissing(['code' => $mainOrder->code]);
 
     $this->actingAs($platformAdmin)
+        ->getJson('http://napcarot.com/api/admin-api/orders?search=CHILDPAY001')
+        ->assertSuccessful()
+        ->assertJsonPath('data.meta.total', 1)
+        ->assertJsonPath('data.data.0.code', $childOrder->code)
+        ->assertJsonPath('data.data.0.payment_transfer_content', 'CHILDPAY001');
+
+    $this->actingAs($platformAdmin)
         ->getJson("http://napcarot.com/api/admin-api/orders/{$childOrder->code}")
-        ->assertSuccessful();
+        ->assertSuccessful()
+        ->assertJsonPath('data.payment_transfer_content', 'CHILDPAY001');
 
     $this->actingAs($childAdmin)
         ->getJson('http://daily-orders.test/api/admin-api/orders')

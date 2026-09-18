@@ -295,6 +295,11 @@ const applyFilters = async (): Promise<void> => {
     await load();
 };
 
+const quickSearchPaymentCode = async (paymentCode: string): Promise<void> => {
+    filters.search = paymentCode;
+    await applyFilters();
+};
+
 const clearFilters = async (): Promise<void> => {
     Object.assign(filters, { search: '', tenant_id: '', payment_status: '', order_status: '', per_page: 20, page: 1 });
     await load();
@@ -564,7 +569,7 @@ onBeforeUnmount(() => {
                         ><Search class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" /><input
                             v-model.trim="filters.search"
                             class="min-h-11 w-full rounded-xl border-slate-200 bg-slate-50 pl-9 pr-3 font-normal outline-none transition placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:ring-indigo-100"
-                            placeholder="Mã đơn, Topup ID hoặc email..." /></span
+                            placeholder="Mã đơn, mã thanh toán, Topup ID hoặc email..." /></span
                 ></label>
                 <label v-if="showSiteFilter" class="text-sm font-bold text-slate-700"
                     >Website<select
@@ -723,6 +728,16 @@ onBeforeUnmount(() => {
                                 <td class="px-4 py-4">
                                     <p class="text-base font-black tabular-nums text-slate-950">{{ formatMoney(order.total_amount) }}</p>
                                     <OrderStatusBadge class="mt-2" kind="payment" :status="order.payment_status" />
+                                    <button
+                                        v-if="order.payment_method === 'bank_transfer' && order.payment_transfer_content"
+                                        type="button"
+                                        class="mt-2 block max-w-[155px] truncate rounded-md bg-indigo-50 px-2 py-1 font-mono text-xs font-bold text-indigo-700 transition hover:bg-indigo-100 hover:text-indigo-900 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                                        :title="`Lọc theo mã thanh toán ${order.payment_transfer_content}`"
+                                        :aria-label="`Lọc theo mã thanh toán ${order.payment_transfer_content}`"
+                                        @click.stop="quickSearchPaymentCode(order.payment_transfer_content)"
+                                    >
+                                        Mã TT: {{ order.payment_transfer_content }}
+                                    </button>
                                 </td>
                                 <td class="px-4 py-4">
                                     <OrderStatusBadge kind="order" :status="order.order_status" />
@@ -820,6 +835,16 @@ onBeforeUnmount(() => {
                                 kind="order"
                                 :status="order.order_status"
                             />
+                            <button
+                                v-if="order.payment_method === 'bank_transfer' && order.payment_transfer_content"
+                                type="button"
+                                class="max-w-full truncate rounded-md bg-indigo-50 px-2 py-1 font-mono text-xs font-bold text-indigo-700"
+                                :title="`Lọc theo mã thanh toán ${order.payment_transfer_content}`"
+                                :aria-label="`Lọc theo mã thanh toán ${order.payment_transfer_content}`"
+                                @click.stop="quickSearchPaymentCode(order.payment_transfer_content)"
+                            >
+                                Mã TT: {{ order.payment_transfer_content }}
+                            </button>
                         </div>
                         <div class="mt-4 flex items-center gap-2">
                             <button

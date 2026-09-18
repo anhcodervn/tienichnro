@@ -148,7 +148,16 @@ class Order extends Model
 
     public function latestPaymentTransaction(): HasOne
     {
-        return $this->hasOne(PaymentTransaction::class)->latestOfMany();
+        return $this->hasOne(PaymentTransaction::class)
+            ->withoutGlobalScope(TenantScope::class)
+            ->latestOfMany();
+    }
+
+    public function legacyPaymentTransaction(): HasOne
+    {
+        return $this->hasOne(PaymentTransaction::class, 'transaction_code', 'code')
+            ->withoutGlobalScope(TenantScope::class)
+            ->whereNull('order_id');
     }
 
     public function recipients(): HasMany
