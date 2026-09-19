@@ -5,10 +5,13 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    @if (request()->routeIs('client.support.chat'))
+        <meta name="robots" content="noindex,nofollow">
+    @endif
     @php
         $settings = $systemSettings ?? [];
         $siteName = $settings['site_name'] ?? config('app.name', 'Laravel');
-        $metaTitle = $settings['meta_title'] ?: $siteName;
+        $metaTitle = ($settings['meta_title'] ?? '') ?: $siteName;
         $metaDescription = $settings['meta_description'] ?? '';
         $favicon = $settings['favicon'] ?? '';
     @endphp
@@ -86,7 +89,9 @@
 <body class="font-sans antialiased">
     <div id="app" data-site-name="{{ $siteName }}"></div>
 
-    <script src="{{ asset('assets/libs/tinymce/tinymce.min.js') }}"></script>
+    @unless (request()->routeIs('client.support.chat'))
+        <script src="{{ asset('assets/libs/tinymce/tinymce.min.js') }}"></script>
+    @endunless
 
     <!-- Google Tag Manager (noscript) -->
     @if (!empty($settings['gtm_id']))

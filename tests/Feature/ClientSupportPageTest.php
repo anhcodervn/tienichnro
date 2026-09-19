@@ -12,9 +12,10 @@ test('authenticated user can open the realtime support chat page', function (): 
     $this->actingAs($user)
         ->get(route('client.support.chat'))
         ->assertOk()
-        ->assertViewIs('client.support.index')
-        ->assertSee('data-support-chat', false)
-        ->assertSee(route('client.support.index'), false)
-        ->assertSee("users.{$user->id}.support", false)
-        ->assertSee('Chat trực tiếp với hỗ trợ');
+        ->assertViewIs('app')
+        ->assertSee('id="app"', false)
+        ->assertSee('noindex,nofollow', false)
+        ->assertDontSee('data-mobile-bottom-nav', false)
+        ->assertDontSee('data-floating-support', false)
+        ->assertDontSee('assets/libs/tinymce/tinymce.min.js', false);
 });

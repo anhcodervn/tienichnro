@@ -10,13 +10,7 @@ export default defineConfig(({ mode }) => {
     return {
         plugins: [
             laravel({
-                input: [
-                    'resources/css/app.css',
-                    'resources/js/app.ts',
-                    'resources/css/client.css',
-                    'resources/js/client.js',
-                    'resources/js/client-support.js',
-                ],
+                input: ['resources/css/app.css', 'resources/js/app.ts', 'resources/css/client.css', 'resources/js/client.js'],
                 refresh: true,
             }),
             vue(),

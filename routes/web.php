@@ -51,7 +51,7 @@ Route::middleware(['guest', 'site.active'])->group(function (): void {
 
 Route::middleware('auth')->group(function (): void {
     Route::post('/dang-xuat', [AuthController::class, 'logout'])->name('logout');
-    Route::view('/chat', 'client.support.index')->name('client.support.chat');
+    Route::view('/chat', 'app')->name('client.support.chat');
     Route::get('/verify-email', EmailVerificationPromptController::class)->name('verification.notice');
     Route::get('/verify-email/{id}/{hash}', VerifyEmailController::class)->middleware('signed')->name('verification.verify');
     Route::post('/email/verification-notification', EmailVerificationNotificationController::class)
