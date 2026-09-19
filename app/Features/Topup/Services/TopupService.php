@@ -15,6 +15,7 @@ class TopupService
     public function __construct(
         private readonly OrderStatusService $statusService,
         private readonly ProviderBalanceFallbackService $providerBalanceFallbackService,
+        private readonly TopupProviderResolver $providerResolver,
     ) {}
 
     public function process(int $orderId): void
@@ -41,11 +42,24 @@ class TopupService
         }
 
         if (! $this->providerBalanceFallbackService->divertIfInsufficient($order->id)) {
+            $supportsBatchQuantity = $this->providerResolver->resolveForOrder($order)->supportsBatchQuantity();
+
             $order->recipients()
                 ->whereNotIn('status', ['completed', 'cancelled'])
                 ->orderBy('position')
-                ->get(['id', 'quantity'])
-                ->each(function ($recipient): void {
+                ->get(['id', 'quantity', 'provider_response'])
+                ->each(function ($recipient) use ($supportsBatchQuantity): void {
+                    $items = data_get($recipient->provider_response, 'items', []);
+                    $hasLegacyUnitItems = is_array($items)
+                        && $items !== []
+                        && (int) data_get($items, '1.quantity', 0) !== $recipient->quantity;
+
+                    if ($supportsBatchQuantity && ! $hasLegacyUnitItems) {
+                        ProcessTopupRecipient::dispatch($recipient->id)->afterCommit();
+
+                        return;
+                    }
+
                     foreach (range(1, $recipient->quantity) as $unit) {
                         ProcessTopupRecipient::dispatch($recipient->id, $unit)->afterCommit();
                     }

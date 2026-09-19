@@ -22,6 +22,8 @@ class Order extends Model
 
     public const AFFILIATE_SOURCE_COOKIE = 'referral_cookie';
 
+    public const AFFILIATE_SOURCE_ADMIN = 'admin_manual';
+
     protected $hidden = [
         'topup_provider_id',
         'provider',

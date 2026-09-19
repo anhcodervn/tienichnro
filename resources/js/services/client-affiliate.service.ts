@@ -12,6 +12,23 @@ export type ClientAffiliateHomeData = {
     announcements: ClientAffiliateAnnouncement[];
 };
 
+export type ClientAffiliateRate = {
+    package_id: number;
+    game: string;
+    package: string;
+    denomination: number;
+    selling_price: number;
+    commission_type: 'fixed' | 'percentage';
+    fixed_amount: number | null;
+    percentage: number | null;
+    estimated_commission: number;
+    source: 'package' | 'global';
+};
+
+export type ClientAffiliateRatesData = {
+    rates: ClientAffiliateRate[];
+};
+
 export type ClientAffiliateData = {
     program: { minimum_withdrawal: number; minimum_conversion: number; holding_days: number };
     profile: {
@@ -44,6 +61,7 @@ const root = '/api/client/affiliate';
 export const clientAffiliateService = {
     home: async (): Promise<ClientAffiliateHomeData> => (await api.get(`${root}/home`)).data.data,
     data: async (): Promise<ClientAffiliateData> => (await api.get(root)).data.data,
+    rates: async (): Promise<ClientAffiliateRatesData> => (await api.get(`${root}/rates`)).data.data,
     updatePayout: (payload: { bank_name: string; bank_account_name: string; bank_account_number: string }) =>
         api.put(`${root}/payout-account`, payload),
     convert: (amount: number, idempotencyKey: string) => api.post(`${root}/convert`, { amount, idempotency_key: idempotencyKey }),

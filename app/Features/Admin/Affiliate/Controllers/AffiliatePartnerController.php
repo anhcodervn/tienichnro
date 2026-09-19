@@ -3,6 +3,7 @@
 namespace App\Features\Admin\Affiliate\Controllers;
 
 use App\Features\Admin\Affiliate\Requests\AffiliateIndexRequest;
+use App\Features\Admin\Affiliate\Requests\AssignAffiliateOrderRequest;
 use App\Features\Admin\Affiliate\Requests\UpdateAffiliateProfileStatusRequest;
 use App\Features\Admin\Affiliate\Services\AdminAffiliateService;
 use App\Http\Controllers\Controller;
@@ -25,6 +26,19 @@ class AffiliatePartnerController extends Controller
 
         return response()->json(['status' => true, 'data' => $this->service->updateProfile(
             $profile, $request->validated(), $admin, $request,
+        )]);
+    }
+
+    public function assignOrder(AssignAffiliateOrderRequest $request, int $profile): JsonResponse
+    {
+        /** @var User $admin */
+        $admin = $request->user();
+
+        return response()->json(['status' => true, 'data' => $this->service->assignOrder(
+            $profile,
+            (string) $request->validated('order_code'),
+            $admin,
+            $request,
         )]);
     }
 }

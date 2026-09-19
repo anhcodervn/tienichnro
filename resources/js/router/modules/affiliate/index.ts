@@ -13,6 +13,11 @@ export default {
             component: () => import('@/pages/affiliate/index.vue'),
         },
         {
+            path: 'bang-gia-chiet-khau',
+            name: 'affiliate.rates',
+            component: () => import('@/pages/affiliate/rates.vue'),
+        },
+        {
             path: ':pathMatch(.*)*',
             redirect: { name: 'affiliate.home' },
         },

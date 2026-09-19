@@ -9,7 +9,7 @@ import {
     type Paginated,
 } from '@/services/admin-affiliate.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { BadgeDollarSign, Banknote, HandCoins, LoaderCircle, RefreshCw, Save, ShieldAlert, Users } from 'lucide-vue-next';
+import { BadgeDollarSign, Banknote, ChevronDown, Filter, HandCoins, Link2, LoaderCircle, RefreshCw, Save, ShieldAlert, Users } from 'lucide-vue-next';
 import Swal from 'sweetalert2';
 import { computed, onMounted, ref, watch } from 'vue';
 
@@ -25,6 +25,10 @@ const partners = ref<Paginated<AffiliatePartner> | null>(null);
 const commissions = ref<Paginated<AffiliateCommission> | null>(null);
 const withdrawals = ref<Paginated<AffiliateWithdrawal> | null>(null);
 const statusFilter = ref('');
+const searchFilter = ref('');
+const dateFromFilter = ref('');
+const dateToFilter = ref('');
+const filtersOpen = ref(false);
 const currentPage = ref(1);
 
 const tabs: Array<{ key: Tab; label: string }> = [
@@ -52,6 +56,9 @@ const withdrawalStatusLabel = (status: string): string => withdrawalStatusLabels
 const query = computed<Record<string, unknown>>(() => ({
     ...(selectedSiteId.value ? { site_id: selectedSiteId.value } : {}),
     ...(statusFilter.value ? { status: statusFilter.value } : {}),
+    ...(searchFilter.value.trim() ? { search: searchFilter.value.trim() } : {}),
+    ...(dateFromFilter.value ? { date_from: dateFromFilter.value } : {}),
+    ...(dateToFilter.value ? { date_to: dateToFilter.value } : {}),
     page: currentPage.value,
 }));
 const activePagination = computed(() => {
@@ -172,6 +179,48 @@ const togglePartner = async (partner: AffiliatePartner): Promise<void> => {
     }
 };
 
+const assignOrder = async (partner: AffiliatePartner): Promise<void> => {
+    const result = await Swal.fire({
+        title: `Gắn đơn cho ${partner.user.username}`,
+        input: 'text',
+        inputLabel: 'Mã đơn topup',
+        inputPlaceholder: 'TOP...',
+        inputAttributes: { autocapitalize: 'characters', autocomplete: 'off' },
+        inputValidator: (value) => (!/^TOP[A-Z0-9]+$/.test(value.trim().toUpperCase()) ? 'Mã đơn phải bắt đầu bằng TOP.' : undefined),
+        showCancelButton: true,
+        confirmButtonText: 'Gắn mã',
+        cancelButtonText: 'Hủy',
+    });
+    if (!result.isConfirmed) return;
+
+    try {
+        const orderCode = result.value.trim().toUpperCase();
+        const response = await adminAffiliateService.assignPartnerOrder(partner.id, orderCode);
+        handleSuccessResponse(response, `Đã gắn đơn ${orderCode} cho ${partner.user.username}.`);
+        await load();
+    } catch (error) {
+        handleErrorResponse(error);
+    }
+};
+
+const applyFilters = (): void => {
+    if (currentPage.value !== 1) {
+        currentPage.value = 1;
+
+        return;
+    }
+
+    void load();
+};
+
+const resetFilters = (): void => {
+    searchFilter.value = '';
+    statusFilter.value = '';
+    dateFromFilter.value = '';
+    dateToFilter.value = '';
+    applyFilters();
+};
+
 const toggleCommissionFlag = async (commission: AffiliateCommission): Promise<void> => {
     const action = commission.is_flagged ? 'unflag' : 'flag';
     const result = await Swal.fire({
@@ -235,17 +284,21 @@ const updateWithdrawal = async (withdrawal: AffiliateWithdrawal, action: 'approv
 };
 
 watch(activeTab, () => {
-    const filtersWillChange = statusFilter.value !== '' || currentPage.value !== 1;
+    const pageWillChange = currentPage.value !== 1;
     statusFilter.value = '';
+    searchFilter.value = '';
+    dateFromFilter.value = '';
+    dateToFilter.value = '';
+    filtersOpen.value = false;
     currentPage.value = 1;
 
-    if (filtersWillChange) {
+    if (pageWillChange) {
         return;
     }
 
     void load();
 });
-watch([selectedSiteId, statusFilter], () => {
+watch(selectedSiteId, () => {
     if (currentPage.value !== 1) {
         currentPage.value = 1;
 
@@ -375,10 +428,33 @@ onMounted(load);
         </template>
 
         <section v-else-if="activeTab === 'partners' && partners" class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-            <header class="flex items-center justify-between border-b border-slate-200 p-5">
-                <h2 class="font-black">Cộng tác viên</h2>
-                <span class="text-sm text-slate-500">{{ partners.total }} tài khoản</span>
+            <header class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-5">
+                <div>
+                    <h2 class="font-black">Cộng tác viên</h2>
+                    <span class="text-sm text-slate-500">{{ partners.total }} tài khoản</span>
+                </div>
+                <button type="button" class="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold" @click="filtersOpen = !filtersOpen">
+                    <Filter class="size-4" /> Bộ lọc <ChevronDown class="size-4 transition" :class="filtersOpen ? 'rotate-180' : ''" />
+                </button>
             </header>
+            <div v-if="filtersOpen" class="grid gap-3 border-b border-slate-200 bg-slate-50 p-5 md:grid-cols-2 xl:grid-cols-5">
+                <label class="grid gap-1 text-xs font-bold text-slate-600 xl:col-span-2">
+                    Tìm kiếm
+                    <input v-model="searchFilter" type="search" placeholder="Tên, email hoặc mã giới thiệu" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal" @keyup.enter="applyFilters" />
+                </label>
+                <label class="grid gap-1 text-xs font-bold text-slate-600">
+                    Trạng thái
+                    <select v-model="statusFilter" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal">
+                        <option value="">Tất cả</option><option value="active">Hoạt động</option><option value="suspended">Tạm khóa</option>
+                    </select>
+                </label>
+                <label class="grid gap-1 text-xs font-bold text-slate-600">Từ ngày<input v-model="dateFromFilter" type="date" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal" /></label>
+                <label class="grid gap-1 text-xs font-bold text-slate-600">Đến ngày<input v-model="dateToFilter" type="date" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal" /></label>
+                <div class="flex gap-2 md:col-span-2 xl:col-span-5 xl:justify-end">
+                    <button type="button" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold" @click="resetFilters">Xóa lọc</button>
+                    <button type="button" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white" @click="applyFilters">Áp dụng</button>
+                </div>
+            </div>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[980px] text-sm">
                     <thead class="bg-slate-50 text-left text-slate-500">
@@ -410,9 +486,14 @@ onMounted(load);
                                 >
                             </td>
                             <td class="px-5 py-4 text-right">
-                                <button type="button" class="rounded-lg border px-3 py-2 font-bold" @click="togglePartner(partner)">
-                                    {{ partner.status === 'active' ? 'Tạm khóa' : 'Mở lại' }}
-                                </button>
+                                <div class="flex justify-end gap-2">
+                                    <button v-if="partner.status === 'active'" type="button" class="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 font-bold text-blue-700" @click="assignOrder(partner)">
+                                        <Link2 class="size-4" /> Gắn mã
+                                    </button>
+                                    <button type="button" class="rounded-lg border px-3 py-2 font-bold" @click="togglePartner(partner)">
+                                        {{ partner.status === 'active' ? 'Tạm khóa' : 'Mở lại' }}
+                                    </button>
+                                </div>
                             </td>
                         </tr>
                     </tbody>
@@ -424,16 +505,19 @@ onMounted(load);
             v-else-if="activeTab === 'commissions' && commissions"
             class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
         >
-            <header class="flex items-center justify-between border-b border-slate-200 p-5">
+            <header class="flex items-center justify-between gap-3 border-b border-slate-200 p-5">
                 <h2 class="font-black">Lịch sử hoa hồng</h2>
-                <select v-model="statusFilter" class="rounded-lg border px-3 py-2 text-sm">
-                    <option value="">Tất cả</option>
-                    <option value="pending">Đang giữ</option>
-                    <option value="available">Đã duyệt</option>
-                    <option value="reversed">Thu hồi</option>
-                    <option value="flagged">Cần kiểm tra</option>
-                </select>
+                <button type="button" class="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold" @click="filtersOpen = !filtersOpen">
+                    <Filter class="size-4" /> Bộ lọc <ChevronDown class="size-4 transition" :class="filtersOpen ? 'rotate-180' : ''" />
+                </button>
             </header>
+            <div v-if="filtersOpen" class="grid gap-3 border-b border-slate-200 bg-slate-50 p-5 md:grid-cols-2 xl:grid-cols-5">
+                <label class="grid gap-1 text-xs font-bold text-slate-600 xl:col-span-2">Tìm kiếm<input v-model="searchFilter" type="search" placeholder="Mã đơn, CTV, khách hoặc gói" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal" @keyup.enter="applyFilters" /></label>
+                <label class="grid gap-1 text-xs font-bold text-slate-600">Trạng thái<select v-model="statusFilter" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal"><option value="">Tất cả</option><option value="pending">Đang giữ</option><option value="available">Đã duyệt</option><option value="reversed">Thu hồi</option><option value="flagged">Cần kiểm tra</option></select></label>
+                <label class="grid gap-1 text-xs font-bold text-slate-600">Từ ngày<input v-model="dateFromFilter" type="date" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal" /></label>
+                <label class="grid gap-1 text-xs font-bold text-slate-600">Đến ngày<input v-model="dateToFilter" type="date" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal" /></label>
+                <div class="flex gap-2 md:col-span-2 xl:col-span-5 xl:justify-end"><button type="button" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold" @click="resetFilters">Xóa lọc</button><button type="button" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white" @click="applyFilters">Áp dụng</button></div>
+            </div>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[980px] text-sm">
                     <thead class="bg-slate-50 text-left text-slate-500">
@@ -486,16 +570,19 @@ onMounted(load);
             v-else-if="activeTab === 'withdrawals' && withdrawals"
             class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"
         >
-            <header class="flex items-center justify-between border-b border-slate-200 p-5">
+            <header class="flex items-center justify-between gap-3 border-b border-slate-200 p-5">
                 <h2 class="font-black">Yêu cầu rút tiền</h2>
-                <select v-model="statusFilter" class="rounded-lg border px-3 py-2 text-sm">
-                    <option value="">Tất cả</option>
-                    <option value="requested">Chờ duyệt</option>
-                    <option value="approved">Đã duyệt</option>
-                    <option value="paid">Đã trả</option>
-                    <option value="rejected">Từ chối</option>
-                </select>
+                <button type="button" class="inline-flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-bold" @click="filtersOpen = !filtersOpen">
+                    <Filter class="size-4" /> Bộ lọc <ChevronDown class="size-4 transition" :class="filtersOpen ? 'rotate-180' : ''" />
+                </button>
             </header>
+            <div v-if="filtersOpen" class="grid gap-3 border-b border-slate-200 bg-slate-50 p-5 md:grid-cols-2 xl:grid-cols-5">
+                <label class="grid gap-1 text-xs font-bold text-slate-600 xl:col-span-2">Tìm kiếm<input v-model="searchFilter" type="search" placeholder="Tên, email hoặc mã giao dịch" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal" @keyup.enter="applyFilters" /></label>
+                <label class="grid gap-1 text-xs font-bold text-slate-600">Trạng thái<select v-model="statusFilter" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal"><option value="">Tất cả</option><option value="requested">Chờ duyệt</option><option value="approved">Đã duyệt</option><option value="paid">Đã trả</option><option value="rejected">Từ chối</option></select></label>
+                <label class="grid gap-1 text-xs font-bold text-slate-600">Từ ngày<input v-model="dateFromFilter" type="date" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal" /></label>
+                <label class="grid gap-1 text-xs font-bold text-slate-600">Đến ngày<input v-model="dateToFilter" type="date" class="min-h-10 rounded-xl border border-slate-300 bg-white px-3 text-sm font-normal" /></label>
+                <div class="flex gap-2 md:col-span-2 xl:col-span-5 xl:justify-end"><button type="button" class="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold" @click="resetFilters">Xóa lọc</button><button type="button" class="rounded-xl bg-blue-600 px-4 py-2 text-sm font-bold text-white" @click="applyFilters">Áp dụng</button></div>
+            </div>
             <div class="overflow-x-auto">
                 <table class="w-full min-w-[980px] text-sm">
                     <thead class="bg-slate-50 text-left text-slate-500">

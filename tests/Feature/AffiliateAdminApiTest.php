@@ -10,9 +10,11 @@ use App\Models\AffiliateWithdrawal;
 use App\Models\Game;
 use App\Models\GlobalTopupPackage;
 use App\Models\GlobalTopupPackageGameSetting;
+use App\Models\Order;
 use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\TopupPackage;
+use App\Models\TopupProvider;
 use App\Models\User;
 
 test('affiliate admin api requires an administrator', function (): void {
@@ -131,13 +133,26 @@ test('admin configures percentage commission per package and changes are audited
 test('admin configures a global rate and can restore a package to global inheritance', function (): void {
     $main = Tenant::query()->where('is_main', true)->firstOrFail();
     $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
+    $provider = TopupProvider::factory()->create(['slug' => 'global-affiliate-provider']);
     $globalPackage = GlobalTopupPackage::factory()->create([
+        'provider_id' => $provider->id,
         'price' => 100000,
         'provider_price' => 90000,
     ]);
-    $game = Game::factory()->create(['package_mode' => 'global']);
+    $game = Game::factory()->create([
+        'package_mode' => 'global',
+        'provider_service_code' => 'GLOBAL-AFFILIATE-GAME',
+    ]);
     GlobalTopupPackageGameSetting::factory()->create([
         'denomination' => $globalPackage->denomination,
+        'game_id' => $game->id,
+    ]);
+    $catalogOnlyGlobalPackage = GlobalTopupPackage::factory()->create([
+        'price' => 200000,
+        'provider_price' => 180000,
+    ]);
+    GlobalTopupPackageGameSetting::factory()->create([
+        'denomination' => $catalogOnlyGlobalPackage->denomination,
         'game_id' => $game->id,
     ]);
     $package = TopupPackage::factory()->create([
@@ -168,10 +183,13 @@ test('admin configures a global rate and can restore a package to global inherit
         ->json('data');
     $disabledPackage = collect($disabledConfiguration['rates'])->firstWhere('package_id', $package->id);
     $configuredGlobalRate = collect($disabledConfiguration['global_rates'])->firstWhere('global_package_id', $globalPackage->id);
+    $catalogOnlyGlobalRate = collect($disabledConfiguration['global_rates'])->firstWhere('global_package_id', $catalogOnlyGlobalPackage->id);
 
     expect($disabledPackage['mode'])->toBe('disabled')
         ->and($configuredGlobalRate['fixed_amount'])->toBe(2500)
-        ->and($configuredGlobalRate['games'])->toContain($game->name);
+        ->and($configuredGlobalRate['games'])->toContain($game->name)
+        ->and($catalogOnlyGlobalRate['package'])->toBe($catalogOnlyGlobalPackage->name)
+        ->and($catalogOnlyGlobalRate['minimum_margin'])->toBe(20000);
 
     $this->actingAs($admin)
         ->deleteJson("http://napcarot.com/api/admin-api/affiliate/rates/{$package->id}?site_id={$main->id}")
@@ -227,6 +245,101 @@ test('admin can hold and release a pending commission for manual review', functi
         ->count())->toBe(2);
 });
 
+test('admin manually assigns an unclaimed topup order to an affiliate and snapshots commission', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
+    $partner = User::factory()->create(['tenant_id' => $main->id]);
+    $secondPartner = User::factory()->create(['tenant_id' => $main->id]);
+    $profile = AffiliateProfile::factory()->create(['tenant_id' => $main->id, 'user_id' => $partner->id]);
+    $secondProfile = AffiliateProfile::factory()->create(['tenant_id' => $main->id, 'user_id' => $secondPartner->id]);
+    $package = TopupPackage::factory()->create();
+    AffiliateProgram::factory()->create(['tenant_id' => $main->id, 'is_enabled' => true]);
+    AffiliatePackageRate::factory()->create([
+        'tenant_id' => $main->id,
+        'topup_package_id' => $package->id,
+        'commission_type' => AffiliatePackageRate::TYPE_FIXED,
+        'fixed_amount' => 2500,
+        'is_active' => true,
+    ]);
+    $order = Order::factory()->create([
+        'tenant_id' => $main->id,
+        'topup_package_id' => $package->id,
+        'user_id' => User::factory()->create(['tenant_id' => $main->id])->id,
+        'payment_status' => 'paid',
+        'order_status' => 'completed',
+        'completed_at' => now()->subHour(),
+    ]);
+
+    $this->actingAs($admin)
+        ->postJson("http://napcarot.com/api/admin-api/affiliate/partners/{$profile->id}/orders", [
+            'order_code' => strtolower($order->code),
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.order_code', $order->code)
+        ->assertJsonPath('data.partner.id', $partner->id);
+
+    $order->refresh();
+    $commission = AffiliateCommission::query()->withoutGlobalScopes()->where('order_id', $order->id)->firstOrFail();
+
+    expect($order->affiliate_referrer_id)->toBe($partner->id)
+        ->and($order->affiliate_attribution_source)->toBe(Order::AFFILIATE_SOURCE_ADMIN)
+        ->and($order->affiliate_referral_code)->toBe($partner->referral_code)
+        ->and($order->affiliate_attributed_at)->not->toBeNull()
+        ->and($commission->referrer_id)->toBe($partner->id)
+        ->and($commission->amount)->toBe(2500)
+        ->and($commission->earned_at)->not->toBeNull()
+        ->and($commission->available_at)->not->toBeNull()
+        ->and(AdminAuditLog::query()->withoutGlobalScopes()
+            ->where('action', 'affiliate_order_manually_assigned')
+            ->where('subject_type', Order::class)
+            ->where('subject_id', $order->id)
+            ->exists())->toBeTrue();
+
+    $this->actingAs($admin)
+        ->postJson("http://napcarot.com/api/admin-api/affiliate/partners/{$secondProfile->id}/orders", [
+            'order_code' => $order->code,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonPath('message', 'Mã đơn này đã có cộng tác viên nhận.');
+
+    expect($order->refresh()->affiliate_referrer_id)->toBe($partner->id);
+});
+
+test('affiliate admin lists support search and created date filters', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
+    $partner = User::factory()->create(['tenant_id' => $main->id, 'username' => 'filter-partner']);
+    $profile = AffiliateProfile::factory()->create([
+        'tenant_id' => $main->id,
+        'user_id' => $partner->id,
+        'created_at' => now()->subDay(),
+    ]);
+    $order = Order::factory()->create(['tenant_id' => $main->id]);
+    $commission = AffiliateCommission::factory()->create([
+        'tenant_id' => $main->id,
+        'order_id' => $order->id,
+        'referrer_id' => $partner->id,
+        'created_at' => now()->subDay(),
+    ]);
+    $withdrawal = AffiliateWithdrawal::factory()->create([
+        'tenant_id' => $main->id,
+        'user_id' => $partner->id,
+        'bank_transaction_reference' => 'BANK-FILTER-123',
+        'created_at' => now()->subDay(),
+    ]);
+    $date = now()->subDay()->toDateString();
+
+    $this->actingAs($admin)
+        ->getJson("http://napcarot.com/api/admin-api/affiliate/partners?search=filter-partner&date_from={$date}&date_to={$date}")
+        ->assertOk()->assertJsonPath('data.total', 1)->assertJsonPath('data.data.0.id', $profile->id);
+    $this->actingAs($admin)
+        ->getJson("http://napcarot.com/api/admin-api/affiliate/commissions?search={$order->code}&date_from={$date}&date_to={$date}")
+        ->assertOk()->assertJsonPath('data.total', 1)->assertJsonPath('data.data.0.id', $commission->id);
+    $this->actingAs($admin)
+        ->getJson("http://napcarot.com/api/admin-api/affiliate/withdrawals?search=BANK-FILTER-123&date_from={$date}&date_to={$date}")
+        ->assertOk()->assertJsonPath('data.total', 1)->assertJsonPath('data.data.0.id', $withdrawal->id);
+});
+
 test('withdrawal lists mask account numbers while authorized detail can reveal it', function (): void {
     $main = Tenant::query()->where('is_main', true)->firstOrFail();
     $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
@@ -262,4 +375,70 @@ test('client affiliate dashboard follows the site enable switch', function (): v
         ->assertJsonPath('data.referral.code', $user->referral_code);
 
     expect(AffiliateProfile::query()->withoutGlobalScopes()->where('user_id', $user->id)->exists())->toBeTrue();
+});
+
+test('affiliate rate card shows effective fixed percentage and global commissions', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $user = User::factory()->create(['tenant_id' => $main->id]);
+    AffiliateProgram::factory()->create(['tenant_id' => $main->id, 'is_enabled' => true]);
+
+    $fixedPackage = TopupPackage::factory()->create(['name' => 'Gói cố định', 'price' => 100000, 'provider_price' => 90000]);
+    AffiliatePackageRate::factory()->create([
+        'tenant_id' => $main->id,
+        'topup_package_id' => $fixedPackage->id,
+        'commission_type' => AffiliatePackageRate::TYPE_FIXED,
+        'fixed_amount' => 2500,
+        'is_active' => true,
+    ]);
+    $percentagePackage = TopupPackage::factory()->create(['name' => 'Gói phần trăm', 'price' => 200000, 'provider_price' => 180000]);
+    AffiliatePackageRate::factory()->create([
+        'tenant_id' => $main->id,
+        'topup_package_id' => $percentagePackage->id,
+        'commission_type' => AffiliatePackageRate::TYPE_PERCENTAGE,
+        'percentage_basis_points' => 525,
+        'is_active' => true,
+    ]);
+    $disabledPackage = TopupPackage::factory()->create(['name' => 'Gói đã tắt']);
+    AffiliatePackageRate::factory()->create([
+        'tenant_id' => $main->id,
+        'topup_package_id' => $disabledPackage->id,
+        'is_active' => false,
+    ]);
+
+    $globalPackage = GlobalTopupPackage::factory()->create(['price' => 150000, 'provider_price' => 140000]);
+    $globalGame = Game::factory()->create(['package_mode' => 'global']);
+    GlobalTopupPackageGameSetting::factory()->create([
+        'game_id' => $globalGame->id,
+        'denomination' => $globalPackage->denomination,
+    ]);
+    $inheritedPackage = TopupPackage::factory()->create([
+        'game_id' => $globalGame->id,
+        'global_topup_package_id' => $globalPackage->id,
+        'name' => 'Gói kế thừa Global',
+        'status' => 'active',
+    ]);
+    AffiliateGlobalPackageRate::factory()->create([
+        'tenant_id' => $main->id,
+        'global_topup_package_id' => $globalPackage->id,
+        'commission_type' => AffiliatePackageRate::TYPE_FIXED,
+        'fixed_amount' => 3000,
+        'is_active' => true,
+    ]);
+
+    $rates = $this->actingAs($user)
+        ->getJson('http://napcarot.com/api/client/affiliate/rates')
+        ->assertOk()
+        ->json('data.rates');
+
+    $fixed = collect($rates)->firstWhere('package_id', $fixedPackage->id);
+    $percentage = collect($rates)->firstWhere('package_id', $percentagePackage->id);
+    $global = collect($rates)->firstWhere('package_id', $inheritedPackage->id);
+
+    expect($fixed['estimated_commission'])->toBe(2500)
+        ->and($fixed['source'])->toBe('package')
+        ->and($percentage['percentage'])->toBe(5.25)
+        ->and($percentage['estimated_commission'])->toBe(10500)
+        ->and($global['estimated_commission'])->toBe(3000)
+        ->and($global['source'])->toBe('global')
+        ->and(collect($rates)->contains('package_id', $disabledPackage->id))->toBeFalse();
 });

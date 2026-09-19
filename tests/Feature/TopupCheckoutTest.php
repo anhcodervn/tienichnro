@@ -400,6 +400,49 @@ test('bank transfer order creates one shared payment request through the configu
         && $request->data()['amount'] === 180000);
 });
 
+test('bulk checkout uses the full quantity for the payment transaction and QR amount', function (int $expectedQuantity, string $bulkRecipients): void {
+    $this->withoutVite();
+
+    [$game, $server, $package] = topupCatalog();
+    ConfigRecharge::query()->create([
+        'provider' => 'manual',
+        'bank_name' => 'MBBank',
+        'account_name' => 'NGUYEN VAN A',
+        'account_number' => '0123456789',
+        'qr_template' => 'https://img.vietqr.io/image/{bank_code}-{account_number}-compact2.png?amount={amount}&addInfo={nd}',
+        'transfer_prefix' => 'NAP',
+        'is_active' => true,
+    ]);
+
+    $response = $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+        'purchase_mode' => 'bulk',
+        'bulk_recipients' => $bulkRecipients,
+    ]));
+
+    $order = Order::query()->sole();
+    $paymentTransaction = PaymentTransaction::query()->sole();
+    $expectedTotal = 90000 * $expectedQuantity;
+
+    $response->assertRedirect(route('orders.payment', $order));
+    expect($order->quantity)->toBe($expectedQuantity)
+        ->and((int) $order->total_amount)->toBe($expectedTotal)
+        ->and((int) $paymentTransaction->amount)->toBe($expectedTotal)
+        ->and($paymentTransaction->raw_data['qr_url'])->toContain('amount='.$expectedTotal);
+
+    $this->get(route('orders.payment', $order))
+        ->assertSuccessful()
+        ->assertSee(number_format($expectedTotal, 0, ',', '.').'đ')
+        ->assertSee('amount='.$expectedTotal, false);
+})->with([
+    '10 cards' => [10, 'account-01|hero-01|10'],
+    '100 cards' => [
+        100,
+        collect(range(1, 10))
+            ->map(fn (int $position): string => "account-{$position}|hero-{$position}|10")
+            ->implode("\n"),
+    ],
+]);
+
 test('payment page rebuilds a stored QR URL that still contains a template placeholder', function (): void {
     [$game, $server, $package] = topupCatalog();
     $user = User::factory()->create();

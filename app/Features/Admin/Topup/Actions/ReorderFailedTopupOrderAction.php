@@ -8,6 +8,7 @@ use App\Features\Topup\Enums\TopupProviderStatus;
 use App\Features\Topup\Jobs\ProcessTopupRecipient;
 use App\Features\Topup\Services\OrderStatusService;
 use App\Features\Topup\Services\TopupProviderBalanceService;
+use App\Features\Topup\Services\TopupProviderResolver;
 use App\Models\AdminAuditLog;
 use App\Models\Order;
 use App\Models\OrderRecipient;
@@ -23,6 +24,7 @@ class ReorderFailedTopupOrderAction
     public function __construct(
         private readonly TopupProviderBalanceService $providerBalanceService,
         private readonly OrderStatusService $orderStatusService,
+        private readonly TopupProviderResolver $providerResolver,
     ) {}
 
     public function handle(Order $order, User $admin, Request $request): Order
@@ -81,6 +83,7 @@ class ReorderFailedTopupOrderAction
                     continue;
                 }
 
+                $isBatch = $this->isBatchRecipient($recipient, $items);
                 $requestId = $this->requestId($lockedOrder, $recipient, $attempt);
                 $reorderHistory = is_array($providerResponse['reorder_history'] ?? null)
                     ? $providerResponse['reorder_history']
@@ -97,10 +100,15 @@ class ReorderFailedTopupOrderAction
                         ->all(),
                 ];
 
+                if ($isBatch) {
+                    $items = [];
+                }
+
                 foreach ($failedUnits[$recipient->id] as $unit) {
                     $items[(string) $unit] = [
                         'unit' => $unit,
-                        'request_id' => $recipient->quantity === 1
+                        'quantity' => $isBatch ? $recipient->quantity : 1,
+                        'request_id' => $recipient->quantity === 1 || $isBatch
                             ? $requestId
                             : $requestId.'-U'.str_pad((string) $unit, 3, '0', STR_PAD_LEFT),
                         'status' => TopupProviderStatus::Pending->value,
@@ -214,7 +222,23 @@ class ReorderFailedTopupOrderAction
                     $this->throwAmbiguousState();
                 }
 
-                $failedUnits[$recipient->id] = range(1, $recipient->quantity);
+                $failedUnits[$recipient->id] = $this->providerResolver
+                    ->resolveForOrder($order)
+                    ->supportsBatchQuantity()
+                        ? [1]
+                        : range(1, $recipient->quantity);
+
+                continue;
+            }
+
+            if ($this->isBatchRecipient($recipient, $items)) {
+                $status = data_get($items, '1.status');
+
+                if ($status !== TopupProviderStatus::Failed->value && ! $forceReorder) {
+                    $this->throwAmbiguousState();
+                }
+
+                $failedUnits[$recipient->id] = [1];
 
                 continue;
             }
@@ -245,6 +269,13 @@ class ReorderFailedTopupOrderAction
         }
 
         return $failedUnits;
+    }
+
+    /** @param array<int|string, mixed> $items */
+    private function isBatchRecipient(OrderRecipient $recipient, array $items): bool
+    {
+        return $recipient->quantity > 1
+            && (int) data_get($items, '1.quantity', 0) === $recipient->quantity;
     }
 
     private function throwAmbiguousState(): never

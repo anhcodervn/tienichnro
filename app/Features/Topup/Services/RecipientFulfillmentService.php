@@ -34,7 +34,19 @@ class RecipientFulfillmentService
 
         $order = $recipient->order;
         $adapter = $this->providerResolver->resolveForOrder($order);
-        $requestId = $this->unitRequestId($recipient, $unit);
+        $items = data_get($recipient->provider_response, 'items', []);
+        $hasLegacyUnitItems = is_array($items)
+            && $items !== []
+            && (int) data_get($items, '1.quantity', 0) !== $recipient->quantity;
+        $supportsBatchQuantity = $adapter->supportsBatchQuantity() && ! $hasLegacyUnitItems;
+
+        if ($supportsBatchQuantity && $unit !== 1) {
+            return;
+        }
+
+        $requestId = $supportsBatchQuantity
+            ? $this->baseRequestId($order, $recipient)
+            : $this->unitRequestId($recipient, $unit);
         $item = $this->providerItem($recipient, $unit);
 
         if (filled($item['reference'] ?? null)) {
@@ -46,16 +58,36 @@ class RecipientFulfillmentService
         }
 
         try {
-            $result = $adapter->submit($order, $recipient, $order->provider, $requestId);
+            $result = $adapter->submit(
+                $order,
+                $recipient,
+                $order->provider,
+                $requestId,
+                $supportsBatchQuantity ? $recipient->quantity : 1,
+            );
         } catch (TopupProviderConnectionException $exception) {
-            if ($this->storeProviderException($recipient->id, $unit, $requestId, $exception, true)) {
+            if ($this->storeProviderException(
+                $recipient->id,
+                $unit,
+                $requestId,
+                $exception,
+                true,
+                batchQuantity: $supportsBatchQuantity ? $recipient->quantity : null,
+            )) {
                 return;
             }
 
             throw $exception;
         }
 
-        $this->storeUnitResult($recipient->id, $unit, $requestId, $result, true);
+        $this->storeUnitResult(
+            $recipient->id,
+            $unit,
+            $requestId,
+            $result,
+            true,
+            batchQuantity: $supportsBatchQuantity ? $recipient->quantity : null,
+        );
 
         if (! $result->status->isTerminal() && $adapter->supportsStatusChecks()) {
             SyncTopupRecipientStatus::dispatch($recipient->id, $unit, 1)->delay(now()->addSeconds(5));
@@ -138,7 +170,11 @@ class RecipientFulfillmentService
         $checked = 0;
 
         foreach ($recipients as $recipient) {
-            foreach (range(1, $recipient->quantity) as $unit) {
+            $units = $this->isBatchItem($recipient->quantity, $this->providerItem($recipient, 1))
+                ? [1]
+                : range(1, $recipient->quantity);
+
+            foreach ($units as $unit) {
                 $item = $this->providerItem($recipient, $unit);
 
                 if (blank($item['reference'] ?? null)
@@ -252,8 +288,9 @@ class RecipientFulfillmentService
         bool $submitted,
         int $attempt = 0,
         bool $preserveCompleted = false,
+        ?int $batchQuantity = null,
     ): void {
-        DB::transaction(function () use ($recipientId, $unit, $requestId, $result, $submitted, $attempt, $preserveCompleted): void {
+        DB::transaction(function () use ($recipientId, $unit, $requestId, $result, $submitted, $attempt, $preserveCompleted, $batchQuantity): void {
             $recipient = OrderRecipient::query()->lockForUpdate()->findOrFail($recipientId);
 
             if ($recipient->status === 'cancelled' || ($recipient->status === 'completed' && ! $preserveCompleted)) {
@@ -281,6 +318,7 @@ class RecipientFulfillmentService
             ];
             $items[(string) $unit] = [
                 'unit' => $unit,
+                'quantity' => $batchQuantity ?? ($previousItem['quantity'] ?? 1),
                 'request_id' => $requestId,
                 'reference' => $result->reference ?: ($previousItem['reference'] ?? null),
                 'status' => $preserveCompleted ? ($previousItem['status'] ?? 'completed') : $result->status->value,
@@ -299,7 +337,12 @@ class RecipientFulfillmentService
                 'last_checked_at' => $submitted ? ($previousItem['last_checked_at'] ?? null) : $recordedAt,
                 'check_attempts' => max((int) ($previousItem['check_attempts'] ?? 0), $attempt),
             ];
-            $providerResponse['schema_version'] = 2;
+            $providerResponse['schema_version'] = $batchQuantity !== null
+                ? 3
+                : max((int) ($providerResponse['schema_version'] ?? 0), 2);
+            if ($batchQuantity !== null) {
+                $providerResponse['fulfillment_mode'] = 'batch';
+            }
             $providerResponse['items'] = $items;
 
             $recipientStatus = $preserveCompleted ? 'completed' : $this->recipientStatus($recipient->quantity, $items);
@@ -322,7 +365,8 @@ class RecipientFulfillmentService
                 'failed_at' => $preserveCompleted ? $recipient->failed_at : ($recipientStatus === 'failed' ? now() : null),
             ])->save();
 
-            if ($recipient->quantity === 1 && $recipient->order()->firstOrFail()->recipients()->count() === 1) {
+            if (($recipient->quantity === 1 || $this->isBatchItem($recipient->quantity, $items[(string) $unit]))
+                && $recipient->order()->firstOrFail()->recipients()->count() === 1) {
                 if ($result->reference !== null) {
                     Order::query()
                         ->whereKey($recipient->order_id)
@@ -349,6 +393,7 @@ class RecipientFulfillmentService
         bool $submitted,
         int $attempt = 0,
         bool $preserveCompleted = false,
+        ?int $batchQuantity = null,
     ): bool {
         if ($exception->debugContext === []) {
             return false;
@@ -368,6 +413,7 @@ class RecipientFulfillmentService
             $attempt,
             $preserveCompleted,
             $failedSubmission,
+            $batchQuantity,
         ): ?int {
             $recipient = OrderRecipient::query()->lockForUpdate()->find($recipientId);
 
@@ -401,6 +447,7 @@ class RecipientFulfillmentService
             $items[(string) $unit] = [
                 ...$previousItem,
                 'unit' => $unit,
+                'quantity' => $batchQuantity ?? ($previousItem['quantity'] ?? 1),
                 'request_id' => $requestId,
                 'status' => $itemStatus,
                 'message' => $message,
@@ -413,7 +460,12 @@ class RecipientFulfillmentService
                 'last_checked_at' => $submitted ? ($previousItem['last_checked_at'] ?? null) : $recordedAt,
                 'check_attempts' => max((int) ($previousItem['check_attempts'] ?? 0), $attempt),
             ];
-            $providerResponse['schema_version'] = 2;
+            $providerResponse['schema_version'] = $batchQuantity !== null
+                ? 3
+                : max((int) ($providerResponse['schema_version'] ?? 0), 2);
+            if ($batchQuantity !== null) {
+                $providerResponse['fulfillment_mode'] = 'batch';
+            }
             $providerResponse['items'] = $items;
             $recipientStatus = $preserveCompleted ? $recipient->status : $this->recipientStatus($recipient->quantity, $items);
 
@@ -447,6 +499,16 @@ class RecipientFulfillmentService
     /** @param array<int|string, mixed> $items */
     private function recipientStatus(int $quantity, array $items): string
     {
+        $batchItem = is_array($items[1] ?? null) ? $items[1] : (is_array($items['1'] ?? null) ? $items['1'] : []);
+
+        if ($this->isBatchItem($quantity, $batchItem)) {
+            return match ((string) ($batchItem['status'] ?? 'pending')) {
+                TopupProviderStatus::Completed->value => 'completed',
+                TopupProviderStatus::Failed->value => 'failed',
+                default => 'processing',
+            };
+        }
+
         $statuses = collect(range(1, $quantity))
             ->map(fn (int $unit): string => (string) data_get($items, $unit.'.status', 'pending'));
 
@@ -459,6 +521,12 @@ class RecipientFulfillmentService
         }
 
         return 'processing';
+    }
+
+    /** @param array<string, mixed> $item */
+    private function isBatchItem(int $quantity, array $item): bool
+    {
+        return $quantity > 1 && (int) ($item['quantity'] ?? 0) === $quantity;
     }
 
     /** @return array<string, mixed> */

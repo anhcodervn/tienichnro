@@ -51,6 +51,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
         OrderRecipient $recipient,
         ?TopupProvider $provider,
         string $requestId,
+        ?int $quantity = null,
     ): TopupProviderResultDto {
         if (! $provider instanceof TopupProvider) {
             throw ValidationException::withMessages([
@@ -79,7 +80,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
             ...($server !== '' ? ['server' => $server] : []),
             'account' => $account,
             'price' => (int) ($order->denomination ?? 0),
-            'amount' => 1,
+            'amount' => $quantity ?? $recipient->quantity,
             ...($providerFields !== [] ? ['extra' => $providerFields] : []),
         ];
 
@@ -107,6 +108,11 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
     }
 
     public function supportsStatusChecks(): bool
+    {
+        return true;
+    }
+
+    public function supportsBatchQuantity(): bool
     {
         return true;
     }

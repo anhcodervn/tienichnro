@@ -42,6 +42,7 @@ const routeTitles: Record<string, string> = {
     'admin.error.404': 'Trang quản trị không tồn tại',
     'affiliate.home': 'Trang chủ cộng tác viên',
     'affiliate.dashboard': 'Tổng quan hoa hồng',
+    'affiliate.rates': 'Bảng giá chiết khấu',
 };
 
 const router = createRouter({

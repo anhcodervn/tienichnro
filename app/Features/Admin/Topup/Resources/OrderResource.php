@@ -87,6 +87,7 @@ class OrderResource extends JsonResource
                         ->filter(fn (mixed $item): bool => is_array($item))
                         ->map(fn (array $item): array => [
                             'unit' => $item['unit'] ?? null,
+                            'quantity' => $item['quantity'] ?? 1,
                             'request_id' => $item['request_id'] ?? null,
                             'reference' => $item['reference'] ?? null,
                             'status' => $item['status'] ?? null,

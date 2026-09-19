@@ -13,9 +13,17 @@ interface TopupProviderInterface
 {
     public function assertConfigured(TopupProvider $provider, TopupPackage $package, GameServer $server): void;
 
-    public function submit(Order $order, OrderRecipient $recipient, ?TopupProvider $provider, string $requestId): TopupProviderResultDto;
+    public function submit(
+        Order $order,
+        OrderRecipient $recipient,
+        ?TopupProvider $provider,
+        string $requestId,
+        ?int $quantity = null,
+    ): TopupProviderResultDto;
 
     public function status(Order $order, OrderRecipient $recipient, TopupProvider $provider, string $requestId, string $reference): TopupProviderResultDto;
 
     public function supportsStatusChecks(): bool;
+
+    public function supportsBatchQuantity(): bool;
 }

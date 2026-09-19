@@ -1,17 +1,22 @@
 <script setup lang="ts">
 import { useUserStore } from '@/stores/user.store';
-import { BellRing, HandCoins, Home, LayoutDashboard, LogOut, Menu, X } from 'lucide-vue-next';
+import { BadgePercent, BellRing, HandCoins, Home, LayoutDashboard, LogOut, Menu, X } from 'lucide-vue-next';
 import { computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
 const sidebarOpen = ref(false);
 const userStore = useUserStore();
 const route = useRoute();
+const isHome = computed(() => route.name === 'affiliate.home');
 const isDashboard = computed(() => route.name === 'affiliate.dashboard');
-const pageTitle = computed(() => (isDashboard.value ? 'Tổng quan hoa hồng' : 'Trang chủ cộng tác viên'));
-const pageDescription = computed(() =>
-    isDashboard.value ? 'Theo dõi hiệu quả giới thiệu và quản lý hoa hồng' : 'Thông báo và thông tin mới nhất từ quản trị viên',
-);
+const isRates = computed(() => route.name === 'affiliate.rates');
+const pageTitle = computed(() => (isDashboard.value ? 'Tổng quan hoa hồng' : isRates.value ? 'Bảng giá chiết khấu' : 'Trang chủ cộng tác viên'));
+const pageDescription = computed(() => {
+    if (isDashboard.value) return 'Theo dõi hiệu quả giới thiệu và quản lý hoa hồng';
+    if (isRates.value) return 'Tra cứu mức hoa hồng nhận được theo từng gói nạp';
+
+    return 'Thông báo và thông tin mới nhất từ quản trị viên';
+});
 
 const logout = async (): Promise<void> => {
     const token = document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
@@ -41,7 +46,7 @@ const logout = async (): Promise<void> => {
                 <RouterLink
                     to="/cong-tac-vien"
                     class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
-                    :class="!isDashboard ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
+                    :class="isHome ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
                     @click="sidebarOpen = false"
                     ><BellRing class="size-5" /> Trang chủ</RouterLink
                 >
@@ -51,6 +56,13 @@ const logout = async (): Promise<void> => {
                     :class="isDashboard ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
                     @click="sidebarOpen = false"
                     ><LayoutDashboard class="size-5" /> Tổng quan hoa hồng</RouterLink
+                >
+                <RouterLink
+                    to="/cong-tac-vien/bang-gia-chiet-khau"
+                    class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
+                    :class="isRates ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
+                    @click="sidebarOpen = false"
+                    ><BadgePercent class="size-5" /> Bảng giá chiết khấu</RouterLink
                 >
                 <a href="/" class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold text-slate-600 hover:bg-slate-50"
                     ><Home class="size-5" /> Về trang chính</a

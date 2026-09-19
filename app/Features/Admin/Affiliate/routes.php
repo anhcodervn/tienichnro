@@ -21,6 +21,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin-api/affiliate')->nam
     Route::delete('/rates/{topupPackage}', [AffiliateProgramController::class, 'resetRate'])->name('rates.reset');
     Route::get('/partners', [AffiliatePartnerController::class, 'index'])->name('partners.index');
     Route::patch('/partners/{profile}', [AffiliatePartnerController::class, 'update'])->whereNumber('profile')->name('partners.update');
+    Route::post('/partners/{profile}/orders', [AffiliatePartnerController::class, 'assignOrder'])->whereNumber('profile')->name('partners.orders.store');
     Route::get('/commissions', [AffiliateCommissionController::class, 'index'])->name('commissions.index');
     Route::patch('/commissions/{commission}', [AffiliateCommissionController::class, 'update'])->whereNumber('commission')->name('commissions.update');
     Route::get('/withdrawals', [AffiliateWithdrawalController::class, 'index'])->name('withdrawals.index');

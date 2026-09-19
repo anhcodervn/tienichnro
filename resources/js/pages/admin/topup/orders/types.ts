@@ -30,6 +30,7 @@ export type ProviderExchange = {
 
 export type ProviderItemRow = {
     unit?: number | null;
+    quantity?: number;
     request_id?: string | null;
     reference?: string | null;
     status?: string | null;

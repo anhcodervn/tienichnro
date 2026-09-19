@@ -61,8 +61,13 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
         }
     }
 
-    public function submit(Order $order, OrderRecipient $recipient, ?TopupProvider $provider, string $requestId): TopupProviderResultDto
-    {
+    public function submit(
+        Order $order,
+        OrderRecipient $recipient,
+        ?TopupProvider $provider,
+        string $requestId,
+        ?int $quantity = null,
+    ): TopupProviderResultDto {
         if (! $provider instanceof TopupProvider) {
             throw ValidationException::withMessages(['package_id' => 'Gói nạp hiện chưa sẵn sàng. Vui lòng liên hệ hỗ trợ.']);
         }
@@ -115,6 +120,11 @@ class The9pTopupProvider implements TopupProviderBalanceInterface, TopupProvider
     public function supportsStatusChecks(): bool
     {
         return true;
+    }
+
+    public function supportsBatchQuantity(): bool
+    {
+        return false;
     }
 
     public function balance(TopupProvider $provider): TopupProviderBalanceDto

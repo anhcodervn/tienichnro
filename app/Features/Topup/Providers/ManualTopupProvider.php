@@ -18,8 +18,13 @@ class ManualTopupProvider implements TopupProviderInterface
         // Manual fulfillment does not require remote credentials.
     }
 
-    public function submit(Order $order, OrderRecipient $recipient, ?TopupProvider $provider, string $requestId): TopupProviderResultDto
-    {
+    public function submit(
+        Order $order,
+        OrderRecipient $recipient,
+        ?TopupProvider $provider,
+        string $requestId,
+        ?int $quantity = null,
+    ): TopupProviderResultDto {
         return new TopupProviderResultDto(
             status: TopupProviderStatus::Processing,
             reference: 'MANUAL-'.$requestId,
@@ -33,6 +38,11 @@ class ManualTopupProvider implements TopupProviderInterface
     }
 
     public function supportsStatusChecks(): bool
+    {
+        return false;
+    }
+
+    public function supportsBatchQuantity(): bool
     {
         return false;
     }

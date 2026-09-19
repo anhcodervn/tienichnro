@@ -7,7 +7,9 @@ use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Jobs\ProcessTopupRecipient;
 use App\Features\Topup\Jobs\SyncTopupRecipientStatus;
 use App\Features\Topup\Providers\AccNroVnTopupProvider;
+use App\Features\Topup\Services\ProviderBalanceFallbackService;
 use App\Features\Topup\Services\RecipientFulfillmentService;
+use App\Features\Topup\Services\TopupService;
 use App\Models\Game;
 use App\Models\GameServer;
 use App\Models\Order;
@@ -19,6 +21,8 @@ use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Queue;
+
+use function Pest\Laravel\mock;
 
 beforeEach(function (): void {
     Http::preventStrayRequests();
@@ -203,30 +207,19 @@ test('accnrovn create response completes only with success and a non empty topup
     'success with topup id completes' => ['TOPUP-CREATE-001', 'completed'],
 ]);
 
-test('multi unit orders keep provider topup ids on their individual items', function (): void {
+test('multi unit orders submit one provider request with the full amount', function (): void {
     [$order, $recipient] = accNroVnOrderFixture(['quantity' => 2]);
     Http::fake([
-        'https://accnro.vn/api/v1/partner/recharge/create' => Http::sequence()
-            ->push([
-                'success' => true,
-                'message' => 'OK',
-                'data' => [
-                    'order_id' => 'ACC-MULTI-1',
-                    'status' => 'success',
-                    'status_code' => 'SUCCESS',
-                    'topup_id' => '1205644',
-                ],
-            ])
-            ->push([
-                'success' => true,
-                'message' => 'OK',
-                'data' => [
-                    'order_id' => 'ACC-MULTI-2',
-                    'status' => 'success',
-                    'status_code' => 'SUCCESS',
-                    'topup_id' => '1205645',
-                ],
-            ]),
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::response([
+            'success' => true,
+            'message' => 'OK',
+            'data' => [
+                'order_id' => 'ACC-MULTI-1',
+                'status' => 'success',
+                'status_code' => 'SUCCESS',
+                'topup_id' => '1205644',
+            ],
+        ]),
     ]);
 
     $fulfillmentService = app(RecipientFulfillmentService::class);
@@ -234,10 +227,66 @@ test('multi unit orders keep provider topup ids on their individual items', func
     $fulfillmentService->submit($recipient->id, 2);
 
     $items = $recipient->refresh()->provider_response['items'];
-    expect($items[1]['response']['provider_topup_id'])->toBe('1205644')
-        ->and($items[2]['response']['provider_topup_id'])->toBe('1205645')
+    expect($items)->toHaveCount(1)
+        ->and($items[1]['quantity'])->toBe(2)
+        ->and($items[1]['request_id'])->toBe($order->code.'-R001')
+        ->and($items[1]['submission']['request']['payload']['amount'])->toBe(2)
+        ->and($items[1]['response']['provider_topup_id'])->toBe('1205644')
         ->and($order->refresh()->order_status)->toBe(OrderStatus::Completed)
-        ->and($order->topup_id)->toBeNull();
+        ->and($order->topup_id)->toBe('1205644');
+
+    Http::assertSentCount(1);
+});
+
+test('accnrovn queues one batch job per recipient regardless of quantity', function (): void {
+    [$order, $recipient] = accNroVnOrderFixture(['quantity' => 10]);
+    mock(ProviderBalanceFallbackService::class)
+        ->shouldReceive('divertIfInsufficient')
+        ->once()
+        ->with($order->id)
+        ->andReturnFalse();
+
+    app(TopupService::class)->process($order->id);
+
+    Queue::assertPushed(ProcessTopupRecipient::class, 1);
+    Queue::assertPushed(ProcessTopupRecipient::class, fn (ProcessTopupRecipient $job): bool => $job->recipientId === $recipient->id
+        && $job->unit === 1);
+});
+
+test('accnrovn preserves unit amount for an in progress legacy order', function (): void {
+    [$order, $recipient] = accNroVnOrderFixture([
+        'quantity' => 2,
+        'status' => 'processing',
+        'provider_response' => [
+            'schema_version' => 2,
+            'items' => [
+                1 => [
+                    'unit' => 1,
+                    'request_id' => 'LEGACY-UNIT-001',
+                    'reference' => 'ACC-LEGACY-001',
+                    'status' => 'completed',
+                ],
+            ],
+        ],
+    ]);
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::response([
+            'success' => true,
+            'data' => [
+                'order_id' => 'ACC-LEGACY-002',
+                'status' => 'success',
+                'status_code' => 'SUCCESS',
+                'topup_id' => '1205645',
+            ],
+        ]),
+    ]);
+
+    app(RecipientFulfillmentService::class)->submit($recipient->id, 2);
+
+    expect(data_get($recipient->refresh()->provider_response, 'items.2.submission.request.payload.amount'))->toBe(1)
+        ->and($recipient->status)->toBe('completed')
+        ->and($order->refresh()->order_status)->toBe(OrderStatus::Completed);
+    Http::assertSentCount(1);
 });
 
 test('accnrovn omits server when the game server has no provider code', function (): void {
@@ -463,7 +512,7 @@ test('admin does not invent a server field for a historical request that never s
 
 test('accnrovn marks a rejected submission as failed with a retry action and clear diagnostics', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
-    [$order, $recipient] = accNroVnOrderFixture();
+    [$order, $recipient] = accNroVnOrderFixture(['quantity' => 2]);
     Http::fake([
         'https://accnro.vn/api/v1/partner/recharge/create' => Http::response(
             '<html>provider maintenance</html>',
@@ -490,6 +539,8 @@ test('accnrovn marks a rejected submission as failed with a retry action and cle
         ->and($order->refresh()->order_status)->toBe(OrderStatus::Failed)
         ->and($order->failure_reason)->toBe($expectedMessage)
         ->and($item['status'])->toBe('failed')
+        ->and($item['quantity'])->toBe(2)
+        ->and($item['last_error']['request']['payload']['amount'])->toBe(2)
         ->and($item['last_error']['request']['url'])->toBe('https://accnro.vn/api/v1/partner/recharge/create')
         ->and($item['last_error']['request']['headers']['Content-Type'])->toBe(['application/json'])
         ->and($item['last_error']['request']['payload']['secret_key'])
@@ -524,7 +575,10 @@ test('accnrovn marks a rejected submission as failed with a retry action and cle
         ->assertJsonPath('data.can_reorder', false);
 
     expect($recipient->refresh()->failure_reason)->toBeNull()
-        ->and(data_get($recipient->provider_response, 'items.1.status'))->toBe('pending');
+        ->and(data_get($recipient->provider_response, 'items.1.status'))->toBe('pending')
+        ->and(data_get($recipient->provider_response, 'items.1.quantity'))->toBe(2)
+        ->and(data_get($recipient->provider_response, 'items.1.request_id'))->toBe($order->code.'-R001-A001');
+    Queue::assertPushed(ProcessTopupRecipient::class, 1);
     Queue::assertPushed(ProcessTopupRecipient::class, fn (ProcessTopupRecipient $job): bool => $job->recipientId === $recipient->id && $job->unit === 1);
 });
 

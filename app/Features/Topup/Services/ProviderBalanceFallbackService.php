@@ -16,6 +16,7 @@ class ProviderBalanceFallbackService
     public function __construct(
         private readonly TopupDiscordReporterService $discordReporter,
         private readonly TopupProviderBalanceService $providerBalanceService,
+        private readonly TopupProviderResolver $providerResolver,
     ) {}
 
     public function divertIfInsufficient(int $orderId): bool
@@ -82,6 +83,7 @@ class ProviderBalanceFallbackService
             }
 
             $currency = $provider->balance_currency ?: 'VND';
+            $supportsBatchQuantity = $this->providerResolver->resolve($provider)->supportsBatchQuantity();
             $reason = sprintf(
                 'Provider không đủ số dư (%s/%s %s). Đơn đã chuyển sang xử lý thủ công và chưa gửi sang provider.',
                 number_format($providerBalance, 0, ',', '.'),
@@ -94,10 +96,13 @@ class ProviderBalanceFallbackService
                 $providerResponse = $recipient->provider_response ?? [];
                 $items = $providerResponse['items'] ?? [];
 
-                foreach (range(1, $recipient->quantity) as $unit) {
+                $units = $supportsBatchQuantity ? [1] : range(1, $recipient->quantity);
+
+                foreach ($units as $unit) {
                     $items[$unit] = [
                         ...($items[$unit] ?? []),
                         'unit' => $unit,
+                        'quantity' => $supportsBatchQuantity ? $recipient->quantity : 1,
                         'status' => 'processing',
                         'failure_reason' => $reason,
                         'message' => 'Chờ admin xử lý thủ công; chưa gửi yêu cầu sang provider.',
@@ -110,6 +115,8 @@ class ProviderBalanceFallbackService
                     'provider_status' => 'processing',
                     'provider_response' => [
                         ...$providerResponse,
+                        'schema_version' => $supportsBatchQuantity ? 3 : max((int) ($providerResponse['schema_version'] ?? 0), 2),
+                        ...($supportsBatchQuantity ? ['fulfillment_mode' => 'batch'] : []),
                         'items' => $items,
                         'manual_review' => [
                             'code' => self::REASON_CODE,

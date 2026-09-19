@@ -3,6 +3,7 @@
 namespace App\Features\Admin\Affiliate\Services;
 
 use App\Exceptions\ApiException;
+use App\Features\Affiliate\Services\AffiliateCommissionService;
 use App\Features\Affiliate\Services\AffiliateWalletService;
 use App\Features\Topup\Services\TopupPackagePricingService;
 use App\Models\AdminAuditLog;
@@ -14,6 +15,7 @@ use App\Models\AffiliateProfile;
 use App\Models\AffiliateProgram;
 use App\Models\AffiliateWithdrawal;
 use App\Models\GlobalTopupPackage;
+use App\Models\Order;
 use App\Models\Scopes\TenantScope;
 use App\Models\Tenant;
 use App\Models\TopupPackage;
@@ -34,6 +36,7 @@ class AdminAffiliateService
         private readonly TenantContext $tenantContext,
         private readonly TopupPackagePricingService $pricingService,
         private readonly AffiliateWalletService $walletService,
+        private readonly AffiliateCommissionService $commissionService,
         private readonly EditorContentRenderer $contentRenderer,
     ) {}
 
@@ -160,13 +163,29 @@ class AdminAffiliateService
             ->where('tenant_id', $tenantId)
             ->get()
             ->keyBy('global_topup_package_id');
-        $packages = TopupPackage::query()->with(['game:id,name,package_mode', 'globalTopupPackage'])
+        $globalCatalog = GlobalTopupPackage::query()
+            ->with(['gameSettings.game:id,name,package_mode,status'])
+            ->where('status', 'active')
+            ->orderBy('sort_order')
+            ->orderBy('denomination')
+            ->get()
+            ->filter(fn (GlobalTopupPackage $package): bool => $package->gameSettings->contains(
+                fn ($setting): bool => $setting->game?->package_mode === 'global'
+                    && $setting->game?->status === 'active'
+                    && is_array($setting->receives)
+                    && $setting->receives !== [],
+            ));
+        $packages = TopupPackage::query()->with([
+            'game:id,name,package_mode,provider_service_code',
+            'globalTopupPackage.provider',
+            'globalTopupPackage.gameSettings',
+        ])
             ->where('status', 'active')
             ->orderBy('game_id')->orderBy('denomination')->get();
 
-        return $this->tenantContext->run($tenant, function () use ($tenant, $program, $rates, $globalRates, $packages): array {
+        return $this->tenantContext->run($tenant, function () use ($tenant, $program, $rates, $globalRates, $globalCatalog, $packages): array {
             $this->pricingService->apply($packages);
-            $globalPackages = $packages
+            $linkedGlobalPackages = $packages
                 ->filter(fn (TopupPackage $package): bool => $package->package_source === 'global' && $package->global_topup_package_id !== null)
                 ->groupBy('global_topup_package_id');
 
@@ -178,17 +197,29 @@ class AdminAffiliateService
                     'holding_days' => 7,
                     'minimum_conversion' => AffiliateWalletService::MINIMUM_CONVERSION,
                 ],
-                'global_rates' => $globalPackages->map(function ($mappedPackages, int|string $globalPackageId) use ($tenant, $globalRates): array {
-                    /** @var TopupPackage $representative */
-                    $representative = $mappedPackages->first();
-                    $rate = $globalRates->get((int) $globalPackageId);
+                'global_rates' => $globalCatalog->map(function (GlobalTopupPackage $globalPackage) use ($tenant, $globalRates, $linkedGlobalPackages): array {
+                    $mappedPackages = $linkedGlobalPackages->get($globalPackage->id, collect());
+                    $rate = $globalRates->get($globalPackage->id);
+                    $games = $globalPackage->gameSettings
+                        ->filter(fn ($setting): bool => $setting->game?->package_mode === 'global'
+                            && $setting->game?->status === 'active'
+                            && is_array($setting->receives)
+                            && $setting->receives !== [])
+                        ->pluck('game.name')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
+                    $minimumMargin = $mappedPackages->isNotEmpty()
+                        ? (int) $mappedPackages->map(fn (TopupPackage $package): int => $this->packageMargin($tenant, $package))->min()
+                        : ($tenant->is_main ? max(0, $globalPackage->price - $globalPackage->provider_price) : 0);
 
                     return [
-                        'global_package_id' => (int) $globalPackageId,
-                        'package' => $representative->globalTopupPackage?->name,
-                        'denomination' => (int) ($representative->globalTopupPackage?->denomination ?? $representative->denomination),
-                        'games' => $mappedPackages->pluck('game.name')->filter()->unique()->values()->all(),
-                        'minimum_margin' => (int) $mappedPackages->map(fn (TopupPackage $package): int => $this->packageMargin($tenant, $package))->min(),
+                        'global_package_id' => $globalPackage->id,
+                        'package' => $globalPackage->name,
+                        'denomination' => $globalPackage->denomination,
+                        'games' => $games,
+                        'minimum_margin' => $minimumMargin,
                         'commission_type' => $rate?->commission_type ?? AffiliatePackageRate::TYPE_FIXED,
                         'fixed_amount' => $rate?->fixed_amount ?? 0,
                         'percentage' => $rate?->percentage_basis_points === null ? 0 : $rate->percentage_basis_points / 100,
@@ -340,6 +371,8 @@ class AdminAffiliateService
                 ->where(fn (Builder $nested) => $nested->where('username', 'like', "%{$search}%")
                     ->orWhere('email', 'like', "%{$search}%")
                     ->orWhere('referral_code', 'like', "%{$search}%"))))
+            ->when(filled($filters['date_from'] ?? null), fn (Builder $query) => $query->whereDate('created_at', '>=', $filters['date_from']))
+            ->when(filled($filters['date_to'] ?? null), fn (Builder $query) => $query->whereDate('created_at', '<=', $filters['date_to']))
             ->latest('id')
             ->paginate((int) ($filters['per_page'] ?? 20));
         $userIds = $profiles->getCollection()->pluck('user_id')->all();
@@ -373,6 +406,7 @@ class AdminAffiliateService
     public function commissions(array $filters): LengthAwarePaginator
     {
         $tenantId = $this->resolveTenantId($filters['site_id'] ?? null, true);
+        $search = trim((string) ($filters['search'] ?? ''));
 
         return AffiliateCommission::query()->withoutGlobalScope(TenantScope::class)
             ->select(['id', 'tenant_id', 'order_id', 'referrer_id', 'referred_user_id', 'topup_package_id', 'commission_type', 'rate_value', 'base_amount', 'quantity', 'amount', 'holding_days', 'status', 'is_flagged', 'hold_reason', 'earned_at', 'available_at', 'reversed_at', 'created_at'])
@@ -385,6 +419,18 @@ class AdminAffiliateService
             ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
             ->when(($filters['status'] ?? null) === 'flagged', fn (Builder $query) => $query->where('is_flagged', true))
             ->when(filled($filters['status'] ?? null) && $filters['status'] !== 'flagged', fn (Builder $query) => $query->where('status', $filters['status']))
+            ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $nested) use ($search): void {
+                $nested->whereHas('order', fn (Builder $orderQuery) => $orderQuery->withoutGlobalScope(TenantScope::class)->where('code', 'like', "%{$search}%"))
+                    ->orWhereHas('referrer', fn (Builder $userQuery) => $userQuery->withoutGlobalScope(TenantScope::class)->where(fn (Builder $user) => $user
+                        ->where('username', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")))
+                    ->orWhereHas('referredUser', fn (Builder $userQuery) => $userQuery->withoutGlobalScope(TenantScope::class)->where(fn (Builder $user) => $user
+                        ->where('username', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")))
+                    ->orWhereHas('package', fn (Builder $packageQuery) => $packageQuery->where('name', 'like', "%{$search}%"));
+            }))
+            ->when(filled($filters['date_from'] ?? null), fn (Builder $query) => $query->whereDate('created_at', '>=', $filters['date_from']))
+            ->when(filled($filters['date_to'] ?? null), fn (Builder $query) => $query->whereDate('created_at', '<=', $filters['date_to']))
             ->latest('id')->paginate((int) ($filters['per_page'] ?? 20));
     }
 
@@ -392,12 +438,21 @@ class AdminAffiliateService
     public function withdrawals(array $filters): LengthAwarePaginator
     {
         $tenantId = $this->resolveTenantId($filters['site_id'] ?? null, true);
+        $search = trim((string) ($filters['search'] ?? ''));
 
         return AffiliateWithdrawal::query()->withoutGlobalScope(TenantScope::class)
             ->select(['id', 'tenant_id', 'user_id', 'admin_id', 'amount', 'status', 'bank_name', 'bank_account_name', 'bank_account_number', 'bank_transaction_reference', 'admin_note', 'approved_at', 'paid_at', 'rejected_at', 'created_at'])
             ->with(['user' => fn ($query) => $query->withoutGlobalScope(TenantScope::class)->select(['id', 'username', 'email'])])
             ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
             ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
+            ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $nested) use ($search): void {
+                $nested->where('bank_transaction_reference', 'like', "%{$search}%")
+                    ->orWhereHas('user', fn (Builder $userQuery) => $userQuery->withoutGlobalScope(TenantScope::class)->where(fn (Builder $user) => $user
+                        ->where('username', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%")));
+            }))
+            ->when(filled($filters['date_from'] ?? null), fn (Builder $query) => $query->whereDate('created_at', '>=', $filters['date_from']))
+            ->when(filled($filters['date_to'] ?? null), fn (Builder $query) => $query->whereDate('created_at', '<=', $filters['date_to']))
             ->latest('id')->paginate((int) ($filters['per_page'] ?? 20))
             ->through(fn (AffiliateWithdrawal $withdrawal): array => $this->serializeWithdrawal($withdrawal));
     }
@@ -427,6 +482,72 @@ class AdminAffiliateService
             $this->audit($profile->tenant_id, $admin, 'affiliate_profile_status_updated', $profile, $old, $profile->only(['status', 'admin_note']), $request);
 
             return $profile->refresh();
+        }, 3);
+    }
+
+    /** @return array<string, mixed> */
+    public function assignOrder(int $profileId, string $orderCode, User $admin, Request $request): array
+    {
+        return DB::transaction(function () use ($profileId, $orderCode, $admin, $request): array {
+            $profile = AffiliateProfile::query()->withoutGlobalScope(TenantScope::class)
+                ->with(['user' => fn ($query) => $query->withoutGlobalScope(TenantScope::class)])
+                ->lockForUpdate()
+                ->findOrFail($profileId);
+            $this->assertAdminTenant($profile->tenant_id);
+
+            if ($profile->status !== 'active' || ! $profile->user instanceof User || $profile->user->status !== 'active') {
+                throw new ApiException('Cộng tác viên phải đang hoạt động để nhận đơn.', 422);
+            }
+
+            $order = Order::query()->withoutGlobalScope(TenantScope::class)
+                ->where('tenant_id', $profile->tenant_id)
+                ->where('code', $orderCode)
+                ->lockForUpdate()
+                ->first();
+
+            if (! $order instanceof Order) {
+                throw new ApiException('Không tìm thấy mã đơn topup trên website của cộng tác viên.', 404);
+            }
+
+            if ($order->affiliate_referrer_id !== null || $order->affiliateCommission()->withoutGlobalScope(TenantScope::class)->exists()) {
+                throw new ApiException('Mã đơn này đã có cộng tác viên nhận.', 422);
+            }
+
+            if ($order->user_id === $profile->user_id || mb_strtolower(trim((string) $order->email)) === mb_strtolower(trim((string) $profile->user->email))) {
+                throw new ApiException('Không thể gắn đơn của chính cộng tác viên.', 422);
+            }
+
+            $old = $order->only(['affiliate_referrer_id', 'affiliate_attribution_source', 'affiliate_referral_code', 'affiliate_attributed_at']);
+            $order->forceFill([
+                'affiliate_referrer_id' => $profile->user_id,
+                'affiliate_attribution_source' => Order::AFFILIATE_SOURCE_ADMIN,
+                'affiliate_referral_code' => $profile->user->referral_code,
+                'affiliate_attributed_at' => now(),
+            ])->save();
+
+            $tenant = Tenant::query()->findOrFail($profile->tenant_id);
+            $commission = $this->tenantContext->run($tenant, function () use ($order) {
+                $commission = $this->commissionService->snapshot($order->refresh());
+                $this->commissionService->markOrderCompleted($order->refresh());
+
+                return $commission?->refresh();
+            });
+
+            $this->audit(
+                $profile->tenant_id,
+                $admin,
+                'affiliate_order_manually_assigned',
+                $order,
+                $old,
+                $order->only(['affiliate_referrer_id', 'affiliate_attribution_source', 'affiliate_referral_code', 'affiliate_attributed_at']),
+                $request,
+            );
+
+            return [
+                'order_code' => $order->code,
+                'partner' => $profile->user->only(['id', 'username', 'email', 'referral_code']),
+                'commission_id' => $commission?->id,
+            ];
         }, 3);
     }
 
@@ -587,7 +708,11 @@ class AdminAffiliateService
 
         $tenant = Tenant::query()->findOrFail($tenantId);
         $packages = TopupPackage::query()
-            ->with('game:id,package_mode')
+            ->with([
+                'game:id,package_mode,provider_service_code',
+                'globalTopupPackage.provider',
+                'globalTopupPackage.gameSettings',
+            ])
             ->where('global_topup_package_id', $globalPackage->id)
             ->where('status', 'active')
             ->whereHas('game', fn (Builder $query) => $query->where('package_mode', 'global'))
