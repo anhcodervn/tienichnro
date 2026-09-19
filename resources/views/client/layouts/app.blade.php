@@ -107,7 +107,7 @@
     @endif
     @stack('head')
 </head>
-<body data-authenticated="{{ auth()->check() ? 'true' : 'false' }}" data-order-lookup-url="{{ route('orders.lookup') }}" data-order-detail-url-template="{{ route('orders.details', ['order' => '__ORDER__']) }}">
+<body class="pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0" data-authenticated="{{ auth()->check() ? 'true' : 'false' }}" data-order-lookup-url="{{ route('orders.lookup') }}" data-order-detail-url-template="{{ route('orders.details', ['order' => '__ORDER__']) }}">
     @if ($gtmId !== '')
         <noscript data-site-gtm-noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{ urlencode($gtmId) }}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     @endif
@@ -120,7 +120,7 @@
             <a href="{{ route('home') }}" class="flex min-w-0 items-center gap-3 rounded-[5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" data-client-home>
                 @if ($headerLogo !== '')
                     <img src="{{ $headerLogo }}" alt="{{ $siteName }}"
-                    class="h-[3rem] w-[full] shrink-0 object-contain object-left lg:h-[3.5rem]">
+                    class="h-10 w-auto max-w-[8rem] shrink-0 object-contain object-left sm:h-12 sm:max-w-[12rem] lg:h-14 lg:max-w-none">
                 @else
                     <span class="grid h-10 w-10 shrink-0 place-items-center rounded-[5px] bg-emerald-600 font-extrabold text-white">C</span>
                     <span class="truncate font-extrabold tracking-tight text-slate-950">{{ $siteName }}</span>
@@ -232,28 +232,32 @@
                     <a class="client-button gap-2" href="{{ route('auth.register') }}"><i class="bx bx-user-plus text-lg" aria-hidden="true"></i>Đăng ký</a>
                 @endauth
             </div>
-            <div class="flex shrink-0 items-center gap-2 lg:hidden">
+            <div class="flex min-w-0 shrink-0 items-center lg:hidden">
                 @auth
                     <div class="relative" data-account-menu data-mobile-account-menu>
                         <button
                             type="button"
-                            class="flex h-11 w-11 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-white text-sm font-extrabold text-white shadow-sm transition hover:border-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                            class="flex h-12 w-[9.5rem] items-center gap-2 rounded-[5px] border border-slate-200 bg-white px-2.5 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 sm:w-44"
                             data-account-menu-toggle
                             aria-controls="client-mobile-account-menu"
                             aria-expanded="false"
                             aria-haspopup="true"
                             aria-label="Mở menu tài khoản"
                         >
-                            <span class="grid h-full w-full place-items-center overflow-hidden rounded-full bg-slate-950">
+                            <span class="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-emerald-600 text-sm font-extrabold text-white">
                                 @if ($clientAccount['avatar'] !== '')
                                     <img class="h-full w-full object-cover" src="{{ $clientAccount['avatar'] }}" alt="Ảnh đại diện của {{ $clientAccount['name'] }}" referrerpolicy="no-referrer">
                                 @else
                                     {{ $clientAccount['initial'] }}
                                 @endif
                             </span>
+                            <span class="min-w-0 flex-1">
+                                <span class="block truncate text-xs font-bold leading-5 text-slate-900">{{ $clientAccount['name'] }}</span>
+                                <span class="block truncate text-[11px] font-bold leading-4 tabular-nums text-emerald-700" data-mobile-header-wallet-balance>{{ number_format((float) $clientAccount['balance'], 0, ',', '.') }}đ</span>
+                            </span>
                         </button>
 
-                        <div id="client-mobile-account-menu" class="absolute right-[-3rem] top-full z-50 mt-2 w-72 max-w-[calc(100vw-1.5rem)] origin-top-right overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-xl" data-account-menu-panel data-mobile-account-menu-panel hidden>
+                        <div id="client-mobile-account-menu" class="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-1.5rem)] origin-top-right overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-xl" data-account-menu-panel data-mobile-account-menu-panel hidden>
                             <div class="border-b border-slate-100 bg-slate-50 px-4 py-3">
                                 <p class="truncate text-sm font-bold text-slate-950">{{ $clientAccount['name'] }}</p>
                                 <p class="mt-0.5 truncate text-xs text-slate-500">{{ $clientAccount['email'] }}</p>
@@ -282,27 +286,12 @@
                             </form>
                         </div>
                     </div>
+                @else
+                    <a class="flex h-12 items-center gap-2 rounded-[5px] border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition hover:border-emerald-300 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('auth.login') }}" data-mobile-login>
+                        <span class="grid h-8 w-8 place-items-center rounded-full bg-emerald-600 text-white"><i class="bx bx-user" aria-hidden="true"></i></span>
+                        <span>Đăng nhập</span>
+                    </a>
                 @endauth
-
-                <button
-                    type="button"
-                    class="grid h-11 w-11 shrink-0 place-items-center rounded-[5px] border border-slate-300 bg-white text-slate-700 transition hover:border-emerald-400 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
-                    data-menu-toggle
-                    data-mobile-sidebar-toggle
-                    aria-controls="mobile-menu"
-                    aria-expanded="false"
-                    aria-haspopup="dialog"
-                    aria-label="Mở menu"
-                >
-                    <svg class="h-6 w-6" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                        <g data-menu-icon-open>
-                            <path d="M4 6h16M4 12h16M4 18h16" />
-                        </g>
-                        <g data-menu-icon-close>
-                            <path d="M6 6l12 12M18 6 6 18" />
-                        </g>
-                    </svg>
-                </button>
             </div>
         </div>
     </header>
@@ -370,13 +359,47 @@
         </aside>
     </div>
 
+    <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_18px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden" aria-label="Điều hướng nhanh trên di động" data-mobile-bottom-nav>
+        <div class="mx-auto grid h-16 max-w-lg grid-cols-4">
+            <a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition', 'text-emerald-700' => request()->routeIs(['home', 'topup.*', 'pricing']), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs(['home', 'topup.*', 'pricing'])]) href="{{ route('home') }}" @if (request()->routeIs(['home', 'topup.*', 'pricing'])) aria-current="page" @endif data-mobile-nav-item="topup">
+                <i class="bx bx-diamond text-xl" aria-hidden="true"></i>
+                <span class="truncate">Nạp game</span>
+            </a>
+            <a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition', 'text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif data-mobile-nav-item="wallet">
+                <i class="bx bx-wallet-alt text-xl" aria-hidden="true"></i>
+                <span class="truncate">Nạp tiền</span>
+            </a>
+            <a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition', 'text-emerald-700' => $orderHistoryActive, 'text-slate-500 hover:text-emerald-700' => ! $orderHistoryActive]) href="{{ $orderHistoryUrl }}" @if ($orderHistoryActive) aria-current="page" @endif data-mobile-nav-item="history">
+                <i class="bx bx-history text-xl" aria-hidden="true"></i>
+                <span class="truncate">Lịch sử</span>
+            </a>
+            <button
+                type="button"
+                class="flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold text-slate-500 transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600 aria-expanded:text-emerald-700"
+                data-menu-toggle
+                data-mobile-sidebar-toggle
+                aria-controls="mobile-menu"
+                aria-expanded="false"
+                aria-haspopup="dialog"
+                aria-label="Mở menu"
+                data-mobile-nav-item="menu"
+            >
+                <span class="relative grid h-5 w-5 place-items-center text-xl" aria-hidden="true">
+                    <i class="bx bx-menu absolute" data-menu-icon-open></i>
+                    <i class="bx bx-x absolute" data-menu-icon-close></i>
+                </span>
+                <span>Menu</span>
+            </button>
+        </div>
+    </nav>
+
     <main id="main-content" class="min-w-0 focus:outline-none" tabindex="-1" data-page-enter>
         @include('client.partials.flash')
         @yield('content')
     </main>
 
     @unless (request()->routeIs(['content.contact', 'client.support.chat']))
-        <x-client.floating-support :raised="request()->routeIs('wallet.deposit.*')" />
+        <x-client.floating-support raised />
     @endunless
 
     <footer class="mt-16 border-t border-slate-200 bg-white">
