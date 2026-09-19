@@ -10,6 +10,7 @@ Route::middleware(['auth:sanctum', 'admin'])
     ->group(function (): void {
         Route::get('/', 'index')->name('index');
         Route::get('{user}/prices', 'prices')->name('prices.index');
+        Route::put('{user}/prices/quick-set', 'quickSetPrices')->name('prices.quick-set');
         Route::put('{user}/global-prices/{globalTopupPackage}', 'updateGlobalPrice')->name('global-prices.update');
         Route::delete('{user}/global-prices/{globalTopupPackage}', 'deleteGlobalPrice')->name('global-prices.destroy');
         Route::put('{user}/prices/{topupPackage}', 'updatePrice')->name('prices.update');

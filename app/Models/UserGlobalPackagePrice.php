@@ -16,6 +16,8 @@ class UserGlobalPackagePrice extends Model
 
     public const MODE_FIXED = 'fixed';
 
+    public const MODE_PROFIT = 'profit';
+
     protected $fillable = [
         'user_id',
         'global_topup_package_id',

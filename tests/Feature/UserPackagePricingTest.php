@@ -70,6 +70,60 @@ test('member minimum profit prevents a discount from going below provider cost',
     expect($price['final_price'])->toBe(83000);
 });
 
+test('member profit pricing follows the current provider cost', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $user = User::factory()->create(['tenant_id' => $main->id]);
+    $package = TopupPackage::factory()->create([
+        'price' => 90000,
+        'provider_price' => 70000,
+    ]);
+    UserPackagePrice::factory()->for($user)->for($package, 'package')->create([
+        'pricing_mode' => UserPackagePrice::MODE_PROFIT,
+        'discount_basis_points' => null,
+        'minimum_profit' => 5000,
+    ]);
+
+    $initialPrice = Site::for($main, fn (): array => app(TopupPackagePricingService::class)->resolve($package, $user));
+    $package->update(['provider_price' => 72000]);
+    $updatedPrice = Site::for($main, fn (): array => app(TopupPackagePricingService::class)->resolve($package->fresh(), $user));
+
+    expect($initialPrice['final_price'])->toBe(75000)
+        ->and($updatedPrice['final_price'])->toBe(77000);
+});
+
+test('admin can save and validate profit pricing for one member package', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
+    $member = User::factory()->create(['tenant_id' => $main->id]);
+    $package = TopupPackage::factory()->create([
+        'price' => 90000,
+        'provider_price' => 70000,
+        'status' => 'active',
+    ]);
+
+    $payload = [
+        'pricing_mode' => 'profit',
+        'discount_percent' => null,
+        'fixed_price' => null,
+        'minimum_profit' => 5000,
+        'is_active' => true,
+    ];
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/users/{$member->id}/prices/{$package->id}", $payload)
+        ->assertOk()
+        ->assertJsonPath('data.prices.0.member_price', 75000)
+        ->assertJsonPath('data.prices.0.member_profit', 5000);
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/users/{$member->id}/prices/{$package->id}", [
+            ...$payload,
+            'minimum_profit' => 25000,
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('minimum_profit');
+});
+
 test('billing account discount becomes cost for every linked child website', function (): void {
     $main = Tenant::query()->where('is_main', true)->firstOrFail();
     $billingUser = User::factory()->create(['tenant_id' => $main->id]);
@@ -225,4 +279,66 @@ test('platform admin can configure each global package price for a member', func
     expect(UserGlobalPackagePrice::query()->where('user_id', $member->id)->count())->toBe(2)
         ->and(UserGlobalPackagePrice::query()->where('user_id', $member->id)->where('global_topup_package_id', $globalPackage->id)->value('discount_basis_points'))->toBe(850)
         ->and(UserGlobalPackagePrice::query()->where('user_id', $member->id)->where('global_topup_package_id', $secondGlobalPackage->id)->value('fixed_price'))->toBe(150000);
+});
+
+test('admin can quick set package profit pricing and receives cost and profit previews', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
+    $member = User::factory()->create(['tenant_id' => $main->id]);
+    $game = Game::factory()->create();
+    $packages = TopupPackage::factory()->count(2)->for($game)->sequence(
+        ['denomination' => 100000, 'price' => 90000, 'provider_price' => 70000],
+        ['denomination' => 200000, 'price' => 180000, 'provider_price' => 140000],
+    )->create(['status' => 'active']);
+
+    $response = $this->actingAs($admin)->putJson("/api/admin-api/users/{$member->id}/prices/quick-set", [
+        'scope' => 'packages',
+        'package_ids' => $packages->pluck('id')->all(),
+        'pricing_mode' => 'profit',
+        'discount_percent' => null,
+        'profit_amount' => 5000,
+        'is_active' => true,
+    ]);
+
+    $response->assertOk()
+        ->assertJsonPath('data.prices.0.cost_price', 70000)
+        ->assertJsonPath('data.prices.0.base_profit', 20000)
+        ->assertJsonPath('data.prices.0.member_price', 75000)
+        ->assertJsonPath('data.prices.0.member_profit', 5000)
+        ->assertJsonPath('data.prices.0.pricing_mode', 'profit');
+
+    expect(UserPackagePrice::query()->where('user_id', $member->id)->count())->toBe(2)
+        ->and(UserPackagePrice::query()->where('user_id', $member->id)->pluck('minimum_profit')->all())->toBe([5000, 5000]);
+
+    $this->actingAs($admin)->putJson("/api/admin-api/users/{$member->id}/prices/quick-set", [
+        'scope' => 'packages',
+        'package_ids' => [$packages->first()->id],
+        'pricing_mode' => 'profit',
+        'profit_amount' => 25000,
+        'is_active' => true,
+    ])->assertUnprocessable()->assertJsonValidationErrors('profit_amount');
+});
+
+test('admin can quick set global package profit atomically', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => 'admin']);
+    $member = User::factory()->create(['tenant_id' => $main->id]);
+    $packages = GlobalTopupPackage::factory()->count(2)->sequence(
+        ['denomination' => 100000, 'price' => 90000, 'provider_price' => 70000],
+        ['denomination' => 200000, 'price' => 180000, 'provider_price' => 140000],
+    )->create(['status' => 'active']);
+
+    $this->actingAs($admin)->putJson("/api/admin-api/users/{$member->id}/prices/quick-set", [
+        'scope' => 'global',
+        'package_ids' => $packages->pluck('id')->all(),
+        'pricing_mode' => 'profit',
+        'discount_percent' => null,
+        'profit_amount' => 5000,
+        'is_active' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.global_packages.0.member_price', 75000)
+        ->assertJsonPath('data.global_packages.0.member_profit', 5000);
+
+    expect(UserGlobalPackagePrice::query()->where('user_id', $member->id)->count())->toBe(2)
+        ->and(UserGlobalPackagePrice::query()->where('user_id', $member->id)->pluck('minimum_profit')->all())->toBe([5000, 5000]);
 });

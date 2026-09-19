@@ -188,111 +188,119 @@
             @error('purchase_mode')<p class="home-field-error">{{ $message }}</p>@enderror
 
             <div id="purchase-panel-single" role="tabpanel" aria-labelledby="purchase-tab-single" data-purchase-panel="single" @if ($initialPurchaseMode !== 'single') hidden @endif>
-                <div class="home-field">
-                    <label class="inline-flex items-center gap-1.5" for="topup-server-single"><i class="bx bx-server text-lg text-cyan-700" aria-hidden="true"></i>Máy chủ <span aria-hidden="true">*</span></label>
-                    <select id="topup-server-single" class="client-input" data-server-picker="single" @disabled($initialPurchaseMode !== 'single') @if ($initialPurchaseMode === 'single') required @endif>
-                        <option value="">Chọn máy chủ</option>
-                        @foreach ($games as $game)
-                            @foreach ($game->servers as $server)
-                                <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }} - ID: {{ $server->id }}</option>
+                <section class="grid w-full min-w-0 gap-4 rounded-[5px] border border-slate-200 bg-slate-50 p-4" data-topup-server-section="single" aria-label="Chọn máy chủ">
+                    <div class="home-field">
+                        <label class="inline-flex items-center gap-1.5" for="topup-server-single"><i class="bx bx-server text-lg text-cyan-700" aria-hidden="true"></i>Máy chủ <span aria-hidden="true">*</span></label>
+                        <select id="topup-server-single" class="client-input" data-server-picker="single" @disabled($initialPurchaseMode !== 'single') @if ($initialPurchaseMode === 'single') required @endif>
+                            <option value="">Chọn máy chủ</option>
+                            @foreach ($games as $game)
+                                @foreach ($game->servers as $server)
+                                    <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }} - ID: {{ $server->id }}</option>
+                                @endforeach
                             @endforeach
-                        @endforeach
-                    </select>
-                    @error('server_id')<p class="home-field-error">{{ $message }}</p>@enderror
-                </div>
+                        </select>
+                        @error('server_id')<p class="home-field-error">{{ $message }}</p>@enderror
+                    </div>
+                </section>
 
-                @foreach ($games as $game)
-                    <div class="home-recipient-grid" data-recipient-fields="{{ $game->id }}" data-single-confirm-recipient-label="{{ collect($game->checkoutFields())->pluck('label')->implode(' | ') }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
-                        @foreach ($game->checkoutFields() as $field)
-                            <div class="home-field home-recipient-field sm:col-span-2" data-field-key="{{ $field['key'] }}">
-                                <label for="recipient-{{ $game->id }}-{{ $field['key'] }}">
-                                    {{ $field['label'] }} @if ($field['required'])<span aria-hidden="true">*</span>@endif
-                                </label>
-                                <input
-                                    id="recipient-{{ $game->id }}-{{ $field['key'] }}"
-                                    class="client-input"
-                                    type="text"
-                                    name="recipient_fields[{{ $field['key'] }}]"
-                                    maxlength="191"
-                                    value="{{ old('recipient_fields.'.$field['key']) }}"
-                                    placeholder="{{ $field['placeholder'] }}"
-                                    autocomplete="off"
-                                    autocapitalize="none"
-                                    spellcheck="false"
-                                    data-recipient-input
-                                    data-required="{{ $field['required'] ? 'true' : 'false' }}"
-                                    data-validation-regex="{{ $field['regex'] }}"
-                                    data-validation-label="{{ $field['label'] }}"
-                                    @disabled((string) $initialGame !== (string) $game->id || $initialPurchaseMode !== 'single')
-                                    @if ($field['required'] && (string) $initialGame === (string) $game->id && $initialPurchaseMode === 'single') required @endif
-                                >
-                                @if ($loop->first)<p class="home-field-help">Nhập đúng thông tin để hệ thống xử lý tự động.</p>@endif
-                                <p class="home-field-error" data-recipient-format-error role="alert" aria-live="polite" hidden></p>
-                                @error('recipient_fields.'.$field['key'])<p class="home-field-error">{{ $message }}</p>@enderror
-                            </div>
-                        @endforeach
+                <section class="grid w-full min-w-0 gap-4 rounded-[5px] border border-slate-200 bg-white p-4" data-topup-payload-section="single" aria-label="Thông tin tài khoản nhận">
+                    @foreach ($games as $game)
+                        <div class="home-recipient-grid" data-recipient-fields="{{ $game->id }}" data-single-confirm-recipient-label="{{ collect($game->checkoutFields())->pluck('label')->implode(' | ') }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
+                            @foreach ($game->checkoutFields() as $field)
+                                <div class="home-field home-recipient-field sm:col-span-2" data-field-key="{{ $field['key'] }}">
+                                    <label for="recipient-{{ $game->id }}-{{ $field['key'] }}">
+                                        {{ $field['label'] }} @if ($field['required'])<span aria-hidden="true">*</span>@endif
+                                    </label>
+                                    <input
+                                        id="recipient-{{ $game->id }}-{{ $field['key'] }}"
+                                        class="client-input"
+                                        type="text"
+                                        name="recipient_fields[{{ $field['key'] }}]"
+                                        maxlength="191"
+                                        value="{{ old('recipient_fields.'.$field['key']) }}"
+                                        placeholder="{{ $field['placeholder'] }}"
+                                        autocomplete="off"
+                                        autocapitalize="none"
+                                        spellcheck="false"
+                                        data-recipient-input
+                                        data-required="{{ $field['required'] ? 'true' : 'false' }}"
+                                        data-validation-regex="{{ $field['regex'] }}"
+                                        data-validation-label="{{ $field['label'] }}"
+                                        @disabled((string) $initialGame !== (string) $game->id || $initialPurchaseMode !== 'single')
+                                        @if ($field['required'] && (string) $initialGame === (string) $game->id && $initialPurchaseMode === 'single') required @endif
+                                    >
+                                    @if ($loop->first)<p class="home-field-help">Nhập đúng thông tin để hệ thống xử lý tự động.</p>@endif
+                                    <p class="home-field-error" data-recipient-format-error role="alert" aria-live="polite" hidden></p>
+                                    @error('recipient_fields.'.$field['key'])<p class="home-field-error">{{ $message }}</p>@enderror
+                                </div>
+                            @endforeach
+                        </div>
+                    @endforeach
+                    <div class="home-field home-quantity-field">
+                        <label for="topup-single-quantity">Số lượng</label>
+                        <div class="home-quantity-control">
+                            <button type="button" data-quantity-decrease aria-label="Giảm số lượng">−</button>
+                            <input id="topup-single-quantity" type="number" name="single_quantity" min="1" max="10" value="{{ $initialSingleQuantity }}" inputmode="numeric" data-single-quantity required @disabled($initialPurchaseMode !== 'single')>
+                            <button type="button" data-quantity-increase aria-label="Tăng số lượng">+</button>
+                        </div>
+                        @error('single_quantity')<p class="home-field-error">{{ $message }}</p>@enderror
                     </div>
-                @endforeach
-                <div class="home-field home-quantity-field">
-                    <label for="topup-single-quantity">Số lượng</label>
-                    <div class="home-quantity-control">
-                        <button type="button" data-quantity-decrease aria-label="Giảm số lượng">−</button>
-                        <input id="topup-single-quantity" type="number" name="single_quantity" min="1" max="10" value="{{ $initialSingleQuantity }}" inputmode="numeric" data-single-quantity required @disabled($initialPurchaseMode !== 'single')>
-                        <button type="button" data-quantity-increase aria-label="Tăng số lượng">+</button>
-                    </div>
-                    @error('single_quantity')<p class="home-field-error">{{ $message }}</p>@enderror
-                </div>
-                @error('recipient_fields')<p class="home-field-error">{{ $message }}</p>@enderror
+                    @error('recipient_fields')<p class="home-field-error">{{ $message }}</p>@enderror
+                </section>
             </div>
 
             <div id="purchase-panel-bulk" role="tabpanel" aria-labelledby="purchase-tab-bulk" data-purchase-panel="bulk" @if ($initialPurchaseMode !== 'bulk') hidden @endif>
-                <div class="home-field">
-                    <label class="inline-flex items-center gap-1.5" for="topup-server-bulk"><i class="bx bx-server text-lg text-cyan-700" aria-hidden="true"></i>Máy chủ áp dụng cho danh sách <span aria-hidden="true">*</span></label>
-                    <select id="topup-server-bulk" class="client-input" data-server-picker="bulk" @disabled($initialPurchaseMode !== 'bulk') @if ($initialPurchaseMode === 'bulk') required @endif>
-                        <option value="">Chọn máy chủ</option>
-                        @foreach ($games as $game)
-                            @foreach ($game->servers as $server)
-                                <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }} - ID: {{ $server->id }}</option>
+                <section class="grid w-full min-w-0 gap-4 rounded-[5px] border border-slate-200 bg-slate-50 p-4" data-topup-server-section="bulk" aria-label="Chọn máy chủ cho danh sách">
+                    <div class="home-field">
+                        <label class="inline-flex items-center gap-1.5" for="topup-server-bulk"><i class="bx bx-server text-lg text-cyan-700" aria-hidden="true"></i>Máy chủ áp dụng cho danh sách <span aria-hidden="true">*</span></label>
+                        <select id="topup-server-bulk" class="client-input" data-server-picker="bulk" @disabled($initialPurchaseMode !== 'bulk') @if ($initialPurchaseMode === 'bulk') required @endif>
+                            <option value="">Chọn máy chủ</option>
+                            @foreach ($games as $game)
+                                @foreach ($game->servers as $server)
+                                    <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }} - ID: {{ $server->id }}</option>
+                                @endforeach
                             @endforeach
-                        @endforeach
-                    </select>
-                    <p class="home-field-help">Máy chủ này được áp dụng cho toàn bộ tài khoản bên dưới.</p>
-                    @error('server_id')<p class="home-field-error">{{ $message }}</p>@enderror
-                </div>
+                        </select>
+                        <p class="home-field-help">Máy chủ này được áp dụng cho toàn bộ tài khoản bên dưới.</p>
+                        @error('server_id')<p class="home-field-error">{{ $message }}</p>@enderror
+                    </div>
+                </section>
 
-                <label class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800" for="topup-bulk-recipients"><i class="bx bx-list text-lg text-cyan-700" aria-hidden="true"></i>Danh sách tài khoản</label>
-                @foreach ($games as $game)
-                    @php
-                        $checkoutFields = collect($game->checkoutFields());
-                        $fieldLabels = $checkoutFields->pluck('label')->push('Số lượng thẻ')->implode(' | ');
-                        $fieldPlaceholders = $checkoutFields
-                            ->map(fn ($field) => filled($field['placeholder'] ?? null) ? $field['placeholder'] : $field['label'])
-                            ->push('Số lượng thẻ')
-                            ->implode('|');
-                    @endphp
-                    <p class="home-bulk-schema" data-bulk-schema="{{ $game->id }}" data-bulk-placeholder="{{ $fieldPlaceholders }}" data-bulk-confirm-recipient-label="{{ $fieldLabels }}" data-bulk-fields="{{ $checkoutFields->map(fn ($field) => ['label' => $field['label'], 'required' => $field['required'], 'regex' => $field['regex']])->values()->toJson() }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
-                        Mỗi dòng 1 tài khoản theo đúng định dạng: <strong>{{ $fieldLabels }}</strong>
-                    </p>
-                @endforeach
-                <textarea
-                    id="topup-bulk-recipients"
-                    class="client-input home-bulk-textarea"
-                    name="bulk_recipients"
-                    rows="6"
-                    maxlength="25000"
-                    placeholder="{{ $initialBulkPlaceholder }}"
-                    autocapitalize="none"
-                    spellcheck="false"
-                    data-bulk-recipients
-                    @disabled($initialPurchaseMode !== 'bulk')
-                    @if ($initialPurchaseMode === 'bulk') required @endif
-                >{{ old('bulk_recipients') }}</textarea>
-                <div class="home-bulk-summary">
-                    <span>Dòng trống được bỏ qua.</span>
-                    <strong><span data-bulk-account-count>{{ $initialBulkRecipientCount }}</span> tài khoản · Tổng số thẻ: <span data-bulk-count>{{ $initialBulkQuantity }}</span></strong>
-                </div>
-                <p class="home-field-error" data-bulk-format-error role="alert" aria-live="polite" hidden></p>
-                @error('bulk_recipients')<p class="home-field-error">{{ $message }}</p>@enderror
+                <section class="grid w-full min-w-0 gap-3 rounded-[5px] border border-slate-200 bg-white p-4" data-topup-payload-section="bulk" aria-label="Danh sách tài khoản nhận">
+                    <label class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800" for="topup-bulk-recipients"><i class="bx bx-list text-lg text-cyan-700" aria-hidden="true"></i>Danh sách tài khoản</label>
+                    @foreach ($games as $game)
+                        @php
+                            $checkoutFields = collect($game->checkoutFields());
+                            $fieldLabels = $checkoutFields->pluck('label')->push('Số lượng thẻ')->implode(' | ');
+                            $fieldPlaceholders = $checkoutFields
+                                ->map(fn ($field) => filled($field['placeholder'] ?? null) ? $field['placeholder'] : $field['label'])
+                                ->push('Số lượng thẻ')
+                                ->implode('|');
+                        @endphp
+                        <p class="home-bulk-schema" data-bulk-schema="{{ $game->id }}" data-bulk-placeholder="{{ $fieldPlaceholders }}" data-bulk-confirm-recipient-label="{{ $fieldLabels }}" data-bulk-fields="{{ $checkoutFields->map(fn ($field) => ['label' => $field['label'], 'required' => $field['required'], 'regex' => $field['regex']])->values()->toJson() }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
+                            Mỗi dòng 1 tài khoản theo đúng định dạng: <strong>{{ $fieldLabels }}</strong>
+                        </p>
+                    @endforeach
+                    <textarea
+                        id="topup-bulk-recipients"
+                        class="client-input home-bulk-textarea"
+                        name="bulk_recipients"
+                        rows="6"
+                        maxlength="25000"
+                        placeholder="{{ $initialBulkPlaceholder }}"
+                        autocapitalize="none"
+                        spellcheck="false"
+                        data-bulk-recipients
+                        @disabled($initialPurchaseMode !== 'bulk')
+                        @if ($initialPurchaseMode === 'bulk') required @endif
+                    >{{ old('bulk_recipients') }}</textarea>
+                    <div class="home-bulk-summary">
+                        <span>Dòng trống được bỏ qua.</span>
+                        <strong><span data-bulk-account-count>{{ $initialBulkRecipientCount }}</span> tài khoản · Tổng số thẻ: <span data-bulk-count>{{ $initialBulkQuantity }}</span></strong>
+                    </div>
+                    <p class="home-field-error" data-bulk-format-error role="alert" aria-live="polite" hidden></p>
+                    @error('bulk_recipients')<p class="home-field-error">{{ $message }}</p>@enderror
+                </section>
             </div>
 
             @guest

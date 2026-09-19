@@ -14,6 +14,7 @@ use App\Features\Admin\User\Requests\AdminUserIndexRequest;
 use App\Features\Admin\User\Requests\AdminUserRelatedListRequest;
 use App\Features\Admin\User\Requests\AdminUserStatusRequest;
 use App\Features\Admin\User\Requests\AdminWalletAdjustRequest;
+use App\Features\Admin\User\Requests\QuickSetUserPackagePricesRequest;
 use App\Features\Admin\User\Requests\UpsertUserPackagePriceRequest;
 use App\Features\Admin\User\Resources\AdminUserDetailResource;
 use App\Features\Admin\User\Resources\AdminUserResource;
@@ -77,6 +78,19 @@ class UserController extends Controller
     public function prices(User $user, UserPackagePriceAdminService $service): JsonResponse
     {
         return response()->json(ApiResponse::success(data: $service->catalog($user)));
+    }
+
+    public function quickSetPrices(
+        QuickSetUserPackagePricesRequest $request,
+        User $user,
+        UserPackagePriceAdminService $service,
+    ): JsonResponse {
+        $service->quickSet($user, $request->validated());
+
+        return response()->json(ApiResponse::success(
+            'Đã áp dụng nhanh chiết khấu cho thành viên.',
+            $service->catalog($user),
+        ));
     }
 
     public function updatePrice(

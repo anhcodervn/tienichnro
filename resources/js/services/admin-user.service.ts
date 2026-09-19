@@ -95,15 +95,21 @@ export type AdminUserLog = {
     created_at: string | null;
 };
 
+export type AdminUserPricingMode = 'discount' | 'fixed' | 'profit';
+
 export type AdminUserPackagePrice = {
     package_id: number;
+    game_id: number;
     game: string | null;
     package: string;
     denomination: number;
+    cost_price: number | null;
     base_price: number;
+    base_profit: number | null;
     member_price: number;
+    member_profit: number | null;
     discount_amount: number;
-    pricing_mode: 'discount' | 'fixed';
+    pricing_mode: AdminUserPricingMode;
     discount_percent: number;
     fixed_price: number | null;
     minimum_profit: number;
@@ -115,10 +121,13 @@ export type AdminUserGlobalPackagePreview = {
     id: number;
     name: string;
     denomination: number;
+    cost_price: number | null;
     base_price: number;
+    base_profit: number | null;
     member_price: number;
+    member_profit: number | null;
     discount_amount: number;
-    pricing_mode: 'discount' | 'fixed';
+    pricing_mode: AdminUserPricingMode;
     discount_percent: number;
     fixed_price: number | null;
     minimum_profit: number;
@@ -128,6 +137,15 @@ export type AdminUserGlobalPackagePreview = {
 export type AdminUserPricingResponse = {
     prices: AdminUserPackagePrice[];
     global_packages: AdminUserGlobalPackagePreview[];
+};
+
+export type QuickSetUserPricesPayload = {
+    scope: 'packages' | 'global';
+    package_ids: number[];
+    pricing_mode: 'discount' | 'profit';
+    discount_percent: number | null;
+    profit_amount: number | null;
+    is_active: boolean;
 };
 
 export type PaginatedAdminUserRelation<T> = {
@@ -160,6 +178,12 @@ export const adminUserService = {
 
     async prices(userId: number | string): Promise<AdminUserPricingResponse> {
         const response = await api.get(`/api/admin-api/users/${userId}/prices`);
+
+        return response.data.data as AdminUserPricingResponse;
+    },
+
+    async quickSetPrices(userId: number | string, payload: QuickSetUserPricesPayload): Promise<AdminUserPricingResponse> {
+        const response = await api.put(`/api/admin-api/users/${userId}/prices/quick-set`, payload);
 
         return response.data.data as AdminUserPricingResponse;
     },

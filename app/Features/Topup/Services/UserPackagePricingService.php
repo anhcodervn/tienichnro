@@ -110,10 +110,12 @@ class UserPackagePricingService
     ): array {
         $discountBasisPoints = (int) ($rule->discount_basis_points ?? 0);
         $pricingMode = $rule->pricing_mode;
-        $candidatePrice = $pricingMode === UserPackagePrice::MODE_FIXED
-            ? (int) ($rule->fixed_price ?? $basePrice)
-            : $basePrice - intdiv($basePrice * $discountBasisPoints, 10000);
         $minimumProfit = (int) $rule->minimum_profit;
+        $candidatePrice = match ($pricingMode) {
+            UserPackagePrice::MODE_FIXED => (int) ($rule->fixed_price ?? $basePrice),
+            UserPackagePrice::MODE_PROFIT => $costFloor === null ? $basePrice : $costFloor + $minimumProfit,
+            default => $basePrice - intdiv($basePrice * $discountBasisPoints, 10000),
+        };
         $minimumPrice = $costFloor === null ? 0 : $costFloor + $minimumProfit;
         $finalPrice = min($basePrice, max(0, $candidatePrice, $minimumPrice));
 

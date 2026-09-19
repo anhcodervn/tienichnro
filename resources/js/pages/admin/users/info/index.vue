@@ -22,6 +22,7 @@ import {
     Plus,
     RotateCcw,
     Save,
+    Sparkles,
     Wallet,
 } from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -48,11 +49,19 @@ const savingPriceId = ref<number | null>(null);
 const resettingPriceId = ref<number | null>(null);
 const savingGlobalPriceId = ref<number | null>(null);
 const resettingGlobalPriceId = ref<number | null>(null);
+const quickSetOpen = ref(false);
+const quickSetSaving = ref(false);
 const detail = ref<AdminUserDetailResponse | null>(null);
 const priceRows = ref<AdminUserPackagePrice[]>([]);
 const globalPackageRows = ref<AdminUserGlobalPackagePreview[]>([]);
 const selectedPricingScope = ref('global');
 const activeTab = ref<TabKey>('overview');
+
+const quickSetForm = reactive({
+    pricing_mode: 'discount' as 'discount' | 'profit',
+    discount_percent: 0,
+    profit_amount: 0,
+});
 
 const walletForm = reactive({
     type: 'add' as 'add' | 'subtract',
@@ -96,20 +105,137 @@ const formatCurrency = (value: number | null | undefined): string =>
     }).format(value ?? 0);
 
 const gamePricingScopes = computed(() => {
-    const games = new Map<string, number>();
+    const games = new Map<number, { label: string; count: number }>();
 
     priceRows.value.forEach((row) => {
-        const game = row.game || 'Chưa phân loại';
-        games.set(game, (games.get(game) ?? 0) + 1);
+        const current = games.get(row.game_id);
+        games.set(row.game_id, {
+            label: row.game || 'Chưa phân loại',
+            count: (current?.count ?? 0) + 1,
+        });
     });
 
-    return Array.from(games, ([label, count]) => ({ value: `game:${label}`, label, count })).sort((left, right) =>
-        left.label.localeCompare(right.label, 'vi'),
+    return Array.from(games, ([gameId, game]) => ({ value: `game:${gameId}`, label: game.label, count: game.count })).sort(
+        (left, right) => left.label.localeCompare(right.label, 'vi'),
     );
 });
 
-const selectedGameName = computed(() => selectedPricingScope.value.replace(/^game:/, ''));
-const selectedGamePriceRows = computed(() => priceRows.value.filter((row) => (row.game || 'Chưa phân loại') === selectedGameName.value));
+const selectedGameId = computed(() => Number(selectedPricingScope.value.replace(/^game:/, '')));
+const selectedGameName = computed(
+    () => gamePricingScopes.value.find((scope) => scope.value === selectedPricingScope.value)?.label ?? 'Chưa phân loại',
+);
+const selectedGamePriceRows = computed(() => priceRows.value.filter((row) => row.game_id === selectedGameId.value));
+const selectedPricingRows = computed<Array<AdminUserPackagePrice | AdminUserGlobalPackagePreview>>(() =>
+    selectedPricingScope.value === 'global' ? globalPackageRows.value : selectedGamePriceRows.value,
+);
+
+const previewMemberPrice = (row: AdminUserPackagePrice | AdminUserGlobalPackagePreview): number => {
+    const costPrice = row.cost_price;
+    const minimumPrice = costPrice === null ? 0 : costPrice + Math.max(0, Number(row.minimum_profit || 0));
+    let candidatePrice = row.base_price;
+
+    if (row.pricing_mode === 'discount') {
+        const basisPoints = Math.round(Math.max(0, Number(row.discount_percent || 0)) * 100);
+        candidatePrice = row.base_price - Math.trunc((row.base_price * basisPoints) / 10000);
+    } else if (row.pricing_mode === 'fixed') {
+        candidatePrice = Math.max(0, Number(row.fixed_price || 0));
+    } else if (costPrice !== null) {
+        candidatePrice = costPrice + Math.max(0, Number(row.minimum_profit || 0));
+    }
+
+    return Math.min(row.base_price, Math.max(0, candidatePrice, minimumPrice));
+};
+
+const previewProfit = (row: AdminUserPackagePrice | AdminUserGlobalPackagePreview): number | null =>
+    row.cost_price === null ? null : previewMemberPrice(row) - row.cost_price;
+
+const pricingModeChanged = (row: AdminUserPackagePrice | AdminUserGlobalPackagePreview): void => {
+    if (row.pricing_mode === 'discount') {
+        row.minimum_profit = 0;
+        return;
+    }
+
+    if (row.pricing_mode === 'profit' && row.cost_price !== null) {
+        row.minimum_profit = Math.max(0, row.member_price - row.cost_price);
+    }
+};
+
+const quickSetError = (message: string): void => {
+    handleErrorResponse({
+        response: {
+            status: 422,
+            data: { message },
+        },
+    });
+};
+
+const previewQuickSet = (): boolean => {
+    const rows = selectedPricingRows.value;
+
+    if (rows.length === 0) {
+        quickSetError('Phạm vi đang chọn chưa có gói để áp dụng.');
+        return false;
+    }
+
+    if (quickSetForm.pricing_mode === 'discount') {
+        const discountPercent = Number(quickSetForm.discount_percent);
+        if (!Number.isFinite(discountPercent) || discountPercent < 0 || discountPercent > 100) {
+            quickSetError('Phần trăm chiết khấu phải từ 0 đến 100.');
+            return false;
+        }
+    } else {
+        const profitAmount = Number(quickSetForm.profit_amount);
+        if (!Number.isFinite(profitAmount) || profitAmount < 0) {
+            quickSetError('Tiền lãi phải là số không âm.');
+            return false;
+        }
+        if (rows.some((row) => row.cost_price === null)) {
+            quickSetError('Có gói chưa cấu hình giá provider nên không thể set theo tiền lãi.');
+            return false;
+        }
+        if (rows.some((row) => profitAmount > row.base_price - Number(row.cost_price))) {
+            quickSetError('Tiền lãi mới không được cao hơn lãi của giá bán hiện tại.');
+            return false;
+        }
+    }
+
+    rows.forEach((row) => {
+        row.pricing_mode = quickSetForm.pricing_mode;
+        row.discount_percent = quickSetForm.pricing_mode === 'discount' ? Number(quickSetForm.discount_percent) : 0;
+        row.fixed_price = null;
+        row.minimum_profit = quickSetForm.pricing_mode === 'profit' ? Number(quickSetForm.profit_amount) : 0;
+        row.is_active = true;
+    });
+
+    return true;
+};
+
+const saveQuickSet = async (): Promise<void> => {
+    if (!previewQuickSet()) {
+        return;
+    }
+
+    quickSetSaving.value = true;
+
+    try {
+        applyPricingResponse(
+            await adminUserService.quickSetPrices(userId, {
+                scope: selectedPricingScope.value === 'global' ? 'global' : 'packages',
+                package_ids: selectedPricingRows.value.map((row) => ('package_id' in row ? row.package_id : row.id)),
+                pricing_mode: quickSetForm.pricing_mode,
+                discount_percent: quickSetForm.pricing_mode === 'discount' ? Number(quickSetForm.discount_percent) : null,
+                profit_amount: quickSetForm.pricing_mode === 'profit' ? Number(quickSetForm.profit_amount) : null,
+                is_active: true,
+            }),
+        );
+        quickSetOpen.value = false;
+        handleSuccessResponse({ data: { status: true, message: 'Đã áp dụng nhanh chiết khấu cho phạm vi đang chọn.' } });
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        quickSetSaving.value = false;
+    }
+};
 
 const formatDate = (value: string | null, includeTime = false): string => {
     if (!value) {
@@ -710,6 +836,82 @@ onMounted(loadDetail);
                                 </div>
                             </nav>
 
+                            <section class="rounded-[10px] border-2 border-emerald-200 bg-emerald-50 p-4">
+                                <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                                    <div>
+                                        <h3 class="flex items-center gap-2 font-black text-emerald-950">
+                                            <Sparkles class="h-4 w-4" />Set chiết khấu nhanh
+                                        </h3>
+                                        <p class="mt-1 text-sm text-emerald-800">
+                                            Áp dụng đồng loạt cho {{ selectedPricingRows.length }} gói trong phạm vi đang chọn và xem trước giá/lãi ngay trên bảng.
+                                        </p>
+                                    </div>
+                                    <button
+                                        type="button"
+                                        class="inline-flex min-h-10 items-center justify-center gap-2 rounded-[8px] bg-emerald-700 px-4 py-2 text-sm font-bold text-white transition hover:bg-emerald-800"
+                                        @click="quickSetOpen = !quickSetOpen"
+                                    >
+                                        <Sparkles class="h-4 w-4" />{{ quickSetOpen ? 'Đóng thiết lập' : 'Set chiết khấu nhanh' }}
+                                    </button>
+                                </div>
+
+                                <div v-if="quickSetOpen" class="mt-4 grid gap-3 border-t border-emerald-200 pt-4 lg:grid-cols-[12rem_minmax(12rem,1fr)_auto] lg:items-end">
+                                    <label class="grid gap-1.5 text-sm font-bold text-slate-700">
+                                        Cách tính
+                                        <select
+                                            v-model="quickSetForm.pricing_mode"
+                                            class="min-h-11 rounded-[8px] border-2 border-emerald-300 bg-white px-3 text-sm outline-none focus:border-emerald-600"
+                                        >
+                                            <option value="discount">Giảm theo %</option>
+                                            <option value="profit">Lãi trên giá provider</option>
+                                        </select>
+                                    </label>
+                                    <label class="grid gap-1.5 text-sm font-bold text-slate-700">
+                                        {{ quickSetForm.pricing_mode === 'discount' ? 'Phần trăm giảm' : 'Tiền lãi mỗi thẻ' }}
+                                        <div class="relative">
+                                            <input
+                                                v-if="quickSetForm.pricing_mode === 'discount'"
+                                                v-model.number="quickSetForm.discount_percent"
+                                                type="number"
+                                                min="0"
+                                                max="100"
+                                                step="0.01"
+                                                class="min-h-11 w-full rounded-[8px] border-2 border-emerald-300 bg-white px-3 pr-9 text-sm outline-none focus:border-emerald-600"
+                                            />
+                                            <input
+                                                v-else
+                                                v-model.number="quickSetForm.profit_amount"
+                                                type="number"
+                                                min="0"
+                                                step="1000"
+                                                class="min-h-11 w-full rounded-[8px] border-2 border-emerald-300 bg-white px-3 pr-10 text-sm outline-none focus:border-emerald-600"
+                                            />
+                                            <span class="pointer-events-none absolute right-3 top-3 text-sm font-bold text-slate-400">
+                                                {{ quickSetForm.pricing_mode === 'discount' ? '%' : 'đ' }}
+                                            </span>
+                                        </div>
+                                    </label>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button
+                                            type="button"
+                                            class="inline-flex min-h-11 items-center justify-center rounded-[8px] border-2 border-emerald-300 bg-white px-4 text-sm font-bold text-emerald-800"
+                                            @click="previewQuickSet"
+                                        >
+                                            Xem trước trên bảng
+                                        </button>
+                                        <button
+                                            type="button"
+                                            class="inline-flex min-h-11 items-center justify-center gap-2 rounded-[8px] bg-[#465fff] px-4 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                            :disabled="quickSetSaving || selectedPricingRows.length === 0"
+                                            @click="saveQuickSet"
+                                        >
+                                            <LoaderCircle v-if="quickSetSaving" class="h-4 w-4 animate-spin" />
+                                            <Save v-else class="h-4 w-4" />Áp dụng và lưu
+                                        </button>
+                                    </div>
+                                </div>
+                            </section>
+
                             <section
                                 v-if="selectedPricingScope === 'global'"
                                 class="overflow-hidden rounded-[10px] border-2 border-indigo-200 bg-white"
@@ -732,18 +934,18 @@ onMounted(loadDetail);
                                         </span>
                                     </div>
                                     <div class="overflow-x-auto">
-                                        <table class="w-full min-w-[1120px]">
+                                        <table class="w-full min-w-[1320px]">
                                             <thead
                                                 class="border-y border-slate-200 bg-white text-left text-xs font-bold uppercase tracking-wide text-slate-500"
                                             >
                                                 <tr>
                                                     <th class="px-4 py-3">Gói Global</th>
                                                     <th class="px-4 py-3">Mệnh giá</th>
-                                                    <th class="px-4 py-3">Giá chuẩn</th>
+                                                    <th class="px-4 py-3">Giá gốc</th>
+                                                    <th class="px-4 py-3">Giá bán / lãi hiện tại</th>
                                                     <th class="px-4 py-3">Cách tính</th>
-                                                    <th class="px-4 py-3">Mức giá</th>
-                                                    <th class="px-4 py-3">Lãi tối thiểu</th>
-                                                    <th class="px-4 py-3">Giá thành viên</th>
+                                                    <th class="px-4 py-3">Giá mới / lãi mới</th>
+                                                    <th class="px-4 py-3">Giá thành viên hiển thị</th>
                                                     <th class="px-4 py-3 text-center">Áp dụng</th>
                                                     <th class="px-4 py-3 text-right">Thao tác</th>
                                                 </tr>
@@ -761,14 +963,24 @@ onMounted(loadDetail);
                                                 >
                                                     <td class="px-4 py-3 font-bold text-slate-900">{{ row.name }}</td>
                                                     <td class="px-4 py-3 font-semibold text-slate-700">{{ formatCurrency(row.denomination) }}</td>
-                                                    <td class="px-4 py-3 font-semibold text-slate-700">{{ formatCurrency(row.base_price) }}</td>
+                                                    <td class="px-4 py-3 font-semibold text-slate-700">
+                                                        {{ row.cost_price === null ? '--' : formatCurrency(row.cost_price) }}
+                                                    </td>
+                                                    <td class="px-4 py-3">
+                                                        <p class="font-bold text-slate-900">{{ formatCurrency(row.base_price) }}</p>
+                                                        <p class="mt-1 text-xs font-semibold text-emerald-700">
+                                                            Lãi {{ row.base_profit === null ? '--' : formatCurrency(row.base_profit) }}
+                                                        </p>
+                                                    </td>
                                                     <td class="px-4 py-3">
                                                         <select
                                                             v-model="row.pricing_mode"
                                                             class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-700 outline-none focus:border-[#465fff]"
+                                                            @change="pricingModeChanged(row)"
                                                         >
                                                             <option value="discount">Giảm theo %</option>
-                                                            <option value="fixed">Giá cố định</option>
+                                                            <option value="profit" :disabled="row.cost_price === null">Lãi provider</option>
+                                                            <option value="fixed">Giá cố định (cũ)</option>
                                                         </select>
                                                     </td>
                                                     <td class="px-4 py-3">
@@ -783,23 +995,40 @@ onMounted(loadDetail);
                                                             />
                                                             <span class="pointer-events-none absolute right-3 top-2 text-sm text-slate-400">%</span>
                                                         </div>
-                                                        <input
-                                                            v-else
-                                                            v-model.number="row.fixed_price"
-                                                            type="number"
-                                                            min="0"
-                                                            class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
-                                                        />
+                                                        <div v-else class="grid gap-1.5">
+                                                            <input
+                                                                v-if="row.pricing_mode === 'profit'"
+                                                                v-model.number="row.minimum_profit"
+                                                                type="number"
+                                                                min="0"
+                                                                class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
+                                                            />
+                                                            <input
+                                                                v-else
+                                                                v-model.number="row.fixed_price"
+                                                                type="number"
+                                                                min="0"
+                                                                class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
+                                                            />
+                                                        </div>
+                                                        <p class="mt-2 text-xs font-bold text-indigo-700">
+                                                            Giá mới {{ formatCurrency(previewMemberPrice(row)) }}
+                                                        </p>
+                                                        <p class="mt-1 text-xs font-semibold text-emerald-700">
+                                                            Lãi {{ previewProfit(row) === null ? '--' : formatCurrency(previewProfit(row)) }}
+                                                        </p>
                                                     </td>
                                                     <td class="px-4 py-3">
-                                                        <input
-                                                            v-model.number="row.minimum_profit"
-                                                            type="number"
-                                                            min="0"
-                                                            class="w-28 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
-                                                        />
+                                                        <p class="font-black text-indigo-600">{{ formatCurrency(row.member_price) }}</p>
+                                                        <p class="mt-1 text-xs font-semibold text-emerald-600">
+                                                            Giảm {{ formatCurrency(row.discount_amount) }}
+                                                        </p>
+                                                        <span
+                                                            v-if="previewMemberPrice(row) !== row.member_price"
+                                                            class="mt-1 inline-flex rounded bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700"
+                                                            >Chưa lưu</span
+                                                        >
                                                     </td>
-                                                    <td class="px-4 py-3 font-black text-indigo-600">{{ formatCurrency(row.member_price) }}</td>
                                                     <td class="px-4 py-3 text-center">
                                                         <input
                                                             v-model="row.is_active"
@@ -855,16 +1084,16 @@ onMounted(loadDetail);
                                     <p class="mt-2 text-sm text-slate-600">Chỉ lưu tại đây khi muốn ghi đè mức Global cho riêng game hoặc gói này.</p>
                                 </div>
                                 <div class="overflow-x-auto">
-                                    <table class="w-full min-w-[1080px]">
+                                    <table class="w-full min-w-[1320px]">
                                         <thead class="bg-slate-100 text-left text-xs font-bold uppercase tracking-wide text-slate-600">
                                             <tr>
                                                 <th class="px-3 py-3">Gói nạp</th>
                                                 <th class="px-3 py-3">Mệnh giá</th>
-                                                <th class="px-3 py-3">Giá chuẩn</th>
+                                                <th class="px-3 py-3">Giá gốc</th>
+                                                <th class="px-3 py-3">Giá bán / lãi hiện tại</th>
                                                 <th class="px-3 py-3">Cách tính</th>
-                                                <th class="px-3 py-3">Mức giá</th>
-                                                <th class="px-3 py-3">Lãi tối thiểu</th>
-                                                <th class="px-3 py-3">Giá thành viên</th>
+                                                <th class="px-3 py-3">Giá mới / lãi mới</th>
+                                                <th class="px-3 py-3">Giá thành viên hiển thị</th>
                                                 <th class="px-3 py-3 text-center">Áp dụng</th>
                                                 <th class="px-3 py-3 text-right">Thao tác</th>
                                             </tr>
@@ -887,15 +1116,23 @@ onMounted(loadDetail);
                                                     {{ formatCurrency(row.denomination) }}
                                                 </td>
                                                 <td class="whitespace-nowrap px-3 py-3 font-semibold text-slate-700">
-                                                    {{ formatCurrency(row.base_price) }}
+                                                    {{ row.cost_price === null ? '--' : formatCurrency(row.cost_price) }}
+                                                </td>
+                                                <td class="whitespace-nowrap px-3 py-3">
+                                                    <p class="font-bold text-slate-900">{{ formatCurrency(row.base_price) }}</p>
+                                                    <p class="mt-1 text-xs font-semibold text-emerald-700">
+                                                        Lãi {{ row.base_profit === null ? '--' : formatCurrency(row.base_profit) }}
+                                                    </p>
                                                 </td>
                                                 <td class="px-3 py-3">
                                                     <select
                                                         v-model="row.pricing_mode"
                                                         class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm font-medium text-slate-700 outline-none focus:border-[#465fff]"
+                                                        @change="pricingModeChanged(row)"
                                                     >
                                                         <option value="discount">Giảm theo %</option>
-                                                        <option value="fixed">Giá cố định</option>
+                                                        <option value="profit" :disabled="row.cost_price === null">Lãi provider</option>
+                                                        <option value="fixed">Giá cố định (cũ)</option>
                                                     </select>
                                                 </td>
                                                 <td class="px-3 py-3">
@@ -911,20 +1148,25 @@ onMounted(loadDetail);
                                                         <span class="pointer-events-none absolute right-3 top-2 text-sm text-slate-400">%</span>
                                                     </div>
                                                     <input
+                                                        v-else-if="row.pricing_mode === 'profit'"
+                                                        v-model.number="row.minimum_profit"
+                                                        type="number"
+                                                        min="0"
+                                                        class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
+                                                    />
+                                                    <input
                                                         v-else
                                                         v-model.number="row.fixed_price"
                                                         type="number"
                                                         min="0"
                                                         class="w-32 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
                                                     />
-                                                </td>
-                                                <td class="px-3 py-3">
-                                                    <input
-                                                        v-model.number="row.minimum_profit"
-                                                        type="number"
-                                                        min="0"
-                                                        class="w-28 rounded-[8px] border-2 border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-700 outline-none focus:border-[#465fff]"
-                                                    />
+                                                    <p class="mt-2 text-xs font-bold text-indigo-700">
+                                                        Giá mới {{ formatCurrency(previewMemberPrice(row)) }}
+                                                    </p>
+                                                    <p class="mt-1 text-xs font-semibold text-emerald-700">
+                                                        Lãi {{ previewProfit(row) === null ? '--' : formatCurrency(previewProfit(row)) }}
+                                                    </p>
                                                 </td>
                                                 <td class="whitespace-nowrap px-3 py-3">
                                                     <p class="font-black text-[#465fff]">{{ formatCurrency(row.member_price) }}</p>
@@ -936,6 +1178,11 @@ onMounted(loadDetail);
                                                     <p v-if="row.discount_amount > 0" class="mt-1 text-xs font-semibold text-emerald-600">
                                                         Giảm {{ formatCurrency(row.discount_amount) }}
                                                     </p>
+                                                    <span
+                                                        v-if="previewMemberPrice(row) !== row.member_price"
+                                                        class="mt-1 inline-flex rounded bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-700"
+                                                        >Chưa lưu</span
+                                                    >
                                                 </td>
                                                 <td class="px-3 py-3 text-center">
                                                     <input

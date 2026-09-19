@@ -8,7 +8,7 @@ use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
-class UpsertUserPackagePriceRequest extends FormRequest
+class QuickSetUserPackagePricesRequest extends FormRequest
 {
     public function authorize(): bool
     {
@@ -21,22 +21,14 @@ class UpsertUserPackagePriceRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'pricing_mode' => ['required', Rule::in(['discount', 'fixed', 'profit'])],
+            'scope' => ['required', Rule::in(['packages', 'global'])],
+            'package_ids' => ['required', 'array', 'min:1', 'max:500'],
+            'package_ids.*' => ['required', 'integer', 'distinct'],
+            'pricing_mode' => ['required', Rule::in(['discount', 'profit'])],
             'discount_percent' => ['nullable', 'required_if:pricing_mode,discount', 'numeric', 'min:0', 'max:100'],
-            'fixed_price' => ['nullable', 'required_if:pricing_mode,fixed', 'integer', 'min:0'],
-            'minimum_profit' => ['required', 'integer', 'min:0'],
+            'profit_amount' => ['nullable', 'required_if:pricing_mode,profit', 'integer', 'min:0'],
             'is_active' => ['required', 'boolean'],
         ];
-    }
-
-    public function messages(): array
-    {
-        return [];
-    }
-
-    public function attributes(): array
-    {
-        return [];
     }
 
     protected function failedValidation(Validator $validator): void

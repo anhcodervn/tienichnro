@@ -91,6 +91,10 @@ test('guest home renders the purchase layout reward table and seo content withou
         ->assertSee('data-purchase-tab="bulk"', false)
         ->assertSee('data-server-picker="single"', false)
         ->assertSee('data-server-picker="bulk"', false)
+        ->assertSee('data-topup-server-section="single"', false)
+        ->assertSee('data-topup-payload-section="single"', false)
+        ->assertSee('data-topup-server-section="bulk"', false)
+        ->assertSee('data-topup-payload-section="bulk"', false)
         ->assertSeeInOrder([
             'id="topup-server-single"',
             'data-server-picker="single"',
