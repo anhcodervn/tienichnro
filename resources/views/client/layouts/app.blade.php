@@ -115,7 +115,7 @@
         <noscript data-site-meta-pixel-noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id={{ urlencode($metaPixelId) }}&amp;ev=PageView&amp;noscript=1" alt=""></noscript>
     @endif
     <a href="#main-content" class="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[5px] focus:bg-slate-950 focus:px-4 focus:py-3 focus:text-white">Bỏ qua điều hướng</a>
-    <header class="sticky top-0 z-40 border-b border-slate-200 bg-white/95 backdrop-blur">
+    <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur lg:z-40">
         <div class="client-container flex min-h-[4.5rem] items-center justify-between gap-3 sm:min-h-20">
             <a href="{{ route('home') }}" class="flex min-w-0 items-center gap-3 rounded-[5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" data-client-home>
                 @if ($headerLogo !== '')
@@ -257,7 +257,7 @@
                             </span>
                         </button>
 
-                        <div id="client-mobile-account-menu" class="absolute right-0 top-full z-50 mt-2 w-72 max-w-[calc(100vw-1.5rem)] origin-top-right overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-xl" data-account-menu-panel data-mobile-account-menu-panel hidden>
+                        <div id="client-mobile-account-menu" class="absolute right-0 top-full z-[60] mt-2 w-72 max-w-[calc(100vw-1.5rem)] origin-top-right overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-xl" data-account-menu-panel data-mobile-account-menu-panel hidden>
                             <div class="border-b border-slate-100 bg-slate-50 px-4 py-3">
                                 <p class="truncate text-sm font-bold text-slate-950">{{ $clientAccount['name'] }}</p>
                                 <p class="mt-0.5 truncate text-xs text-slate-500">{{ $clientAccount['email'] }}</p>
@@ -296,7 +296,7 @@
         </div>
     </header>
 
-    <div id="mobile-menu" class="fixed inset-0 z-50 lg:hidden" data-mobile-menu aria-hidden="true" hidden>
+    <div id="mobile-menu" class="fixed inset-0 z-[70] lg:hidden" data-mobile-menu aria-hidden="true" hidden>
         <button type="button" class="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" data-menu-close data-menu-backdrop tabindex="-1" aria-label="Đóng menu"></button>
 
         <aside
@@ -348,14 +348,24 @@
                 </div>
             </nav>
 
-            @guest
+            @auth
+                <div class="shrink-0 border-t border-slate-200 bg-white p-3" data-mobile-sidebar-footer>
+                    <form method="POST" action="{{ route('logout') }}">
+                        @csrf
+                        <button type="submit" class="flex min-h-12 w-full items-center justify-center gap-2 rounded-[5px] bg-rose-50 px-4 text-sm font-bold text-rose-600 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500" data-mobile-sidebar-logout>
+                            <i class="bx bx-log-out text-xl" aria-hidden="true"></i>
+                            <span>Đăng xuất</span>
+                        </button>
+                    </form>
+                </div>
+            @else
                 <div class="border-t border-slate-200 bg-slate-50 p-4">
                     <div class="grid grid-cols-2 gap-2">
                         <a class="client-button-secondary bg-white" href="{{ route('auth.login') }}">Đăng nhập</a>
                         <a class="client-button" href="{{ route('auth.register') }}">Đăng ký</a>
                     </div>
                 </div>
-            @endguest
+            @endauth
         </aside>
     </div>
 

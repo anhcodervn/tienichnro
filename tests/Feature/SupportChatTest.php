@@ -154,7 +154,10 @@ test('message cursor pages return newest twenty in render order without duplicat
         ]);
     }
 
-    $firstPage = $this->actingAs($user)->getJson('/api/client/support')->assertOk();
+    $firstPage = $this->actingAs($user)
+        ->getJson('/api/client/support')
+        ->assertOk()
+        ->assertJsonPath('data.meta.per_page', 20);
     $firstIds = collect($firstPage->json('data.messages'))->pluck('id')->all();
     $cursor = $firstPage->json('data.meta.next_cursor');
 

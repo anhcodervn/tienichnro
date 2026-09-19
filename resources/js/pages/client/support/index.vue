@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { useSystemSetting } from '@/composables/useSystemSetting';
 import { supportService } from '@/services/support.service';
 import { useSupportStore } from '@/stores/support.store';
 import { useUserStore } from '@/stores/user.store';
@@ -8,6 +9,7 @@ import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
 
 const supportStore = useSupportStore();
 const userStore = useUserStore();
+const { settings, fetchSettings } = useSystemSetting();
 const messageArea = ref<HTMLElement | null>(null);
 const messageInput = ref<HTMLTextAreaElement | null>(null);
 const messages = ref<SupportMessage[]>([]);
@@ -22,11 +24,13 @@ const draft = ref('');
 const errorMessage = ref('');
 const showNewMessage = ref(false);
 const cooldownRemaining = ref(0);
+const faviconFailed = ref(false);
 let cooldownTimer: number | null = null;
 
 const sortedMessages = computed(() => [...messages.value].sort((left, right) => Number(left.id) - Number(right.id)));
 const canSend = computed(() => draft.value.trim() !== '' && !sending.value && cooldownRemaining.value === 0);
 const connectionLabel = computed(() => (supportStore.connected ? 'Đang hoạt động' : 'Đang kết nối...'));
+const faviconUrl = computed(() => String(settings.value.favicon ?? '').trim());
 
 const formatTime = (value: string | null): string => {
     if (!value) return 'Vừa xong';
@@ -124,6 +128,12 @@ const loadThread = async (cursor: string | null = null): Promise<void> => {
     }
 };
 
+const loadOlderMessages = async (): Promise<void> => {
+    if (!hasMore.value || !nextCursor.value || loading.value || loadingOlder.value || refreshing.value) return;
+
+    await loadThread(nextCursor.value);
+};
+
 const startCooldown = (seconds = 10): void => {
     cooldownRemaining.value = Math.max(1, Math.ceil(seconds));
     if (cooldownTimer !== null) window.clearInterval(cooldownTimer);
@@ -181,6 +191,8 @@ const handleComposerKeydown = (event: KeyboardEvent): void => {
 };
 
 const handleScroll = (): void => {
+    const area = messageArea.value;
+    if (area && area.scrollTop <= 120) void loadOlderMessages();
     if (isNearBottom()) showNewMessage.value = false;
 };
 
@@ -215,6 +227,7 @@ onMounted(async () => {
     window.addEventListener('support:messages-read', handleReadReceipt);
     document.addEventListener('visibilitychange', handleVisibility);
 
+    void fetchSettings().catch(() => {});
     const user = userStore.user ?? (await userStore.bootstrap({ silent: true }));
     if (user) await supportStore.start('client', Number(user.id));
     else errorMessage.value = 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.';
@@ -244,8 +257,18 @@ onBeforeUnmount(() => {
                     <i class="bx bx-arrow-left" aria-hidden="true" />
                 </a>
 
-                <span class="relative grid h-11 w-11 shrink-0 place-items-center rounded-full bg-emerald-600 text-xl text-white shadow-sm">
-                    <i class="bx bx-headphone-mic" aria-hidden="true" />
+                <span
+                    class="relative grid h-11 w-11 shrink-0 place-items-center overflow-visible rounded-full bg-emerald-600 text-xl text-white shadow-sm"
+                >
+                    <img
+                        v-if="faviconUrl && !faviconFailed"
+                        :src="faviconUrl"
+                        alt="NapCarot"
+                        class="h-full w-full rounded-full bg-white object-contain p-1"
+                        data-support-favicon
+                        @error="faviconFailed = true"
+                    />
+                    <i v-else class="bx bx-headphone-mic" aria-hidden="true" data-support-fallback-icon />
                     <span
                         class="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white"
                         :class="supportStore.connected ? 'bg-emerald-400' : 'bg-amber-400'"
@@ -293,7 +316,7 @@ onBeforeUnmount(() => {
                         class="inline-flex min-h-9 items-center gap-2 rounded-full border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 shadow-sm transition hover:border-emerald-300 hover:text-emerald-700 disabled:cursor-wait disabled:opacity-60"
                         :disabled="loadingOlder"
                         data-support-load-older
-                        @click="loadThread(nextCursor)"
+                        @click="loadOlderMessages"
                     >
                         <i class="bx bx-history text-base" aria-hidden="true" />
                         {{ loadingOlder ? 'Đang tải...' : 'Tải tin nhắn cũ' }}

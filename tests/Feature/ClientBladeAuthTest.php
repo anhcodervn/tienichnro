@@ -39,6 +39,9 @@ test('authenticated client header shows the account dropdown and current wallet 
         ->assertSee('data-mobile-bottom-nav', false)
         ->assertSee('data-mobile-header-wallet-balance', false)
         ->assertSee('data-mobile-sidebar-toggle', false)
+        ->assertSee('data-mobile-sidebar-footer', false)
+        ->assertSee('data-mobile-sidebar-logout', false)
+        ->assertSee(route('logout'), false)
         ->assertSee('client-mobile-account-menu', false)
         ->assertSee('data-header-wallet-balance', false)
         ->assertSee('player@example.com')
@@ -52,6 +55,7 @@ test('guest client header does not render an account dropdown', function (): voi
     $this->get(route('home'))
         ->assertOk()
         ->assertDontSee('data-account-menu', false)
+        ->assertDontSee('data-mobile-sidebar-footer', false)
         ->assertSee('data-mobile-login', false)
         ->assertSee('data-mobile-bottom-nav', false)
         ->assertSee('data-mobile-sidebar-toggle', false);
