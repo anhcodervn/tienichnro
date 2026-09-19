@@ -107,6 +107,10 @@
                 <p><strong>Quan trọng:</strong> Chuyển đúng số tiền và giữ nguyên nội dung để hệ thống tự đối soát.</p>
             </div>
 
+            @isset($orderSummary)
+                <div class="mt-5">{{ $orderSummary }}</div>
+            @endisset
+
             @isset($actions)
                 <div class="mt-4">{{ $actions }}</div>
             @endisset

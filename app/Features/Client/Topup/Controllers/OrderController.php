@@ -111,6 +111,11 @@ class OrderController extends Controller
     public function payment(Request $request, Order $order, OrderBankPaymentService $orderBankPaymentService): View
     {
         $this->authorizeAccess($request, $order);
+        $order->load([
+            'game:id,name',
+            'server:id,name',
+            'recipients:id,order_id,position,recipient_data,quantity',
+        ]);
 
         return view('client.orders.payment', [
             'order' => $order,

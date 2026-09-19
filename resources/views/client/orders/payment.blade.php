@@ -40,6 +40,9 @@
             </p>
         </x-slot:statusExtra>
     @endif
+    <x-slot:orderSummary>
+        <x-client.order-payment-summary :order="$order" />
+    </x-slot:orderSummary>
 </x-client.bank-transfer-payment>
 </div>
 @endsection

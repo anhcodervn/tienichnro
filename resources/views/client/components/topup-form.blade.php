@@ -231,18 +231,17 @@
                                 @error('recipient_fields.'.$field['key'])<p class="home-field-error">{{ $message }}</p>@enderror
                             </div>
                         @endforeach
-
-                        <div class="home-field home-quantity-field">
-                            <label for="topup-single-quantity">Số lượng</label>
-                            <div class="home-quantity-control">
-                                <button type="button" data-quantity-decrease aria-label="Giảm số lượng">−</button>
-                                <input id="topup-single-quantity" type="number" name="single_quantity" min="1" max="10" value="{{ $initialSingleQuantity }}" inputmode="numeric" data-single-quantity required @disabled($initialPurchaseMode !== 'single')>
-                                <button type="button" data-quantity-increase aria-label="Tăng số lượng">+</button>
-                            </div>
-                            @error('single_quantity')<p class="home-field-error">{{ $message }}</p>@enderror
-                        </div>
                     </div>
                 @endforeach
+                <div class="home-field home-quantity-field">
+                    <label for="topup-single-quantity">Số lượng</label>
+                    <div class="home-quantity-control">
+                        <button type="button" data-quantity-decrease aria-label="Giảm số lượng">−</button>
+                        <input id="topup-single-quantity" type="number" name="single_quantity" min="1" max="10" value="{{ $initialSingleQuantity }}" inputmode="numeric" data-single-quantity required @disabled($initialPurchaseMode !== 'single')>
+                        <button type="button" data-quantity-increase aria-label="Tăng số lượng">+</button>
+                    </div>
+                    @error('single_quantity')<p class="home-field-error">{{ $message }}</p>@enderror
+                </div>
                 @error('recipient_fields')<p class="home-field-error">{{ $message }}</p>@enderror
             </div>
 

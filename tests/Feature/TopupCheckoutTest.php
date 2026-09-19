@@ -127,6 +127,17 @@ test('guest home renders the purchase layout reward table and seo content withou
         ->assertDontSee('id="app"', false);
 });
 
+test('checkout renders only one single account quantity field when multiple games are available', function (): void {
+    topupCatalog();
+    topupCatalog();
+
+    $response = $this->get(route('home'));
+
+    $response->assertOk();
+    expect(substr_count($response->getContent(), 'name="single_quantity"'))->toBe(1)
+        ->and(substr_count($response->getContent(), 'id="topup-single-quantity"'))->toBe(1);
+});
+
 test('authenticated home keeps order history on its dedicated page', function (): void {
     [$game, $server, $package] = topupCatalog();
     $user = User::factory()->create();
@@ -398,6 +409,48 @@ test('bank transfer order creates one shared payment request through the configu
         && $request->data()['transfer_prefix'] === 'NAP'
         && $request->data()['transfer_content'] === $paymentTransaction->content
         && $request->data()['amount'] === 180000);
+});
+
+test('single account checkout charges the selected quantity in the bank transfer QR', function (): void {
+    $this->withoutVite();
+
+    [$game, $server, $package] = topupCatalog();
+    ConfigRecharge::query()->create([
+        'provider' => 'manual',
+        'bank_name' => 'MBBank',
+        'account_name' => 'NGUYEN VAN A',
+        'account_number' => '0123456789',
+        'qr_template' => 'https://img.vietqr.io/image/{bank_code}-{account_number}-compact2.png?amount={amount}&addInfo={nd}',
+        'transfer_prefix' => 'NAP',
+        'is_active' => true,
+    ]);
+
+    $response = $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+        'purchase_mode' => 'single',
+        'single_quantity' => 10,
+    ]));
+
+    $order = Order::query()->sole();
+    $recipient = $order->recipients()->sole();
+    $paymentTransaction = PaymentTransaction::query()->sole();
+
+    $response->assertRedirect(route('orders.payment', $order));
+    expect($order->quantity)->toBe(10)
+        ->and($recipient->quantity)->toBe(10)
+        ->and((int) $order->total_amount)->toBe(900000)
+        ->and((int) $paymentTransaction->amount)->toBe(900000)
+        ->and($paymentTransaction->raw_data['qr_url'])->toContain('amount=900000');
+
+    $this->get(route('orders.payment', $order))
+        ->assertSuccessful()
+        ->assertSee('Thông tin đơn hàng')
+        ->assertSee($game->name)
+        ->assertSee($server->name)
+        ->assertSee($package->name)
+        ->assertSee('ninja-player')
+        ->assertSee('10 thẻ')
+        ->assertSee(number_format(900000, 0, ',', '.').'đ')
+        ->assertSee('amount=900000', false);
 });
 
 test('bulk checkout uses the full quantity for the payment transaction and QR amount', function (int $expectedQuantity, string $bulkRecipients): void {
