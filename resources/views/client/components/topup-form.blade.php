@@ -205,15 +205,15 @@
 
                 <section class="grid w-full min-w-0 gap-4 rounded-[5px] border border-slate-200 bg-white p-4" data-topup-payload-section="single" aria-label="Thông tin tài khoản nhận">
                     @foreach ($games as $game)
-                        <div class="home-recipient-grid" data-recipient-fields="{{ $game->id }}" data-single-confirm-recipient-label="{{ collect($game->checkoutFields())->pluck('label')->implode(' | ') }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
+                        <div class="home-recipient-grid w-full grid-cols-1" data-recipient-fields="{{ $game->id }}" data-single-confirm-recipient-label="{{ collect($game->checkoutFields())->pluck('label')->implode(' | ') }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
                             @foreach ($game->checkoutFields() as $field)
-                                <div class="home-field home-recipient-field sm:col-span-2" data-field-key="{{ $field['key'] }}">
+                                <div class="home-field home-recipient-field w-full min-w-0" data-field-key="{{ $field['key'] }}">
                                     <label for="recipient-{{ $game->id }}-{{ $field['key'] }}">
                                         {{ $field['label'] }} @if ($field['required'])<span aria-hidden="true">*</span>@endif
                                     </label>
                                     <input
                                         id="recipient-{{ $game->id }}-{{ $field['key'] }}"
-                                        class="client-input"
+                                        class="client-input block w-full"
                                         type="text"
                                         name="recipient_fields[{{ $field['key'] }}]"
                                         maxlength="191"
@@ -236,9 +236,9 @@
                             @endforeach
                         </div>
                     @endforeach
-                    <div class="home-field home-quantity-field">
+                    <div class="home-field home-quantity-field w-full min-w-0">
                         <label for="topup-single-quantity">Số lượng</label>
-                        <div class="home-quantity-control">
+                        <div class="home-quantity-control w-full">
                             <button type="button" data-quantity-decrease aria-label="Giảm số lượng">−</button>
                             <input id="topup-single-quantity" type="number" name="single_quantity" min="1" max="10" value="{{ $initialSingleQuantity }}" inputmode="numeric" data-single-quantity required @disabled($initialPurchaseMode !== 'single')>
                             <button type="button" data-quantity-increase aria-label="Tăng số lượng">+</button>
@@ -283,7 +283,7 @@
                     @endforeach
                     <textarea
                         id="topup-bulk-recipients"
-                        class="client-input home-bulk-textarea"
+                        class="client-input home-bulk-textarea block w-full max-w-none"
                         name="bulk_recipients"
                         rows="6"
                         maxlength="25000"

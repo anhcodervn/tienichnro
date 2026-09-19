@@ -370,19 +370,15 @@
     }
 
     .home-recipient-grid {
-        @apply grid min-w-0 gap-4 sm:grid-cols-2;
-    }
-
-    .home-recipient-field:first-child {
-        @apply sm:col-span-2;
+        @apply grid w-full min-w-0 grid-cols-1 gap-4;
     }
 
     .home-quantity-field {
-        @apply content-start sm:col-span-2;
+        @apply w-full min-w-0 content-start;
     }
 
     .home-quantity-control {
-        @apply grid min-h-11 grid-cols-[2.75rem_minmax(3rem,1fr)_2.75rem] overflow-hidden rounded-[5px] border border-slate-300 bg-white;
+        @apply grid min-h-11 w-full grid-cols-[2.75rem_minmax(3rem,1fr)_2.75rem] overflow-hidden rounded-[5px] border border-slate-300 bg-white;
     }
 
     .home-quantity-control button {
@@ -410,7 +406,7 @@
     }
 
     .home-checkout-card .home-bulk-textarea {
-        @apply min-h-32 resize-y py-2 font-mono leading-6;
+        @apply min-h-32 w-full max-w-none resize-y py-2 font-mono leading-6;
     }
 
     .home-bulk-summary {
