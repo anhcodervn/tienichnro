@@ -25,3 +25,8 @@ Schedule::command('affiliate:release-commissions')
     ->everyFiveMinutes()
     ->withoutOverlapping()
     ->onOneServer();
+
+Schedule::command('orders:expire-unpaid')
+    ->everyTenMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();

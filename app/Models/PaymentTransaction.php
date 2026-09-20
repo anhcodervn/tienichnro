@@ -24,6 +24,7 @@ class PaymentTransaction extends Model
         'transfer_reference',
         'raw_data',
         'status',
+        'expired_at',
     ];
 
     protected function casts(): array
@@ -31,6 +32,7 @@ class PaymentTransaction extends Model
         return [
             'amount' => 'decimal:2',
             'raw_data' => 'array',
+            'expired_at' => 'datetime',
         ];
     }
 

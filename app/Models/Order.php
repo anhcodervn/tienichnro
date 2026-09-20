@@ -49,7 +49,7 @@ class Order extends Model
         'discount_amount', 'member_level_discount_amount', 'total_amount', 'provider_unit_cost', 'provider_total_cost', 'gross_profit',
         'payment_method', 'payment_status', 'order_status',
         'provider_reference', 'paid_at', 'processing_at', 'completed_at', 'failed_at',
-        'cancelled_at', 'failure_reason', 'customer_ip', 'user_agent', 'metadata',
+        'cancelled_at', 'expired_at', 'failure_reason', 'customer_ip', 'user_agent', 'metadata',
     ];
 
     protected $attributes = [
@@ -72,7 +72,8 @@ class Order extends Model
             'discount_amount' => 'decimal:2', 'member_level_discount_amount' => 'decimal:2', 'total_amount' => 'decimal:2',
             'provider_unit_cost' => 'decimal:2', 'provider_total_cost' => 'decimal:2', 'gross_profit' => 'decimal:2',
             'paid_at' => 'datetime', 'processing_at' => 'datetime', 'completed_at' => 'datetime',
-            'failed_at' => 'datetime', 'cancelled_at' => 'datetime', 'affiliate_attributed_at' => 'datetime', 'metadata' => 'array',
+            'failed_at' => 'datetime', 'cancelled_at' => 'datetime', 'expired_at' => 'datetime',
+            'affiliate_attributed_at' => 'datetime', 'metadata' => 'array',
         ];
     }
 
