@@ -12,11 +12,11 @@ class TopupProviderPrice extends Model
     /** @use HasFactory<TopupProviderPriceFactory> */
     use HasFactory;
 
-    protected $fillable = ['topup_provider_id', 'topup_package_id', 'global_topup_package_id', 'price'];
+    protected $fillable = ['topup_provider_id', 'topup_package_id', 'global_topup_package_id', 'price', 'available', 'synced_at'];
 
     protected function casts(): array
     {
-        return ['price' => 'integer'];
+        return ['price' => 'integer', 'available' => 'boolean', 'synced_at' => 'datetime'];
     }
 
     public function provider(): BelongsTo

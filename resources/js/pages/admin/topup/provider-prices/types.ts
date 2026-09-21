@@ -8,6 +8,11 @@ export type Provider = {
     balance_status: ProviderStatus;
     balance_checked_at: string | null;
     balance_error_message: string | null;
+    price_sync_status: ProviderStatus;
+    price_synced_at: string | null;
+    price_sync_error_code: string | null;
+    price_sync_error_message: string | null;
+    price_sync_latency_ms: number | null;
 };
 
 export type PriceRow = {

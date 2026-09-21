@@ -43,12 +43,12 @@ const form = reactive({
 
 const connectionConfigTemplate = (slug: string, type: ProviderRow['type'] = form.type): string => {
     if (type === 'accnro' || slug.trim().toLowerCase() === 'accnrovn') {
-        return '{\n  "base_url": "https://accnro.vn/api/v1/partner/recharge",\n  "partner_id": "",\n  "secret_key": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
+        return '{\n  "base_url": "https://accnro.vn/api/v1/partner/recharge",\n  "partner_id": "",\n  "secret_key": "",\n  "proxy": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
     }
 
     if (type === 'manual') return '{\n  "mode": "manual"\n}';
 
-    return '{\n  "base_url": "https://the9p.com/api/rechargews",\n  "partner_id": "",\n  "partner_key": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
+    return '{\n  "base_url": "",\n  "partner_id": "",\n  "partner_key": "",\n  "proxy": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
 };
 const reset = (): void => {
     editingId.value = null;

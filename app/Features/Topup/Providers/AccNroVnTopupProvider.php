@@ -8,6 +8,7 @@ use App\Features\Topup\DTOs\TopupProviderBalanceDto;
 use App\Features\Topup\DTOs\TopupProviderResultDto;
 use App\Features\Topup\Enums\TopupProviderStatus;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
+use App\Features\Topup\Services\TopupProviderHttpClientFactory;
 use App\Models\GameServer;
 use App\Models\Order;
 use App\Models\OrderRecipient;
@@ -15,7 +16,6 @@ use App\Models\TopupPackage;
 use App\Models\TopupProvider;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Http\Client\Response;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Validation\ValidationException;
 use JsonException;
 use Throwable;
@@ -29,6 +29,8 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
         'Content-Type' => 'application/json',
     ];
 
+    public function __construct(private readonly TopupProviderHttpClientFactory $httpClientFactory) {}
+
     public function assertConfigured(TopupProvider $provider, TopupPackage $package, GameServer $server): void
     {
         $config = $this->configuration($provider);
@@ -37,7 +39,8 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
             || $config['secret_key'] === ''
             || $game === ''
             || filter_var($config['base_url'], FILTER_VALIDATE_URL) === false
-            || parse_url($config['base_url'], PHP_URL_SCHEME) !== 'https';
+            || parse_url($config['base_url'], PHP_URL_SCHEME) !== 'https'
+            || ! TopupProviderHttpClientFactory::isValidProxyUrl($config['proxy_url']);
 
         if ($hasInvalidConfiguration) {
             throw ValidationException::withMessages([
@@ -152,7 +155,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
         );
     }
 
-    /** @return array{base_url:string,partner_id:string,secret_key:string,connect_timeout:int,timeout:int,max_status_checks:int} */
+    /** @return array{base_url:string,partner_id:string,secret_key:string,proxy_url:string,connect_timeout:int,timeout:int,max_status_checks:int} */
     public function configuration(TopupProvider $provider): array
     {
         $config = $provider->connection_config ?? [];
@@ -170,6 +173,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
             'base_url' => $this->normalizedBaseUrl((string) ($config['base_url'] ?? self::DEFAULT_BASE_URL)),
             'partner_id' => $partnerId,
             'secret_key' => $secretKey,
+            'proxy_url' => TopupProviderHttpClientFactory::normalizeProxyUrl($config['proxy_url'] ?? $config['proxy'] ?? null),
             'connect_timeout' => min(max((int) ($config['connect_timeout'] ?? 5), 1), 15),
             'timeout' => min(max((int) ($config['timeout'] ?? 20), 5), 45),
             'max_status_checks' => min(max((int) ($config['max_status_checks'] ?? 20), 1), 100),
@@ -177,7 +181,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
     }
 
     /**
-     * @param  array{base_url:string,partner_id:string,secret_key:string,connect_timeout:int,timeout:int,max_status_checks:int}  $config
+     * @param  array{base_url:string,partner_id:string,secret_key:string,proxy_url:string,connect_timeout:int,timeout:int,max_status_checks:int}  $config
      * @param  array<string, mixed>  $payload
      * @return array{response: Response, request: array<string, mixed>}
      */
@@ -194,10 +198,8 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
         ];
 
         try {
-            $response = Http::acceptJson()
-                ->asJson()
-                ->connectTimeout($config['connect_timeout'])
-                ->timeout($config['timeout'])
+            $response = $this->httpClientFactory
+                ->make($config['connect_timeout'], $config['timeout'], $config['proxy_url'])
                 ->beforeSending(function (ClientRequest $request) use (&$requestSnapshot): void {
                     $requestSnapshot = [
                         'method' => $request->method(),
@@ -320,7 +322,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
         ];
     }
 
-    /** @param array{base_url:string,partner_id:string,secret_key:string,connect_timeout:int,timeout:int,max_status_checks:int} $config */
+    /** @param array{base_url:string,partner_id:string,secret_key:string,proxy_url:string,connect_timeout:int,timeout:int,max_status_checks:int} $config */
     private function assertConnectionConfigured(array $config): void
     {
         if (
@@ -328,6 +330,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
             || $config['secret_key'] === ''
             || filter_var($config['base_url'], FILTER_VALIDATE_URL) === false
             || parse_url($config['base_url'], PHP_URL_SCHEME) !== 'https'
+            || ! TopupProviderHttpClientFactory::isValidProxyUrl($config['proxy_url'])
         ) {
             throw new TopupProviderConnectionException(
                 'invalid_configuration',

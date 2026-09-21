@@ -335,6 +335,7 @@ test('admin manages encrypted provider connection config without leaking secrets
         'base_url' => 'https://api.provider.example/v1',
         'api_key' => 'public-key-123',
         'api_secret' => 'very-secret-value',
+        'proxy' => 'http://proxy-user:proxy-pass@proxy.example:8080',
         'timeout' => 30,
         'balance_warning_threshold' => 1000000,
     ];
@@ -363,11 +364,13 @@ test('admin manages encrypted provider connection config without leaking secrets
         ->assertJsonPath('data.connection_config.base_url', 'https://api.provider.example/v1')
         ->assertJsonPath('data.connection_config.api_key', TopupProvider::SECRET_MASK)
         ->assertJsonPath('data.connection_config.api_secret', TopupProvider::SECRET_MASK)
+        ->assertJsonPath('data.connection_config.proxy', TopupProvider::SECRET_MASK)
         ->assertJsonPath('data.connection_config.timeout', 30)
         ->assertJsonPath('data.connection_config.balance_warning_threshold', 1000000);
 
     expect($shown->getContent())->not->toContain('public-key-123')
-        ->not->toContain('very-secret-value');
+        ->not->toContain('very-secret-value')
+        ->not->toContain('proxy-pass');
 
     $this->actingAs($admin)->putJson("/api/admin-api/topup-providers/{$provider->id}", [
         'name' => 'Provider Carot mới',
@@ -376,6 +379,7 @@ test('admin manages encrypted provider connection config without leaking secrets
             'base_url' => 'https://new.provider.example/v2',
             'api_key' => TopupProvider::SECRET_MASK,
             'api_secret' => TopupProvider::SECRET_MASK,
+            'proxy' => TopupProvider::SECRET_MASK,
             'timeout' => 45,
             'balance_warning_threshold' => 2000000,
         ],
@@ -385,6 +389,7 @@ test('admin manages encrypted provider connection config without leaking secrets
         'base_url' => 'https://new.provider.example/v2',
         'api_key' => 'public-key-123',
         'api_secret' => 'very-secret-value',
+        'proxy' => 'http://proxy-user:proxy-pass@proxy.example:8080',
         'timeout' => 45,
         'balance_warning_threshold' => 2000000,
     ]);
@@ -403,6 +408,7 @@ test('admin manages encrypted provider connection config without leaking secrets
 
     expect($auditJson)->not->toContain('public-key-123')
         ->not->toContain('very-secret-value')
+        ->not->toContain('proxy-pass')
         ->not->toContain((string) $rawConfig);
 });
 
@@ -434,6 +440,15 @@ test('provider validation rejects unsafe connection config and duplicate slugs',
         'connection_config' => [
             'base_url' => 'https://provider.example',
             'balance_warning_threshold' => -1,
+        ],
+    ])->assertUnprocessable()->assertJsonValidationErrors('connection_config');
+
+    $this->actingAs($admin)->postJson('/api/admin-api/topup-providers', [
+        'name' => 'Proxy không hợp lệ',
+        'slug' => 'invalid-proxy',
+        'connection_config' => [
+            'base_url' => 'https://provider.example',
+            'proxy' => 'file://proxy.example:8080',
         ],
     ])->assertUnprocessable()->assertJsonValidationErrors('connection_config');
 });

@@ -34,6 +34,12 @@ const saving = computed(() => (difference.value !== null && difference.value < 0
                 <BadgeCheck class="h-3 w-3" /> Đang dùng
             </span>
             <span
+                v-if="provider.price_sync_status === 'failed'"
+                class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-rose-700"
+            >
+                API lỗi
+            </span>
+            <span
                 v-if="isCheapest"
                 class="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black uppercase tracking-wide text-emerald-700"
             >
@@ -62,7 +68,13 @@ const saving = computed(() => (difference.value !== null && difference.value < 0
                 </p>
             </div>
         </div>
-        <div v-else class="mt-3 flex flex-1 items-center text-sm font-semibold text-slate-400">Chưa có báo giá</div>
+        <div
+            v-else
+            class="mt-3 flex flex-1 items-center text-sm font-semibold"
+            :class="provider.price_sync_status === 'failed' ? 'text-rose-600' : 'text-slate-400'"
+        >
+            {{ provider.price_sync_status === 'failed' ? provider.price_sync_error_message || 'Không thể lấy giá provider' : 'Không hỗ trợ gói' }}
+        </div>
 
         <div v-if="sourcePrice !== null" class="mt-2 min-h-5 text-xs font-bold">
             <span v-if="saving > 0" class="text-emerald-700">Tiết kiệm +{{ formatMoney(saving) }} so với hiện tại</span>

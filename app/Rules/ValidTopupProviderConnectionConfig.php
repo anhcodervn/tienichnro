@@ -2,6 +2,8 @@
 
 namespace App\Rules;
 
+use App\Features\Topup\Services\TopupProviderHttpClientFactory;
+use App\Models\TopupProvider;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Translation\PotentiallyTranslatedString;
@@ -58,6 +60,19 @@ class ValidTopupProviderConnectionConfig implements ValidationRule
 
         if (is_string($baseUrl) && $baseUrl !== '' && ! $this->hasValidBaseUrl($baseUrl)) {
             $fail('base_url phải là URL HTTP hoặc HTTPS hợp lệ và không được trỏ tới địa chỉ nội bộ.');
+
+            return;
+        }
+
+        $proxyUrl = $value['proxy_url'] ?? $value['proxy'] ?? null;
+
+        if (
+            $proxyUrl !== null
+            && $proxyUrl !== ''
+            && $proxyUrl !== TopupProvider::SECRET_MASK
+            && (! is_string($proxyUrl) || ! TopupProviderHttpClientFactory::isValidProxyUrl($proxyUrl))
+        ) {
+            $fail('Proxy phải có dạng http://user:pass@host:port, https://host:port, socks5://host:port hoặc socks5h://host:port.');
         }
     }
 

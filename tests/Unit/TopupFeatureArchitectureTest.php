@@ -17,7 +17,7 @@ test('topup domain and client delivery are owned by feature modules', function (
         'app/Features/Topup/Observers/OrderRecipientObserver.php',
         'app/Features/Topup/Providers/ManualTopupProvider.php',
         'app/Features/Topup/Providers/AccNroVnTopupProvider.php',
-        'app/Features/Topup/Providers/The9pTopupProvider.php',
+        'app/Features/Topup/Providers/MerchantPartnerCardTopupProvider.php',
         'app/Features/Topup/Services/RecipientFulfillmentService.php',
         'app/Features/Topup/Services/TopupProviderResolver.php',
         'app/Features/Topup/Services/OrderService.php',
@@ -34,6 +34,7 @@ test('topup domain and client delivery are owned by feature modules', function (
         'app/Services/Topup/TopupService.php',
         'app/Events/OrderStatusUpdated.php',
         'app/Observers/OrderObserver.php',
+        'app/Features/Topup/Providers/The9pTopupProvider.php',
     ];
 
     foreach ($featureFiles as $featureFile) {

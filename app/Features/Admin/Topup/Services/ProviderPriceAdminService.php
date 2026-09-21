@@ -21,7 +21,7 @@ class ProviderPriceAdminService
 
     /**
      * @param  array<string, mixed>  $filters
-     * @return array{packages: Collection<int, array<string, mixed>>, providers: Collection<int, TopupProvider>}
+     * @return array{packages: Collection<int, array<string, mixed>>, providers: Collection<int, array<string, mixed>>}
      */
     public function catalog(array $filters): array
     {
@@ -33,12 +33,17 @@ class ProviderPriceAdminService
         if ($scope !== 'global') {
             $rows = $rows->concat(TopupPackage::query()
                 ->select(['id', 'game_id', 'provider_id', 'name', 'denomination', 'provider_price', 'price', 'original_price'])
-                ->with(['game:id,name', 'provider:id,name,slug,type', 'providerPrices:id,topup_provider_id,topup_package_id,price'])
+                ->with([
+                    'game:id,name',
+                    'provider:id,name,slug,type',
+                    'providerPrices:id,topup_provider_id,topup_package_id,price,available,synced_at',
+                    'providerPrices.provider:id,price_sync_status',
+                ])
                 ->whereNull('global_topup_package_id')
                 ->active()
                 ->when($providerId !== null, fn ($query) => $query->whereHas(
                     'providerPrices',
-                    fn ($quotes) => $quotes->where('topup_provider_id', $providerId),
+                    fn ($quotes) => $quotes->where('topup_provider_id', $providerId)->where('available', true),
                 ))
                 ->when($search !== '', fn ($query) => $query->where(function ($nested) use ($search): void {
                     $nested->where('name', 'like', "%{$search}%")
@@ -53,11 +58,15 @@ class ProviderPriceAdminService
         if ($scope !== 'package') {
             $rows = $rows->concat(GlobalTopupPackage::query()
                 ->select(['id', 'provider_id', 'name', 'denomination', 'provider_price', 'price', 'original_price'])
-                ->with(['provider:id,name,slug,type', 'providerPrices:id,topup_provider_id,global_topup_package_id,price'])
+                ->with([
+                    'provider:id,name,slug,type',
+                    'providerPrices:id,topup_provider_id,global_topup_package_id,price,available,synced_at',
+                    'providerPrices.provider:id,price_sync_status',
+                ])
                 ->where('status', 'active')
                 ->when($providerId !== null, fn ($query) => $query->whereHas(
                     'providerPrices',
-                    fn ($quotes) => $quotes->where('topup_provider_id', $providerId),
+                    fn ($quotes) => $quotes->where('topup_provider_id', $providerId)->where('available', true),
                 ))
                 ->when($search !== '', fn ($query) => $query->where('name', 'like', "%{$search}%"))
                 ->orderBy('sort_order')
@@ -69,13 +78,21 @@ class ProviderPriceAdminService
         return [
             'packages' => $rows->values(),
             'providers' => TopupProvider::query()->orderBy('name')->orderBy('id')->get([
-                'id',
-                'name',
-                'slug',
-                'type',
-                'balance_status',
-                'balance_checked_at',
-                'balance_error_message',
+                'id', 'name', 'slug', 'type', 'balance_status', 'balance_checked_at', 'balance_error_message',
+                'price_sync_status', 'price_synced_at', 'price_sync_error_code', 'price_sync_error_message', 'price_sync_latency_ms',
+            ])->map(fn (TopupProvider $provider): array => [
+                'id' => $provider->id,
+                'name' => $provider->name,
+                'slug' => $provider->slug,
+                'type' => $provider->type->value,
+                'balance_status' => $provider->balance_status,
+                'balance_checked_at' => $provider->balance_checked_at?->toISOString(),
+                'balance_error_message' => $provider->balance_error_message,
+                'price_sync_status' => $provider->price_sync_status,
+                'price_synced_at' => $provider->price_synced_at?->toISOString(),
+                'price_sync_error_code' => $provider->price_sync_error_code,
+                'price_sync_error_message' => $provider->price_sync_error_message,
+                'price_sync_latency_ms' => $provider->price_sync_latency_ms,
             ]),
         ];
     }
@@ -131,7 +148,7 @@ class ProviderPriceAdminService
             } else {
                 $package->providerPrices()->updateOrCreate(
                     ['topup_provider_id' => $provider->id],
-                    ['price' => $providerPrice],
+                    ['price' => $providerPrice, 'available' => true],
                 );
 
                 if ($package->provider_id === $provider->id) {
@@ -168,7 +185,7 @@ class ProviderPriceAdminService
 
             $package->providerPrices()->updateOrCreate(
                 ['topup_provider_id' => $provider->id],
-                ['price' => $providerPrice],
+                ['price' => $providerPrice, 'available' => true],
             );
             $package->update([
                 'provider_id' => $provider->id,
@@ -235,8 +252,8 @@ class ProviderPriceAdminService
     private function freshRow(TopupPackage|GlobalTopupPackage $package, string $scope): array
     {
         $relations = $package instanceof TopupPackage
-            ? ['game:id,name', 'provider:id,name,slug,type', 'providerPrices']
-            : ['provider:id,name,slug,type', 'providerPrices'];
+            ? ['game:id,name', 'provider:id,name,slug,type', 'providerPrices.provider:id,price_sync_status']
+            : ['provider:id,name,slug,type', 'providerPrices.provider:id,price_sync_status'];
 
         return $this->row($package->refresh()->load($relations), $scope);
     }
@@ -247,6 +264,8 @@ class ProviderPriceAdminService
         $providerPrice = (int) $package->provider_price;
         $price = (int) $package->price;
         $quotes = $package->providerPrices
+            ->where('available', true)
+            ->filter(fn (TopupProviderPrice $quote): bool => $quote->provider?->price_sync_status !== 'failed')
             ->mapWithKeys(fn (TopupProviderPrice $quote): array => [(string) $quote->topup_provider_id => $quote->price]);
         $bestPrice = $quotes->min();
         $bestProviderId = $bestPrice === null

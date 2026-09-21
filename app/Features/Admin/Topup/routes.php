@@ -23,6 +23,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin-api')->name('admin.t
         Route::post('topup-providers/refresh-balances', [TopupProviderController::class, 'refreshBalances'])->name('topup-providers.refresh-balances');
         Route::apiResource('topup-providers', TopupProviderController::class)->parameters(['topup-providers' => 'topupProvider']);
         Route::get('provider-prices', [ProviderPriceController::class, 'index'])->name('provider-prices.index');
+        Route::post('provider-prices/refresh', [ProviderPriceController::class, 'refresh'])->name('provider-prices.refresh');
         Route::put('provider-prices/{scope}/{id}', [ProviderPriceController::class, 'update'])
             ->whereIn('scope', ['package', 'global'])
             ->whereNumber('id')

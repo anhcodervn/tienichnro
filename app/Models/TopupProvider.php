@@ -26,6 +26,11 @@ class TopupProvider extends Model
         'balance_checked_at',
         'balance_error_code',
         'balance_error_message',
+        'price_sync_status',
+        'price_synced_at',
+        'price_sync_error_code',
+        'price_sync_error_message',
+        'price_sync_latency_ms',
     ];
 
     protected $hidden = [
@@ -39,6 +44,8 @@ class TopupProvider extends Model
             'connection_config' => 'encrypted:array',
             'balance' => 'integer',
             'balance_checked_at' => 'datetime',
+            'price_synced_at' => 'datetime',
+            'price_sync_latency_ms' => 'integer',
         ];
     }
 
@@ -114,6 +121,6 @@ class TopupProvider extends Model
 
     private function isSensitiveKey(string $key): bool
     {
-        return preg_match('/secret|serect|token|password|api[_-]?key|partner[_-]?key|authorization|private[_-]?key/i', $key) === 1;
+        return preg_match('/secret|serect|token|password|api[_-]?key|partner[_-]?key|authorization|private[_-]?key|proxy(?:[_-]?url)?/i', $key) === 1;
     }
 }

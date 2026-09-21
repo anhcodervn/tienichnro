@@ -39,7 +39,7 @@ const matchesStatus = (row: PriceRow): boolean => {
         return row.provider_id !== null && row.best_provider_id !== row.provider_id && bestPrice !== null && bestPrice < row.provider_price;
     }
     if (filters.status === 'provider_error') {
-        return providers.value.some((provider) => provider.balance_status === 'failed' && providerQuote(row, provider.id) !== null);
+        return providers.value.some((provider) => provider.price_sync_status === 'failed');
     }
 
     return true;
@@ -56,20 +56,20 @@ const summary = computed(() => ({
 }));
 const latestConnectionCheck = computed(() => {
     const checked = providers.value
-        .map((provider) => provider.balance_checked_at)
+        .map((provider) => provider.price_synced_at)
         .filter((value): value is string => Boolean(value))
         .sort()
         .at(-1);
-    if (!checked) return 'Chưa kiểm tra kết nối';
+    if (!checked) return 'Chưa đồng bộ giá';
 
-    return `Kiểm tra kết nối ${new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(checked))}`;
+    return `Cập nhật giá ${new Intl.DateTimeFormat('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' }).format(new Date(checked))}`;
 });
 
 const rowKey = (row: PriceRow): string => `${row.scope}-${row.id}`;
 const providerStatus = (provider: Provider): { label: string; classes: string } => {
-    if (provider.balance_status === 'success') return { label: 'Online', classes: 'bg-emerald-500' };
-    if (provider.balance_status === 'failed') return { label: 'API lỗi', classes: 'bg-rose-500' };
-    return { label: 'Chưa kiểm tra', classes: 'bg-slate-400' };
+    if (provider.price_sync_status === 'success') return { label: 'Đã lấy giá', classes: 'bg-emerald-500' };
+    if (provider.price_sync_status === 'failed') return { label: 'API lỗi', classes: 'bg-rose-500' };
+    return { label: 'Chưa đồng bộ', classes: 'bg-slate-400' };
 };
 
 const load = async (background = false): Promise<void> => {
@@ -98,6 +98,26 @@ const loadTaxSettings = async (): Promise<void> => {
         taxSettings.value = response.settings;
     } catch (error) {
         handleErrorResponse(error);
+    }
+};
+
+const refreshPrices = async (showFeedback = true): Promise<void> => {
+    if (refreshing.value) return;
+    refreshing.value = true;
+
+    try {
+        const response = await adminTopupService.refreshProviderPrices({
+            search: filters.search || undefined,
+            scope: filters.scope === 'all' ? undefined : filters.scope,
+            provider_id: filters.provider_id || undefined,
+        });
+        providers.value = response.data.data.providers;
+        rows.value = normalizeRows(response.data.data.packages, providers.value);
+        if (showFeedback) handleSuccessResponse(response);
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        refreshing.value = false;
     }
 };
 
@@ -139,7 +159,9 @@ const saveProviderSelection = async (selection: ProviderSelection): Promise<void
     }
 };
 
-onMounted(() => void Promise.all([load(), loadTaxSettings()]));
+onMounted(() => {
+    void Promise.all([load(), loadTaxSettings()]).then(() => refreshPrices(false));
+});
 </script>
 
 <template>
@@ -158,7 +180,7 @@ onMounted(() => void Promise.all([load(), loadTaxSettings()]));
                     type="button"
                     :disabled="refreshing"
                     class="ui-focus inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 font-black text-blue-700 hover:bg-blue-50 disabled:opacity-50"
-                    @click="load(true)"
+                    @click="refreshPrices()"
                 >
                     <RefreshCw class="h-4 w-4" :class="refreshing && 'animate-spin'" /> Làm mới giá
                 </button>
@@ -242,7 +264,7 @@ onMounted(() => void Promise.all([load(), loadTaxSettings()]));
                                         <p class="truncate font-black text-slate-900">{{ provider.name }}</p>
                                         <p
                                             class="mt-1 flex items-center gap-1.5 text-[11px] font-semibold normal-case text-slate-500"
-                                            :title="provider.balance_error_message ?? 'Trạng thái kiểm tra kết nối gần nhất'"
+                                            :title="provider.price_sync_error_message ?? 'Trạng thái đồng bộ bảng giá gần nhất'"
                                         >
                                             <span class="h-2 w-2 rounded-full" :class="providerStatus(provider).classes" />{{
                                                 providerStatus(provider).label

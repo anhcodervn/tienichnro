@@ -10,6 +10,7 @@ export const adminTopupService = {
     deleteProvider: (id: number) => axios.delete(`${root}/topup-providers/${id}`),
     refreshProviderBalances: (providerIds: number[]) => axios.post(`${root}/topup-providers/refresh-balances`, { provider_ids: providerIds }),
     providerPrices: (params = {}) => axios.get(`${root}/provider-prices`, { params }),
+    refreshProviderPrices: (params = {}) => axios.post(`${root}/provider-prices/refresh`, params),
     updateProviderQuote: (scope: 'package' | 'global', id: number, providerId: number, providerPrice: number | null) =>
         axios.put(`${root}/provider-prices/${scope}/${id}/providers/${providerId}`, { provider_price: providerPrice }),
     selectPackageProvider: (scope: 'package' | 'global', id: number, providerId: number, providerPrice: number, price: number) =>

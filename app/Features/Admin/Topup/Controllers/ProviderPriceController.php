@@ -7,6 +7,7 @@ use App\Features\Admin\Topup\Requests\SelectProviderPriceRequest;
 use App\Features\Admin\Topup\Requests\UpdateProviderPriceRequest;
 use App\Features\Admin\Topup\Requests\UpdateProviderQuoteRequest;
 use App\Features\Admin\Topup\Services\ProviderPriceAdminService;
+use App\Features\Admin\Topup\Services\ProviderProductCatalogSyncService;
 use App\Http\Controllers\Controller;
 use App\Models\TopupProvider;
 use App\Models\User;
@@ -15,11 +16,30 @@ use Illuminate\Http\Request;
 
 class ProviderPriceController extends Controller
 {
-    public function __construct(private readonly ProviderPriceAdminService $service) {}
+    public function __construct(
+        private readonly ProviderPriceAdminService $service,
+        private readonly ProviderProductCatalogSyncService $catalogSyncService,
+    ) {}
 
     public function index(ListProviderPriceRequest $request): JsonResponse
     {
         return response()->json(['status' => true, 'data' => $this->service->catalog($request->validated())]);
+    }
+
+    public function refresh(ListProviderPriceRequest $request): JsonResponse
+    {
+        $results = $this->catalogSyncService->refresh();
+
+        return response()->json([
+            'status' => true,
+            'message' => collect($results)->contains('status', 'success')
+                ? 'Đã cập nhật bảng giá provider.'
+                : 'Không provider nào cập nhật giá thành công.',
+            'data' => [
+                ...$this->service->catalog($request->validated()),
+                'sync_results' => $results,
+            ],
+        ]);
     }
 
     public function update(UpdateProviderPriceRequest $request, string $scope, int $id): JsonResponse
