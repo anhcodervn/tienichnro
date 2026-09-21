@@ -436,10 +436,14 @@ onMounted(async () => {
             description="Quản lý thông tin vận hành, nhận diện thương hiệu, liên hệ và SEO của hệ thống napcarot.vn."
         />
 
-        <section class="overflow-hidden rounded-[10px] border border-slate-200 bg-white shadow-sm">
-            <div class="border-b border-slate-200 px-4 py-4">
+        <section
+            :class="
+                activeTab === 'tax' ? 'overflow-visible bg-transparent' : 'overflow-hidden rounded-[10px] border border-slate-200 bg-white shadow-sm'
+            "
+        >
+            <div :class="activeTab === 'tax' ? 'py-1' : 'border-b border-slate-200 px-4 py-4'">
                 <div class="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
+                    <div v-if="activeTab !== 'tax'">
                         <h2 class="text-base font-semibold text-slate-900">{{ currentTab.label }}</h2>
                         <p class="text-sm text-slate-500">{{ currentTab.description }}</p>
                     </div>
@@ -468,7 +472,7 @@ onMounted(async () => {
                 <div class="h-40 animate-pulse rounded-[10px] bg-slate-100"></div>
             </div>
 
-            <div v-else class="p-4">
+            <div v-else :class="activeTab === 'tax' ? 'pt-3' : 'p-4'">
                 <div v-show="activeTab === 'general'" class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <article class="rounded-[10px] border border-slate-200 bg-white p-4">
                         <div class="mb-4 flex items-start justify-between gap-3">
