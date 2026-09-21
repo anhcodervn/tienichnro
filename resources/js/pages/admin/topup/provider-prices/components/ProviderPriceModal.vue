@@ -87,7 +87,10 @@ const submit = (): void => {
             <div class="grid gap-4 sm:grid-cols-2">
                 <label class="grid gap-1.5 text-sm font-bold text-slate-700">
                     Provider
-                    <select v-model.number="form.providerId" class="ui-focus min-h-11 rounded-lg border-slate-300 text-sm font-semibold">
+                    <select
+                        v-model.number="form.providerId"
+                        class="ui-focus min-h-11 rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold"
+                    >
                         <option v-for="provider in providers" :key="provider.id" :value="provider.id">{{ provider.name }}</option>
                     </select>
                 </label>
@@ -99,7 +102,7 @@ const submit = (): void => {
                             type="number"
                             min="0"
                             required
-                            class="ui-focus min-h-11 w-full rounded-lg border-slate-300 pr-10 text-right font-black"
+                            class="ui-focus min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 pr-10 text-right font-black"
                         />
                         <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-slate-400">đ</span>
                     </div>
@@ -115,7 +118,7 @@ const submit = (): void => {
                         min="0"
                         :max="row.original_price"
                         required
-                        class="ui-focus min-h-11 w-full rounded-lg border-slate-300 pr-10 text-right font-black"
+                        class="ui-focus min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 pr-10 text-right font-black"
                     />
                     <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-bold text-slate-400">đ</span>
                 </div>
