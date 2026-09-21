@@ -19,7 +19,7 @@ class ProviderPriceProtectionService
     /** @return array<string, mixed> */
     public function run(): array
     {
-        $syncResults = $this->catalogSyncService->refresh();
+        $syncResults = $this->catalogSyncService->refreshSelectedSources();
         $successfulProviderIds = collect($syncResults)
             ->filter(fn (array $result): bool => ($result['status'] ?? null) === 'success')
             ->keys()
@@ -67,11 +67,21 @@ class ProviderPriceProtectionService
                 ->whereBelongsTo($provider, 'provider')
                 ->whereNull('global_topup_package_id')
                 ->active()
+                ->whereHas('game', fn ($query) => $query->where('package_mode', 'custom'))
+                ->whereHas('providerPrices', fn ($query) => $query
+                    ->whereBelongsTo($provider, 'provider')
+                    ->where('available', true))
                 ->lockForUpdate()
                 ->get(['id', 'provider_price', 'price', 'original_price']);
             $globalPackages = GlobalTopupPackage::query()
                 ->whereBelongsTo($provider, 'provider')
                 ->where('status', 'active')
+                ->whereHas('packages', fn ($query) => $query
+                    ->active()
+                    ->whereHas('game', fn ($gameQuery) => $gameQuery->where('package_mode', 'global')))
+                ->whereHas('providerPrices', fn ($query) => $query
+                    ->whereBelongsTo($provider, 'provider')
+                    ->where('available', true))
                 ->lockForUpdate()
                 ->get(['id', 'provider_price', 'price', 'original_price']);
 

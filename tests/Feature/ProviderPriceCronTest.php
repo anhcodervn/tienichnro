@@ -3,6 +3,7 @@
 use App\Enums\TopupProviderType;
 use App\Models\Game;
 use App\Models\GlobalTopupPackage;
+use App\Models\GlobalTopupPackageGameSetting;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
 use Illuminate\Http\Client\Request;
@@ -35,7 +36,7 @@ test('provider price cron refreshes costs and only raises active package prices 
             'minimum_profit_percent' => 10,
         ],
     ]);
-    $game = Game::factory()->create(['provider_service_code' => 'nr']);
+    $game = Game::factory()->create(['package_mode' => 'custom', 'provider_service_code' => 'nr']);
     $adjustedPackage = TopupPackage::factory()->for($game)->create([
         'provider_id' => $provider->id,
         'denomination' => 100000,
@@ -76,6 +77,14 @@ test('provider price cron refreshes costs and only raises active package prices 
         'original_price' => 200000,
         'status' => 'active',
     ]);
+    $globalGame = Game::factory()->create(['package_mode' => 'global', 'provider_service_code' => 'nr']);
+    GlobalTopupPackageGameSetting::factory()->for($globalGame)->create(['denomination' => 200000]);
+    TopupPackage::factory()->for($globalGame)->create([
+        'global_topup_package_id' => $globalPackage->id,
+        'provider_id' => $provider->id,
+        'denomination' => 200000,
+        'status' => 'active',
+    ]);
 
     Http::fake([
         'https://provider.test/api/rechargews' => Http::response([
@@ -92,8 +101,10 @@ test('provider price cron refreshes costs and only raises active package prices 
         ]),
     ]);
 
-    $this->withToken('private-cron-key')
-        ->postJson(route('api.cron.provider-prices'))
+    $response = $this->withToken('private-cron-key')
+        ->postJson(route('api.cron.provider-prices'));
+
+    $response
         ->assertSuccessful()
         ->assertJsonPath('status', true)
         ->assertJsonPath('data.providers_synced', 1)
@@ -160,4 +171,124 @@ test('provider price cron leaves sale prices unchanged when automatic protection
 
     expect((int) $package->refresh()->provider_price)->toBe(90000)
         ->and((int) $package->price)->toBe(80000);
+});
+
+test('provider price cron follows the selected source for custom and global game modes', function (): void {
+    $merchantProvider = TopupProvider::factory()->create([
+        'slug' => 'merchant-custom-source',
+        'type' => TopupProviderType::MerchantPartnerCard,
+        'connection_config' => [
+            'base_url' => 'https://merchant-source.test/api/rechargews',
+            'partner_id' => 'merchant-partner',
+            'partner_key' => 'merchant-secret',
+            'minimum_profit_percent' => 10,
+        ],
+    ]);
+    $accNroProvider = TopupProvider::factory()->create([
+        'slug' => 'accnro-global-source',
+        'type' => TopupProviderType::AccNro,
+        'connection_config' => [
+            'base_url' => 'https://accnro-source.test/api/v1/partner/recharge',
+            'partner_id' => 'accnro-partner',
+            'secret_key' => 'accnro-secret',
+            'minimum_profit_percent' => 10,
+        ],
+    ]);
+    TopupProvider::factory()->create([
+        'slug' => 'unused-provider',
+        'type' => TopupProviderType::MerchantPartnerCard,
+        'connection_config' => [
+            'base_url' => 'https://unused-source.test/api/rechargews',
+            'partner_id' => 'unused',
+            'partner_key' => 'unused-secret',
+        ],
+    ]);
+
+    $customGame = Game::factory()->create(['package_mode' => 'custom', 'provider_service_code' => 'custom-game']);
+    $customPackage = TopupPackage::factory()->for($customGame)->create([
+        'provider_id' => $merchantProvider->id,
+        'denomination' => 100000,
+        'provider_price' => 70000,
+        'price' => 85000,
+        'original_price' => 100000,
+    ]);
+    $unmatchedPackage = TopupPackage::factory()->for($customGame)->create([
+        'provider_id' => $merchantProvider->id,
+        'denomination' => 300000,
+        'provider_price' => 290000,
+        'price' => 291000,
+        'original_price' => 300000,
+    ]);
+
+    $globalGame = Game::factory()->create(['package_mode' => 'global', 'provider_service_code' => 'global-game']);
+    $globalPackage = GlobalTopupPackage::factory()->create([
+        'provider_id' => $accNroProvider->id,
+        'denomination' => 200000,
+        'provider_price' => 140000,
+        'price' => 170000,
+        'original_price' => 200000,
+    ]);
+    GlobalTopupPackageGameSetting::factory()->for($globalGame)->create(['denomination' => 200000]);
+    $globalChild = TopupPackage::factory()->for($globalGame)->create([
+        'global_topup_package_id' => $globalPackage->id,
+        'provider_id' => $accNroProvider->id,
+        'denomination' => 200000,
+        'provider_price' => 140000,
+        'price' => 170000,
+        'original_price' => 200000,
+    ]);
+    $ignoredStandalonePackage = TopupPackage::factory()->for($globalGame)->create([
+        'provider_id' => $merchantProvider->id,
+        'denomination' => 500000,
+        'provider_price' => 400000,
+        'price' => 410000,
+        'original_price' => 500000,
+    ]);
+
+    Http::fake([
+        'https://merchant-source.test/api/rechargews' => Http::response([
+            'status' => 'success',
+            'data' => [[
+                'service_code' => 'custom-game',
+                'items' => [
+                    ['value' => 100000, 'price' => 80000],
+                    ['value' => 500000, 'price' => 450000],
+                ],
+            ]],
+        ]),
+        'https://accnro-source.test/api/v1/partner/recharge/catalog' => Http::response([
+            'success' => true,
+            'data' => [
+                'games' => [[
+                    'code' => 'global-game',
+                    'pricing' => [['denomination' => 200000, 'price' => 160000]],
+                ]],
+            ],
+        ], 201),
+    ]);
+
+    $this->withToken('private-cron-key')
+        ->postJson(route('api.cron.provider-prices'))
+        ->assertSuccessful()
+        ->assertJsonPath('data.providers_synced', 2)
+        ->assertJsonPath('data.packages_checked', 2)
+        ->assertJsonPath('data.packages_adjusted', 2)
+        ->assertJsonPath("data.sync_results.{$merchantProvider->id}.matched_packages", 1)
+        ->assertJsonPath("data.sync_results.{$merchantProvider->id}.matched_global_packages", 0)
+        ->assertJsonPath("data.sync_results.{$accNroProvider->id}.matched_packages", 0)
+        ->assertJsonPath("data.sync_results.{$accNroProvider->id}.matched_global_packages", 1);
+
+    expect((int) $customPackage->refresh()->provider_price)->toBe(80000)
+        ->and((int) $customPackage->price)->toBe(88889)
+        ->and((int) $globalPackage->refresh()->provider_price)->toBe(160000)
+        ->and((int) $globalPackage->price)->toBe(177778)
+        ->and((int) $globalChild->refresh()->provider_price)->toBe(160000)
+        ->and((int) $globalChild->price)->toBe(177778)
+        ->and((int) $unmatchedPackage->refresh()->provider_price)->toBe(290000)
+        ->and((int) $unmatchedPackage->price)->toBe(291000)
+        ->and((int) $ignoredStandalonePackage->refresh()->provider_price)->toBe(400000)
+        ->and((int) $ignoredStandalonePackage->price)->toBe(410000);
+
+    Http::assertSentCount(2);
+    Http::assertNotSent(fn (Request $request): bool => str_contains($request->url(), 'unused-source.test'));
 });

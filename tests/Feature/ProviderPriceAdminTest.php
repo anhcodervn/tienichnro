@@ -353,14 +353,16 @@ test('global package price is refreshed only when all related services have the 
     $provider = TopupProvider::factory()->create([
         'connection_config' => ['base_url' => 'https://global.test/api/rechargews', 'partner_id' => 'global', 'partner_key' => 'secret'],
     ]);
-    $firstGame = Game::factory()->create(['provider_service_code' => 'nro']);
-    $secondGame = Game::factory()->create(['provider_service_code' => 'nso']);
+    $firstGame = Game::factory()->create(['package_mode' => 'global', 'provider_service_code' => 'nro']);
+    $secondGame = Game::factory()->create(['package_mode' => 'global', 'provider_service_code' => 'nso']);
     $globalPackage = GlobalTopupPackage::factory()->create([
         'provider_id' => $provider->id,
         'denomination' => 100000,
         'provider_price' => 82000,
         'status' => 'active',
     ]);
+    GlobalTopupPackageGameSetting::factory()->for($firstGame)->create(['denomination' => 100000]);
+    GlobalTopupPackageGameSetting::factory()->for($secondGame)->create(['denomination' => 100000]);
     TopupPackage::factory()->for($firstGame)->create([
         'global_topup_package_id' => $globalPackage->id,
         'denomination' => 100000,

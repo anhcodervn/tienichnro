@@ -26,12 +26,45 @@ class ProviderProductCatalogSyncService
     /** @return array<int, array<string, mixed>> */
     public function refresh(): array
     {
+        return $this->refreshProviders();
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function refreshSelectedSources(): array
+    {
+        $customProviderIds = TopupPackage::query()
+            ->whereNotNull('provider_id')
+            ->whereNull('global_topup_package_id')
+            ->active()
+            ->whereHas('game', fn ($query) => $query->where('package_mode', 'custom'))
+            ->pluck('provider_id');
+        $globalProviderIds = GlobalTopupPackage::query()
+            ->whereNotNull('provider_id')
+            ->where('status', 'active')
+            ->whereHas('packages', fn ($query) => $query
+                ->active()
+                ->whereHas('game', fn ($gameQuery) => $gameQuery->where('package_mode', 'global')))
+            ->pluck('provider_id');
+
+        return $this->refreshProviders(
+            $customProviderIds->merge($globalProviderIds)->unique()->values()->all(),
+            true,
+        );
+    }
+
+    /**
+     * @param  array<int, int>|null  $providerIds
+     * @return array<int, array<string, mixed>>
+     */
+    private function refreshProviders(?array $providerIds = null, bool $selectedSourcesOnly = false): array
+    {
         $results = [];
         $providers = TopupProvider::query()
             ->whereIn('type', [
                 TopupProviderType::MerchantPartnerCard->value,
                 TopupProviderType::AccNro->value,
             ])
+            ->when($providerIds !== null, fn ($query) => $query->whereKey($providerIds))
             ->orderBy('id')
             ->get();
 
@@ -46,7 +79,7 @@ class ProviderProductCatalogSyncService
                 }
 
                 $products = $providerAdapter->products($provider);
-                $counts = $this->syncProviderPrices($provider, $products);
+                $counts = $this->syncProviderPrices($provider, $products, $selectedSourcesOnly);
                 $latency = $this->latencyInMilliseconds($startedAt);
                 $provider->update([
                     'price_sync_status' => 'success',
@@ -82,7 +115,7 @@ class ProviderProductCatalogSyncService
      * @param  Collection<int, TopupProviderProductDto>  $products
      * @return array{matched_packages:int,matched_global_packages:int,products:int}
      */
-    private function syncProviderPrices(TopupProvider $provider, Collection $products): array
+    private function syncProviderPrices(TopupProvider $provider, Collection $products, bool $selectedSourcesOnly): array
     {
         if ($products->isEmpty()) {
             throw new TopupProviderConnectionException('empty_catalog', 'Provider không trả về sản phẩm hợp lệ nào.');
@@ -92,7 +125,7 @@ class ProviderProductCatalogSyncService
             ->groupBy(fn (TopupProviderProductDto $product): string => $this->productKey($product->serviceCode, $product->denomination))
             ->map(fn (Collection $matches): int => (int) $matches->min('price'));
 
-        return DB::transaction(function () use ($provider, $productIndex, $products): array {
+        return DB::transaction(function () use ($provider, $productIndex, $products, $selectedSourcesOnly): array {
             $now = now();
             $matchedPackages = 0;
             $matchedGlobalPackages = 0;
@@ -100,11 +133,20 @@ class ProviderProductCatalogSyncService
                 ->with('game:id,provider_service_code')
                 ->whereNull('global_topup_package_id')
                 ->active()
+                ->whereHas('game', fn ($query) => $query->where('package_mode', 'custom'))
+                ->when($selectedSourcesOnly, fn ($query) => $query->whereBelongsTo($provider, 'provider'))
                 ->get(['id', 'game_id', 'provider_id', 'provider_price', 'denomination']);
             $globalPackages = GlobalTopupPackage::query()
-                ->with(['packages' => fn ($query) => $query->active()->with('game:id,provider_service_code')])
+                ->with(['packages' => fn ($query) => $query
+                    ->active()
+                    ->whereHas('game', fn ($gameQuery) => $gameQuery->where('package_mode', 'global'))
+                    ->with('game:id,provider_service_code')])
                 ->where('status', 'active')
-                ->get(['id', 'provider_id', 'provider_service_codes', 'provider_price', 'denomination']);
+                ->whereHas('packages', fn ($query) => $query
+                    ->active()
+                    ->whereHas('game', fn ($gameQuery) => $gameQuery->where('package_mode', 'global')))
+                ->when($selectedSourcesOnly, fn ($query) => $query->whereBelongsTo($provider, 'provider'))
+                ->get(['id', 'provider_id', 'provider_price', 'denomination']);
 
             TopupProviderPrice::query()
                 ->whereBelongsTo($provider, 'provider')
@@ -168,11 +210,8 @@ class ProviderProductCatalogSyncService
     /** @return Collection<int, string> */
     private function globalServiceCodes(GlobalTopupPackage $package): Collection
     {
-        $configuredCodes = collect($package->provider_service_codes ?? [])->flatten();
-
         return $package->packages
             ->map(fn (TopupPackage $child): ?string => $child->game?->provider_service_code)
-            ->concat($configuredCodes)
             ->map(fn (mixed $code): string => strtoupper(trim((string) $code)))
             ->filter()
             ->unique()
