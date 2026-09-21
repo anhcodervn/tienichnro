@@ -16,12 +16,14 @@ const form = reactive<TaxSettingType>({
 const preview = reactive({ salePrice: 805_000, costPrice: 803_000 });
 
 const roundTax = (amount: number, rate: string | number): number => Math.round((amount * Number(rate || 0)) / 100);
-const estimatedVat = computed(() => (form.tax_enabled ? roundTax(preview.salePrice, form.vat_rate) : 0));
-const estimatedPit = computed(() => (form.tax_enabled ? roundTax(preview.salePrice, form.pit_rate) : 0));
+const previewSalePrice = computed(() => Math.max(0, Number(preview.salePrice) || 0));
+const previewCostPrice = computed(() => Math.max(0, Number(preview.costPrice) || 0));
+const estimatedVat = computed(() => (form.tax_enabled ? roundTax(previewSalePrice.value, form.vat_rate) : 0));
+const estimatedPit = computed(() => (form.tax_enabled ? roundTax(previewSalePrice.value, form.pit_rate) : 0));
 const estimatedTax = computed(() => estimatedVat.value + estimatedPit.value);
-const grossProfit = computed(() => preview.salePrice - preview.costPrice);
+const grossProfit = computed(() => previewSalePrice.value - previewCostPrice.value);
 const netProfit = computed(() => grossProfit.value - estimatedTax.value);
-const margin = computed(() => (preview.salePrice > 0 ? (netProfit.value / preview.salePrice) * 100 : 0));
+const margin = computed(() => (previewSalePrice.value > 0 ? (netProfit.value / previewSalePrice.value) * 100 : 0));
 const money = (value: number): string => `${new Intl.NumberFormat('vi-VN').format(value)}đ`;
 
 const load = async (): Promise<void> => {
@@ -171,14 +173,45 @@ onMounted(load);
                     </div>
                 </div>
 
-                <dl class="mt-7 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-4 text-sm">
-                    <dt class="text-slate-500">Giá bán</dt>
-                    <dd class="text-base font-black text-slate-950">{{ money(preview.salePrice) }}</dd>
-                    <dt class="text-slate-500">Giá vốn</dt>
-                    <dd class="text-base font-black text-slate-950">{{ money(preview.costPrice) }}</dd>
+                <div class="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+                    <label class="grid gap-2 text-sm font-black text-slate-800">
+                        Giá vốn / giá gốc
+                        <span class="relative block">
+                            <input
+                                v-model.number="preview.costPrice"
+                                type="number"
+                                min="0"
+                                step="1"
+                                class="ui-focus min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 pr-10 text-right font-black text-slate-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                            <span
+                                class="pointer-events-none absolute inset-y-px right-px grid w-9 place-items-center rounded-r-lg bg-slate-50 font-bold text-slate-500"
+                                >đ</span
+                            >
+                        </span>
+                    </label>
+                    <label class="grid gap-2 text-sm font-black text-slate-800">
+                        Giá bán dự kiến
+                        <span class="relative block">
+                            <input
+                                v-model.number="preview.salePrice"
+                                type="number"
+                                min="0"
+                                step="1"
+                                class="ui-focus min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 pr-10 text-right font-black text-slate-900 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                            />
+                            <span
+                                class="pointer-events-none absolute inset-y-px right-px grid w-9 place-items-center rounded-r-lg bg-slate-50 font-bold text-slate-500"
+                                >đ</span
+                            >
+                        </span>
+                    </label>
+                </div>
+                <p class="mt-2 text-xs leading-5 text-slate-500">Hai giá trị này chỉ dùng để tính thử, không tự động cập nhật giá bán của gói.</p>
 
-                    <dt class="border-t border-slate-200 pt-4 text-slate-500">Lãi gộp</dt>
-                    <dd class="border-t border-slate-200 pt-4 text-base font-black text-slate-950">{{ money(grossProfit) }}</dd>
+                <dl class="mt-5 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-4 border-t border-slate-200 pt-5 text-sm">
+                    <dt class="text-slate-500">Lãi gộp</dt>
+                    <dd class="text-base font-black text-slate-950">{{ money(grossProfit) }}</dd>
                     <dt class="text-slate-500">VAT dự kiến</dt>
                     <dd class="font-bold text-slate-700">{{ money(estimatedVat) }}</dd>
                     <dt class="text-slate-500">TNCN dự kiến</dt>

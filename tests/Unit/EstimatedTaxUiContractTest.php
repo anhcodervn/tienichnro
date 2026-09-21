@@ -8,6 +8,8 @@ test('admin tax settings orders and reports expose estimated tax language', func
     $reports = file_get_contents($projectRoot.'/resources/js/pages/admin/reports/index.vue');
 
     expect($settings)
+        ->toContain('v-model.number="preview.costPrice"')
+        ->toContain('v-model.number="preview.salePrice"')
         ->toContain('Thuế dự kiến')
         ->toContain('Theo doanh thu bán ra')
         ->toContain('Theo lợi nhuận — sẽ hỗ trợ sau')

@@ -24,9 +24,12 @@ test('provider price matrix uses read-only cells and a shared selection modal', 
 
     expect($modal)
         ->toContain("import Modal from '@/components/shared/Modal/index.vue'")
+        ->toContain('taxSettings: TaxSettingType')
+        ->toContain('estimatedTax')
         ->toContain('Chọn nguồn provider')
         ->toContain('Giá nguồn')
         ->toContain('Giá bán mới')
-        ->toContain('Biên lợi nhuận')
+        ->toContain('Biên lợi nhuận ròng')
+        ->toContain('Lãi ròng dự kiến')
         ->toContain('Chọn nguồn & lưu');
 });

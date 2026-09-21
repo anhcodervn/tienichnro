@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import Modal from '@/components/shared/Modal/index.vue';
+import type { TaxSettingType } from '@/types/setting.type';
 import { ArrowLeftRight, BadgePercent, Check, LoaderCircle, TrendingUp, WalletCards } from 'lucide-vue-next';
 import { computed, reactive, watch } from 'vue';
 import { formatMoney, providerQuote, type PriceRow, type Provider, type ProviderSelection } from '../types';
@@ -10,6 +11,7 @@ const props = defineProps<{
     providers: Provider[];
     initialProviderId: number | null;
     saving: boolean;
+    taxSettings: TaxSettingType;
 }>();
 
 const emit = defineEmits<{
@@ -20,9 +22,19 @@ const emit = defineEmits<{
 const form = reactive({ providerId: 0, providerPrice: 0, salePrice: 0 });
 const selectedProvider = computed(() => props.providers.find((provider) => provider.id === form.providerId) ?? null);
 const currentProvider = computed(() => props.providers.find((provider) => provider.id === props.row?.provider_id) ?? null);
-const profit = computed(() => form.salePrice - form.providerPrice);
-const margin = computed(() => (form.salePrice > 0 ? (profit.value * 100) / form.salePrice : 0));
-const saving = computed(() => (props.row ? props.row.provider_price - form.providerPrice : 0));
+const salePrice = computed(() => Math.max(0, Number(form.salePrice) || 0));
+const providerPrice = computed(() => Math.max(0, Number(form.providerPrice) || 0));
+const grossProfit = computed(() => salePrice.value - providerPrice.value);
+const estimatedVat = computed(() =>
+    props.taxSettings.tax_enabled ? Math.round((salePrice.value * Number(props.taxSettings.vat_rate || 0)) / 100) : 0,
+);
+const estimatedPit = computed(() =>
+    props.taxSettings.tax_enabled ? Math.round((salePrice.value * Number(props.taxSettings.pit_rate || 0)) / 100) : 0,
+);
+const estimatedTax = computed(() => estimatedVat.value + estimatedPit.value);
+const netProfit = computed(() => grossProfit.value - estimatedTax.value);
+const margin = computed(() => (salePrice.value > 0 ? (netProfit.value * 100) / salePrice.value : 0));
+const providerSavings = computed(() => (props.row ? props.row.provider_price - form.providerPrice : 0));
 const isCurrentProvider = computed(() => props.row?.provider_id === form.providerId);
 const canSubmit = computed(() => form.providerId > 0 && form.providerPrice >= 0 && form.salePrice >= form.providerPrice && !props.saving);
 
@@ -110,19 +122,40 @@ const submit = (): void => {
                 <span class="text-xs font-medium text-slate-500">Tối đa {{ formatMoney(row.original_price) }} · Không được thấp hơn giá nguồn.</span>
             </label>
 
-            <div class="grid grid-cols-2 divide-x divide-emerald-200 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
+            <div
+                class="grid grid-cols-2 divide-x rounded-xl border p-4"
+                :class="netProfit >= 0 ? 'divide-emerald-200 border-emerald-200 bg-emerald-50' : 'divide-rose-200 border-rose-200 bg-rose-50'"
+            >
                 <div class="pr-4">
                     <p class="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                        <TrendingUp class="h-4 w-4 text-emerald-600" /> Lãi dự kiến
+                        <TrendingUp class="h-4 w-4" :class="netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'" /> Lãi ròng dự kiến
                     </p>
-                    <p class="mt-1 text-xl font-black" :class="profit > 0 ? 'text-emerald-700' : 'text-rose-600'">{{ formatMoney(profit) }}</p>
+                    <p class="mt-1 text-xl font-black" :class="netProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'">
+                        {{ formatMoney(netProfit) }}
+                    </p>
                 </div>
                 <div class="pl-4">
                     <p class="flex items-center gap-1.5 text-xs font-semibold text-slate-500">
-                        <BadgePercent class="h-4 w-4 text-emerald-600" /> Biên lợi nhuận
+                        <BadgePercent class="h-4 w-4" :class="netProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'" /> Biên lợi nhuận ròng
                     </p>
-                    <p class="mt-1 text-xl font-black" :class="margin > 0 ? 'text-emerald-700' : 'text-rose-600'">{{ margin.toFixed(2) }}%</p>
+                    <p class="mt-1 text-xl font-black" :class="netProfit >= 0 ? 'text-emerald-700' : 'text-rose-600'">{{ margin.toFixed(2) }}%</p>
                 </div>
+                <dl
+                    class="col-span-2 mt-4 grid grid-cols-[1fr_auto] gap-x-3 gap-y-2 border-t pt-3 text-xs"
+                    :class="netProfit >= 0 ? 'border-emerald-200' : 'border-rose-200'"
+                >
+                    <dt class="text-slate-500">Lãi gộp</dt>
+                    <dd class="font-black text-slate-800">{{ formatMoney(grossProfit) }}</dd>
+                    <dt class="text-slate-500">
+                        Thuế dự kiến
+                        <span v-if="taxSettings.tax_enabled" class="font-semibold">
+                            (VAT {{ Number(taxSettings.vat_rate).toFixed(2) }}% + TNCN {{ Number(taxSettings.pit_rate).toFixed(2) }}%)
+                        </span>
+                    </dt>
+                    <dd class="font-black text-amber-700">
+                        {{ estimatedTax > 0 ? `-${formatMoney(estimatedTax)}` : formatMoney(estimatedTax) }}
+                    </dd>
+                </dl>
             </div>
 
             <div class="grid gap-3 rounded-xl bg-slate-50 p-4 sm:grid-cols-2">
@@ -136,12 +169,15 @@ const submit = (): void => {
                 </div>
                 <div class="border-slate-200 sm:border-l sm:pl-4">
                     <p class="text-xs font-semibold text-slate-500">Chênh lệch khi chuyển</p>
-                    <p class="mt-1 text-sm font-black" :class="saving > 0 ? 'text-emerald-700' : saving < 0 ? 'text-rose-600' : 'text-slate-700'">
+                    <p
+                        class="mt-1 text-sm font-black"
+                        :class="providerSavings > 0 ? 'text-emerald-700' : providerSavings < 0 ? 'text-rose-600' : 'text-slate-700'"
+                    >
                         {{
-                            saving > 0
-                                ? `Tiết kiệm +${formatMoney(saving)}`
-                                : saving < 0
-                                  ? `Tăng +${formatMoney(Math.abs(saving))}`
+                            providerSavings > 0
+                                ? `Tiết kiệm +${formatMoney(providerSavings)}`
+                                : providerSavings < 0
+                                  ? `Tăng +${formatMoney(Math.abs(providerSavings))}`
                                   : 'Không đổi giá vốn'
                         }}
                     </p>
@@ -168,7 +204,7 @@ const submit = (): void => {
                     :disabled="!canSubmit"
                     class="ui-focus inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 font-black text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40"
                 >
-                    <LoaderCircle v-if="saving" class="h-4 w-4 animate-spin" />
+                    <LoaderCircle v-if="props.saving" class="h-4 w-4 animate-spin" />
                     <Check v-else class="h-4 w-4" />
                     {{ isCurrentProvider ? 'Cập nhật & lưu' : 'Chọn nguồn & lưu' }}
                 </button>

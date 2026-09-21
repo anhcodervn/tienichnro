@@ -1,5 +1,7 @@
 <script setup lang="ts">
+import { adminSettingService } from '@/services/admin-setting.service';
 import { adminTopupService } from '@/services/admin-topup.service';
+import type { TaxSettingType } from '@/types/setting.type';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { AlertTriangle, CircleDollarSign, Filter, LoaderCircle, RefreshCw, Search, ServerCog } from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
@@ -12,6 +14,12 @@ const providers = ref<Provider[]>([]);
 const loading = ref(false);
 const refreshing = ref(false);
 const saving = ref(false);
+const taxSettings = ref<TaxSettingType>({
+    tax_enabled: false,
+    tax_calculation_type: 'revenue',
+    vat_rate: '1.0000',
+    pit_rate: '0.5000',
+});
 const filters = reactive({ search: '', scope: 'all', provider_id: '' as string | number, status: 'all' });
 const modal = reactive<{ open: boolean; row: PriceRow | null; providerId: number | null }>({ open: false, row: null, providerId: null });
 
@@ -84,6 +92,15 @@ const load = async (background = false): Promise<void> => {
     }
 };
 
+const loadTaxSettings = async (): Promise<void> => {
+    try {
+        const response = await adminSettingService.getTax();
+        taxSettings.value = response.settings;
+    } catch (error) {
+        handleErrorResponse(error);
+    }
+};
+
 const clearFilters = async (): Promise<void> => {
     Object.assign(filters, { search: '', scope: 'all', provider_id: '', status: 'all' });
     await load();
@@ -122,7 +139,7 @@ const saveProviderSelection = async (selection: ProviderSelection): Promise<void
     }
 };
 
-onMounted(load);
+onMounted(() => void Promise.all([load(), loadTaxSettings()]));
 </script>
 
 <template>
@@ -279,6 +296,7 @@ onMounted(load);
             :open="modal.open"
             :row="modal.row"
             :providers="providers"
+            :tax-settings="taxSettings"
             :initial-provider-id="modal.providerId"
             :saving="saving"
             @close="closeProviderModal"
