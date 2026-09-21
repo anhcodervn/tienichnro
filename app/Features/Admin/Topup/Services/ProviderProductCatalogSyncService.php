@@ -3,10 +3,11 @@
 namespace App\Features\Admin\Topup\Services;
 
 use App\Enums\TopupProviderType;
+use App\Features\Topup\Contracts\TopupProviderCatalogInterface;
 use App\Features\Topup\DTOs\TopupProviderProductDto;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
-use App\Features\Topup\Providers\MerchantPartnerCardTopupProvider;
 use App\Features\Topup\Services\GlobalTopupPackageSyncService;
+use App\Features\Topup\Services\TopupProviderResolver;
 use App\Models\GlobalTopupPackage;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
@@ -18,7 +19,7 @@ use Throwable;
 class ProviderProductCatalogSyncService
 {
     public function __construct(
-        private readonly MerchantPartnerCardTopupProvider $merchantPartnerCardProvider,
+        private readonly TopupProviderResolver $providerResolver,
         private readonly GlobalTopupPackageSyncService $globalPackageSyncService,
     ) {}
 
@@ -27,7 +28,10 @@ class ProviderProductCatalogSyncService
     {
         $results = [];
         $providers = TopupProvider::query()
-            ->where('type', TopupProviderType::MerchantPartnerCard->value)
+            ->whereIn('type', [
+                TopupProviderType::MerchantPartnerCard->value,
+                TopupProviderType::AccNro->value,
+            ])
             ->orderBy('id')
             ->get();
 
@@ -35,7 +39,13 @@ class ProviderProductCatalogSyncService
             $startedAt = hrtime(true);
 
             try {
-                $products = $this->merchantPartnerCardProvider->products($provider);
+                $providerAdapter = $this->providerResolver->resolve($provider);
+
+                if (! $providerAdapter instanceof TopupProviderCatalogInterface) {
+                    throw new TopupProviderConnectionException('catalog_unsupported', 'Provider không hỗ trợ đồng bộ bảng giá.');
+                }
+
+                $products = $providerAdapter->products($provider);
                 $counts = $this->syncProviderPrices($provider, $products);
                 $latency = $this->latencyInMilliseconds($startedAt);
                 $provider->update([

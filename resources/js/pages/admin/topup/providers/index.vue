@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { adminTopupService } from '@/services/admin-topup.service';
-import { onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 type ProviderRow = {
@@ -17,6 +17,18 @@ type ProviderRow = {
     balance_checked_at: string | null;
     balance_error_code: string | null;
     balance_error_message: string | null;
+};
+
+type ProviderConfigGuide = {
+    title: string;
+    description: string;
+    domainExample: string | null;
+    fields: Array<{
+        key: string;
+        required: boolean;
+        description: string;
+        example: string;
+    }>;
 };
 
 const route = useRoute();
@@ -38,7 +50,82 @@ const form = reactive({
     slug: '',
     type: 'merchant_partner_card' as ProviderRow['type'],
     balance_warning_threshold: 1000000,
+    minimum_profit_percent: 5,
     connection_config_text: '',
+});
+
+const providerConfigGuides: Record<ProviderRow['type'], ProviderConfigGuide> = {
+    merchant_partner_card: {
+        title: 'API Merchant Partner Card',
+        description: 'Dùng cho The9P, NapGame1S, NapFF hoặc provider có API tương thích chuẩn Merchant Partner Card.',
+        domainExample: 'https://api.provider.example/rechargews',
+        fields: [
+            {
+                key: 'base_url',
+                required: true,
+                description: 'URL endpoint nhận lệnh API của provider.',
+                example: 'https://api.provider.example/rechargews',
+            },
+            { key: 'partner_id', required: true, description: 'Mã đại lý/đối tác do provider cấp.', example: 'partner_123' },
+            { key: 'partner_key', required: true, description: 'Khóa bí mật dùng để ký request.', example: 'Nhập khóa do provider cấp' },
+            {
+                key: 'proxy',
+                required: false,
+                description: 'Proxy riêng nếu provider yêu cầu whitelist IP.',
+                example: 'socks5://user:pass@proxy.example:1080',
+            },
+        ],
+    },
+    accnro: {
+        title: 'API riêng của ACC NRO',
+        description: 'Dùng riêng cho accnro.vn. Không dùng partner_key của chuẩn Merchant Partner Card.',
+        domainExample: 'https://accnro.vn/api/v1/partner/recharge',
+        fields: [
+            {
+                key: 'base_url',
+                required: true,
+                description: 'URL gốc của API; hệ thống tự nối /create, /query, /balance và /catalog.',
+                example: 'https://accnro.vn/api/v1/partner/recharge',
+            },
+            { key: 'partner_id', required: true, description: 'Partner ID do ACC NRO cấp.', example: 'pk_partner_123' },
+            { key: 'secret_key', required: true, description: 'Secret key do ACC NRO cấp.', example: 'sk_secret_key' },
+            {
+                key: 'proxy',
+                required: false,
+                description: 'Proxy riêng nếu tài khoản có giới hạn IP.',
+                example: 'https://user:pass@proxy.example:8080',
+            },
+        ],
+    },
+    manual: {
+        title: 'Provider xử lý thủ công',
+        description: 'Không gọi API bên ngoài. Đơn hàng được quản trị viên tiếp nhận và xử lý thủ công.',
+        domainExample: null,
+        fields: [{ key: 'mode', required: true, description: 'Giữ giá trị manual để nhận biết provider thủ công.', example: 'manual' }],
+    },
+};
+
+const merchantBaseUrlExample = (slug: string): string => {
+    const knownProviderUrls: Record<string, string> = {
+        the9p: 'https://the9p.com/api/rechargews',
+        napgame1s: 'https://napgame1s.net/api/rechargews',
+    };
+
+    return knownProviderUrls[slug.trim().toLowerCase()] ?? 'https://api.provider.example/rechargews';
+};
+
+const selectedProviderConfigGuide = computed<ProviderConfigGuide>(() => {
+    const guide = providerConfigGuides[form.type];
+
+    if (form.type !== 'merchant_partner_card') return guide;
+
+    const baseUrl = merchantBaseUrlExample(form.slug);
+
+    return {
+        ...guide,
+        domainExample: baseUrl,
+        fields: guide.fields.map((field) => (field.key === 'base_url' ? { ...field, example: baseUrl } : field)),
+    };
 });
 
 const connectionConfigTemplate = (slug: string, type: ProviderRow['type'] = form.type): string => {
@@ -48,7 +135,19 @@ const connectionConfigTemplate = (slug: string, type: ProviderRow['type'] = form
 
     if (type === 'manual') return '{\n  "mode": "manual"\n}';
 
-    return '{\n  "base_url": "",\n  "partner_id": "",\n  "partner_key": "",\n  "proxy": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
+    return JSON.stringify(
+        {
+            base_url: merchantBaseUrlExample(slug),
+            partner_id: '',
+            partner_key: '',
+            proxy: '',
+            connect_timeout: 5,
+            timeout: 20,
+            max_status_checks: 20,
+        },
+        null,
+        2,
+    );
 };
 const reset = (): void => {
     editingId.value = null;
@@ -57,6 +156,7 @@ const reset = (): void => {
     form.slug = '';
     form.type = 'merchant_partner_card';
     form.balance_warning_threshold = 1000000;
+    form.minimum_profit_percent = 5;
     form.connection_config_text = connectionConfigTemplate(form.slug);
 };
 
@@ -136,7 +236,9 @@ const edit = async (row: ProviderRow): Promise<void> => {
     form.type = provider.type;
     const connectionConfig = { ...(provider.connection_config || {}) };
     form.balance_warning_threshold = Number(connectionConfig.balance_warning_threshold ?? 1000000);
+    form.minimum_profit_percent = Number(connectionConfig.minimum_profit_percent ?? 0);
     delete connectionConfig.balance_warning_threshold;
+    delete connectionConfig.minimum_profit_percent;
     form.connection_config_text = JSON.stringify(connectionConfig, null, 2);
 };
 
@@ -162,13 +264,21 @@ const save = async (): Promise<void> => {
         connectionJsonError.value = 'Ngưỡng cảnh báo phải là số nguyên từ 0 đến 1.000.000.000.000đ.';
         return;
     }
+    if (!Number.isFinite(form.minimum_profit_percent) || form.minimum_profit_percent < 0 || form.minimum_profit_percent > 99.99) {
+        connectionJsonError.value = 'Phần trăm lợi nhuận tối thiểu phải từ 0 đến 99,99%.';
+        return;
+    }
     saving.value = true;
     try {
         await adminTopupService.saveProvider(editingId.value, {
             name: form.name,
             slug: form.slug,
             type: form.type,
-            connection_config: { ...parsedConnectionConfig, balance_warning_threshold: form.balance_warning_threshold },
+            connection_config: {
+                ...parsedConnectionConfig,
+                balance_warning_threshold: form.balance_warning_threshold,
+                minimum_profit_percent: form.minimum_profit_percent,
+            },
         });
         reset();
         await load();
@@ -393,6 +503,49 @@ onMounted(load);
                             <option value="manual">Xử lý thủ công</option>
                         </select></label
                     >
+                    <section class="rounded-lg border border-sky-200 bg-sky-50/70 p-3" aria-live="polite">
+                        <div class="flex flex-wrap items-start justify-between gap-2">
+                            <div>
+                                <p class="text-sm font-bold text-sky-950">Cần nhập gì? · {{ selectedProviderConfigGuide.title }}</p>
+                                <p class="mt-1 text-xs leading-5 text-sky-800">{{ selectedProviderConfigGuide.description }}</p>
+                            </div>
+                            <span class="rounded-full bg-white px-2.5 py-1 text-[11px] font-bold text-sky-700 shadow-sm">Theo loại đã chọn</span>
+                        </div>
+                        <div v-if="selectedProviderConfigGuide.domainExample" class="mt-3 rounded-md border border-sky-200 bg-white px-3 py-2">
+                            <p class="text-[11px] font-bold uppercase tracking-wide text-slate-500">Ví dụ base_url</p>
+                            <code class="mt-1 block break-all text-xs font-semibold text-sky-800">{{
+                                selectedProviderConfigGuide.domainExample
+                            }}</code>
+                            <p v-if="form.type === 'merchant_partner_card'" class="mt-1 text-[11px] leading-4 text-amber-700">
+                                Domain <code>.example</code> chỉ là mẫu; thay bằng domain thật do provider cung cấp trước khi lưu.
+                            </p>
+                        </div>
+                        <ul class="mt-3 grid gap-2">
+                            <li
+                                v-for="field in selectedProviderConfigGuide.fields"
+                                :key="field.key"
+                                class="rounded-md border border-sky-100 bg-white px-3 py-2"
+                            >
+                                <div class="flex flex-wrap items-center gap-2">
+                                    <code class="text-xs font-bold text-slate-900">{{ field.key }}</code>
+                                    <span
+                                        class="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+                                        :class="field.required ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'"
+                                    >
+                                        {{ field.required ? 'Bắt buộc' : 'Tùy chọn' }}
+                                    </span>
+                                </div>
+                                <p class="mt-1 text-xs leading-5 text-slate-600">{{ field.description }}</p>
+                                <p class="mt-1 break-all text-[11px] text-slate-500">
+                                    Ví dụ: <code>{{ field.example }}</code>
+                                </p>
+                            </li>
+                        </ul>
+                        <p v-if="form.type !== 'manual'" class="mt-3 text-[11px] leading-4 text-sky-800">
+                            Các trường thời gian chờ đã có sẵn trong JSON mẫu: <code>connect_timeout</code> 5 giây, <code>timeout</code> 20 giây và
+                            <code>max_status_checks</code> 20 lần.
+                        </p>
+                    </section>
                     <label class="text-sm font-semibold text-slate-700"
                         >Ngưỡng cảnh báo số dư
                         <div class="relative mt-2">
@@ -410,6 +563,27 @@ onMounted(load);
                             >
                         </div>
                         <small class="mt-1.5 block font-normal text-slate-500">Mặc định 1.000.000đ. Nhập 0 để tắt cảnh báo Discord.</small>
+                    </label>
+                    <label class="text-sm font-semibold text-slate-700"
+                        >Lợi nhuận tối thiểu tự động
+                        <div class="relative mt-2">
+                            <input
+                                v-model.number="form.minimum_profit_percent"
+                                type="number"
+                                required
+                                min="0"
+                                max="99.99"
+                                step="0.01"
+                                class="min-h-11 w-full rounded-md border border-slate-300 px-3 pr-10"
+                            />
+                            <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm font-semibold text-slate-500"
+                                >%</span
+                            >
+                        </div>
+                        <small class="mt-1.5 block font-normal leading-5 text-slate-500">
+                            Cron chỉ tăng giá bán khi biên lãi thấp hơn mức này. Công thức: (giá bán − giá provider) / giá bán. Nhập 0 để tắt tự động
+                            tăng giá cho provider này.
+                        </small>
                     </label>
                     <label class="text-sm font-semibold text-slate-700"
                         >JSON cấu hình kết nối<textarea

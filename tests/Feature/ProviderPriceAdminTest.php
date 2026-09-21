@@ -247,6 +247,66 @@ test('admin refreshes merchant partner card products and maps prices by service 
     });
 });
 
+test('admin refreshes accnrovn catalog prices by game code and denomination', function (): void {
+    Http::preventStrayRequests();
+
+    $admin = User::factory()->create(['role' => 'admin']);
+    $provider = TopupProvider::factory()->create([
+        'name' => 'AccNRO.vn',
+        'slug' => 'accnrovn',
+        'type' => TopupProviderType::AccNro,
+        'connection_config' => [
+            'base_url' => 'https://accnro.test/api/v1/partner/recharge',
+            'partner_id' => 'partner-123',
+            'secret_key' => 'secret-key',
+        ],
+    ]);
+    $game = Game::factory()->create(['provider_service_code' => 'nr']);
+    $package = TopupPackage::factory()->for($game)->create([
+        'provider_id' => $provider->id,
+        'denomination' => 100000,
+        'provider_price' => 81000,
+        'price' => 90000,
+        'original_price' => 100000,
+        'status' => 'active',
+    ]);
+
+    Http::fake([
+        'https://accnro.test/api/v1/partner/recharge/catalog' => Http::response([
+            'success' => true,
+            'message' => 'OK',
+            'data' => [
+                'games' => [[
+                    'code' => 'nr',
+                    'name' => 'Ngọc Rồng',
+                    'pricing' => [
+                        ['denomination' => 100000, 'price' => 80200],
+                        ['denomination' => 200000, 'price' => 160400],
+                    ],
+                ]],
+                'denominations' => [100000, 200000],
+            ],
+        ], 201),
+    ]);
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin-api/provider-prices/refresh')
+        ->assertSuccessful()
+        ->assertJsonPath("data.packages.0.provider_prices.{$provider->id}", 80200)
+        ->assertJsonPath('data.providers.0.price_sync_status', 'success')
+        ->assertJsonPath("data.sync_results.{$provider->id}.products", 2)
+        ->assertJsonPath("data.sync_results.{$provider->id}.matched_packages", 1);
+
+    expect((int) $package->refresh()->provider_price)->toBe(80200)
+        ->and($package->providerPrices()->where('topup_provider_id', $provider->id)->firstOrFail()->available)->toBeTrue();
+
+    Http::assertSent(function (ClientRequest $request): bool {
+        return $request->url() === 'https://accnro.test/api/v1/partner/recharge/catalog'
+            && $request['partner_id'] === 'partner-123'
+            && $request['secret_key'] === 'secret-key';
+    });
+});
+
 test('one merchant catalog failure does not prevent another provider price refresh', function (): void {
     Http::preventStrayRequests();
 

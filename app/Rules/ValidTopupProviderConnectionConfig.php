@@ -56,6 +56,17 @@ class ValidTopupProviderConnectionConfig implements ValidationRule
             return;
         }
 
+        $minimumProfitPercent = $value['minimum_profit_percent'] ?? null;
+
+        if (
+            array_key_exists('minimum_profit_percent', $value)
+            && (! is_numeric($minimumProfitPercent) || (float) $minimumProfitPercent < 0 || (float) $minimumProfitPercent > 99.99)
+        ) {
+            $fail('Phần trăm lợi nhuận tối thiểu phải từ 0 đến 99,99%.');
+
+            return;
+        }
+
         $baseUrl = $value['base_url'] ?? null;
 
         if (is_string($baseUrl) && $baseUrl !== '' && ! $this->hasValidBaseUrl($baseUrl)) {

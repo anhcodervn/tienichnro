@@ -54,6 +54,16 @@ test('provider editor is separated from catalog while package provider lookup re
         ->toContain('adminTopupService.deleteProvider')
         ->toContain("slug.trim().toLowerCase() === 'accnrovn'")
         ->toContain('https://accnro.vn/api/v1/partner/recharge')
+        ->toContain('Cần nhập gì?')
+        ->toContain('https://api.provider.example/rechargews')
+        ->toContain("the9p: 'https://the9p.com/api/rechargews'")
+        ->toContain("napgame1s: 'https://napgame1s.net/api/rechargews'")
+        ->toContain("key: 'partner_key', required: true")
+        ->toContain("key: 'secret_key', required: true")
+        ->toContain("field.required ? 'Bắt buộc' : 'Tùy chọn'")
+        ->toContain('form.minimum_profit_percent')
+        ->toContain('Lợi nhuận tối thiểu tự động')
+        ->toContain('(giá bán − giá provider) / giá bán')
         ->toContain('filters.search')
         ->toContain('pagination.current_page');
 });

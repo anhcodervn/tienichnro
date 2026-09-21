@@ -338,6 +338,7 @@ test('admin manages encrypted provider connection config without leaking secrets
         'proxy' => 'http://proxy-user:proxy-pass@proxy.example:8080',
         'timeout' => 30,
         'balance_warning_threshold' => 1000000,
+        'minimum_profit_percent' => 7.5,
     ];
 
     $created = $this->actingAs($admin)->postJson('/api/admin-api/topup-providers', [
@@ -366,7 +367,8 @@ test('admin manages encrypted provider connection config without leaking secrets
         ->assertJsonPath('data.connection_config.api_secret', TopupProvider::SECRET_MASK)
         ->assertJsonPath('data.connection_config.proxy', TopupProvider::SECRET_MASK)
         ->assertJsonPath('data.connection_config.timeout', 30)
-        ->assertJsonPath('data.connection_config.balance_warning_threshold', 1000000);
+        ->assertJsonPath('data.connection_config.balance_warning_threshold', 1000000)
+        ->assertJsonPath('data.connection_config.minimum_profit_percent', 7.5);
 
     expect($shown->getContent())->not->toContain('public-key-123')
         ->not->toContain('very-secret-value')
@@ -382,6 +384,7 @@ test('admin manages encrypted provider connection config without leaking secrets
             'proxy' => TopupProvider::SECRET_MASK,
             'timeout' => 45,
             'balance_warning_threshold' => 2000000,
+            'minimum_profit_percent' => 10,
         ],
     ])->assertOk();
 
@@ -392,6 +395,7 @@ test('admin manages encrypted provider connection config without leaking secrets
         'proxy' => 'http://proxy-user:proxy-pass@proxy.example:8080',
         'timeout' => 45,
         'balance_warning_threshold' => 2000000,
+        'minimum_profit_percent' => 10,
     ]);
 
     $this->actingAs($admin)->patchJson("/api/admin-api/topup-providers/{$provider->id}", [
@@ -426,6 +430,15 @@ test('provider validation rejects unsafe connection config and duplicate slugs',
         'name' => 'Private provider',
         'slug' => 'private-provider',
         'connection_config' => ['base_url' => 'http://127.0.0.1/admin'],
+    ])->assertUnprocessable()->assertJsonValidationErrors('connection_config');
+
+    $this->actingAs($admin)->postJson('/api/admin-api/topup-providers', [
+        'name' => 'Sai phần trăm lợi nhuận',
+        'slug' => 'invalid-profit-percent',
+        'connection_config' => [
+            'base_url' => 'https://provider.example',
+            'minimum_profit_percent' => 100,
+        ],
     ])->assertUnprocessable()->assertJsonValidationErrors('connection_config');
 
     $this->actingAs($admin)->postJson('/api/admin-api/topup-providers', [

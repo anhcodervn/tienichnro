@@ -3,8 +3,10 @@
 namespace App\Features\Topup\Providers;
 
 use App\Features\Topup\Contracts\TopupProviderBalanceInterface;
+use App\Features\Topup\Contracts\TopupProviderCatalogInterface;
 use App\Features\Topup\Contracts\TopupProviderInterface;
 use App\Features\Topup\DTOs\TopupProviderBalanceDto;
+use App\Features\Topup\DTOs\TopupProviderProductDto;
 use App\Features\Topup\DTOs\TopupProviderResultDto;
 use App\Features\Topup\Enums\TopupProviderStatus;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
@@ -16,11 +18,12 @@ use App\Models\TopupPackage;
 use App\Models\TopupProvider;
 use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Http\Client\Response;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 use JsonException;
 use Throwable;
 
-class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProviderInterface
+class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProviderCatalogInterface, TopupProviderInterface
 {
     private const DEFAULT_BASE_URL = 'https://accnro.vn/api/v1/partner/recharge';
 
@@ -153,6 +156,67 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
             balance: (int) round((float) $rawBalance),
             currency: 'VND',
         );
+    }
+
+    /** @return Collection<int, TopupProviderProductDto> */
+    public function products(TopupProvider $provider): Collection
+    {
+        $config = $this->configuration($provider);
+        $response = $this->request($config, 'catalog', [
+            'partner_id' => $config['partner_id'],
+            'secret_key' => $config['secret_key'],
+        ])['response'];
+
+        if ($response->clientError()) {
+            try {
+                $response->throw();
+            } catch (Throwable $exception) {
+                throw TopupProviderConnectionException::fromThrowable($exception);
+            }
+        }
+
+        $body = $response->json();
+        $games = is_array($body) && is_array(data_get($body, 'data.games'))
+            ? data_get($body, 'data.games')
+            : null;
+
+        if (($body['success'] ?? null) !== true || ! is_array($games)) {
+            throw new TopupProviderConnectionException(
+                'invalid_catalog_response',
+                'Provider trả về danh sách sản phẩm không đúng định dạng.',
+            );
+        }
+
+        return collect($games)
+            ->filter(fn (mixed $game): bool => is_array($game))
+            ->flatMap(function (array $game): array {
+                $serviceCode = strtoupper(trim((string) ($game['code'] ?? '')));
+                $pricing = is_array($game['pricing'] ?? null) ? $game['pricing'] : [];
+
+                return collect($pricing)
+                    ->filter(fn (mixed $price): bool => is_array($price))
+                    ->map(function (array $price) use ($serviceCode): ?TopupProviderProductDto {
+                        $denomination = $price['denomination'] ?? null;
+                        $providerPrice = $price['price'] ?? null;
+
+                        if ($serviceCode === '' || ! is_numeric($denomination) || ! is_numeric($providerPrice)) {
+                            return null;
+                        }
+
+                        $normalizedDenomination = (int) round((float) $denomination);
+                        $normalizedPrice = (int) round((float) $providerPrice);
+
+                        if ($normalizedDenomination <= 0 || $normalizedPrice <= 0) {
+                            return null;
+                        }
+
+                        return new TopupProviderProductDto($serviceCode, $normalizedDenomination, $normalizedPrice);
+                    })
+                    ->filter()
+                    ->values()
+                    ->all();
+            })
+            ->values();
     }
 
     /** @return array{base_url:string,partner_id:string,secret_key:string,proxy_url:string,connect_timeout:int,timeout:int,max_status_checks:int} */
