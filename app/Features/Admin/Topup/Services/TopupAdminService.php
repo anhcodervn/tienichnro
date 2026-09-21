@@ -87,7 +87,8 @@ class TopupAdminService
             ->withCount('packages')
             ->when($search !== '', fn (Builder $query) => $query->where(function (Builder $nested) use ($search): void {
                 $nested->where('name', 'like', "%{$search}%")
-                    ->orWhere('slug', 'like', "%{$search}%");
+                    ->orWhere('slug', 'like', "%{$search}%")
+                    ->orWhere('type', 'like', "%{$search}%");
             }))
             ->orderBy('name')
             ->orderBy('id')
@@ -118,7 +119,7 @@ class TopupAdminService
     public function orders(Request $request): LengthAwarePaginator
     {
         $isPlatformView = $this->tenantContext->isActive() && $this->tenantContext->isMain();
-        $relations = ['game:id,name', 'server:id,name', 'provider:id,name,slug', 'latestPaymentTransaction', 'legacyPaymentTransaction'];
+        $relations = ['game:id,name', 'server:id,name', 'provider:id,name,slug,type', 'latestPaymentTransaction', 'legacyPaymentTransaction'];
 
         if ($isPlatformView) {
             $relations[] = 'tenant:id,name,slug';
@@ -346,7 +347,7 @@ class TopupAdminService
 
         if ($order->payment_status !== PaymentStatus::Paid
             || ! in_array($order->order_status, [OrderStatus::Processing, OrderStatus::Completed], true)
-            || ! TopupProviderResolver::supportsStatusChecks($order->provider?->slug)) {
+            || ! TopupProviderResolver::supportsStatusChecks($order->provider?->type?->value ?? $order->provider?->slug)) {
             throw ValidationException::withMessages([
                 'sync_provider' => 'Chỉ có thể kiểm tra đơn provider tự động đã thanh toán, đang xử lý hoặc đã hoàn thành.',
             ]);

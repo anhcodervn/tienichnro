@@ -22,7 +22,7 @@ import { computed, onMounted, reactive, ref } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
 type BreakdownKey = 'games' | 'providers' | 'packages';
-type TrendMetric = 'revenue' | 'gross_profit';
+type TrendMetric = 'revenue' | 'gross_profit' | 'estimated_tax' | 'net_profit';
 
 const route = useRoute();
 const router = useRouter();
@@ -59,7 +59,16 @@ const dateTime = (value: string | null): string =>
           )
         : '--';
 
-const maxTrendValue = computed(() => Math.max(...(report.value?.trend.map((item) => item[trendMetric.value]) ?? [0]), 1));
+const maxTrendValue = computed(() => Math.max(...(report.value?.trend.map((item) => Math.abs(item[trendMetric.value])) ?? [0]), 1));
+const trendTitle = computed(
+    () =>
+        ({
+            revenue: 'Doanh thu theo ngày',
+            gross_profit: 'Lãi gộp theo ngày',
+            estimated_tax: 'Thuế dự kiến theo ngày',
+            net_profit: 'Lãi ròng dự kiến theo ngày',
+        })[trendMetric.value],
+);
 const breakdownRows = computed<ReportBreakdown[]>(() => report.value?.breakdowns[activeBreakdown.value] ?? []);
 const breakdownTabs: Array<{ key: BreakdownKey; label: string; icon: typeof Gamepad2 }> = [
     { key: 'games', label: 'Theo game', icon: Gamepad2 },
@@ -93,6 +102,20 @@ const metricCards = computed(() => {
             tone: 'emerald',
         },
         {
+            label: 'Tổng thuế dự kiến',
+            value: money(report.value.summary.estimated_tax),
+            growth: report.value.growth.estimated_tax,
+            icon: ReceiptText,
+            tone: 'amber',
+        },
+        {
+            label: 'Lãi ròng dự kiến',
+            value: money(report.value.summary.net_profit),
+            growth: report.value.growth.net_profit,
+            icon: ChartNoAxesCombined,
+            tone: report.value.summary.net_profit < 0 ? 'rose' : 'emerald',
+        },
+        {
             label: 'Đơn thành công',
             value: number(report.value.summary.successful_orders),
             growth: report.value.growth.successful_orders,
@@ -113,6 +136,13 @@ const metricCards = computed(() => {
             icon: CircleDollarSign,
             tone: 'violet',
         },
+        {
+            label: 'Biên lợi nhuận ròng',
+            value: `${report.value.summary.net_margin_percent.toLocaleString('vi-VN')}%`,
+            growth: report.value.growth.net_margin_percent,
+            icon: CircleDollarSign,
+            tone: report.value.summary.net_margin_percent < 0 ? 'rose' : 'violet',
+        },
     ];
 });
 
@@ -122,6 +152,7 @@ const toneClasses: Record<string, string> = {
     indigo: 'bg-indigo-50 text-indigo-700',
     violet: 'bg-violet-50 text-violet-700',
     amber: 'bg-amber-50 text-amber-700',
+    rose: 'bg-rose-50 text-rose-700',
 };
 
 const growthLabel = (percentage: number | null): string => {
@@ -281,9 +312,7 @@ onMounted(loadReport);
                 <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                            <h2 class="text-lg font-black text-slate-950">
-                                {{ trendMetric === 'revenue' ? 'Doanh thu theo ngày' : 'Lợi nhuận theo ngày' }}
-                            </h2>
+                            <h2 class="text-lg font-black text-slate-950">{{ trendTitle }}</h2>
                             <p class="mt-1 text-sm text-slate-500">{{ report.period.from }} — {{ report.period.to }}</p>
                         </div>
                         <div class="flex items-center gap-2">
@@ -299,7 +328,21 @@ onMounted(loadReport);
                                 :class="trendMetric === 'gross_profit' ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-600'"
                                 @click="trendMetric = 'gross_profit'"
                             >
-                                Lợi nhuận
+                                Lãi gộp
+                            </button>
+                            <button
+                                class="rounded-lg px-3 py-1.5 text-xs font-bold"
+                                :class="trendMetric === 'estimated_tax' ? 'bg-amber-600 text-white' : 'bg-slate-100 text-slate-600'"
+                                @click="trendMetric = 'estimated_tax'"
+                            >
+                                Thuế
+                            </button>
+                            <button
+                                class="rounded-lg px-3 py-1.5 text-xs font-bold"
+                                :class="trendMetric === 'net_profit' ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600'"
+                                @click="trendMetric = 'net_profit'"
+                            >
+                                Lãi ròng
                             </button>
                         </div>
                     </div>
@@ -324,10 +367,14 @@ onMounted(loadReport);
                                         :class="
                                             trendMetric === 'revenue'
                                                 ? 'from-emerald-600 to-emerald-400 group-hover:from-emerald-500 group-hover:to-emerald-300'
-                                                : 'from-indigo-600 to-violet-400 group-hover:from-indigo-500 group-hover:to-violet-300'
+                                                : trendMetric === 'estimated_tax'
+                                                  ? 'from-amber-600 to-amber-400 group-hover:from-amber-500 group-hover:to-amber-300'
+                                                  : trendMetric === 'net_profit' && item.net_profit < 0
+                                                    ? 'from-rose-700 to-rose-400 group-hover:from-rose-600 group-hover:to-rose-300'
+                                                    : 'from-indigo-600 to-violet-400 group-hover:from-indigo-500 group-hover:to-violet-300'
                                         "
                                         :style="{
-                                            height: `${Math.max((item[trendMetric] / maxTrendValue) * 100, item[trendMetric] > 0 ? 4 : 0)}%`,
+                                            height: `${Math.max((Math.abs(item[trendMetric]) / maxTrendValue) * 100, item[trendMetric] !== 0 ? 4 : 0)}%`,
                                         }"
                                     ></div>
                                 </div>
@@ -398,7 +445,9 @@ onMounted(loadReport);
                                     <th class="px-5 py-3 text-right">Lượt</th>
                                     <th class="px-5 py-3 text-right">Doanh thu</th>
                                     <th class="px-5 py-3 text-right">Cost</th>
-                                    <th class="px-5 py-3 text-right">Lợi nhuận</th>
+                                    <th class="px-5 py-3 text-right">Lãi gộp</th>
+                                    <th class="px-5 py-3 text-right">Thuế</th>
+                                    <th class="px-5 py-3 text-right">Lãi ròng</th>
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-slate-100">
@@ -414,9 +463,13 @@ onMounted(loadReport);
                                             {{ row.unpriced_orders }} đơn thiếu cost
                                         </span>
                                     </td>
+                                    <td class="px-5 py-4 text-right font-bold text-amber-700">{{ money(row.estimated_tax) }}</td>
+                                    <td class="px-5 py-4 text-right font-black" :class="row.net_profit < 0 ? 'text-rose-700' : 'text-emerald-700'">
+                                        {{ money(row.net_profit) }}
+                                    </td>
                                 </tr>
                                 <tr v-if="!breakdownRows.length">
-                                    <td colspan="6" class="px-5 py-10 text-center text-slate-500">Chưa có đơn thành công trong kỳ.</td>
+                                    <td colspan="8" class="px-5 py-10 text-center text-slate-500">Chưa có đơn thành công trong kỳ.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -446,9 +499,15 @@ onMounted(loadReport);
                             <div class="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-slate-500">
                                 <span>{{ order.package }} · {{ order.successful_units }} lượt</span><span>{{ dateTime(order.completed_at) }}</span>
                             </div>
-                            <p class="mt-2 text-xs font-bold" :class="order.gross_profit === null ? 'text-amber-700' : 'text-indigo-700'">
-                                {{ order.gross_profit === null ? 'Thiếu snapshot cost provider' : `Lợi nhuận: ${money(order.gross_profit)}` }}
-                            </p>
+                            <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs font-bold">
+                                <span :class="order.gross_profit === null ? 'text-amber-700' : 'text-indigo-700'">
+                                    {{ order.gross_profit === null ? 'Thiếu snapshot cost provider' : `Lãi gộp: ${money(order.gross_profit)}` }}
+                                </span>
+                                <span v-if="order.estimated_tax !== null" class="text-amber-700">Thuế: {{ money(order.estimated_tax) }}</span>
+                                <span v-if="order.net_profit !== null" :class="order.net_profit < 0 ? 'text-rose-700' : 'text-emerald-700'"
+                                    >Lãi ròng: {{ money(order.net_profit) }}</span
+                                >
+                            </div>
                         </div>
                         <div v-if="!report.recent_successful_orders.length" class="p-10 text-center text-sm text-slate-500">
                             Chưa có đơn thành công.
@@ -467,6 +526,20 @@ onMounted(loadReport);
                     <p class="mt-1 leading-6 text-amber-800">
                         Doanh thu của các đơn này là {{ money(report.summary.unpriced_revenue) }} và chưa được cộng vào lợi nhuận để tránh báo cáo
                         sai.
+                    </p>
+                </div>
+            </div>
+
+            <div
+                v-if="report.summary.legacy_tax_orders > 0"
+                class="flex items-start gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-800"
+            >
+                <TriangleAlert class="mt-0.5 h-5 w-5 shrink-0 text-slate-500" />
+                <div>
+                    <strong>{{ number(report.summary.legacy_tax_orders) }} đơn cũ chưa có snapshot thuế</strong>
+                    <p class="mt-1 leading-6 text-slate-600">
+                        Doanh thu {{ money(report.summary.legacy_tax_revenue) }} của nhóm này vẫn được ghi nhận, nhưng không được tự động tính lại
+                        bằng thuế suất hiện tại.
                     </p>
                 </div>
             </div>

@@ -24,6 +24,7 @@ const routeTitles: Record<string, string> = {
     'admin.topup.servers': 'Danh sách máy chủ game',
     'admin.topup.packages': 'Danh sách gói nạp game',
     'admin.topup.providers': 'Nhà cung cấp nạp game',
+    'admin.topup.provider-prices': 'So sánh giá provider',
     'admin.topup.orders': 'Đơn nạp game',
     'admin.users.index': 'Quản lý người dùng',
     'admin.users.show': 'Chi tiết người dùng',

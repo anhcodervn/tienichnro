@@ -7,6 +7,7 @@ type ProviderRow = {
     id: number;
     name: string;
     slug: string;
+    type: 'merchant_partner_card' | 'accnro' | 'manual';
     has_connection_config: boolean;
     packages_count?: number;
     supports_balance: boolean;
@@ -32,12 +33,20 @@ const filters = reactive({
     page: Math.max(Number(route.query.page || 1), 1),
 });
 const pagination = reactive({ current_page: 1, last_page: 1, total: 0, from: null as number | null, to: null as number | null });
-const form = reactive({ name: '', slug: '', balance_warning_threshold: 1000000, connection_config_text: '' });
+const form = reactive({
+    name: '',
+    slug: '',
+    type: 'merchant_partner_card' as ProviderRow['type'],
+    balance_warning_threshold: 1000000,
+    connection_config_text: '',
+});
 
-const connectionConfigTemplate = (slug: string): string => {
-    if (slug.trim().toLowerCase() === 'accnrovn') {
+const connectionConfigTemplate = (slug: string, type: ProviderRow['type'] = form.type): string => {
+    if (type === 'accnro' || slug.trim().toLowerCase() === 'accnrovn') {
         return '{\n  "base_url": "https://accnro.vn/api/v1/partner/recharge",\n  "partner_id": "",\n  "secret_key": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
     }
+
+    if (type === 'manual') return '{\n  "mode": "manual"\n}';
 
     return '{\n  "base_url": "https://the9p.com/api/rechargews",\n  "partner_id": "",\n  "partner_key": "",\n  "connect_timeout": 5,\n  "timeout": 20,\n  "max_status_checks": 20\n}';
 };
@@ -46,6 +55,7 @@ const reset = (): void => {
     connectionJsonError.value = '';
     form.name = '';
     form.slug = '';
+    form.type = 'merchant_partner_card';
     form.balance_warning_threshold = 1000000;
     form.connection_config_text = connectionConfigTemplate(form.slug);
 };
@@ -123,6 +133,7 @@ const edit = async (row: ProviderRow): Promise<void> => {
     editingId.value = provider.id;
     form.name = provider.name;
     form.slug = provider.slug;
+    form.type = provider.type;
     const connectionConfig = { ...(provider.connection_config || {}) };
     form.balance_warning_threshold = Number(connectionConfig.balance_warning_threshold ?? 1000000);
     delete connectionConfig.balance_warning_threshold;
@@ -156,6 +167,7 @@ const save = async (): Promise<void> => {
         await adminTopupService.saveProvider(editingId.value, {
             name: form.name,
             slug: form.slug,
+            type: form.type,
             connection_config: { ...parsedConnectionConfig, balance_warning_threshold: form.balance_warning_threshold },
         });
         reset();
@@ -177,10 +189,10 @@ const remove = async (row: ProviderRow): Promise<void> => {
 };
 
 watch(
-    () => form.slug,
-    (slug, previousSlug) => {
+    () => [form.slug, form.type] as const,
+    ([slug], [previousSlug, previousType]) => {
         if (editingId.value !== null) return;
-        if (form.connection_config_text === connectionConfigTemplate(previousSlug)) {
+        if (form.connection_config_text === connectionConfigTemplate(previousSlug, previousType)) {
             form.connection_config_text = connectionConfigTemplate(slug);
         }
     },
@@ -249,6 +261,7 @@ onMounted(load);
                                 <tr>
                                     <th class="p-4">Tên provider</th>
                                     <th class="p-4">Slug</th>
+                                    <th class="p-4">Loại kết nối</th>
                                     <th class="p-4">Kết nối</th>
                                     <th class="p-4">Số dư provider</th>
                                     <th class="p-4">Gói nạp</th>
@@ -263,6 +276,15 @@ onMounted(load);
                                 <tr v-for="provider in providers" :key="provider.id" class="group hover:bg-slate-50/70">
                                     <td class="p-4 font-semibold text-slate-950">{{ provider.name }}</td>
                                     <td class="p-4 font-mono text-xs text-slate-600">{{ provider.slug }}</td>
+                                    <td class="p-4 text-xs font-semibold text-slate-600">
+                                        {{
+                                            provider.type === 'merchant_partner_card'
+                                                ? 'Merchant Partner Card'
+                                                : provider.type === 'accnro'
+                                                  ? 'ACC NRO'
+                                                  : 'Thủ công'
+                                        }}
+                                    </td>
                                     <td class="p-4">
                                         <span
                                             class="rounded-md px-2 py-1 text-xs font-semibold"
@@ -364,6 +386,13 @@ onMounted(load);
                             pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
                             class="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-3"
                     /></label>
+                    <label class="text-sm font-semibold text-slate-700"
+                        >Loại kết nối<select v-model="form.type" class="mt-2 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal">
+                            <option value="merchant_partner_card">Merchant Partner Card (the9p, napgame1s, napff...)</option>
+                            <option value="accnro">ACC NRO riêng</option>
+                            <option value="manual">Xử lý thủ công</option>
+                        </select></label
+                    >
                     <label class="text-sm font-semibold text-slate-700"
                         >Ngưỡng cảnh báo số dư
                         <div class="relative mt-2">

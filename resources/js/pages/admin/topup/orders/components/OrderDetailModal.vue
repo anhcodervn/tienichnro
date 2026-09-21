@@ -255,7 +255,51 @@ const formatDebug = (value: unknown): string => {
                                     ({{ displayOrder.pricing.gross_margin_percent }}%)
                                 </span>
                             </dd>
+                            <template v-if="displayOrder.pricing.tax_snapshot_available">
+                                <dt class="text-slate-500">Thuế GTGT dự kiến</dt>
+                                <dd class="font-semibold text-slate-800">
+                                    {{ formatMoney(displayOrder.pricing.estimated_vat ?? 0) }}
+                                    <span class="text-xs text-slate-500">({{ displayOrder.pricing.vat_rate }}%)</span>
+                                </dd>
+                                <dt class="text-slate-500">Thuế TNCN dự kiến</dt>
+                                <dd class="font-semibold text-slate-800">
+                                    {{ formatMoney(displayOrder.pricing.estimated_pit ?? 0) }}
+                                    <span class="text-xs text-slate-500">({{ displayOrder.pricing.pit_rate }}%)</span>
+                                </dd>
+                                <dt class="font-semibold text-amber-700">Tổng thuế dự kiến</dt>
+                                <dd class="font-black text-amber-700">{{ formatMoney(displayOrder.pricing.estimated_tax ?? 0) }}</dd>
+                                <dt class="text-slate-500">Phí thanh toán</dt>
+                                <dd class="font-semibold text-slate-800">{{ formatMoney(displayOrder.pricing.payment_fee ?? 0) }}</dd>
+                                <dt class="text-slate-500">Chi phí khác</dt>
+                                <dd class="font-semibold text-slate-800">{{ formatMoney(displayOrder.pricing.other_cost ?? 0) }}</dd>
+                                <dt class="border-t border-slate-200 pt-3 font-black text-slate-700">Lãi ròng dự kiến</dt>
+                                <dd
+                                    class="border-t border-slate-200 pt-3 text-right font-black"
+                                    :class="displayOrder.pricing.profit_status === 'loss' ? 'text-rose-700' : 'text-emerald-700'"
+                                >
+                                    {{ formatMoney(displayOrder.pricing.net_profit ?? 0) }}
+                                    <span
+                                        class="ml-1 rounded-full px-2 py-0.5 text-[10px] uppercase"
+                                        :class="displayOrder.pricing.profit_status === 'loss' ? 'bg-rose-100' : 'bg-emerald-100'"
+                                    >
+                                        {{ displayOrder.pricing.profit_status === 'loss' ? 'Lỗ' : 'Lãi' }}
+                                    </span>
+                                    <span v-if="displayOrder.pricing.profit_margin !== null" class="ml-1 text-xs"
+                                        >({{ displayOrder.pricing.profit_margin }}%)</span
+                                    >
+                                </dd>
+                            </template>
+                            <template v-else>
+                                <dt class="border-t border-slate-100 pt-2 text-slate-500">Thuế và lãi ròng</dt>
+                                <dd class="border-t border-slate-100 pt-2 text-right text-xs font-bold text-slate-500">Đơn cũ chưa có snapshot</dd>
+                            </template>
                         </dl>
+                        <p
+                            v-if="displayOrder.pricing.tax_snapshot_available"
+                            class="mt-3 rounded-lg bg-slate-50 p-2.5 text-xs leading-5 text-slate-500"
+                        >
+                            Số liệu thuế chỉ là ước tính quản trị tại thời điểm bán, không phải số thuế đã kê khai hoặc đã nộp.
+                        </p>
                     </section>
 
                     <section v-if="displayOrder.payment_transaction" class="rounded-xl border border-sky-200 bg-sky-50/60 p-4">

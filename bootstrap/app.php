@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsureSiteIsActive;
 use App\Http\Middleware\EnsureTenancyIsActive;
 use App\Http\Middleware\EnsureTenantSession;
+use App\Http\Middleware\RecordAdminActivity;
 use App\Http\Middleware\ResolveTenant;
 use App\Support\SettingStore;
 use Illuminate\Foundation\Application;
@@ -31,7 +32,9 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToGroup('api', ResolveTenant::class);
         $middleware->appendToGroup('web', EnsureTenantSession::class);
         $middleware->appendToGroup('web', CaptureAffiliateReferral::class);
+        $middleware->appendToGroup('web', RecordAdminActivity::class);
         $middleware->appendToGroup('api', EnsureTenantSession::class);
+        $middleware->appendToGroup('api', RecordAdminActivity::class);
         $middleware->statefulApi();
         $middleware->trustProxies(at: '*');
         $middleware->trimStrings(except: ['content.*', '*_content.*', 'custom_css', 'custom_js', 'custom_head_tags', 'custom_script']);

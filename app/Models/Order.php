@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\OrderStatus;
 use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
+use App\Enums\TaxCalculationType;
 use App\Models\Concerns\BelongsToTenant;
 use App\Models\Scopes\TenantScope;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -35,6 +36,17 @@ class Order extends Model
         'provider_unit_cost',
         'provider_total_cost',
         'gross_profit',
+        'tax_enabled',
+        'tax_calculation_type',
+        'vat_rate',
+        'pit_rate',
+        'estimated_vat',
+        'estimated_pit',
+        'estimated_tax',
+        'payment_fee',
+        'other_cost',
+        'net_profit',
+        'profit_margin',
     ];
 
     protected $fillable = [
@@ -47,6 +59,8 @@ class Order extends Model
         'package_name', 'denomination', 'carot_amount', 'unit_price', 'sale_unit_price', 'retail_unit_price',
         'tenant_cost_unit_price', 'tenant_cost_total', 'tenant_profit', 'subtotal',
         'discount_amount', 'member_level_discount_amount', 'total_amount', 'provider_unit_cost', 'provider_total_cost', 'gross_profit',
+        'tax_enabled', 'tax_calculation_type', 'vat_rate', 'pit_rate', 'estimated_vat', 'estimated_pit', 'estimated_tax',
+        'payment_fee', 'other_cost', 'net_profit', 'profit_margin',
         'payment_method', 'payment_status', 'order_status',
         'provider_reference', 'paid_at', 'processing_at', 'completed_at', 'failed_at',
         'cancelled_at', 'expired_at', 'failure_reason', 'customer_ip', 'user_agent', 'metadata',
@@ -71,6 +85,10 @@ class Order extends Model
             'tenant_cost_unit_price' => 'integer', 'tenant_cost_total' => 'integer', 'tenant_profit' => 'integer',
             'discount_amount' => 'decimal:2', 'member_level_discount_amount' => 'decimal:2', 'total_amount' => 'decimal:2',
             'provider_unit_cost' => 'decimal:2', 'provider_total_cost' => 'decimal:2', 'gross_profit' => 'decimal:2',
+            'tax_enabled' => 'boolean', 'tax_calculation_type' => TaxCalculationType::class,
+            'vat_rate' => 'decimal:4', 'pit_rate' => 'decimal:4',
+            'estimated_vat' => 'decimal:2', 'estimated_pit' => 'decimal:2', 'estimated_tax' => 'decimal:2',
+            'payment_fee' => 'decimal:2', 'other_cost' => 'decimal:2', 'net_profit' => 'decimal:2', 'profit_margin' => 'decimal:4',
             'paid_at' => 'datetime', 'processing_at' => 'datetime', 'completed_at' => 'datetime',
             'failed_at' => 'datetime', 'cancelled_at' => 'datetime', 'expired_at' => 'datetime',
             'affiliate_attributed_at' => 'datetime', 'metadata' => 'array',

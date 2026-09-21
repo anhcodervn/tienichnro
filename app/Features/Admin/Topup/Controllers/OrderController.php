@@ -48,7 +48,7 @@ class OrderController extends Controller
     {
         $isPlatformView = app(TenantContext::class)->isActive() && app(TenantContext::class)->isMain();
         $relations = [
-            'game:id,name', 'server:id,name', 'provider:id,name,slug', 'recipients',
+            'game:id,name', 'server:id,name', 'provider:id,name,slug,type', 'recipients',
             'latestPaymentTransaction', 'legacyPaymentTransaction',
         ];
 

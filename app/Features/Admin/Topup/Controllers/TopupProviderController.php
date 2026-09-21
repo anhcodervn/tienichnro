@@ -76,7 +76,7 @@ class TopupProviderController extends Controller
 
         $providers = TopupProvider::query()
             ->whereIn('id', $providerIds)
-            ->whereIn('slug', TopupProviderResolver::BALANCE_PROVIDER_SLUGS)
+            ->whereIn('type', TopupProviderResolver::BALANCE_PROVIDER_TYPES)
             ->get();
 
         foreach ($providers as $provider) {

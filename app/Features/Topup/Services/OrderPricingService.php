@@ -12,6 +12,8 @@ class OrderPricingService
     public function __construct(
         private readonly TopupPackagePricingService $topupPackagePricingService,
         private readonly GameRewardService $gameRewardService,
+        private readonly TaxConfigurationService $taxConfigurationService,
+        private readonly OrderProfitCalculatorService $orderProfitCalculator,
     ) {}
 
     /**
@@ -84,6 +86,15 @@ class OrderPricingService
         $totalAmount = $sellingPrice * $quantity;
         $providerUnitCost = $price['provider_price'];
         $providerTotalCost = $providerUnitCost === null ? null : $providerUnitCost * $quantity;
+        $taxConfiguration = $this->taxConfigurationService->current();
+        $profit = $this->orderProfitCalculator->calculate(
+            costPrice: $providerTotalCost,
+            salePrice: $totalAmount,
+            vatRate: $taxConfiguration['vat_rate'],
+            pitRate: $taxConfiguration['pit_rate'],
+            taxEnabled: $taxConfiguration['enabled'],
+            calculationType: $taxConfiguration['calculation_type'],
+        );
 
         return [
             'package' => $package,
@@ -96,7 +107,18 @@ class OrderPricingService
             'total_amount' => $totalAmount,
             'provider_unit_cost' => $providerUnitCost,
             'provider_total_cost' => $providerTotalCost,
-            'gross_profit' => $providerTotalCost === null ? null : $totalAmount - $providerTotalCost,
+            'gross_profit' => $profit['gross_profit'],
+            'tax_enabled' => $taxConfiguration['enabled'],
+            'tax_calculation_type' => $taxConfiguration['calculation_type']->value,
+            'vat_rate' => $taxConfiguration['vat_rate'],
+            'pit_rate' => $taxConfiguration['pit_rate'],
+            'estimated_vat' => $profit['estimated_vat'],
+            'estimated_pit' => $profit['estimated_pit'],
+            'estimated_tax' => $profit['estimated_tax'],
+            'payment_fee' => 0,
+            'other_cost' => 0,
+            'net_profit' => $profit['net_profit'],
+            'profit_margin' => $profit['profit_margin'],
             'tenant_cost_unit_price' => $tenantCostPrice,
             'tenant_cost_total' => $tenantCostPrice * $quantity,
             'tenant_profit' => ((int) $price['tenant_profit']) * $quantity,

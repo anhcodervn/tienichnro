@@ -14,13 +14,19 @@ class AdminAuditLog extends Model
     public const UPDATED_AT = null;
 
     protected $fillable = [
-        'tenant_id', 'admin_id', 'action', 'subject_type', 'subject_id', 'old_values', 'new_values',
-        'ip', 'user_agent', 'created_at',
+        'tenant_id', 'admin_id', 'request_id', 'action', 'route_name', 'method', 'path', 'status_code',
+        'duration_ms', 'subject_type', 'subject_id', 'old_values', 'new_values', 'ip', 'user_agent', 'created_at',
     ];
 
     protected function casts(): array
     {
-        return ['old_values' => 'array', 'new_values' => 'array', 'created_at' => 'datetime'];
+        return [
+            'status_code' => 'integer',
+            'duration_ms' => 'integer',
+            'old_values' => 'array',
+            'new_values' => 'array',
+            'created_at' => 'datetime',
+        ];
     }
 
     public function admin(): BelongsTo

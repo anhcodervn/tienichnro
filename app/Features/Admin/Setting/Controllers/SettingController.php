@@ -175,6 +175,12 @@ class SettingController extends Controller
             'monitoring' => [
                 'discord_webhooks' => [],
             ],
+            'tax' => [
+                'tax_enabled' => false,
+                'tax_calculation_type' => 'revenue',
+                'vat_rate' => '1.0000',
+                'pit_rate' => '0.5000',
+            ],
             'security' => [
                 'turnstile_enabled' => false,
                 'turnstile_site_key' => '',
@@ -284,6 +290,12 @@ class SettingController extends Controller
             ],
             'monitoring' => [
                 'discord_webhooks' => 'discord_webhooks',
+            ],
+            'tax' => [
+                'tax_enabled' => 'tax_enabled',
+                'tax_calculation_type' => 'tax_calculation_type',
+                'vat_rate' => 'vat_rate',
+                'pit_rate' => 'pit_rate',
             ],
             'security' => [
                 'turnstile_enabled' => 'turnstile_enabled',

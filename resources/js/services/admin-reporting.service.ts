@@ -15,6 +15,8 @@ export type ReportBreakdown = {
     revenue: number;
     provider_cost: number;
     gross_profit: number;
+    estimated_tax: number;
+    net_profit: number;
     unpriced_orders: number;
 };
 
@@ -31,11 +33,30 @@ export type AdminTopupReport = {
         successful_orders: number;
         successful_units: number;
         revenue: number;
+        total_revenue: number;
         average_order_value: number;
         completion_rate: number;
         provider_cost: number;
+        total_cost: number;
         gross_profit: number;
+        total_gross_profit: number;
         gross_margin_percent: number;
+        estimated_vat: number;
+        total_estimated_vat: number;
+        estimated_pit: number;
+        total_estimated_pit: number;
+        estimated_tax: number;
+        total_estimated_tax: number;
+        payment_fee: number;
+        total_payment_fee: number;
+        other_cost: number;
+        total_other_cost: number;
+        net_profit: number;
+        total_net_profit: number;
+        net_margin_percent: number;
+        tax_snapshot_orders: number;
+        legacy_tax_orders: number;
+        legacy_tax_revenue: number;
         priced_orders: number;
         unpriced_orders: number;
         unpriced_revenue: number;
@@ -45,6 +66,9 @@ export type AdminTopupReport = {
         provider_cost: GrowthMetric;
         gross_profit: GrowthMetric;
         gross_margin_percent: GrowthMetric;
+        estimated_tax: GrowthMetric;
+        net_profit: GrowthMetric;
+        net_margin_percent: GrowthMetric;
         successful_orders: GrowthMetric;
         successful_units: GrowthMetric;
         average_order_value: GrowthMetric;
@@ -62,6 +86,8 @@ export type AdminTopupReport = {
         revenue: number;
         provider_cost: number;
         gross_profit: number;
+        estimated_tax: number;
+        net_profit: number;
         successful_orders: number;
         successful_units: number;
     }>;
@@ -79,6 +105,8 @@ export type AdminTopupReport = {
         revenue: number;
         provider_cost: number | null;
         gross_profit: number | null;
+        estimated_tax: number | null;
+        net_profit: number | null;
         completed_at: string | null;
     }>;
     criteria: string;

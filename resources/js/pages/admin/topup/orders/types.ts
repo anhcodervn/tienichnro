@@ -84,10 +84,25 @@ export type OrderRow = {
     pricing?: {
         sale_unit_price: number;
         sale_total: number;
+        sale_price: number;
         provider_unit_cost: number | null;
         provider_total_cost: number | null;
+        cost_price: number | null;
         gross_profit: number | null;
         gross_margin_percent: number | null;
+        tax_snapshot_available: boolean;
+        tax_enabled: boolean | null;
+        tax_calculation_type: 'revenue' | null;
+        vat_rate: number | null;
+        pit_rate: number | null;
+        estimated_vat: number | null;
+        estimated_pit: number | null;
+        estimated_tax: number | null;
+        payment_fee: number | null;
+        other_cost: number | null;
+        net_profit: number | null;
+        profit_margin: number | null;
+        profit_status: 'profit' | 'loss' | null;
     };
     payment_transaction?: {
         status: string;

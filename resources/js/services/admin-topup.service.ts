@@ -9,6 +9,14 @@ export const adminTopupService = {
         id ? axios.put(`${root}/topup-providers/${id}`, payload) : axios.post(`${root}/topup-providers`, payload),
     deleteProvider: (id: number) => axios.delete(`${root}/topup-providers/${id}`),
     refreshProviderBalances: (providerIds: number[]) => axios.post(`${root}/topup-providers/refresh-balances`, { provider_ids: providerIds }),
+    providerPrices: (params = {}) => axios.get(`${root}/provider-prices`, { params }),
+    updateProviderQuote: (scope: 'package' | 'global', id: number, providerId: number, providerPrice: number | null) =>
+        axios.put(`${root}/provider-prices/${scope}/${id}/providers/${providerId}`, { provider_price: providerPrice }),
+    selectPackageProvider: (scope: 'package' | 'global', id: number, providerId: number, providerPrice: number, price: number) =>
+        axios.put(`${root}/provider-prices/${scope}/${id}/providers/${providerId}/select`, {
+            provider_price: providerPrice,
+            price,
+        }),
     games: (params = {}) => axios.get(`${root}/games`, { params }),
     saveGame: (id: number | null, payload: Record<string, unknown>) =>
         id ? axios.put(`${root}/games/${id}`, payload) : axios.post(`${root}/games`, payload),

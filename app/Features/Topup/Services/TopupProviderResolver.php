@@ -2,10 +2,11 @@
 
 namespace App\Features\Topup\Services;
 
+use App\Enums\TopupProviderType;
 use App\Features\Topup\Contracts\TopupProviderInterface;
 use App\Features\Topup\Providers\AccNroVnTopupProvider;
 use App\Features\Topup\Providers\ManualTopupProvider;
-use App\Features\Topup\Providers\The9pTopupProvider;
+use App\Features\Topup\Providers\MerchantPartnerCardTopupProvider;
 use App\Models\GameServer;
 use App\Models\Order;
 use App\Models\TopupPackage;
@@ -15,40 +16,56 @@ use Illuminate\Validation\ValidationException;
 class TopupProviderResolver
 {
     /** @var array<int, string> */
-    public const BALANCE_PROVIDER_SLUGS = ['the9p', 'accnrovn'];
+    public const BALANCE_PROVIDER_TYPES = [
+        TopupProviderType::MerchantPartnerCard->value,
+        TopupProviderType::AccNro->value,
+    ];
 
     /** @var array<int, string> */
-    public const STATUS_CHECK_PROVIDER_SLUGS = ['the9p', 'accnrovn'];
+    public const STATUS_CHECK_PROVIDER_TYPES = [
+        TopupProviderType::MerchantPartnerCard->value,
+        TopupProviderType::AccNro->value,
+    ];
 
     public function __construct(
         private readonly ManualTopupProvider $manualProvider,
-        private readonly The9pTopupProvider $the9pProvider,
+        private readonly MerchantPartnerCardTopupProvider $merchantPartnerCardProvider,
         private readonly AccNroVnTopupProvider $accNroVnProvider,
     ) {}
 
     public function resolve(?TopupProvider $provider): TopupProviderInterface
     {
-        return $this->resolveSlug($provider?->slug);
+        return $this->resolveType($provider?->type?->value, $provider?->slug);
     }
 
     public function resolveForOrder(Order $order): TopupProviderInterface
     {
-        return $this->resolveSlug(
+        return $this->resolveType(
+            (string) data_get($order->metadata, 'provider.type', $order->provider?->type?->value),
             (string) data_get($order->metadata, 'provider.slug', $order->provider?->slug),
         );
     }
 
-    private function resolveSlug(?string $slug): TopupProviderInterface
+    private function resolveType(?string $type, ?string $legacySlug = null): TopupProviderInterface
     {
-        if (blank($slug) || $slug === 'manual') {
+        $resolvedType = match ($legacySlug) {
+            'accnrovn' => TopupProviderType::AccNro->value,
+            'manual' => TopupProviderType::Manual->value,
+            default => $type ?: match ($legacySlug) {
+                'the9p' => TopupProviderType::MerchantPartnerCard->value,
+                default => $legacySlug,
+            },
+        };
+
+        if (blank($resolvedType) || $resolvedType === TopupProviderType::Manual->value) {
             return $this->manualProvider;
         }
 
-        if ($slug === 'the9p') {
-            return $this->the9pProvider;
+        if ($resolvedType === TopupProviderType::MerchantPartnerCard->value) {
+            return $this->merchantPartnerCardProvider;
         }
 
-        if ($slug === 'accnrovn') {
+        if ($resolvedType === TopupProviderType::AccNro->value) {
             return $this->accNroVnProvider;
         }
 
@@ -57,14 +74,14 @@ class TopupProviderResolver
         ]);
     }
 
-    public static function supportsBalance(?string $slug): bool
+    public static function supportsBalance(?string $typeOrLegacySlug): bool
     {
-        return in_array($slug, self::BALANCE_PROVIDER_SLUGS, true);
+        return in_array($typeOrLegacySlug, [...self::BALANCE_PROVIDER_TYPES, 'the9p', 'accnrovn'], true);
     }
 
-    public static function supportsStatusChecks(?string $slug): bool
+    public static function supportsStatusChecks(?string $typeOrLegacySlug): bool
     {
-        return in_array($slug, self::STATUS_CHECK_PROVIDER_SLUGS, true);
+        return in_array($typeOrLegacySlug, [...self::STATUS_CHECK_PROVIDER_TYPES, 'the9p', 'accnrovn'], true);
     }
 
     public function assertAvailable(TopupPackage $package, GameServer $server): void

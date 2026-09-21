@@ -17,6 +17,7 @@ import type {
     SettingApiResponse,
     SliderImageSettingType,
     SystemSettingType,
+    TaxSettingType,
 } from '@/types/setting.type';
 
 const getTab = async <T>(tab: string): Promise<SettingApiResponse<T>> => {
@@ -113,6 +114,12 @@ export const adminSettingService = {
     },
     updateSecurity(payload: SecuritySettingType) {
         return updateTab<SecuritySettingType>('security', payload);
+    },
+    getTax() {
+        return getTab<TaxSettingType>('tax');
+    },
+    updateTax(payload: TaxSettingType) {
+        return updateTab<TaxSettingType>('tax', payload);
     },
     getOptions() {
         return getTab<OptionSettingType>('options');

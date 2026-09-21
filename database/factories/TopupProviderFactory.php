@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\TopupProviderType;
 use App\Models\TopupProvider;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -22,6 +23,7 @@ class TopupProviderFactory extends Factory
         return [
             'name' => $name,
             'slug' => fake()->unique()->slug(2),
+            'type' => TopupProviderType::MerchantPartnerCard,
             'connection_config' => [
                 'base_url' => 'https://the9p.com/api/rechargews',
                 'partner_id' => fake()->numerify('######'),

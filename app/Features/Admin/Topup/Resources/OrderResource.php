@@ -51,15 +51,32 @@ class OrderResource extends JsonResource
             'pricing' => [
                 'sale_unit_price' => (int) ($this->sale_unit_price ?? ($this->quantity > 0 ? (int) $this->total_amount / $this->quantity : 0)),
                 'sale_total' => (int) $this->total_amount,
+                'sale_price' => (int) $this->total_amount,
                 'tenant_cost_unit_price' => $this->tenant_cost_unit_price === null ? null : (int) $this->tenant_cost_unit_price,
                 'tenant_cost_total' => $this->tenant_cost_total === null ? null : (int) $this->tenant_cost_total,
                 'tenant_profit' => $this->tenant_profit === null ? null : (int) $this->tenant_profit,
                 'provider_unit_cost' => Site::isMain() && $this->provider_unit_cost !== null ? (int) $this->provider_unit_cost : null,
                 'provider_total_cost' => Site::isMain() && $this->provider_total_cost !== null ? (int) $this->provider_total_cost : null,
+                'cost_price' => Site::isMain() && $this->provider_total_cost !== null ? (int) $this->provider_total_cost : null,
                 'gross_profit' => Site::isMain() && $this->gross_profit !== null ? (int) $this->gross_profit : null,
                 'gross_margin_percent' => ! Site::isMain() || $this->gross_profit === null || (int) $this->total_amount <= 0
                     ? null
                     : round(((int) $this->gross_profit / (int) $this->total_amount) * 100, 1),
+                'tax_snapshot_available' => Site::isMain() && $this->tax_enabled !== null,
+                'tax_enabled' => Site::isMain() && $this->tax_enabled !== null ? (bool) $this->tax_enabled : null,
+                'tax_calculation_type' => Site::isMain() ? $this->tax_calculation_type?->value : null,
+                'vat_rate' => Site::isMain() && $this->vat_rate !== null ? (float) $this->vat_rate : null,
+                'pit_rate' => Site::isMain() && $this->pit_rate !== null ? (float) $this->pit_rate : null,
+                'estimated_vat' => Site::isMain() && $this->estimated_vat !== null ? (int) $this->estimated_vat : null,
+                'estimated_pit' => Site::isMain() && $this->estimated_pit !== null ? (int) $this->estimated_pit : null,
+                'estimated_tax' => Site::isMain() && $this->estimated_tax !== null ? (int) $this->estimated_tax : null,
+                'payment_fee' => Site::isMain() && $this->payment_fee !== null ? (int) $this->payment_fee : null,
+                'other_cost' => Site::isMain() && $this->other_cost !== null ? (int) $this->other_cost : null,
+                'net_profit' => Site::isMain() && $this->net_profit !== null ? (int) $this->net_profit : null,
+                'profit_margin' => Site::isMain() && $this->profit_margin !== null ? (float) $this->profit_margin : null,
+                'profit_status' => ! Site::isMain() || $this->net_profit === null
+                    ? null
+                    : ((int) $this->net_profit < 0 ? 'loss' : 'profit'),
             ],
             'payment_transaction' => $paymentTransaction instanceof PaymentTransaction ? [
                 'status' => $paymentTransaction->status,
@@ -115,7 +132,7 @@ class OrderResource extends JsonResource
             'can_sync_provider' => Site::isMain()
                 && $this->payment_status === PaymentStatus::Paid
                 && in_array($this->order_status, [OrderStatus::Processing, OrderStatus::Completed], true)
-                && TopupProviderResolver::supportsStatusChecks($this->provider?->slug)
+                && TopupProviderResolver::supportsStatusChecks($this->provider?->type?->value ?? $this->provider?->slug)
                 && $this->hasQueryableProviderItems(),
             'can_retry_provider_submission' => Site::isMain()
                 && $this->payment_status === PaymentStatus::Paid

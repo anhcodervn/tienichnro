@@ -4,6 +4,7 @@ namespace App\Features\Reporting\Services;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Features\Topup\Services\OrderProfitCalculatorService;
 use App\Models\Order;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,6 +12,8 @@ use Illuminate\Support\Facades\DB;
 
 class TopupReportService
 {
+    public function __construct(private readonly OrderProfitCalculatorService $profitCalculator) {}
+
     /** @return array<string, mixed> */
     public function report(?string $fromDate = null, ?string $toDate = null): array
     {
@@ -41,6 +44,9 @@ class TopupReportService
                 'revenue' => $this->growth($current['revenue'], $previous['revenue']),
                 'provider_cost' => $this->growth($current['provider_cost'], $previous['provider_cost']),
                 'gross_profit' => $this->growth($current['gross_profit'], $previous['gross_profit']),
+                'estimated_tax' => $this->growth($current['estimated_tax'], $previous['estimated_tax']),
+                'net_profit' => $this->growth($current['net_profit'], $previous['net_profit']),
+                'net_margin_percent' => $this->growth($current['net_margin_percent'], $previous['net_margin_percent']),
                 'gross_margin_percent' => $this->growth($current['gross_margin_percent'], $previous['gross_margin_percent']),
                 'successful_orders' => $this->growth($current['successful_orders'], $previous['successful_orders']),
                 'successful_units' => $this->growth($current['successful_units'], $previous['successful_units']),
@@ -54,7 +60,7 @@ class TopupReportService
                 'packages' => $this->packageBreakdown($from, $to),
             ],
             'recent_successful_orders' => $this->recentSuccessfulOrders($from, $to),
-            'criteria' => 'Doanh thu chỉ tính đơn đã thanh toán và hoàn thành. Lợi nhuận chỉ tính các đơn có snapshot cost provider tại lúc tạo đơn.',
+            'criteria' => 'Doanh thu chỉ tính đơn đã thanh toán và hoàn thành. Thuế và lợi nhuận dùng snapshot tại lúc tạo đơn, không tính lại theo cấu hình hiện tại.',
         ];
     }
 
@@ -71,20 +77,51 @@ class TopupReportService
             ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NOT NULL THEN 1 ELSE 0 END), 0) as priced_orders')
             ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NULL THEN 1 ELSE 0 END), 0) as unpriced_orders')
             ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NULL THEN total_amount ELSE 0 END), 0) as unpriced_revenue')
+            ->selectRaw('COALESCE(SUM(CASE WHEN tax_enabled IS NOT NULL THEN estimated_vat ELSE 0 END), 0) as estimated_vat')
+            ->selectRaw('COALESCE(SUM(CASE WHEN tax_enabled IS NOT NULL THEN estimated_pit ELSE 0 END), 0) as estimated_pit')
+            ->selectRaw('COALESCE(SUM(CASE WHEN tax_enabled IS NOT NULL THEN estimated_tax ELSE 0 END), 0) as estimated_tax')
+            ->selectRaw('COALESCE(SUM(CASE WHEN tax_enabled IS NOT NULL THEN payment_fee ELSE 0 END), 0) as payment_fee')
+            ->selectRaw('COALESCE(SUM(CASE WHEN tax_enabled IS NOT NULL THEN other_cost ELSE 0 END), 0) as other_cost')
+            ->selectRaw('COALESCE(SUM(CASE WHEN net_profit IS NOT NULL THEN net_profit ELSE 0 END), 0) as net_profit')
+            ->selectRaw('COALESCE(SUM(CASE WHEN net_profit IS NOT NULL THEN total_amount ELSE 0 END), 0) as net_priced_revenue')
+            ->selectRaw('COALESCE(SUM(CASE WHEN tax_enabled IS NOT NULL THEN 1 ELSE 0 END), 0) as tax_snapshot_orders')
+            ->selectRaw('COALESCE(SUM(CASE WHEN tax_enabled IS NULL THEN 1 ELSE 0 END), 0) as legacy_tax_orders')
+            ->selectRaw('COALESCE(SUM(CASE WHEN tax_enabled IS NULL THEN total_amount ELSE 0 END), 0) as legacy_tax_revenue')
             ->first();
         $successfulOrders = (int) ($summary?->successful_orders ?? 0);
         $revenue = (int) ($summary?->revenue ?? 0);
         $pricedRevenue = (int) ($summary?->priced_revenue ?? 0);
         $grossProfit = (int) ($summary?->gross_profit ?? 0);
+        $netProfit = (int) ($summary?->net_profit ?? 0);
+        $netPricedRevenue = (int) ($summary?->net_priced_revenue ?? 0);
 
         return [
             'successful_orders' => $successfulOrders,
             'successful_units' => (int) ($summary?->successful_units ?? 0),
             'revenue' => $revenue,
+            'total_revenue' => $revenue,
             'average_order_value' => $successfulOrders > 0 ? (int) round($revenue / $successfulOrders) : 0,
             'provider_cost' => (int) ($summary?->provider_cost ?? 0),
+            'total_cost' => (int) ($summary?->provider_cost ?? 0),
             'gross_profit' => $grossProfit,
+            'total_gross_profit' => $grossProfit,
             'gross_margin_percent' => $pricedRevenue > 0 ? round(($grossProfit / $pricedRevenue) * 100, 1) : 0.0,
+            'estimated_vat' => (int) ($summary?->estimated_vat ?? 0),
+            'total_estimated_vat' => (int) ($summary?->estimated_vat ?? 0),
+            'estimated_pit' => (int) ($summary?->estimated_pit ?? 0),
+            'total_estimated_pit' => (int) ($summary?->estimated_pit ?? 0),
+            'estimated_tax' => (int) ($summary?->estimated_tax ?? 0),
+            'total_estimated_tax' => (int) ($summary?->estimated_tax ?? 0),
+            'payment_fee' => (int) ($summary?->payment_fee ?? 0),
+            'total_payment_fee' => (int) ($summary?->payment_fee ?? 0),
+            'other_cost' => (int) ($summary?->other_cost ?? 0),
+            'total_other_cost' => (int) ($summary?->other_cost ?? 0),
+            'net_profit' => $netProfit,
+            'total_net_profit' => $netProfit,
+            'net_margin_percent' => $this->profitCalculator->profitMargin($netProfit, $netPricedRevenue) ?? 0.0,
+            'tax_snapshot_orders' => (int) ($summary?->tax_snapshot_orders ?? 0),
+            'legacy_tax_orders' => (int) ($summary?->legacy_tax_orders ?? 0),
+            'legacy_tax_revenue' => (int) ($summary?->legacy_tax_revenue ?? 0),
             'priced_orders' => (int) ($summary?->priced_orders ?? 0),
             'unpriced_orders' => (int) ($summary?->unpriced_orders ?? 0),
             'unpriced_revenue' => (int) ($summary?->unpriced_revenue ?? 0),
@@ -149,6 +186,8 @@ class TopupReportService
             ->selectRaw('COALESCE(SUM(total_amount), 0) as revenue')
             ->selectRaw('COALESCE(SUM(CASE WHEN provider_total_cost IS NOT NULL THEN provider_total_cost ELSE 0 END), 0) as provider_cost')
             ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NOT NULL THEN gross_profit ELSE 0 END), 0) as gross_profit')
+            ->selectRaw('COALESCE(SUM(CASE WHEN tax_enabled IS NOT NULL THEN estimated_tax ELSE 0 END), 0) as estimated_tax')
+            ->selectRaw('COALESCE(SUM(CASE WHEN net_profit IS NOT NULL THEN net_profit ELSE 0 END), 0) as net_profit')
             ->groupByRaw($dateExpression)
             ->orderBy('report_date')
             ->get()
@@ -163,6 +202,8 @@ class TopupReportService
                 'revenue' => (int) ($row?->revenue ?? 0),
                 'provider_cost' => (int) ($row?->provider_cost ?? 0),
                 'gross_profit' => (int) ($row?->gross_profit ?? 0),
+                'estimated_tax' => (int) ($row?->estimated_tax ?? 0),
+                'net_profit' => (int) ($row?->net_profit ?? 0),
                 'successful_orders' => (int) ($row?->successful_orders ?? 0),
                 'successful_units' => (int) ($row?->successful_units ?? 0),
             ];
@@ -179,6 +220,7 @@ class TopupReportService
             ->select(['games.id', 'games.name'])
             ->selectRaw('COUNT(*) as successful_orders, COALESCE(SUM(orders.quantity), 0) as successful_units, COALESCE(SUM(orders.total_amount), 0) as revenue')
             ->selectRaw('COALESCE(SUM(CASE WHEN orders.provider_total_cost IS NOT NULL THEN orders.provider_total_cost ELSE 0 END), 0) as provider_cost, COALESCE(SUM(CASE WHEN orders.gross_profit IS NOT NULL THEN orders.gross_profit ELSE 0 END), 0) as gross_profit')
+            ->selectRaw('COALESCE(SUM(CASE WHEN orders.tax_enabled IS NOT NULL THEN orders.estimated_tax ELSE 0 END), 0) as estimated_tax, COALESCE(SUM(CASE WHEN orders.net_profit IS NOT NULL THEN orders.net_profit ELSE 0 END), 0) as net_profit')
             ->selectRaw('COALESCE(SUM(CASE WHEN orders.gross_profit IS NULL THEN 1 ELSE 0 END), 0) as unpriced_orders')
             ->groupBy('games.id', 'games.name')
             ->orderByDesc('revenue')
@@ -196,6 +238,7 @@ class TopupReportService
             ->select(['topup_providers.id', 'topup_providers.name'])
             ->selectRaw('COUNT(*) as successful_orders, COALESCE(SUM(orders.quantity), 0) as successful_units, COALESCE(SUM(orders.total_amount), 0) as revenue')
             ->selectRaw('COALESCE(SUM(CASE WHEN orders.provider_total_cost IS NOT NULL THEN orders.provider_total_cost ELSE 0 END), 0) as provider_cost, COALESCE(SUM(CASE WHEN orders.gross_profit IS NOT NULL THEN orders.gross_profit ELSE 0 END), 0) as gross_profit')
+            ->selectRaw('COALESCE(SUM(CASE WHEN orders.tax_enabled IS NOT NULL THEN orders.estimated_tax ELSE 0 END), 0) as estimated_tax, COALESCE(SUM(CASE WHEN orders.net_profit IS NOT NULL THEN orders.net_profit ELSE 0 END), 0) as net_profit')
             ->selectRaw('COALESCE(SUM(CASE WHEN orders.gross_profit IS NULL THEN 1 ELSE 0 END), 0) as unpriced_orders')
             ->groupBy('topup_providers.id', 'topup_providers.name')
             ->orderByDesc('revenue')
@@ -212,6 +255,7 @@ class TopupReportService
             ->select('package_name')
             ->selectRaw('COUNT(*) as successful_orders, COALESCE(SUM(quantity), 0) as successful_units, COALESCE(SUM(total_amount), 0) as revenue')
             ->selectRaw('COALESCE(SUM(CASE WHEN provider_total_cost IS NOT NULL THEN provider_total_cost ELSE 0 END), 0) as provider_cost, COALESCE(SUM(CASE WHEN gross_profit IS NOT NULL THEN gross_profit ELSE 0 END), 0) as gross_profit')
+            ->selectRaw('COALESCE(SUM(CASE WHEN tax_enabled IS NOT NULL THEN estimated_tax ELSE 0 END), 0) as estimated_tax, COALESCE(SUM(CASE WHEN net_profit IS NOT NULL THEN net_profit ELSE 0 END), 0) as net_profit')
             ->selectRaw('COALESCE(SUM(CASE WHEN gross_profit IS NULL THEN 1 ELSE 0 END), 0) as unpriced_orders')
             ->groupBy('package_name')
             ->orderByDesc('revenue')
@@ -228,7 +272,10 @@ class TopupReportService
             ->with(['game:id,name', 'provider:id,name'])
             ->latest('completed_at')
             ->limit(10)
-            ->get(['id', 'code', 'game_id', 'topup_provider_id', 'package_name', 'quantity', 'total_amount', 'provider_total_cost', 'gross_profit', 'completed_at'])
+            ->get([
+                'id', 'code', 'game_id', 'topup_provider_id', 'package_name', 'quantity', 'total_amount',
+                'provider_total_cost', 'gross_profit', 'tax_enabled', 'estimated_tax', 'net_profit', 'completed_at',
+            ])
             ->map(fn (Order $order): array => [
                 'code' => $order->code,
                 'game' => $order->game?->name,
@@ -238,6 +285,8 @@ class TopupReportService
                 'revenue' => (int) $order->total_amount,
                 'provider_cost' => $order->provider_total_cost === null ? null : (int) $order->provider_total_cost,
                 'gross_profit' => $order->gross_profit === null ? null : (int) $order->gross_profit,
+                'estimated_tax' => $order->tax_enabled === null ? null : (int) $order->estimated_tax,
+                'net_profit' => $order->net_profit === null ? null : (int) $order->net_profit,
                 'completed_at' => $order->completed_at?->toISOString(),
             ])->all();
     }
@@ -253,6 +302,8 @@ class TopupReportService
             'revenue' => (int) $row->revenue,
             'provider_cost' => (int) $row->provider_cost,
             'gross_profit' => (int) $row->gross_profit,
+            'estimated_tax' => (int) $row->estimated_tax,
+            'net_profit' => (int) $row->net_profit,
             'unpriced_orders' => (int) $row->unpriced_orders,
         ];
     }

@@ -5,7 +5,9 @@ import UploadImage from '@/components/shared/UpladImage/index.vue';
 import { useSystemSetting } from '@/composables/useSystemSetting';
 import CustomCodeSettings from '@/pages/admin/settings/CustomCodeSettings.vue';
 import SecuritySettings from '@/pages/admin/settings/SecuritySettings.vue';
+import TaxSettings from '@/pages/admin/settings/TaxSettings.vue';
 import { adminSettingService } from '@/services/admin-setting.service';
+import { useUserStore } from '@/stores/user.store';
 import type {
     BrandingSettingType,
     ContactSettingType,
@@ -31,6 +33,7 @@ type TabKey =
     | 'seo'
     | 'custom-code'
     | 'monitoring'
+    | 'tax'
     | 'security';
 
 const tabs: Array<{ key: TabKey; label: string; description: string }> = [
@@ -80,6 +83,11 @@ const tabs: Array<{ key: TabKey; label: string; description: string }> = [
         description: 'Bot cảnh báo vận hành cho đăng ký mới, nạp tiền và đơn nạp game lỗi.',
     },
     {
+        key: 'tax',
+        label: 'Thuế & lợi nhuận',
+        description: 'Cấu hình thuế dự kiến và snapshot lợi nhuận ròng của đơn hàng.',
+    },
+    {
         key: 'security',
         label: 'Captcha & bảo mật',
         description: 'Cloudflare Turnstile bảo vệ thao tác tạo đơn của khách chưa đăng nhập.',
@@ -87,6 +95,9 @@ const tabs: Array<{ key: TabKey; label: string; description: string }> = [
 ];
 
 const activeTab = ref<TabKey>('general');
+const userStore = useUserStore();
+const isPlatformAdmin = computed(() => userStore.user?.capabilities?.platform_admin === true);
+const visibleTabs = computed(() => tabs.filter((tab) => tab.key !== 'tax' || isPlatformAdmin.value));
 const { fetchSettings: refreshSharedSettings } = useSystemSetting();
 const loading = ref(true);
 const saving = ref<Record<TabKey, boolean>>({
@@ -99,6 +110,7 @@ const saving = ref<Record<TabKey, boolean>>({
     seo: false,
     'custom-code': false,
     monitoring: false,
+    tax: false,
     security: false,
 });
 
@@ -172,7 +184,7 @@ const webhookEventOptions = [
     { label: 'Nạp tiền thành công', value: 'recharge_success' },
 ];
 
-const currentTab = computed(() => tabs.find((tab) => tab.key === activeTab.value) ?? tabs[0]);
+const currentTab = computed(() => visibleTabs.value.find((tab) => tab.key === activeTab.value) ?? visibleTabs.value[0]);
 const siteDomainPreview = computed(() => generalForm.value.site_domain?.trim() || window.location.origin);
 const shareTitlePreview = computed(() => seoForm.value.meta_title?.trim() || generalForm.value.site_name?.trim() || 'Tiêu đề website');
 const shareDescriptionPreview = computed(
@@ -434,7 +446,7 @@ onMounted(async () => {
 
                     <div class="flex flex-wrap gap-2">
                         <button
-                            v-for="tab in tabs"
+                            v-for="tab in visibleTabs"
                             :key="tab.key"
                             type="button"
                             class="rounded-[10px] border px-3 py-2 text-sm font-medium transition"
@@ -1377,6 +1389,8 @@ onMounted(async () => {
                 </div>
 
                 <CustomCodeSettings v-show="activeTab === 'custom-code'" />
+
+                <TaxSettings v-if="isPlatformAdmin" v-show="activeTab === 'tax'" />
 
                 <SecuritySettings v-show="activeTab === 'security'" />
 

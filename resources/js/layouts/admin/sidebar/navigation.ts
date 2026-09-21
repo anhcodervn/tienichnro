@@ -10,6 +10,7 @@ import {
     ListChecks,
     Mail,
     MessagesSquare,
+    ScrollText,
     Settings,
     ShoppingCart,
     Users,
@@ -67,6 +68,12 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         href: '/admin/reports',
     },
     {
+        key: 'audit-logs',
+        label: 'Nhật ký quản trị',
+        icon: ScrollText,
+        href: '/admin/audit-logs',
+    },
+    {
         key: 'affiliate',
         label: 'Affiliate',
         icon: HandCoins,
@@ -113,9 +120,21 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 label: 'Bảng thực nhận game',
                 href: '/admin/topup/global-rewards',
             },
+        ],
+        platformOnly: true,
+    },
+    {
+        key: 'topup-providers',
+        label: 'Nhà cung cấp',
+        icon: HandCoins,
+        children: [
             {
-                label: 'Nhà cung cấp',
+                label: 'Danh sách provider',
                 href: '/admin/topup/providers',
+            },
+            {
+                label: 'So sánh giá provider',
+                href: '/admin/topup/provider-prices',
             },
         ],
         platformOnly: true,

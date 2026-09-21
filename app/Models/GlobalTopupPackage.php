@@ -70,4 +70,9 @@ class GlobalTopupPackage extends Model
     {
         return $this->hasMany(AffiliateGlobalPackageRate::class);
     }
+
+    public function providerPrices(): HasMany
+    {
+        return $this->hasMany(TopupProviderPrice::class, 'global_topup_package_id');
+    }
 }

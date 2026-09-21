@@ -23,6 +23,11 @@ export default {
             component: () => import('@/pages/admin/reports/index.vue'),
         },
         {
+            path: 'audit-logs',
+            name: 'admin.audit-logs.index',
+            component: () => import('@/pages/admin/audit-logs/index.vue'),
+        },
+        {
             path: 'affiliate',
             name: 'admin.affiliate.index',
             component: () => import('@/pages/admin/affiliate/index.vue'),
@@ -74,6 +79,11 @@ export default {
             path: 'topup/providers',
             name: 'admin.topup.providers',
             component: () => import('@/pages/admin/topup/providers/index.vue'),
+        },
+        {
+            path: 'topup/provider-prices',
+            name: 'admin.topup.provider-prices',
+            component: () => import('@/pages/admin/topup/provider-prices/index.vue'),
         },
         {
             path: 'topup/orders',

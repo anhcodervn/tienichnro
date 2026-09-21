@@ -134,6 +134,17 @@ test('admin order detail exposes QR reconciliation fields without raw callback p
         'provider_unit_cost' => 75000,
         'provider_total_cost' => 75000,
         'gross_profit' => 15000,
+        'tax_enabled' => true,
+        'tax_calculation_type' => 'revenue',
+        'vat_rate' => 1,
+        'pit_rate' => 0.5,
+        'estimated_vat' => 900,
+        'estimated_pit' => 450,
+        'estimated_tax' => 1350,
+        'payment_fee' => 0,
+        'other_cost' => 0,
+        'net_profit' => 13650,
+        'profit_margin' => 15.1667,
     ]);
     PaymentTransaction::query()->create([
         'order_id' => $order->id,
@@ -156,8 +167,16 @@ test('admin order detail exposes QR reconciliation fields without raw callback p
         ->assertOk()
         ->assertJsonPath('data.topup_id', null)
         ->assertJsonPath('data.pricing.sale_unit_price', 90000)
+        ->assertJsonPath('data.pricing.sale_price', 450000)
         ->assertJsonPath('data.pricing.provider_total_cost', 75000)
+        ->assertJsonPath('data.pricing.cost_price', 75000)
         ->assertJsonPath('data.pricing.gross_profit', 15000)
+        ->assertJsonPath('data.pricing.tax_snapshot_available', true)
+        ->assertJsonPath('data.pricing.estimated_vat', 900)
+        ->assertJsonPath('data.pricing.estimated_pit', 450)
+        ->assertJsonPath('data.pricing.estimated_tax', 1350)
+        ->assertJsonPath('data.pricing.net_profit', 13650)
+        ->assertJsonPath('data.pricing.profit_status', 'profit')
         ->assertJsonPath('data.payment_method', 'bank_transfer')
         ->assertJsonPath('data.payment_transfer_content', 'NAPADMIN001')
         ->assertJsonPath('data.payment_transaction.expected_content', 'NAPADMIN001')

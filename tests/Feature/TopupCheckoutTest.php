@@ -329,6 +329,7 @@ test('checkout snapshots direct provider field names without provider-specific m
         ->and($order->recipients()->firstOrFail()->recipient_data)->toBe(['account' => 'anh200@gmail.com'])
         ->and(data_get($order->metadata, 'provider'))->toBe([
             'slug' => 'accnrovn',
+            'type' => 'merchant_partner_card',
             'service_code' => 'nr',
             'server_code' => '16',
         ]);

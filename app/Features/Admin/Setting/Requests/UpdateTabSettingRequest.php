@@ -139,6 +139,12 @@ class UpdateTabSettingRequest extends FormRequest
                 'discord_webhooks.*.events' => ['nullable', 'array'],
                 'discord_webhooks.*.events.*' => ['string', 'in:test_ping,user_registered,recharge_success'],
             ],
+            'tax' => [
+                'tax_enabled' => ['required', 'boolean'],
+                'tax_calculation_type' => ['required', Rule::in(['revenue'])],
+                'vat_rate' => ['required', 'decimal:0,4', 'between:0,100'],
+                'pit_rate' => ['required', 'decimal:0,4', 'between:0,100'],
+            ],
             'security' => [
                 'turnstile_enabled' => ['required', 'boolean'],
                 'turnstile_site_key' => ['nullable', 'string', 'max:255', 'required_if:turnstile_enabled,true'],

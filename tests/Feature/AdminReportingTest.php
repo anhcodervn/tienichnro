@@ -28,6 +28,17 @@ test('admin report counts only paid completed orders by completion date and comp
         'provider_unit_cost' => 4000,
         'provider_total_cost' => 8000,
         'gross_profit' => 2000,
+        'tax_enabled' => true,
+        'tax_calculation_type' => 'revenue',
+        'vat_rate' => 1,
+        'pit_rate' => 0.5,
+        'estimated_vat' => 100,
+        'estimated_pit' => 50,
+        'estimated_tax' => 150,
+        'payment_fee' => 0,
+        'other_cost' => 0,
+        'net_profit' => 1850,
+        'profit_margin' => 18.5,
         'quantity' => 2,
         'package_name' => 'Gói 10.000đ',
     ]);
@@ -39,6 +50,17 @@ test('admin report counts only paid completed orders by completion date and comp
         'provider_unit_cost' => 15000,
         'provider_total_cost' => 15000,
         'gross_profit' => 5000,
+        'tax_enabled' => true,
+        'tax_calculation_type' => 'revenue',
+        'vat_rate' => 1,
+        'pit_rate' => 0.5,
+        'estimated_vat' => 200,
+        'estimated_pit' => 100,
+        'estimated_tax' => 300,
+        'payment_fee' => 0,
+        'other_cost' => 0,
+        'net_profit' => 4700,
+        'profit_margin' => 23.5,
         'quantity' => 1,
         'package_name' => 'Gói 20.000đ',
     ]);
@@ -85,9 +107,21 @@ test('admin report counts only paid completed orders by completion date and comp
         ->assertJsonPath('data.summary.successful_orders', 2)
         ->assertJsonPath('data.summary.successful_units', 3)
         ->assertJsonPath('data.summary.revenue', 30000)
+        ->assertJsonPath('data.summary.total_revenue', 30000)
         ->assertJsonPath('data.summary.average_order_value', 15000)
         ->assertJsonPath('data.summary.provider_cost', 23000)
+        ->assertJsonPath('data.summary.total_cost', 23000)
         ->assertJsonPath('data.summary.gross_profit', 7000)
+        ->assertJsonPath('data.summary.total_gross_profit', 7000)
+        ->assertJsonPath('data.summary.estimated_vat', 300)
+        ->assertJsonPath('data.summary.estimated_pit', 150)
+        ->assertJsonPath('data.summary.estimated_tax', 450)
+        ->assertJsonPath('data.summary.total_estimated_tax', 450)
+        ->assertJsonPath('data.summary.net_profit', 6550)
+        ->assertJsonPath('data.summary.total_net_profit', 6550)
+        ->assertJsonPath('data.summary.net_margin_percent', 21.8333)
+        ->assertJsonPath('data.summary.tax_snapshot_orders', 2)
+        ->assertJsonPath('data.summary.legacy_tax_orders', 0)
         ->assertJsonPath('data.summary.gross_margin_percent', 23.3)
         ->assertJsonPath('data.summary.unpriced_orders', 0)
         ->assertJsonPath('data.summary.completion_rate', 60)
@@ -105,11 +139,15 @@ test('admin report counts only paid completed orders by completion date and comp
         ->assertJsonPath('data.trend.0.revenue', 10000)
         ->assertJsonPath('data.trend.0.provider_cost', 8000)
         ->assertJsonPath('data.trend.0.gross_profit', 2000)
+        ->assertJsonPath('data.trend.0.estimated_tax', 150)
+        ->assertJsonPath('data.trend.0.net_profit', 1850)
         ->assertJsonPath('data.trend.1.revenue', 20000)
         ->assertJsonPath('data.breakdowns.games.0.name', 'Ngọc Rồng Online')
         ->assertJsonPath('data.breakdowns.games.0.revenue', 30000)
         ->assertJsonPath('data.breakdowns.games.0.provider_cost', 23000)
         ->assertJsonPath('data.breakdowns.games.0.gross_profit', 7000)
+        ->assertJsonPath('data.breakdowns.games.0.estimated_tax', 450)
+        ->assertJsonPath('data.breakdowns.games.0.net_profit', 6550)
         ->assertJsonPath('data.breakdowns.providers.0.name', 'ACCNROVN')
         ->assertJsonCount(2, 'data.recent_successful_orders');
 
@@ -174,5 +212,10 @@ test('admin report separates legacy successful orders without provider cost snap
         ->assertJsonPath('data.summary.gross_profit', 0)
         ->assertJsonPath('data.summary.priced_orders', 0)
         ->assertJsonPath('data.summary.unpriced_orders', 1)
-        ->assertJsonPath('data.summary.unpriced_revenue', 25000);
+        ->assertJsonPath('data.summary.unpriced_revenue', 25000)
+        ->assertJsonPath('data.summary.tax_snapshot_orders', 0)
+        ->assertJsonPath('data.summary.legacy_tax_orders', 1)
+        ->assertJsonPath('data.summary.legacy_tax_revenue', 25000)
+        ->assertJsonPath('data.summary.estimated_tax', 0)
+        ->assertJsonPath('data.summary.net_profit', 0);
 });

@@ -156,6 +156,13 @@ export interface SecuritySettingType {
     turnstile_secret_configured: boolean;
 }
 
+export interface TaxSettingType {
+    tax_enabled: boolean;
+    tax_calculation_type: 'revenue';
+    vat_rate: string | number;
+    pit_rate: string | number;
+}
+
 export interface SeoSettingType {
     meta_title: string;
     meta_description: string;

@@ -46,7 +46,7 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
 
     public function __construct(Order $order)
     {
-        $order->loadMissing('provider:id,slug');
+        $order->loadMissing('provider:id,slug,type');
 
         $this->orderId = $order->id;
         $this->tenantId = (int) $order->tenant_id;
@@ -59,7 +59,7 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
             && TopupProviderResolver::supportsBalance($order->provider?->slug);
         $this->canSyncProvider = $order->payment_status === PaymentStatus::Paid
             && in_array($order->order_status, [OrderStatus::Processing, OrderStatus::Completed], true)
-            && TopupProviderResolver::supportsStatusChecks($order->provider?->slug);
+            && TopupProviderResolver::supportsStatusChecks($order->provider?->type?->value ?? $order->provider?->slug);
         $this->canRetryProviderSubmission = $order->payment_status === PaymentStatus::Paid
             && $order->order_status === OrderStatus::Processing
             && TopupProviderResolver::supportsBalance($order->provider?->slug)

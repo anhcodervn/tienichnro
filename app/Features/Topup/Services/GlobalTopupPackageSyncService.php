@@ -2,6 +2,7 @@
 
 namespace App\Features\Topup\Services;
 
+use App\Enums\TopupProviderType;
 use App\Models\Game;
 use App\Models\GlobalTopupPackage;
 use App\Models\TopupPackage;
@@ -10,7 +11,7 @@ class GlobalTopupPackageSyncService
 {
     public function sync(GlobalTopupPackage $globalPackage): void
     {
-        $globalPackage->loadMissing(['provider:id,slug', 'gameSettings']);
+        $globalPackage->loadMissing(['provider:id,slug,type', 'gameSettings']);
 
         Game::query()
             ->where('package_mode', 'global')
@@ -29,7 +30,7 @@ class GlobalTopupPackageSyncService
         $game->packages()->whereNull('global_topup_package_id')->update(['status' => 'inactive']);
 
         GlobalTopupPackage::query()
-            ->with(['provider:id,slug', 'gameSettings'])
+            ->with(['provider:id,slug,type', 'gameSettings'])
             ->orderBy('sort_order')
             ->orderBy('id')
             ->each(fn (GlobalTopupPackage $globalPackage) => $this->syncPackageToGame($globalPackage, $game));
@@ -37,7 +38,7 @@ class GlobalTopupPackageSyncService
 
     public function syncPackageForGame(GlobalTopupPackage $globalPackage, Game $game): void
     {
-        $globalPackage->loadMissing(['provider:id,slug', 'gameSettings']);
+        $globalPackage->loadMissing(['provider:id,slug,type', 'gameSettings']);
         $this->syncPackageToGame($globalPackage, $game);
     }
 
@@ -48,7 +49,8 @@ class GlobalTopupPackageSyncService
         $serviceCode = trim((string) $game->provider_service_code);
         $receives = $this->receivesFor($globalPackage, $game);
         $primaryReceive = $receives[0] ?? [];
-        $requiresServiceCode = $globalPackage->provider_id !== null && $globalPackage->provider?->slug !== 'manual';
+        $requiresServiceCode = $globalPackage->provider_id !== null
+            && $globalPackage->provider?->type !== TopupProviderType::Manual;
         $isReady = (! $requiresServiceCode || $serviceCode !== '')
             && $setting !== null
             && $receives !== [];

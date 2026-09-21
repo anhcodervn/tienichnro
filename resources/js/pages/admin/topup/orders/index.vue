@@ -667,13 +667,14 @@ onBeforeUnmount(() => {
 
             <template v-else>
                 <div class="hidden overflow-x-auto lg:block">
-                    <table class="w-full min-w-[1180px] text-left text-sm">
+                    <table class="w-full min-w-[1380px] text-left text-sm">
                         <thead class="border-b border-slate-200 bg-slate-50/80 text-xs font-black uppercase tracking-wider text-slate-500">
                             <tr>
                                 <th class="w-[205px] px-4 py-3.5">Đơn hàng</th>
                                 <th class="w-[230px] px-4 py-3.5">Game / Tài khoản</th>
                                 <th class="w-[190px] px-4 py-3.5">Gói nạp</th>
                                 <th class="w-[175px] px-4 py-3.5">Thanh toán</th>
+                                <th v-if="isPlatformAdmin" class="w-[210px] px-4 py-3.5">Tài chính dự kiến</th>
                                 <th class="w-[190px] px-4 py-3.5">Xử lý provider</th>
                                 <th
                                     class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 px-4 py-3.5 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]"
@@ -738,6 +739,35 @@ onBeforeUnmount(() => {
                                     >
                                         Mã TT: {{ order.payment_transfer_content }}
                                     </button>
+                                </td>
+                                <td v-if="isPlatformAdmin" class="px-4 py-4">
+                                    <template v-if="order.pricing?.tax_snapshot_available">
+                                        <div class="grid grid-cols-[auto_1fr] gap-x-2 gap-y-1 text-xs">
+                                            <span class="text-slate-500">Vốn</span
+                                            ><strong class="text-right text-slate-700">{{
+                                                formatMoney(order.pricing.provider_total_cost ?? 0)
+                                            }}</strong>
+                                            <span class="text-slate-500">Lãi gộp</span
+                                            ><strong class="text-right text-slate-700">{{ formatMoney(order.pricing.gross_profit ?? 0) }}</strong>
+                                            <span class="text-slate-500">Thuế</span
+                                            ><strong class="text-right text-amber-700">{{ formatMoney(order.pricing.estimated_tax ?? 0) }}</strong>
+                                        </div>
+                                        <div class="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-2">
+                                            <span
+                                                class="text-xs font-black"
+                                                :class="order.pricing.profit_status === 'loss' ? 'text-rose-700' : 'text-emerald-700'"
+                                                >{{ order.pricing.profit_status === 'loss' ? 'Lỗ' : 'Lãi' }}</span
+                                            >
+                                            <strong
+                                                class="text-sm"
+                                                :class="order.pricing.profit_status === 'loss' ? 'text-rose-700' : 'text-emerald-700'"
+                                                >{{ formatMoney(order.pricing.net_profit ?? 0) }}</strong
+                                            >
+                                        </div>
+                                    </template>
+                                    <span v-else class="inline-flex rounded-full bg-slate-100 px-2 py-1 text-[11px] font-bold text-slate-500"
+                                        >Đơn cũ chưa có snapshot</span
+                                    >
                                 </td>
                                 <td class="px-4 py-4">
                                     <OrderStatusBadge kind="order" :status="order.order_status" />
@@ -845,6 +875,17 @@ onBeforeUnmount(() => {
                             >
                                 Mã TT: {{ order.payment_transfer_content }}
                             </button>
+                        </div>
+                        <div
+                            v-if="isPlatformAdmin && order.pricing?.tax_snapshot_available"
+                            class="mt-3 flex items-center justify-between rounded-xl px-3 py-2.5"
+                            :class="order.pricing.profit_status === 'loss' ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'"
+                        >
+                            <div>
+                                <p class="text-[11px] font-bold uppercase">Lãi ròng dự kiến</p>
+                                <p class="mt-0.5 text-xs">Thuế {{ formatMoney(order.pricing.estimated_tax ?? 0) }}</p>
+                            </div>
+                            <strong class="text-base">{{ formatMoney(order.pricing.net_profit ?? 0) }}</strong>
                         </div>
                         <div class="mt-4 flex items-center gap-2">
                             <button

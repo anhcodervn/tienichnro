@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\TopupProviderType;
 use Database\Factories\TopupProviderFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -17,6 +18,7 @@ class TopupProvider extends Model
     protected $fillable = [
         'name',
         'slug',
+        'type',
         'connection_config',
         'balance',
         'balance_currency',
@@ -33,6 +35,7 @@ class TopupProvider extends Model
     protected function casts(): array
     {
         return [
+            'type' => TopupProviderType::class,
             'connection_config' => 'encrypted:array',
             'balance' => 'integer',
             'balance_checked_at' => 'datetime',
@@ -52,6 +55,11 @@ class TopupProvider extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class, 'topup_provider_id');
+    }
+
+    public function prices(): HasMany
+    {
+        return $this->hasMany(TopupProviderPrice::class, 'topup_provider_id');
     }
 
     /** @return array<string, mixed> */

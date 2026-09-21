@@ -163,6 +163,11 @@ class TopupPackage extends Model
         return $this->hasMany(Order::class);
     }
 
+    public function providerPrices(): HasMany
+    {
+        return $this->hasMany(TopupProviderPrice::class, 'topup_package_id');
+    }
+
     public function memberLevelPrices(): HasMany
     {
         return $this->hasMany(MemberLevelPackagePrice::class);
