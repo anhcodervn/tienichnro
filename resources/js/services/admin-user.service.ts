@@ -163,6 +163,41 @@ export type AdminUserListParams = {
     page?: number;
 };
 
+export type AdminUserDiscountItem = {
+    id: number;
+    name: string | null;
+    username: string | null;
+    email: string | null;
+    phone: string | null;
+    status: AdminUserStatus;
+    package_rules_count: number;
+    active_package_rules_count: number;
+    global_rules_count: number;
+    active_global_rules_count: number;
+    pricing_modes: AdminUserPricingMode[];
+    discount_rates: number[];
+    updated_at: string | null;
+};
+
+export type AdminUserDiscountListResponse = {
+    data: AdminUserDiscountItem[];
+    meta: AdminPaginationMeta;
+    stats: {
+        discounted_users: number;
+        active_users: number;
+        package_rules: number;
+        global_rules: number;
+    };
+};
+
+export type AdminUserDiscountListParams = {
+    search?: string;
+    rule_status?: 'active' | 'inactive';
+    scope?: 'packages' | 'global';
+    per_page?: number;
+    page?: number;
+};
+
 export const adminUserService = {
     async list(params: AdminUserListParams = {}): Promise<AdminUserListResponse> {
         const response = await api.get('/api/admin-api/users', { params });
@@ -172,6 +207,22 @@ export const adminUserService = {
 
     async show(userId: number | string): Promise<AdminUserDetailResponse> {
         const response = await api.get(`/api/admin-api/users/${userId}`);
+
+        return response.data.data;
+    },
+
+    async discounts(params: AdminUserDiscountListParams = {}): Promise<AdminUserDiscountListResponse> {
+        const response = await api.get('/api/admin-api/users/discounts', { params });
+
+        return response.data.data as AdminUserDiscountListResponse;
+    },
+
+    async bulkSetDiscounts(payload: {
+        user_ids: number[];
+        scope: 'packages' | 'global' | 'all';
+        discount_percent: number;
+    }): Promise<{ users_updated: number; package_rules_upserted: number; global_rules_upserted: number }> {
+        const response = await api.put('/api/admin-api/users/discounts/bulk', payload);
 
         return response.data.data;
     },

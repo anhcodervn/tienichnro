@@ -3,17 +3,21 @@
 namespace App\Features\Admin\User\Controllers;
 
 use App\Features\Admin\User\Actions\AdjustUserWalletAction;
+use App\Features\Admin\User\Actions\BulkSetUserDiscountsAction;
 use App\Features\Admin\User\Actions\ListAdminUsersAction;
+use App\Features\Admin\User\Actions\ListUserDiscountsAction;
 use App\Features\Admin\User\Actions\ListUserLogsAction;
 use App\Features\Admin\User\Actions\ListUserWalletTransactionsAction;
 use App\Features\Admin\User\Actions\ResetAdminUserPasswordAction;
 use App\Features\Admin\User\Actions\ShowAdminUserAction;
 use App\Features\Admin\User\Actions\UpdateAdminUserStatusAction;
 use App\Features\Admin\User\Requests\AdminResetUserPasswordRequest;
+use App\Features\Admin\User\Requests\AdminUserDiscountIndexRequest;
 use App\Features\Admin\User\Requests\AdminUserIndexRequest;
 use App\Features\Admin\User\Requests\AdminUserRelatedListRequest;
 use App\Features\Admin\User\Requests\AdminUserStatusRequest;
 use App\Features\Admin\User\Requests\AdminWalletAdjustRequest;
+use App\Features\Admin\User\Requests\BulkSetUserDiscountRequest;
 use App\Features\Admin\User\Requests\QuickSetUserPackagePricesRequest;
 use App\Features\Admin\User\Requests\UpsertUserPackagePriceRequest;
 use App\Features\Admin\User\Resources\AdminUserDetailResource;
@@ -32,6 +36,19 @@ class UserController extends Controller
     public function index(AdminUserIndexRequest $request, ListAdminUsersAction $action): JsonResponse
     {
         return response()->json(ApiResponse::success(data: $action->handle($request->validated())));
+    }
+
+    public function discounts(AdminUserDiscountIndexRequest $request, ListUserDiscountsAction $action): JsonResponse
+    {
+        return response()->json(ApiResponse::success(data: $action->handle($request->validated())));
+    }
+
+    public function bulkSetDiscounts(BulkSetUserDiscountRequest $request, BulkSetUserDiscountsAction $action): JsonResponse
+    {
+        return response()->json(ApiResponse::success(
+            'Đã áp dụng chiết khấu hàng loạt cho người dùng đã chọn.',
+            $action->handle($request->validated()),
+        ));
     }
 
     public function show(User $user, ShowAdminUserAction $action): JsonResponse

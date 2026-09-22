@@ -99,6 +99,11 @@ export default {
                     component: () => import('@/pages/admin/users/lists/index.vue'),
                 },
                 {
+                    path: 'discounts',
+                    name: 'admin.users.discounts',
+                    component: () => import('@/pages/admin/users/discounts/index.vue'),
+                },
+                {
                     path: ':user_id(\\d+)',
                     name: 'admin.users.show',
                     component: () => import('@/pages/admin/users/info/index.vue'),

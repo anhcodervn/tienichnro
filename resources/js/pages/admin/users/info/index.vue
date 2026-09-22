@@ -115,8 +115,8 @@ const gamePricingScopes = computed(() => {
         });
     });
 
-    return Array.from(games, ([gameId, game]) => ({ value: `game:${gameId}`, label: game.label, count: game.count })).sort(
-        (left, right) => left.label.localeCompare(right.label, 'vi'),
+    return Array.from(games, ([gameId, game]) => ({ value: `game:${gameId}`, label: game.label, count: game.count })).sort((left, right) =>
+        left.label.localeCompare(right.label, 'vi'),
     );
 });
 
@@ -537,7 +537,14 @@ const goToTabPage = async (tab: TabKey, page: number): Promise<void> => {
     }
 };
 
-onMounted(loadDetail);
+onMounted(async () => {
+    await loadDetail();
+
+    const requestedTab = route.query.tab;
+    if (typeof requestedTab === 'string' && tabs.some((tab) => tab.key === requestedTab)) {
+        await openTab(requestedTab as TabKey);
+    }
+});
 </script>
 
 <template>
@@ -843,7 +850,8 @@ onMounted(loadDetail);
                                             <Sparkles class="h-4 w-4" />Set chiết khấu nhanh
                                         </h3>
                                         <p class="mt-1 text-sm text-emerald-800">
-                                            Áp dụng đồng loạt cho {{ selectedPricingRows.length }} gói trong phạm vi đang chọn và xem trước giá/lãi ngay trên bảng.
+                                            Áp dụng đồng loạt cho {{ selectedPricingRows.length }} gói trong phạm vi đang chọn và xem trước giá/lãi
+                                            ngay trên bảng.
                                         </p>
                                     </div>
                                     <button
@@ -855,7 +863,10 @@ onMounted(loadDetail);
                                     </button>
                                 </div>
 
-                                <div v-if="quickSetOpen" class="mt-4 grid gap-3 border-t border-emerald-200 pt-4 lg:grid-cols-[12rem_minmax(12rem,1fr)_auto] lg:items-end">
+                                <div
+                                    v-if="quickSetOpen"
+                                    class="mt-4 grid gap-3 border-t border-emerald-200 pt-4 lg:grid-cols-[12rem_minmax(12rem,1fr)_auto] lg:items-end"
+                                >
                                     <label class="grid gap-1.5 text-sm font-bold text-slate-700">
                                         Cách tính
                                         <select

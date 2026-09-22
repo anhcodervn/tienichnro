@@ -170,6 +170,10 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 href: '/admin/users',
             },
             {
+                label: 'User chiết khấu',
+                href: '/admin/users/discounts',
+            },
+            {
                 label: 'Lịch sử dòng tiền',
                 href: '/admin/users/wallet-transactions',
             },

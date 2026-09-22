@@ -27,6 +27,7 @@ const routeTitles: Record<string, string> = {
     'admin.topup.provider-prices': 'So sánh giá provider',
     'admin.topup.orders': 'Đơn nạp game',
     'admin.users.index': 'Quản lý người dùng',
+    'admin.users.discounts': 'Quản lý user chiết khấu',
     'admin.users.show': 'Chi tiết người dùng',
     'admin.users.wallet-transaction': 'Biến động ví người dùng',
     'admin.users.wallet-transaction.show': 'Lịch sử ví người dùng',

@@ -9,6 +9,8 @@ Route::middleware(['auth:sanctum', 'admin'])
     ->controller(UserController::class)
     ->group(function (): void {
         Route::get('/', 'index')->name('index');
+        Route::get('discounts', 'discounts')->name('discounts.index');
+        Route::put('discounts/bulk', 'bulkSetDiscounts')->name('discounts.bulk');
         Route::get('{user}/prices', 'prices')->name('prices.index');
         Route::put('{user}/prices/quick-set', 'quickSetPrices')->name('prices.quick-set');
         Route::put('{user}/global-prices/{globalTopupPackage}', 'updateGlobalPrice')->name('global-prices.update');
