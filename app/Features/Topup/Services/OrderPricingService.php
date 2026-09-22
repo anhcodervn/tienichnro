@@ -31,7 +31,7 @@ class OrderPricingService
         ?User $user = null,
     ): array {
         $query = TopupPackage::query()->with([
-            'game:id,name,short_name,reward_label,provider_service_code,status,package_mode',
+            'game:id,name,short_name,reward_label,provider_service_code,status,package_mode,min_quantity,max_quantity',
             'globalTopupPackage.provider',
             'server:id,game_id,name,code,status',
         ]);
@@ -70,12 +70,12 @@ class OrderPricingService
         $price = $this->topupPackagePricingService->resolve($package, $user);
         $quantitiesToValidate = $recipientQuantities !== [] ? $recipientQuantities : [$quantity];
         $hasInvalidQuantity = collect($quantitiesToValidate)->contains(
-            fn (mixed $recipientQuantity): bool => (int) $recipientQuantity < $package->min_quantity
-                || ($package->max_quantity !== null && (int) $recipientQuantity > $package->max_quantity),
+            fn (mixed $recipientQuantity): bool => (int) $recipientQuantity < $package->game->min_quantity
+                || (int) $recipientQuantity > $package->game->max_quantity,
         );
 
         if ($hasInvalidQuantity) {
-            throw ValidationException::withMessages([$quantityField => 'Số lượng không nằm trong giới hạn của gói nạp.']);
+            throw ValidationException::withMessages([$quantityField => 'Số lượng của mỗi tài khoản không nằm trong giới hạn của game.']);
         }
 
         $retailPrice = $price['retail_price'];

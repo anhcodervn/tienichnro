@@ -25,14 +25,13 @@ class SeoLandingPageController extends Controller
 
         $gameSlugs = collect($landing['game_slugs'] ?? [])->filter()->values();
         $games = Game::query()
-            ->select(['id', 'name', 'slug', 'short_name', 'description', 'status', 'sort_order'])
+            ->select(['id', 'name', 'slug', 'short_name', 'description', 'min_quantity', 'max_quantity', 'status', 'sort_order'])
             ->active()
             ->when($gameSlugs->isNotEmpty(), fn (Builder $query) => $query->whereIn('slug', $gameSlugs))
             ->with(['packages' => fn ($query) => $query
                 ->select([
                     'id', 'game_id', 'name', 'denomination', 'carot_amount', 'provider_price',
-                    'price', 'original_price', 'discount_percent', 'bonus_text', 'min_quantity',
-                    'max_quantity', 'status', 'sort_order',
+                    'price', 'original_price', 'discount_percent', 'bonus_text', 'status', 'sort_order',
                 ])
                 ->active()
                 ->orderBy('sort_order')
@@ -83,11 +82,10 @@ class SeoLandingPageController extends Controller
         $canonicalUrl = filter_var($configuredSiteDomain, FILTER_VALIDATE_URL)
             ? rtrim($configuredSiteDomain, '/').'/'.$landingSlug
             : route('seo.landing', ['landingSlug' => $landingSlug]);
-        $gameLandings = collect(config('seo.home_game_landings', []))
-            ->map(fn (string $slug): array => [
-                'name' => config("seo.landings.{$slug}.name", $slug),
-                'url' => route('seo.landing', ['landingSlug' => $slug]),
-            ]);
+        $gameLandings = $games->map(fn (Game $game): array => [
+            'name' => 'Nạp '.$game->name,
+            'url' => route('topup.game', ['game' => $game]),
+        ]);
 
         return view('pages.seo.landing', [
             'systemSettings' => $systemSettings,

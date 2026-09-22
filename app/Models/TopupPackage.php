@@ -23,11 +23,10 @@ class TopupPackage extends Model
     protected $fillable = [
         'game_id', 'game_server_id', 'global_topup_package_id', 'provider_id', 'provider_service_code', 'name', 'denomination', 'carot_amount',
         'reward_x2_amount', 'reward_x3_amount', 'first_topup_reward_amount', 'provider_price',
-        'price', 'original_price', 'description', 'bonus_text',
-        'min_quantity', 'max_quantity', 'status', 'sort_order', 'metadata',
+        'price', 'original_price', 'description', 'bonus_text', 'status', 'sort_order', 'metadata',
     ];
 
-    protected $attributes = ['status' => 'active', 'sort_order' => 0, 'min_quantity' => 1];
+    protected $attributes = ['status' => 'active', 'sort_order' => 0];
 
     protected function casts(): array
     {
@@ -36,7 +35,6 @@ class TopupPackage extends Model
             'reward_x2_amount' => 'integer', 'reward_x3_amount' => 'integer', 'first_topup_reward_amount' => 'integer',
             'provider_price' => 'decimal:2', 'price' => 'decimal:2',
             'original_price' => 'decimal:2', 'discount_percent' => 'decimal:2',
-            'min_quantity' => 'integer', 'max_quantity' => 'integer',
             'sort_order' => 'integer', 'metadata' => 'array',
         ];
     }

@@ -169,6 +169,16 @@ export default {
                     component: () => import('@/pages/admin/seo/dashboard/index.vue'),
                 },
                 {
+                    path: 'home',
+                    name: 'admin.seo.home',
+                    component: () => import('@/pages/admin/seo/home/index.vue'),
+                },
+                {
+                    path: 'games',
+                    name: 'admin.seo.games',
+                    component: () => import('@/pages/admin/seo/games/index.vue'),
+                },
+                {
                     path: 'categories',
                     name: 'admin.seo.categories',
                     component: () => import('@/pages/admin/seo/categories/index.vue'),

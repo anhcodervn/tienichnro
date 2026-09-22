@@ -17,6 +17,7 @@
         $shareImage = $shareImage !== '' && ! \Illuminate\Support\Str::startsWith($shareImage, ['http://', 'https://'])
             ? url($shareImage)
             : $shareImage;
+        $shareImageAlt = trim($__env->yieldContent('image_alt'));
         $gameServiceItems = is_array($settings['game_service_items'] ?? null) ? $settings['game_service_items'] : [];
         $footerGameLinks = is_array($settings['footer_game_links'] ?? null) ? $settings['footer_game_links'] : [];
         $showGameServiceMenu = ($settings['game_service_enabled'] ?? false) === true && $gameServiceItems !== [];
@@ -55,6 +56,10 @@
     @if ($shareImage !== '')
         <meta property="og:image" content="{{ $shareImage }}">
         <meta name="twitter:image" content="{{ $shareImage }}">
+        @if ($shareImageAlt !== '')
+            <meta property="og:image:alt" content="{{ $shareImageAlt }}">
+            <meta name="twitter:image:alt" content="{{ $shareImageAlt }}">
+        @endif
     @endif
     @if ($favicon !== '')
         <link rel="icon" href="{{ $favicon }}">
@@ -127,6 +132,7 @@
                 @endif
             </a>
             <nav class="hidden min-w-0 items-center gap-2 text-sm font-semibold text-slate-700 lg:flex xl:gap-4" aria-label="Điều hướng chính">
+                <button type="button" @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('topup.game'), 'hover:text-emerald-700' => ! request()->routeIs('topup.game')]) data-game-picker-open data-game-picker-trigger="desktop" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-game text-lg" aria-hidden="true"></i><span>Nạp game</span></button>
                 <a @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2', 'text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i><span>Nạp tiền</span></a>
                 <a @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2', 'text-emerald-700' => $orderHistoryActive, 'hover:text-emerald-700' => ! $orderHistoryActive]) href="{{ $orderHistoryUrl }}" @if ($orderHistoryActive) aria-current="page" @endif><i class="bx bx-history text-lg" aria-hidden="true"></i><span>Đơn hàng</span></a>
                 @if ($showGameServiceMenu)
@@ -321,6 +327,7 @@
 
             <nav class="min-h-0 flex-1 overscroll-contain overflow-y-auto px-3 py-4" aria-label="Điều hướng di động">
                 <div class="grid gap-1">
+                    <button type="button" data-menu-item data-game-picker-open data-game-picker-trigger="mobile-menu" class="flex items-center gap-3 rounded-[5px] bg-emerald-50 px-4 py-3 text-left text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-game text-xl" aria-hidden="true"></i><span>Nạp game</span><i class="bx bx-chevron-right ml-auto text-xl" aria-hidden="true"></i></button>
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('home'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('home')]) href="{{ route('home') }}" @if (request()->routeIs('home')) aria-current="page" @endif><i class="bx bx-home-alt-2 text-xl" aria-hidden="true"></i><span>Trang chủ</span></a>
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-xl" aria-hidden="true"></i><span>Nạp tiền</span></a>
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => $orderHistoryActive, 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! $orderHistoryActive]) href="{{ $orderHistoryUrl }}" @if ($orderHistoryActive) aria-current="page" @endif><i class="bx bx-history text-xl" aria-hidden="true"></i><span>Lịch sử đơn hàng</span></a>
@@ -371,10 +378,10 @@
 
     <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_18px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden" aria-label="Điều hướng nhanh trên di động" data-mobile-bottom-nav>
         <div class="mx-auto grid h-16 max-w-lg grid-cols-4">
-            <a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition', 'text-emerald-700' => request()->routeIs(['home', 'topup.*', 'pricing']), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs(['home', 'topup.*', 'pricing'])]) href="{{ route('home') }}" @if (request()->routeIs(['home', 'topup.*', 'pricing'])) aria-current="page" @endif data-mobile-nav-item="topup">
+            <button type="button" @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs(['home', 'topup.*', 'pricing']), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs(['home', 'topup.*', 'pricing'])]) data-game-picker-open data-game-picker-trigger="mobile-bottom" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog" data-mobile-nav-item="topup">
                 <i class="bx bx-diamond text-xl" aria-hidden="true"></i>
                 <span class="truncate">Nạp game</span>
-            </a>
+            </button>
             <a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition', 'text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif data-mobile-nav-item="wallet">
                 <i class="bx bx-wallet-alt text-xl" aria-hidden="true"></i>
                 <span class="truncate">Nạp tiền</span>
@@ -402,6 +409,8 @@
             </button>
         </div>
     </nav>
+
+    <x-client.game-picker-modal :games="$navigationGames ?? collect()" />
 
     <main id="main-content" class="min-w-0 focus:outline-none" tabindex="-1" data-page-enter>
         @include('client.partials.flash')

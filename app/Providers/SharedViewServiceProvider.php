@@ -3,6 +3,7 @@
 namespace App\Providers;
 
 use App\Models\AffiliateProgram;
+use App\Models\Game;
 use App\Models\User;
 use App\Support\CustomHeadTags;
 use App\Support\SafeNavigationUrl;
@@ -69,7 +70,18 @@ class SharedViewServiceProvider extends ServiceProvider
 
             $sharedSettings['game_service_items'] = $gameServiceItems;
             $viewSettings = $view->getData()['systemSettings'] ?? [];
+            $navigationGames = $view->getData()['navigationGames'] ?? null;
             $user = auth()->user();
+
+            if ($navigationGames === null) {
+                $navigationGames = Schema::hasTable('games')
+                    ? Game::query()
+                        ->active()
+                        ->orderBy('sort_order')
+                        ->orderBy('id')
+                        ->get(['id', 'name', 'slug', 'short_name', 'image'])
+                    : collect();
+            }
 
             if ($user instanceof User) {
                 $displayName = $user->name ?: $user->email;
@@ -93,6 +105,7 @@ class SharedViewServiceProvider extends ServiceProvider
                 'game_service_items' => $gameServiceItems,
                 'footer_game_links' => $footerGameLinks,
             ]);
+            $view->with('navigationGames', $navigationGames);
             $view->with('customCodeAssets', [
                 'css' => $storedSettings['custom_css_enabled'] === true && $storedSettings['custom_css'] !== '',
                 'js' => $storedSettings['custom_js_enabled'] === true && $storedSettings['custom_js'] !== '',

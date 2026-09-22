@@ -28,8 +28,6 @@ class GlobalTopupPackageResource extends JsonResource
                 : 0,
             'description' => $this->description,
             'bonus_text' => $this->bonus_text,
-            'min_quantity' => $this->min_quantity,
-            'max_quantity' => $this->max_quantity,
             'status' => $this->status,
             'sort_order' => $this->sort_order,
             'metadata' => $this->metadata ?? [],

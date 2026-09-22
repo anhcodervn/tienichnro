@@ -190,8 +190,6 @@ it('keeps game rewards when only global package prices are updated', function ()
         'original_price' => 100000,
         'description' => null,
         'bonus_text' => null,
-        'min_quantity' => 1,
-        'max_quantity' => 10,
         'status' => 'active',
         'sort_order' => 0,
         'metadata' => [],

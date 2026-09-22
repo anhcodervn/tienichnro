@@ -85,8 +85,6 @@ function taxSnapshotCatalog(): array
         'provider_price' => 803_000,
         'price' => 805_000,
         'original_price' => 805_000,
-        'min_quantity' => 1,
-        'max_quantity' => 10,
     ]);
 
     return [$game, $server, $package];

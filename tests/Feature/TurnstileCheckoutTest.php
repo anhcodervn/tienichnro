@@ -28,8 +28,6 @@ function turnstileCatalog(): array
         'game_server_id' => $server->id,
         'price' => 90000,
         'original_price' => 100000,
-        'min_quantity' => 1,
-        'max_quantity' => 10,
     ]);
 
     return [$game, $server, $package];
@@ -115,10 +113,10 @@ test('admin cannot enable turnstile without complete keys', function (): void {
 });
 
 test('guest checkout renders turnstile above the submit button only when enabled', function (): void {
-    turnstileCatalog();
+    [$game] = turnstileCatalog();
     enableTurnstile();
 
-    $this->get(route('home'))
+    $this->get(route('topup.game', ['game' => $game]))
         ->assertOk()
         ->assertSee('data-turnstile-checkout', false)
         ->assertSee('data-sitekey="site-key-test"', false)
@@ -128,7 +126,7 @@ test('guest checkout renders turnstile above the submit button only when enabled
     $user = User::factory()->create();
 
     $this->actingAs($user)
-        ->get(route('home'))
+        ->get(route('topup.game', ['game' => $game]))
         ->assertOk()
         ->assertDontSee('data-turnstile-checkout', false)
         ->assertDontSee('data-turnstile-script', false);

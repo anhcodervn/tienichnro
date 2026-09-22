@@ -28,7 +28,8 @@
         @apply w-full min-w-0 max-w-full;
     }
 
-    body.client-menu-open {
+    body.client-menu-open,
+    body.client-game-picker-open {
         @apply overflow-hidden;
     }
 

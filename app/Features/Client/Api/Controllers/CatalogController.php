@@ -17,7 +17,7 @@ class CatalogController extends Controller
     {
         $games = Game::query()
             ->active()
-            ->select(['id', 'name', 'slug', 'short_name', 'checkout_fields', 'package_mode', 'sort_order'])
+            ->select(['id', 'name', 'slug', 'short_name', 'checkout_fields', 'package_mode', 'min_quantity', 'max_quantity', 'sort_order'])
             ->with([
                 'servers' => fn (HasMany $query): HasMany => $query
                     ->active()
@@ -27,7 +27,7 @@ class CatalogController extends Controller
                     ->whereNotNull('denomination')
                     ->select([
                         'id', 'game_id', 'global_topup_package_id', 'name', 'denomination', 'provider_price', 'price',
-                        'original_price', 'min_quantity', 'max_quantity', 'sort_order',
+                        'original_price', 'sort_order',
                     ]),
             ])
             ->orderBy('sort_order')

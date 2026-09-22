@@ -34,8 +34,6 @@ class GlobalTopupPackageFactory extends Factory
             'original_price' => $denomination,
             'description' => null,
             'bonus_text' => null,
-            'min_quantity' => 1,
-            'max_quantity' => 10,
             'status' => 'active',
             'sort_order' => 0,
             'metadata' => [],

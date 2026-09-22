@@ -8,6 +8,10 @@ Route::middleware(['auth:sanctum', 'admin', 'platform.admin'])
     ->name('admin-api.seo.')
     ->group(function (): void {
         Route::get('/overview', [SeoController::class, 'overview'])->name('overview');
+        Route::get('/home', [SeoController::class, 'home'])->name('home.show');
+        Route::patch('/home', [SeoController::class, 'updateHome'])->name('home.update');
+        Route::get('/games', [SeoController::class, 'games'])->name('games.index');
+        Route::patch('/games/{game}', [SeoController::class, 'updateGame'])->name('games.update');
 
         Route::get('/categories', [SeoController::class, 'categories'])->name('categories.index');
         Route::post('/categories', [SeoController::class, 'storeCategory'])->name('categories.store');

@@ -41,8 +41,6 @@ it('protects and lets admins manage global topup packages', function () {
         'price' => 90000,
         'description' => 'Dùng chung cho các game Teamobi',
         'bonus_text' => 'Nhận ngay Carot',
-        'min_quantity' => 1,
-        'max_quantity' => 10,
         'status' => 'active',
         'sort_order' => 1,
         'metadata' => [],
@@ -89,10 +87,9 @@ it('protects and lets admins manage global topup packages', function () {
         ->and(data_get($mapping->metadata, 'global_receives.0.code'))->toBe('NX')
         ->and((int) $mapping->provider_price)->toBe(70000)
         ->and((int) $mapping->original_price)->toBe(100000)
-        ->and((float) $mapping->discount_percent)->toBe(10.0)
-        ->and($mapping->max_quantity)->toBe(10);
+        ->and((float) $mapping->discount_percent)->toBe(10.0);
 
-    $this->get(route('home'))
+    $this->get(route('topup.game', ['game' => $game]))
         ->assertSuccessful()
         ->assertSee('data-package-button="'.$mapping->id.'"', false)
         ->assertSee('-10%');
@@ -229,8 +226,6 @@ it('uses every global package value and provider across games while keeping each
         'reward_x3_amount' => 495,
         'first_topup_reward_amount' => 390,
         'bonus_text' => 'Thưởng Global',
-        'min_quantity' => 1,
-        'max_quantity' => 3,
     ]);
     GlobalTopupPackageGameSetting::factory()->for($globalPackage)->for($firstGame)->create([
         'provider_service_code' => 'nro',
@@ -278,8 +273,6 @@ it('uses every global package value and provider across games while keeping each
             'provider_price' => 89999,
             'price' => 89999,
             'original_price' => 89999,
-            'min_quantity' => 3,
-            'max_quantity' => 3,
         ])->save();
     }
 
@@ -350,8 +343,6 @@ it('prevents manual package mapping and management for global games', function (
         'provider_price' => 70000,
         'price' => 88000,
         'original_price' => 100000,
-        'min_quantity' => 1,
-        'max_quantity' => 10,
         'status' => 'active',
         'sort_order' => 1,
     ];

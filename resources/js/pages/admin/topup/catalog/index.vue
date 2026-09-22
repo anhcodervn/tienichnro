@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import UploadImage from '@/components/shared/UpladImage/index.vue';
 import { adminTopupService } from '@/services/admin-topup.service';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -77,13 +78,12 @@ const resetEditor = (): void => {
             reward_label: 'Thực nhận',
             provider_service_code: '',
             package_mode: 'custom',
+            min_quantity: 1,
+            max_quantity: 10,
             image: '',
             description: '',
-            content: '',
             status: 'active',
             sort_order: 0,
-            seo_title: '',
-            seo_description: '',
             metadata: {},
             checkout_fields: defaultCheckoutFields(),
         });
@@ -100,8 +100,6 @@ const resetEditor = (): void => {
             price: '',
             description: '',
             bonus_text: '',
-            min_quantity: 1,
-            max_quantity: '',
             status: 'active',
             sort_order: 0,
             metadata: {},
@@ -274,13 +272,12 @@ const payload = (): Record<string, unknown> => {
             reward_label: form.reward_label || 'Thực nhận',
             provider_service_code: form.provider_service_code?.trim() || null,
             package_mode: form.package_mode,
+            min_quantity: Number(form.min_quantity),
+            max_quantity: Number(form.max_quantity),
             image: form.image || null,
             description: form.description || null,
-            content: form.content || null,
             status: form.status,
             sort_order: Number(form.sort_order),
-            seo_title: form.seo_title || null,
-            seo_description: form.seo_description || null,
             metadata: form.metadata ?? {},
             checkout_fields: (form.checkout_fields as CheckoutField[]).map((field) => ({
                 key: field.key.trim(),
@@ -311,8 +308,6 @@ const payload = (): Record<string, unknown> => {
         price: Number(form.price),
         description: form.description || null,
         bonus_text: form.bonus_text || null,
-        min_quantity: Number(form.min_quantity),
-        max_quantity: form.max_quantity === '' ? null : Number(form.max_quantity),
         status: form.status,
         sort_order: Number(form.sort_order),
         metadata: form.metadata ?? {},
@@ -465,6 +460,7 @@ watch(() => props.catalogType, load, { immediate: true });
                                     <th class="p-4">Đơn vị nhận</th>
                                     <th class="p-4">Mã provider</th>
                                     <th class="p-4">Loại gói</th>
+                                    <th class="p-4">SL / tài khoản</th>
                                     <th class="p-4">Máy chủ</th>
                                     <th class="p-4">Gói nạp</th>
                                     <th class="p-4">Trạng thái</th>
@@ -503,8 +499,18 @@ watch(() => props.catalogType, load, { immediate: true });
                                 <tr v-for="row in rows" :key="row.id" class="group hover:bg-slate-50/70">
                                     <template v-if="catalogType === 'games'">
                                         <td class="p-4 font-semibold text-slate-950">
-                                            {{ row.name }}
-                                            <div class="text-xs font-normal text-slate-500">{{ row.short_name || '—' }}</div>
+                                            <div class="flex items-center gap-3">
+                                                <img
+                                                    v-if="row.image"
+                                                    :src="row.image"
+                                                    :alt="row.name"
+                                                    class="size-11 shrink-0 rounded-md border border-slate-200 object-cover"
+                                                />
+                                                <div>
+                                                    {{ row.name }}
+                                                    <div class="text-xs font-normal text-slate-500">{{ row.short_name || '—' }}</div>
+                                                </div>
+                                            </div>
                                         </td>
                                         <td class="p-4 font-mono text-xs">{{ row.slug }}</td>
                                         <td class="p-4">{{ row.reward_label || 'Thực nhận' }}</td>
@@ -518,6 +524,9 @@ watch(() => props.catalogType, load, { immediate: true });
                                             >
                                                 {{ row.package_mode === 'global' ? 'Dùng gói Global' : 'Gói riêng' }}
                                             </span>
+                                        </td>
+                                        <td class="whitespace-nowrap p-4 font-semibold text-slate-700">
+                                            {{ row.min_quantity }}–{{ row.max_quantity }}
                                         </td>
                                         <td class="p-4">{{ row.servers_count || 0 }}</td>
                                         <td class="p-4">{{ row.packages_count || 0 }}</td>
@@ -610,6 +619,33 @@ watch(() => props.catalogType, load, { immediate: true });
                             class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 px-3 font-normal"
                     /></label>
                     <template v-if="catalogType === 'games'">
+                        <div class="rounded-md border border-slate-200 bg-slate-50 p-4">
+                            <div class="mb-3 flex items-center justify-between gap-3">
+                                <div>
+                                    <p class="text-sm font-semibold text-slate-700">Ảnh game</p>
+                                    <p class="mt-1 text-xs font-normal leading-5 text-slate-500">
+                                        JPG, PNG hoặc WebP, tối đa 10 MB. Trình duyệt tự crop giữa và chuyển WebP đúng 512×512 trước khi tải lên.
+                                    </p>
+                                </div>
+                                <button
+                                    v-if="form.image"
+                                    type="button"
+                                    class="shrink-0 text-xs font-semibold text-rose-600 hover:text-rose-700"
+                                    @click="form.image = ''"
+                                >
+                                    Xóa ảnh
+                                </button>
+                            </div>
+                            <UploadImage
+                                :accept="['image/jpeg', 'image/png', 'image/webp']"
+                                :compress="false"
+                                :image-src="form.image"
+                                :name-image="form.slug || form.name || 'game'"
+                                :square-size="512"
+                                upload-url="/api/admin-api/games/image"
+                                @uploaded="form.image = $event"
+                            />
+                        </div>
                         <label class="text-sm font-semibold text-slate-700"
                             >Slug<input
                                 v-model.trim="form.slug"
@@ -652,6 +688,33 @@ watch(() => props.catalogType, load, { immediate: true });
                             <p class="text-xs leading-5 text-violet-700">
                                 Provider lấy từ gói nạp, mã dịch vụ lấy từ Game, còn server và bảng thực nhận được cấu hình theo game. Giá bán lấy từ
                                 gói Global được tự động đồng bộ theo mệnh giá.
+                            </p>
+                        </fieldset>
+                        <fieldset class="rounded-md border border-emerald-200 bg-emerald-50/60 p-4">
+                            <legend class="px-1 text-sm font-bold text-emerald-900">Giới hạn số lượng cho 1 tài khoản</legend>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <label class="text-sm font-semibold text-slate-700"
+                                    >Tối thiểu / tài khoản<input
+                                        v-model.number="form.min_quantity"
+                                        required
+                                        type="number"
+                                        min="1"
+                                        max="10"
+                                        class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 font-normal"
+                                /></label>
+                                <label class="text-sm font-semibold text-slate-700"
+                                    >Tối đa / tài khoản<input
+                                        v-model.number="form.max_quantity"
+                                        required
+                                        type="number"
+                                        :min="Number(form.min_quantity || 1)"
+                                        max="10"
+                                        class="mt-1.5 min-h-11 w-full rounded-md border border-slate-300 bg-white px-3 font-normal"
+                                /></label>
+                            </div>
+                            <p class="mt-2 text-xs leading-5 text-emerald-800">
+                                Áp dụng chung cho mọi gói của game. Mỗi tài khoản trong đơn được kiểm tra riêng; không giới hạn tổng số lượng của cả
+                                đơn.
                             </p>
                         </fieldset>
                         <fieldset class="rounded-md border border-slate-200 bg-slate-50 p-4">

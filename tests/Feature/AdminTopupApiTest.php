@@ -494,6 +494,8 @@ test('admin can create update and delete an empty game with audit logs', functio
         'slug' => 'ninja-school-online',
         'reward_label' => 'Xu',
         'provider_service_code' => 'nso',
+        'min_quantity' => 2,
+        'max_quantity' => 4,
         'checkout_fields' => [
             ['key' => 'account_id', 'label' => 'ID tài khoản', 'placeholder' => 'Nhập ID', 'required' => true, 'regex' => '^[0-9]{6,12}$'],
             ['key' => 'character_name', 'label' => 'Tên nhân vật', 'placeholder' => null, 'required' => false],
@@ -501,12 +503,16 @@ test('admin can create update and delete an empty game with audit logs', functio
         'status' => 'active',
         'sort_order' => 1,
     ])->assertCreated()
-        ->assertJsonPath('data.provider_service_code', 'nso');
+        ->assertJsonPath('data.provider_service_code', 'nso')
+        ->assertJsonPath('data.min_quantity', 2)
+        ->assertJsonPath('data.max_quantity', 4);
 
     $game = Game::query()->findOrFail($created->json('data.id'));
 
     expect($game->reward_label)->toBe('Xu')
         ->and($game->provider_service_code)->toBe('nso')
+        ->and($game->min_quantity)->toBe(2)
+        ->and($game->max_quantity)->toBe(4)
         ->and($game->checkout_fields)->toHaveCount(2)
         ->and($game->checkout_fields[0]['key'])->toBe('account_id')
         ->and($game->checkout_fields[0]['regex'])->toBe('^[0-9]{6,12}$');
@@ -516,11 +522,15 @@ test('admin can create update and delete an empty game with audit logs', functio
         'slug' => $game->slug,
         'reward_label' => 'Xu',
         'provider_service_code' => 'nso-v2',
+        'min_quantity' => 3,
+        'max_quantity' => 5,
         'checkout_fields' => $game->checkout_fields,
         'status' => $game->status,
         'sort_order' => $game->sort_order,
     ])->assertOk()
-        ->assertJsonPath('data.provider_service_code', 'nso-v2');
+        ->assertJsonPath('data.provider_service_code', 'nso-v2')
+        ->assertJsonPath('data.min_quantity', 3)
+        ->assertJsonPath('data.max_quantity', 5);
 
     $this->actingAs($admin)->deleteJson("/api/admin-api/games/{$game->id}")
         ->assertOk();
@@ -667,8 +677,6 @@ test('admin package pricing stores provider cost and calculates discount on the 
         'provider_price' => 8100,
         'original_price' => 10000,
         'price' => 8500,
-        'min_quantity' => 1,
-        'max_quantity' => 10,
         'status' => 'active',
         'sort_order' => 1,
     ])->assertCreated()
@@ -704,8 +712,6 @@ test('admin package pricing stores provider cost and calculates discount on the 
             'original_price' => 10000,
             'price' => 8500,
             'discount_percent' => 99,
-            'min_quantity' => 1,
-            'max_quantity' => 10,
             'status' => 'active',
             'sort_order' => 2,
         ])
@@ -723,8 +729,6 @@ test('admin package pricing rejects provider cost above sale price and original 
         'provider_price' => 8100,
         'original_price' => 10000,
         'price' => 8500,
-        'min_quantity' => 1,
-        'max_quantity' => 10,
         'status' => 'active',
         'sort_order' => 1,
     ];

@@ -3,20 +3,21 @@
 test('client reward table is configurable and synchronized with the topup form', function (): void {
     $projectRoot = dirname(__DIR__, 2);
     $home = file_get_contents($projectRoot.'/resources/views/client/home/index.blade.php');
-    $form = file_get_contents($projectRoot.'/resources/views/client/components/topup-form.blade.php');
+    $form = file_get_contents($projectRoot.'/resources/views/client/components/topup-form.blade.php')
+        .file_get_contents($projectRoot.'/resources/views/client/components/topup-package-selector.blade.php');
     $script = file_get_contents($projectRoot.'/resources/js/client.js');
     $styles = file_get_contents($projectRoot.'/resources/css/client.css');
     $adminCatalog = file_get_contents($projectRoot.'/resources/js/pages/admin/topup/catalog/index.vue');
 
     expect($home)
         ->toContain('Bảng giá nạp Carot')
-        ->toContain('data-game-reward-tab="{{ $game->id }}"')
-        ->toContain('data-game-reward="{{ $game->id }}"')
+        ->toContain('data-game-reward-tab="{{ $rewardGame[\'id\'] }}"')
+        ->toContain('data-game-reward="{{ $rewardGame[\'id\'] }}"')
         ->toContain('<th scope="col">Mệnh giá</th>')
         ->toContain('<th scope="col">Đơn vị nhận</th>')
-        ->toContain('data-reward-denomination="{{ $setting->denomination }}"')
-        ->toContain('role="region" aria-label="Bảng thực nhận {{ $game->name }}"')
-        ->toContain('$game->globalPackageSettings')
+        ->toContain('data-reward-denomination="{{ $rewardRow[\'denomination\'] }}"')
+        ->toContain('role="region" aria-label="Bảng thực nhận {{ $rewardGame[\'name\'] }}"')
+        ->toContain('$homeRewardGames')
         ->toContain("data_get(\$receive, 'reward_x2_amount')")
         ->toContain("data_get(\$receive, 'reward_x3_amount')")
         ->toContain("data_get(\$receive, 'first_topup_reward_amount')")
@@ -98,7 +99,6 @@ test('client reward table is configurable and synchronized with the topup form',
         ->toContain('@apply absolute -left-1.5 -top-1.5 hidden')
         ->toContain('.home-package-original-price del')
         ->toContain('.home-package-payment-price > span:last-child')
-        ->toContain('@apply content-start sm:col-span-2;')
         ->toContain('.home-order-summary')
         ->toContain(".home-game-tab[aria-selected='true']")
         ->toContain('.home-reward-table')

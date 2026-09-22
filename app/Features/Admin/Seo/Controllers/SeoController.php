@@ -2,10 +2,14 @@
 
 namespace App\Features\Admin\Seo\Controllers;
 
+use App\Features\Admin\Seo\Requests\UpdateGameSeoRequest;
+use App\Features\Admin\Seo\Requests\UpdateHomeSeoRequest;
 use App\Features\Admin\Seo\Requests\UpsertSeoCategoryRequest;
 use App\Features\Admin\Seo\Requests\UpsertSeoPostRequest;
 use App\Features\Admin\Seo\Services\SeoService;
+use App\Features\Topup\Services\HomeSeoService;
 use App\Http\Controllers\Controller;
+use App\Models\Game;
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use Illuminate\Http\JsonResponse;
@@ -15,6 +19,7 @@ class SeoController extends Controller
 {
     public function __construct(
         protected SeoService $seoService,
+        protected HomeSeoService $homeSeoService,
     ) {}
 
     public function overview(): JsonResponse
@@ -22,6 +27,40 @@ class SeoController extends Controller
         return response()->json([
             'status' => true,
             'data' => $this->seoService->overview(),
+        ]);
+    }
+
+    public function home(): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'data' => $this->homeSeoService->settings(),
+        ]);
+    }
+
+    public function updateHome(UpdateHomeSeoRequest $request): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'message' => 'Cập nhật SEO trang chủ thành công.',
+            'data' => $this->homeSeoService->update($request->validated()),
+        ]);
+    }
+
+    public function games(): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'data' => $this->seoService->gameSeoSettings(),
+        ]);
+    }
+
+    public function updateGame(UpdateGameSeoRequest $request, Game $game): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'message' => 'Cập nhật SEO game thành công.',
+            'data' => $this->seoService->updateGameSeoSettings($game, $request->validated()),
         ]);
     }
 

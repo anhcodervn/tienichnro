@@ -24,8 +24,6 @@ class TopupPackageFactory extends Factory
             'provider_price' => $carot * 850,
             'price' => $carot * 900,
             'original_price' => $carot * 1000,
-            'min_quantity' => 1,
-            'max_quantity' => 10,
             'status' => 'active',
             'sort_order' => $carot,
             'metadata' => [],

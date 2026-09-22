@@ -102,7 +102,7 @@ class AdminAuditLogService
     public function paginate(array $filters): array
     {
         $query = AdminAuditLog::query()
-            ->with('admin:id,name,full_name,email,username')
+            ->with('admin:id,full_name,email,username')
             ->when($filters['admin_id'] ?? null, fn ($builder, int $adminId) => $builder->where('admin_id', $adminId))
             ->when($filters['action'] ?? null, fn ($builder, string $action) => $builder->where('action', $action))
             ->when($filters['method'] ?? null, fn ($builder, string $method) => $builder->where('method', $method))
@@ -118,8 +118,7 @@ class AdminAuditLogService
                         ->orWhere('subject_type', 'like', $like)
                         ->orWhere('ip', 'like', $like)
                         ->orWhereHas('admin', function ($adminQuery) use ($like): void {
-                            $adminQuery->where('name', 'like', $like)
-                                ->orWhere('full_name', 'like', $like)
+                            $adminQuery->where('full_name', 'like', $like)
                                 ->orWhere('email', 'like', $like)
                                 ->orWhere('username', 'like', $like);
                         });
@@ -134,8 +133,9 @@ class AdminAuditLogService
             'filter_options' => [
                 'admins' => User::query()
                     ->where('role', 'admin')
-                    ->orderBy('name')
-                    ->get(['id', 'name', 'full_name', 'email', 'username']),
+                    ->orderBy('full_name')
+                    ->orderBy('username')
+                    ->get(['id', 'full_name', 'email', 'username']),
                 'actions' => AdminAuditLog::query()
                     ->distinct()
                     ->orderBy('action')

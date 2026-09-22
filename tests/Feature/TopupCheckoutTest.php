@@ -29,7 +29,7 @@ beforeEach(function (): void {
     Queue::fake();
 });
 
-test('guest home renders the purchase layout reward table and seo content without mounting vue', function (): void {
+test('guest game landing renders the purchase layout and reward content without mounting vue', function (): void {
     [$game, $server, $package] = topupCatalog([
         'denomination' => 100000,
         'carot_amount' => 195,
@@ -72,7 +72,7 @@ test('guest home renders the purchase layout reward table and seo content withou
     ]);
     $inactivePackage = TopupPackage::factory()->for($game)->inactive()->create(['name' => 'Gói đã tạm dừng']);
 
-    $this->get(route('home'))
+    $this->get(route('topup.game', ['game' => $game]))
         ->assertOk()
         ->assertSee($game->name.' - ID: '.$game->id)
         ->assertSee($server->name.' - ID: '.$server->id)
@@ -96,6 +96,12 @@ test('guest home renders the purchase layout reward table and seo content withou
         ->assertSee('data-topup-server-section="bulk"', false)
         ->assertSee('data-topup-payload-section="bulk"', false)
         ->assertSeeInOrder([
+            'data-topup-payload-section="single"',
+            'data-topup-server-section="single"',
+            'data-topup-payload-section="bulk"',
+            'data-topup-server-section="bulk"',
+        ], false)
+        ->assertSeeInOrder([
             'id="topup-server-single"',
             'data-server-picker="single"',
             'required',
@@ -103,21 +109,14 @@ test('guest home renders the purchase layout reward table and seo content withou
         ->assertSee('data-package-button="'.$package->id.'"', false)
         ->assertSee('class="home-package-discount">-10%</span>', false)
         ->assertSee('data-order-total', false)
-        ->assertSee('data-summary-reward', false)
         ->assertSee('name="email"', false)
         ->assertSee('CHỌN GÓI NẠP')
         ->assertSee('name="recipient_fields[game_account]"', false)
         ->assertSee('name="bulk_recipients"', false)
-        ->assertSee('data-game-reward-tab="'.$game->id.'"', false)
-        ->assertSee('data-game-reward="'.$game->id.'"', false)
         ->assertSee($game->name)
         ->assertSee($package->name)
         ->assertSee('90.000đ')
-        ->assertSee('Bảng giá nạp Carot')
         ->assertSee('100.000đ')
-        ->assertSee('20.000đ')
-        ->assertSee('Thực nhận độc lập')
-        ->assertSee('777')
         ->assertSee('Gem mở')
         ->assertSee('Gem khóa')
         ->assertSee('195')
@@ -126,23 +125,22 @@ test('guest home renders the purchase layout reward table and seo content withou
         ->assertSee('390')
         ->assertDontSee('76543')
         ->assertDontSee($inactivePackage->name)
-        ->assertSee('Cách nạp Carot tại NapCarot')
         ->assertDontSee('Lịch sử nạp game gần đây')
         ->assertDontSee('id="app"', false);
 });
 
-test('checkout renders only one single account quantity field when multiple games are available', function (): void {
-    topupCatalog();
+test('game landing renders only one single account quantity field when multiple games are available', function (): void {
+    [$game] = topupCatalog();
     topupCatalog();
 
-    $response = $this->get(route('home'));
+    $response = $this->get(route('topup.game', ['game' => $game]));
 
     $response->assertOk();
     expect(substr_count($response->getContent(), 'name="single_quantity"'))->toBe(1)
         ->and(substr_count($response->getContent(), 'id="topup-single-quantity"'))->toBe(1);
 });
 
-test('authenticated home keeps order history on its dedicated page', function (): void {
+test('authenticated game landing keeps order history on its dedicated page', function (): void {
     [$game, $server, $package] = topupCatalog();
     $user = User::factory()->create();
     $otherUser = User::factory()->create();
@@ -162,20 +160,18 @@ test('authenticated home keeps order history on its dedicated page', function ()
     ]);
 
     $this->actingAs($user)
-        ->get(route('home'))
+        ->get(route('topup.game', ['game' => $game]))
         ->assertOk()
         ->assertSee('data-authenticated="true"', false)
         ->assertDontSee('name="email"', false)
-        ->assertSee('Theo dõi trực tiếp trong lịch sử đơn hàng')
         ->assertDontSee('data-guest-order-history', false)
         ->assertDontSee('Lịch sử nạp game gần đây')
         ->assertDontSee($order->code)
         ->assertDontSee($otherOrder->code)
-        ->assertSee('Cách nạp Carot tại NapCarot')
         ->assertViewMissing('userOrders');
 });
 
-test('home automatically selects wallet when its balance covers the current order', function (): void {
+test('game landing automatically selects wallet when its balance covers the current order', function (): void {
     [$game, $server, $package] = topupCatalog();
     $user = User::factory()->create();
     $user->wallet()->update(['balance' => 180000]);
@@ -188,7 +184,7 @@ test('home automatically selects wallet when its balance covers the current orde
             'purchase_mode' => 'single',
             'single_quantity' => 2,
         ]])
-        ->get(route('home'))
+        ->get(route('topup.game', ['game' => $game]))
         ->assertOk()
         ->assertSee('name="payment_method"', false)
         ->assertSee('data-payment-explicit="false"', false)
@@ -196,14 +192,14 @@ test('home automatically selects wallet when its balance covers the current orde
         ->assertSee('Số dư ví đủ nên hệ thống đang ưu tiên thanh toán bằng ví. Bạn vẫn có thể chọn ATM.');
 });
 
-test('home renders the checkout fields configured for each game', function (): void {
+test('game landing renders the checkout fields configured for its game', function (): void {
     [$game] = topupCatalog();
     $game->update(['checkout_fields' => [
         ['key' => 'player_id', 'label' => 'ID người chơi', 'placeholder' => 'Nhập ID số', 'required' => true],
         ['key' => 'zone', 'label' => 'Khu vực', 'placeholder' => 'Ví dụ: Asia', 'required' => true],
     ]]);
 
-    $this->get(route('home'))
+    $this->get(route('topup.game', ['game' => $game]))
         ->assertOk()
         ->assertSee('name="recipient_fields[player_id]"', false)
         ->assertSee('name="recipient_fields[zone]"', false)
@@ -221,13 +217,16 @@ test('home renders the checkout fields configured for each game', function (): v
 
 function topupCatalog(array $packageAttributes = []): array
 {
-    $game = Game::factory()->create();
+    $game = Game::factory()->create([
+        'min_quantity' => (int) ($packageAttributes['min_quantity'] ?? 1),
+        'max_quantity' => (int) ($packageAttributes['max_quantity'] ?? 10),
+    ]);
+    unset($packageAttributes['min_quantity'], $packageAttributes['max_quantity']);
+
     $server = GameServer::factory()->for($game)->create();
     $package = TopupPackage::factory()->for($game)->create([
         'price' => 90000,
         'original_price' => 100000,
-        'min_quantity' => 1,
-        'max_quantity' => 10,
         ...$packageAttributes,
     ]);
 
@@ -715,6 +714,25 @@ test('bulk checkout applies the package limit to each account instead of the sum
         ->and($order->recipients()->orderBy('position')->pluck('quantity')->all())->toBe([6, 5])
         ->and((int) $order->total_amount)->toBe(990000);
 });
+
+test('single checkout rejects quantities outside the configured game range', function (int $quantity): void {
+    [$game, $server, $package] = topupCatalog([
+        'min_quantity' => 2,
+        'max_quantity' => 4,
+    ]);
+
+    $this->from(route('topup.game', $game))
+        ->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+            'single_quantity' => $quantity,
+        ]))
+        ->assertRedirect(route('topup.game', $game))
+        ->assertSessionHasErrors('single_quantity');
+
+    expect(Order::query()->count())->toBe(0);
+})->with([
+    'below game minimum' => 1,
+    'above game maximum' => 5,
+]);
 
 test('recipient quantity backfill preserves historical single and bulk order semantics', function (): void {
     $singleOrder = Order::factory()->create(['purchase_mode' => 'single', 'quantity' => 4]);

@@ -566,6 +566,10 @@ document.querySelectorAll('[data-menu-toggle]').forEach((button) => {
         link.addEventListener('click', () => void setExpanded(false, { restoreFocus: false }));
     });
 
+    menu.querySelectorAll('[data-game-picker-open]').forEach((gamePickerButton) => {
+        gamePickerButton.addEventListener('click', () => void setExpanded(false, { restoreFocus: false }));
+    });
+
     document.addEventListener('keydown', (event) => {
         if (button.getAttribute('aria-expanded') !== 'true') return;
 
@@ -604,6 +608,95 @@ document.querySelectorAll('[data-menu-toggle]').forEach((button) => {
         if (event.persisted) resetMenu();
     });
 });
+
+const gamePickerModal = document.querySelector('[data-game-picker-modal]');
+
+if (gamePickerModal) {
+    const gamePickerPanel = gamePickerModal.querySelector('[data-game-picker-panel]');
+    const gamePickerBackdrop = gamePickerModal.querySelector('[data-game-picker-backdrop]');
+    const gamePickerTriggers = [...document.querySelectorAll('[data-game-picker-open]')];
+    let gamePickerReturnFocus = null;
+
+    const gamePickerFocusableElements = () =>
+        [
+            ...gamePickerModal.querySelectorAll(
+                'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])',
+            ),
+        ].filter((element) => !element.hidden && element.tabIndex >= 0);
+
+    const setGamePickerExpanded = (expanded) => {
+        gamePickerTriggers.forEach((trigger) => trigger.setAttribute('aria-expanded', String(expanded)));
+    };
+
+    const closeGamePicker = ({ restoreFocus = true } = {}) => {
+        if (gamePickerModal.hidden) return;
+
+        gamePickerModal.hidden = true;
+        gamePickerModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('client-game-picker-open');
+        setGamePickerExpanded(false);
+
+        if (restoreFocus && gamePickerReturnFocus?.isConnected) {
+            gamePickerReturnFocus.focus({ preventScroll: true });
+        }
+    };
+
+    const openGamePicker = (trigger) => {
+        const openedFromMobileMenu = trigger.closest('[data-mobile-menu]');
+        gamePickerReturnFocus = openedFromMobileMenu ? document.querySelector('[data-mobile-sidebar-toggle]') : trigger;
+        gamePickerModal.hidden = false;
+        gamePickerModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('client-game-picker-open');
+        setGamePickerExpanded(true);
+
+        animateAndRelease(gamePickerBackdrop, [{ opacity: 0 }, { opacity: 1 }], { duration: 180 });
+        animateAndRelease(
+            gamePickerPanel,
+            [
+                { opacity: 0, transform: 'translateY(-47%) scale(0.97)' },
+                { opacity: 1, transform: 'translateY(-50%) scale(1)' },
+            ],
+            { duration: 220 },
+        );
+        window.requestAnimationFrame(() => gamePickerFocusableElements()[0]?.focus({ preventScroll: true }));
+    };
+
+    gamePickerTriggers.forEach((trigger) => {
+        trigger.addEventListener('click', () => openGamePicker(trigger));
+    });
+
+    gamePickerModal.querySelectorAll('[data-game-picker-close]').forEach((closeButton) => {
+        closeButton.addEventListener('click', () => closeGamePicker());
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (gamePickerModal.hidden) return;
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closeGamePicker();
+            return;
+        }
+
+        if (event.key !== 'Tab') return;
+
+        const focusable = gamePickerFocusableElements();
+        const first = focusable[0];
+        const last = focusable.at(-1);
+
+        if (!first || !last) return;
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
+
+    window.addEventListener('pagehide', () => closeGamePicker({ restoreFocus: false }));
+}
 
 document.querySelectorAll('[data-account-menu]').forEach((accountMenu) => {
     const button = accountMenu.querySelector('[data-account-menu-toggle]');
@@ -878,6 +971,7 @@ if (orderDetailModal) {
 }
 
 document.querySelectorAll('[data-topup-form]').forEach((form) => {
+    const stepLayout = form.dataset.stepLayout === 'true';
     const game = form.querySelector('[name="game_id"]');
     const server = form.querySelector('[name="server_id"]');
     const serverPickers = Array.from(form.querySelectorAll('[data-server-picker]'));
@@ -1285,7 +1379,7 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
                   : bulkResult.hasInvalidRows
                     ? `KIỂM TRA DÒNG ${bulkResult.firstInvalidLine}`
                     : canSubmit
-                      ? `NẠP NGAY ${formatMoney(paymentTotal)}`
+                      ? `${stepLayout ? 'THANH TOÁN' : 'NẠP NGAY'} ${formatMoney(paymentTotal)}`
                       : count === 0
                         ? 'NHẬP DANH SÁCH TÀI KHOẢN'
                         : 'KIỂM TRA SỐ LƯỢNG';

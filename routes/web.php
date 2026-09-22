@@ -85,6 +85,14 @@ Route::get('/sitemap-articles.xml', [SitemapController::class, 'articles'])->nam
 Route::get('/sitemap-categories.xml', [SitemapController::class, 'categories'])->name('sitemap.categories');
 Route::get('/sitemap-games.xml', [SitemapController::class, 'games'])->name('sitemap.games');
 
+Route::get('/nap-game-teamobi', SeoLandingPageController::class)
+    ->defaults('landingSlug', 'nap-game-teamobi')
+    ->name('seo.landing.teamobi');
+
+if (file_exists(base_path('app/Features/Client/Topup/routes.php'))) {
+    require base_path('app/Features/Client/Topup/routes.php');
+}
+
 Route::get('/{landingSlug}', SeoLandingPageController::class)
     ->whereIn('landingSlug', array_keys(config('seo.landings', [])))
     ->name('seo.landing');
@@ -98,10 +106,6 @@ Route::get('/admin/{any?}', function (Request $request, SettingStore $settingSto
         'light_logo' => '', 'dark_logo' => '', 'favicon' => '',
     ])]);
 })->middleware('auth')->where('any', '.*')->name('admin.spa');
-
-if (file_exists(base_path('app/Features/Client/Topup/routes.php'))) {
-    require base_path('app/Features/Client/Topup/routes.php');
-}
 
 if (file_exists(base_path('app/Features/Client/Wallet/web.php'))) {
     require base_path('app/Features/Client/Wallet/web.php');

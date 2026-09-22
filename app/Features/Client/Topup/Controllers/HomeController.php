@@ -2,10 +2,8 @@
 
 namespace App\Features\Client\Topup\Controllers;
 
-use App\Features\Affiliate\Services\AffiliateReferralService;
-use App\Features\Client\Topup\Services\TurnstileService;
 use App\Features\Topup\Services\GameRewardService;
-use App\Features\Topup\Services\TopupPackagePricingService;
+use App\Features\Topup\Services\HomeSeoService;
 use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\Order;
@@ -15,37 +13,29 @@ use App\Support\EditorContentRenderer;
 use App\Support\SettingStore;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
-use Illuminate\Http\Request;
 
 class HomeController extends Controller
 {
     public function __invoke(
-        Request $request,
-        AffiliateReferralService $affiliateReferralService,
         SettingStore $settingStore,
         EditorContentRenderer $contentRenderer,
-        TurnstileService $turnstileService,
-        TopupPackagePricingService $topupPackagePricingService,
         GameRewardService $gameRewardService,
+        HomeSeoService $homeSeoService,
     ): View {
         $games = Game::query()
             ->select([
-                'id', 'name', 'slug', 'short_name', 'reward_label', 'description', 'checkout_fields',
-                'package_mode', 'status', 'sort_order',
+                'id', 'name', 'slug', 'short_name', 'reward_label', 'image', 'status', 'sort_order',
             ])
             ->active()
             ->with([
-                'servers' => fn ($query) => $query
-                    ->select(['id', 'game_id', 'name', 'status', 'sort_order'])
-                    ->active(),
                 'packages' => fn ($query) => $query
                     ->select([
-                        'id', 'game_id', 'global_topup_package_id', 'name', 'denomination', 'carot_amount',
-                        'reward_x2_amount', 'reward_x3_amount', 'first_topup_reward_amount', 'provider_price', 'price', 'original_price', 'metadata',
-                        'discount_percent', 'bonus_text', 'min_quantity', 'max_quantity',
-                        'status', 'sort_order',
+                        'id', 'game_id', 'name', 'denomination', 'carot_amount', 'reward_x2_amount',
+                        'reward_x3_amount', 'first_topup_reward_amount', 'metadata', 'status', 'sort_order',
                     ])
-                    ->active(),
+                    ->active()
+                    ->orderBy('sort_order')
+                    ->orderBy('id'),
                 'globalPackageSettings' => fn ($query) => $query
                     ->select(['id', 'game_id', 'denomination', 'receives'])
                     ->orderBy('denomination'),
@@ -54,19 +44,41 @@ class HomeController extends Controller
             ->orderBy('id')
             ->get();
 
-        /** @var User|null $user */
-        $user = $request->user();
-        $affiliateReferrerUsername = $affiliateReferralService->referrer($request)?->username;
-        $walletBalance = (int) ($user?->wallet()->value('balance') ?? 0);
         $gameRewardService->applyToPackages(
             $games->flatMap(fn (Game $game) => $game->packages),
             $games->flatMap(fn (Game $game) => $game->globalPackageSettings),
         );
-        $topupPackagePricingService->apply($games->flatMap(fn (Game $game) => $game->packages), $user);
-        $games->each(fn (Game $game) => $game->setRelation(
-            'packages',
-            $game->packages->filter(fn ($package) => $package->is_price_available)->values(),
-        ));
+        $homeRewardGames = $games->map(function (Game $game): array {
+            $packagesByDenomination = $game->packages
+                ->filter(fn ($package): bool => $package->denomination !== null)
+                ->keyBy(fn ($package): int => (int) $package->denomination);
+            $settingsByDenomination = $game->globalPackageSettings
+                ->keyBy(fn ($setting): int => (int) $setting->denomination);
+
+            $rows = $packagesByDenomination->keys()
+                ->merge($settingsByDenomination->keys())
+                ->unique()
+                ->sort()
+                ->map(function (int $denomination) use ($game, $packagesByDenomination, $settingsByDenomination): array {
+                    $package = $packagesByDenomination->get($denomination);
+                    $receives = $package
+                        ? $package->rewardItems($game->reward_label)
+                        : array_values((array) $settingsByDenomination->get($denomination)?->receives);
+
+                    return [
+                        'denomination' => $denomination,
+                        'receives' => collect($receives)->filter(fn ($receive): bool => is_array($receive))->values(),
+                    ];
+                })
+                ->filter(fn (array $row): bool => $row['receives']->isNotEmpty())
+                ->values();
+
+            return [
+                'id' => $game->id,
+                'name' => $game->name ?: $game->short_name,
+                'rows' => $rows,
+            ];
+        });
 
         $systemSettings = $settingStore->getMany([
             'site_name' => config('app.name', 'Nạp Carot'),
@@ -74,9 +86,6 @@ class HomeController extends Controller
             'site_description' => 'Nạp Carot game Teamobi nhanh chóng và minh bạch.',
             'support_email' => '', 'hotline' => '', 'light_logo' => '', 'favicon' => '',
             'meta_title' => '', 'meta_description' => '',
-            'home_notice_title' => 'Thông báo quan trọng',
-            'home_notice_content' => [],
-            'home_notice_is_published' => true,
             'home_popup_title' => 'Thông báo',
             'home_popup_content' => [],
             'home_popup_is_published' => false,
@@ -84,16 +93,6 @@ class HomeController extends Controller
             'home_popup_allow_dismiss' => false,
             'home_popup_dismiss_hours' => 24,
         ]);
-        $homeNoticeContent = is_array($systemSettings['home_notice_content'])
-            ? $systemSettings['home_notice_content']
-            : [];
-        $homeGameLandings = collect(config('seo.home_game_landings', []))
-            ->map(fn (string $slug): array => [
-                'slug' => $slug,
-                'name' => config("seo.landings.{$slug}.name", $slug),
-                'description' => config("seo.landings.{$slug}.description", ''),
-                'url' => route('seo.landing', ['landingSlug' => $slug]),
-            ]);
         $latestSeoPosts = SeoPost::query()
             ->select(['id', 'seo_category_id', 'title', 'slug', 'excerpt', 'published_at'])
             ->with('category:id,name,slug,is_active')
@@ -115,29 +114,87 @@ class HomeController extends Controller
                     'postSlug' => $post->slug,
                 ]),
             ]);
-        $homeFaqs = collect(config('seo.faqs', []));
+        $homeSeo = $homeSeoService->settings();
+        $homeSeoIsPublished = $homeSeo['is_published'];
+        $homeSeoContent = $homeSeoIsPublished && is_array($homeSeo['content']) ? $homeSeo['content'] : [];
+        $homeSeoHtml = $contentRenderer->renderNodes($homeSeoContent);
+        $homeFaqs = collect($homeSeoIsPublished ? $homeSeo['faqs'] : config('seo.faqs', []))
+            ->filter(fn (mixed $faq): bool => is_array($faq)
+                && filled($faq['question'] ?? null)
+                && filled($faq['answer'] ?? null))
+            ->map(fn (array $faq): array => [
+                'question' => trim((string) $faq['question']),
+                'answer' => trim((string) $faq['answer']),
+            ])
+            ->values();
         $configuredSiteDomain = trim((string) $systemSettings['site_domain']);
         $homeCanonicalUrl = filter_var($configuredSiteDomain, FILTER_VALIDATE_URL)
             ? rtrim($configuredSiteDomain, '/').'/'
             : rtrim(route('home'), '/').'/';
+        $homeSchemas = [
+            [
+                '@context' => 'https://schema.org',
+                '@type' => 'WebSite',
+                'name' => config('seo.brand_name', 'NapCarot'),
+                'url' => $homeCanonicalUrl,
+            ],
+            [
+                '@context' => 'https://schema.org',
+                '@type' => 'Organization',
+                'name' => config('seo.brand_name', 'NapCarot'),
+                'url' => $homeCanonicalUrl,
+            ],
+        ];
+
+        if ($homeFaqs->isNotEmpty()) {
+            $homeSchemas[] = [
+                '@context' => 'https://schema.org',
+                '@type' => 'FAQPage',
+                'mainEntity' => $homeFaqs->map(fn (array $faq): array => [
+                    '@type' => 'Question',
+                    'name' => $faq['question'],
+                    'acceptedAnswer' => [
+                        '@type' => 'Answer',
+                        'text' => $faq['answer'],
+                    ],
+                ])->all(),
+            ];
+        }
+
+        if ($games->isNotEmpty()) {
+            $homeSchemas[] = [
+                '@context' => 'https://schema.org',
+                '@type' => 'ItemList',
+                'name' => 'Danh sách game hỗ trợ nạp Carot',
+                'itemListElement' => $games->values()->map(function (Game $game, int $index): array {
+                    $item = [
+                        '@type' => 'ListItem',
+                        'position' => $index + 1,
+                        'name' => $game->name,
+                        'url' => route('topup.game', ['game' => $game]),
+                    ];
+
+                    if (filled($game->image)) {
+                        $item['image'] = filter_var($game->image, FILTER_VALIDATE_URL)
+                            ? $game->image
+                            : url($game->image);
+                    }
+
+                    return $item;
+                })->all(),
+            ];
+        }
 
         return view('client.home.index', [
             'games' => $games,
+            'homeRewardGames' => $homeRewardGames,
             'homeStatistics' => [
                 'members' => User::query()->count(),
                 'orders' => Order::query()->count(),
                 'games' => $games->count(),
             ],
-            'walletBalance' => $walletBalance,
-            'affiliateReferrerUsername' => $affiliateReferrerUsername,
             'systemSettings' => $systemSettings,
-            'homeNoticeTitle' => (string) $systemSettings['home_notice_title'],
-            'homeNoticeHtml' => $contentRenderer->renderNodes($homeNoticeContent),
-            'homeNoticeIsPublished' => (bool) $systemSettings['home_notice_is_published'],
             ...$this->homePopupData($systemSettings, $contentRenderer),
-            'turnstileEnabled' => $turnstileService->isEnabled(),
-            'turnstileSiteKey' => $turnstileService->siteKey(),
-            'homeGameLandings' => $homeGameLandings,
             'mainSeoLandings' => collect(['nap-carot', 'nap-game-teamobi'])->map(fn (string $slug): array => [
                 'slug' => $slug,
                 'name' => config("seo.landings.{$slug}.name", $slug),
@@ -145,33 +202,14 @@ class HomeController extends Controller
             ]),
             'latestSeoPosts' => $latestSeoPosts,
             'homeFaqs' => $homeFaqs,
+            'homeSeoMetaTitle' => $homeSeoIsPublished ? $homeSeo['meta_title'] : config('seo.homepage.title'),
+            'homeSeoMetaDescription' => $homeSeoIsPublished ? $homeSeo['meta_description'] : config('seo.homepage.description'),
+            'homeSeoH1' => $homeSeoIsPublished ? $homeSeo['h1'] : 'Nạp Carot Game Teamobi Nhanh Chóng, Giá Tốt',
+            'homeSeoArticleTitle' => $homeSeoIsPublished ? $homeSeo['article_title'] : 'Nạp Carot game Teamobi: chọn đúng game, rõ giá trước khi thanh toán',
+            'homeSeoHtml' => $homeSeoHtml,
+            'homeSeoIsPublished' => $homeSeoIsPublished && $homeSeoHtml->isNotEmpty(),
             'homeCanonicalUrl' => $homeCanonicalUrl,
-            'homeSchemas' => [
-                [
-                    '@context' => 'https://schema.org',
-                    '@type' => 'WebSite',
-                    'name' => config('seo.brand_name', 'NapCarot'),
-                    'url' => $homeCanonicalUrl,
-                ],
-                [
-                    '@context' => 'https://schema.org',
-                    '@type' => 'Organization',
-                    'name' => config('seo.brand_name', 'NapCarot'),
-                    'url' => $homeCanonicalUrl,
-                ],
-                [
-                    '@context' => 'https://schema.org',
-                    '@type' => 'FAQPage',
-                    'mainEntity' => $homeFaqs->map(fn (array $faq): array => [
-                        '@type' => 'Question',
-                        'name' => $faq['question'],
-                        'acceptedAnswer' => [
-                            '@type' => 'Answer',
-                            'text' => $faq['answer'],
-                        ],
-                    ])->all(),
-                ],
-            ],
+            'homeSchemas' => $homeSchemas,
         ]);
     }
 

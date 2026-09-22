@@ -19,6 +19,8 @@ class CatalogGameResource extends JsonResource
             'name' => $this->name,
             'slug' => $this->slug,
             'short_name' => $this->short_name,
+            'min_amount' => $this->min_quantity,
+            'max_amount' => $this->max_quantity,
             'payload_fields' => $this->checkoutFields(),
             'servers' => $this->whenLoaded('servers', fn (): array => $this->servers
                 ->map(fn (GameServer $server): array => [
@@ -34,8 +36,8 @@ class CatalogGameResource extends JsonResource
                     'retail_price' => (int) ($package->retail_price ?? $package->price),
                     'package_source' => $package->package_source ?? 'custom',
                     'original_price' => $package->original_price !== null ? (int) $package->original_price : null,
-                    'min_amount' => $package->min_quantity,
-                    'max_amount' => $package->max_quantity,
+                    'min_amount' => $this->min_quantity,
+                    'max_amount' => $this->max_quantity,
                     'currency' => 'VND',
                 ])->all()),
         ];

@@ -77,8 +77,6 @@ class NgocRongTopupPackageSeeder extends Seeder
             'provider_price' => $this->discountedPrice($denomination, self::PROVIDER_DISCOUNT_PERCENT),
             'original_price' => $denomination,
             'price' => $this->discountedPrice($denomination, self::SALE_DISCOUNT_PERCENT),
-            'min_quantity' => 1,
-            'max_quantity' => 10,
             'status' => 'active',
             'sort_order' => $denomination,
             'metadata' => [

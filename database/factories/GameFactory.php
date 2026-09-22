@@ -18,6 +18,8 @@ class GameFactory extends Factory
             'short_name' => Str::upper(Str::substr(Str::slug($name, ''), 0, 8)),
             'reward_label' => 'Thực nhận',
             'provider_service_code' => null,
+            'min_quantity' => 1,
+            'max_quantity' => 10,
             'description' => fake()->sentence(),
             'status' => 'active',
             'sort_order' => fake()->numberBetween(0, 100),

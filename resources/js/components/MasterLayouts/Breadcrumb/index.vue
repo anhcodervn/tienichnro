@@ -76,6 +76,8 @@ const routeLabelMap: Record<string, string> = {
     'admin.queues.index': 'Quản lý queue',
     'admin.feedbacks.index': 'Liên hệ và góp ý',
     'admin.seo.dashboard': 'Quản trị SEO',
+    'admin.seo.home': 'SEO trang chủ',
+    'admin.seo.games': 'SEO từng game',
     'admin.seo.categories': 'Danh mục SEO',
     'admin.seo.posts': 'Bài viết SEO',
     'admin.seo.posts.create': 'Tạo bài viết SEO',

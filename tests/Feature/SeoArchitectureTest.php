@@ -1,12 +1,27 @@
 <?php
 
+use App\Models\Game;
+use App\Models\GlobalTopupPackageGameSetting;
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use App\Models\SeoRedirect;
 use App\Models\Setting;
+use App\Models\TopupPackage;
 use Database\Seeders\SeoContentSeeder;
 
 test('homepage targets carot and exposes visible seo sections with matching schema', function (): void {
+    $game = Game::factory()->create([
+        'name' => 'Game SEO động',
+        'slug' => 'game-seo-dong',
+        'image' => '/storage/uploads/games/game-seo-dong.webp',
+        'sort_order' => 20,
+    ]);
+    $firstGame = Game::factory()->create([
+        'name' => 'Game chọn nhanh',
+        'slug' => 'game-chon-nhanh',
+        'sort_order' => 10,
+    ]);
+    $inactiveGame = Game::factory()->inactive()->create(['slug' => 'game-seo-an']);
     $homeUrl = rtrim(route('home'), '/').'/';
     $response = $this->get(route('home'))
         ->assertOk()
@@ -23,19 +38,30 @@ test('homepage targets carot and exposes visible seo sections with matching sche
         ->assertSee('FAQPage')
         ->assertSee('WebSite')
         ->assertSee('Organization')
+        ->assertSee('ItemList')
+        ->assertSee('data-home-game-picker', false)
+        ->assertSee('src="/storage/uploads/games/game-seo-dong.webp"', false)
+        ->assertSee('aria-label="Nạp Game SEO động"', false)
+        ->assertSee(route('topup.game', ['game' => $game]))
         ->assertSeeInOrder([
-            'Rõ giá',
-            'Tự động',
-            'Dễ tra cứu',
-            'NapCarot · Nạp game Teamobi',
-            'Nạp Carot Game Teamobi Nhanh Chóng, Giá Tốt',
-        ]);
+            route('topup.game', ['game' => $firstGame]),
+            route('topup.game', ['game' => $game]),
+        ])
+        ->assertDontSee(route('topup.game', ['game' => $inactiveGame]))
+        ->assertSeeInOrder([
+            'data-home-compact-header',
+            'data-home-game-picker',
+            'data-community-cta',
+            'data-home-trust-strip',
+            'data-home-reward-reference',
+            'data-home-seo-article',
+            'data-home-supporting-blocks',
+            'data-home-seo-posts',
+            'data-home-faq',
+        ], false);
 
-    expect(substr_count($response->getContent(), '<h1'))->toBe(1);
-
-    foreach (config('seo.home_game_landings') as $landingSlug) {
-        $response->assertSee(route('seo.landing', ['landingSlug' => $landingSlug]));
-    }
+    expect(substr_count($response->getContent(), '<h1'))->toBe(1)
+        ->and(substr_count($response->getContent(), 'data-home-game-link'))->toBe(2);
 });
 
 test('homepage shows the three latest seo posts followed by the all posts card', function (): void {
@@ -67,8 +93,48 @@ test('homepage shows the three latest seo posts followed by the all posts card',
     expect(substr_count($response->getContent(), 'data-home-latest-post'))->toBe(3);
 });
 
+test('homepage reward reference includes custom and global game reward data', function (): void {
+    $customGame = Game::factory()->create([
+        'name' => 'Game gói riêng',
+        'package_mode' => 'custom',
+        'reward_label' => 'Xu',
+    ]);
+    TopupPackage::factory()->for($customGame)->create([
+        'denomination' => 50000,
+        'carot_amount' => 321,
+        'status' => 'active',
+    ]);
+
+    $globalGame = Game::factory()->create([
+        'name' => 'Game gói chung',
+        'package_mode' => 'global',
+    ]);
+    GlobalTopupPackageGameSetting::factory()->for($globalGame)->create([
+        'denomination' => 100000,
+        'receives' => [[
+            'code' => 'GEM',
+            'label' => 'Ngọc',
+            'base_amount' => 999,
+            'reward_x2_amount' => null,
+            'reward_x3_amount' => null,
+            'first_topup_reward_amount' => null,
+        ]],
+    ]);
+
+    $this->get(route('home'))
+        ->assertOk()
+        ->assertSee('Game gói riêng')
+        ->assertSee('50.000đ')
+        ->assertSee('321')
+        ->assertSee('Game gói chung')
+        ->assertSee('100.000đ')
+        ->assertSee('999');
+});
+
 test('all configured money pages are indexable and self canonical', function (): void {
-    foreach (array_keys(config('seo.landings')) as $landingSlug) {
+    $gameLandings = config('seo.home_game_landings', []);
+
+    foreach (array_diff(array_keys(config('seo.landings')), $gameLandings) as $landingSlug) {
         $url = route('seo.landing', ['landingSlug' => $landingSlug]);
 
         $this->get($url)
@@ -165,6 +231,10 @@ test('seo content seeder preserves legacy ids creates direct redirects and is id
 
 test('draft seo articles stay private until an admin publishes them', function (): void {
     $this->seed(SeoContentSeeder::class);
+    Game::query()->updateOrCreate(
+        ['slug' => 'ngoc-rong-online'],
+        ['name' => 'Ngọc Rồng Online', 'status' => 'active'],
+    );
     $post = SeoPost::query()->where('slug', 'cach-nap-ngoc-rong-online-bang-carot')->firstOrFail();
     $category = $post->category;
 

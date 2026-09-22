@@ -1,6 +1,7 @@
 <?php
 
 use App\Features\Admin\Topup\Controllers\GameController;
+use App\Features\Admin\Topup\Controllers\GameImageController;
 use App\Features\Admin\Topup\Controllers\GameServerController;
 use App\Features\Admin\Topup\Controllers\GlobalTopupPackageController;
 use App\Features\Admin\Topup\Controllers\GlobalTopupRewardController;
@@ -12,6 +13,9 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'admin'])->prefix('admin-api')->name('admin.topup.')->group(function (): void {
     Route::middleware('platform.admin')->group(function (): void {
+        Route::post('games/image', [GameImageController::class, 'store'])
+            ->middleware('throttle:30,1')
+            ->name('games.image.store');
         Route::apiResource('games', GameController::class);
         Route::apiResource('game-servers', GameServerController::class)->parameters(['game-servers' => 'gameServer']);
         Route::apiResource('topup-packages', TopupPackageController::class)->parameters(['topup-packages' => 'topupPackage']);

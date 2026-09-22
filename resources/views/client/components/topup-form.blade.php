@@ -5,6 +5,7 @@
     $turnstileSiteKey = (string) ($turnstileSiteKey ?? '');
     $showConfirmation = (bool) ($showConfirmation ?? false);
     $useH1 = (bool) ($useH1 ?? ! $selectedGame);
+    $stepLayout = (bool) ($stepLayout ?? false);
     $affiliateReferrerUsername = (string) ($affiliateReferrerUsername ?? '');
     $requestedGame = old('game_id', $selectedGame?->id ?? $games->first()?->id);
     $initialGame = $games->contains(fn ($game) => (string) $game->id === (string) $requestedGame)
@@ -42,8 +43,8 @@
         ? 'wallet'
         : 'bank_transfer';
     $initialBulkQuantitiesAreValid = $initialBulkLines->isNotEmpty()
-        && $initialBulkLines->every(function ($line) use ($initialPackage): bool {
-            if (! $initialPackage) {
+        && $initialBulkLines->every(function ($line) use ($initialPackage, $initialGameModel): bool {
+            if (! $initialPackage || ! $initialGameModel) {
                 return false;
             }
 
@@ -51,21 +52,33 @@
             $quantity = trim((string) end($values));
 
             return preg_match('/^[1-9]\d*$/D', $quantity) === 1
-                && (int) $quantity >= (int) $initialPackage->min_quantity
-                && (int) $quantity <= min(10, (int) ($initialPackage->max_quantity ?: 10));
+                && (int) $quantity >= (int) $initialGameModel->min_quantity
+                && (int) $quantity <= (int) $initialGameModel->max_quantity;
         });
     $initialCanSubmit = $initialPackage && ($initialPurchaseMode === 'bulk'
         ? $initialBulkQuantitiesAreValid
-        : $initialQuantity >= (int) $initialPackage->min_quantity
-            && $initialQuantity <= min(10, (int) ($initialPackage->max_quantity ?: 10)));
+        : $initialGameModel
+            && $initialQuantity >= (int) $initialGameModel->min_quantity
+            && $initialQuantity <= (int) $initialGameModel->max_quantity);
 @endphp
 
-<form method="POST" action="{{ route('checkout.store') }}" class="home-checkout-card" data-topup-form>
+<form
+    method="POST"
+    action="{{ route('checkout.store') }}"
+    @class([
+        'home-checkout-card',
+        '!overflow-visible !rounded-none !border-0 !bg-transparent !shadow-none' => $stepLayout,
+    ])
+    data-topup-form
+    data-step-layout="{{ $stepLayout ? 'true' : 'false' }}"
+    data-detached-steps="{{ $stepLayout ? 'true' : 'false' }}"
+>
     @csrf
     <input type="hidden" name="idempotency_key" value="{{ old('idempotency_key', (string) \Illuminate\Support\Str::uuid()) }}">
     <input type="hidden" name="purchase_mode" value="{{ $initialPurchaseMode }}" data-purchase-mode>
 
-    <header class="home-checkout-header">
+    @unless ($stepLayout)
+    <header class="home-checkout-header" data-topup-form-header>
         <div>
             <p class="home-checkout-eyebrow inline-flex items-center gap-1.5"><i class="bx bx-bolt text-base" aria-hidden="true"></i>Nạp game tự động</p>
             @if ($selectedGame || ! $useH1)
@@ -81,10 +94,11 @@
         </div>
         <span class="home-checkout-secure inline-flex items-center gap-1.5"><i class="bx bx-shield text-base" aria-hidden="true"></i>Giá được xác nhận lại trên hệ thống</span>
     </header>
+    @endunless
 
-    <div class="home-checkout-layout">
-        <div class="home-checkout-fields">
-            <div class="home-field">
+    <div @class(['home-checkout-layout', 'gap-4 lg:!grid-cols-1' => $stepLayout])>
+        <div @class(['home-checkout-fields', '!p-0' => $stepLayout])>
+            <div @class(['home-field', 'hidden' => $stepLayout])>
                 <label class="inline-flex items-center gap-1.5" for="topup-game"><i class="bx bx-joystick text-lg text-cyan-700" aria-hidden="true"></i>Game <span aria-hidden="true">*</span></label>
                 <select id="topup-game" name="game_id" class="client-input" required>
                     <option value="">Chọn game</option>
@@ -95,66 +109,9 @@
                 @error('game_id')<p class="home-field-error">{{ $message }}</p>@enderror
             </div>
 
-            <fieldset class="home-package-fieldset">
-                <legend class="inline-flex items-center gap-1.5"><i class="bx bx-coins text-lg text-cyan-700" aria-hidden="true"></i>Chọn mệnh giá <span aria-hidden="true">*</span></legend>
-                <label class="sr-only" for="topup-package">Gói nạp</label>
-                <select id="topup-package" name="package_id" class="sr-only" aria-required="true" data-package-select>
-                    <option value="">Chọn gói nạp</option>
-                    @foreach ($games as $game)
-                        @foreach ($game->packages as $package)
-                            <option
-                                value="{{ $package->id }}"
-                                data-game="{{ $game->id }}"
-                                data-name="{{ $package->name }}"
-                                data-denomination="{{ (int) ($package->denomination ?? $package->original_price) }}"
-                                data-original="{{ (int) $package->original_price }}"
-                                data-retail="{{ (int) ($package->retail_price ?? $package->price) }}"
-                                data-price="{{ (int) $package->price }}"
-                                data-discount="{{ (float) $package->discount_percent }}"
-                                data-min="{{ $package->min_quantity }}"
-                                data-max="{{ min(10, (int) ($package->max_quantity ?: 10)) }}"
-                                data-reward-label="{{ $game->reward_label ?: 'Thực nhận' }}"
-                                data-reward="{{ $package->carot_amount }}"
-                                data-reward-x2="{{ $package->reward_x2_amount }}"
-                                data-reward-x3="{{ $package->reward_x3_amount }}"
-                                data-reward-first="{{ $package->first_topup_reward_amount }}"
-                                data-rewards="{{ json_encode($package->rewardItems($game->reward_label), JSON_UNESCAPED_UNICODE) }}"
-                                @selected((string) $requestedPackage === (string) $package->id)
-                            >{{ $package->name }} · {{ number_format((int) $package->price, 0, ',', '.') }}đ</option>
-                        @endforeach
-                    @endforeach
-                </select>
-
-                @foreach ($games as $game)
-                    <div class="home-package-grid" data-package-options="{{ $game->id }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
-                        @forelse ($game->packages as $package)
-                            <button
-                                type="button"
-                                class="home-package-option"
-                                data-package-button="{{ $package->id }}"
-                                aria-pressed="{{ (string) $requestedPackage === (string) $package->id ? 'true' : 'false' }}"
-                            >
-                                <span class="home-package-check" aria-hidden="true">✓</span>
-                                @if ((float) $package->discount_percent > 0)
-                                    <span class="home-package-discount">-{{ number_format((float) $package->discount_percent, 0, ',', '.') }}%</span>
-                                @endif
-                                <strong class="home-package-name">{{ $package->name }}</strong>
-                                <span class="home-package-original-price">
-                                    <span>Giá gốc</span>
-                                    <del>{{ number_format((int) ($package->original_price ?? $package->price), 0, ',', '.') }}đ</del>
-                                </span>
-                                <span class="home-package-payment-price">
-                                    <span>Thanh toán</span>
-                                    <span>{{ number_format((int) $package->price, 0, ',', '.') }}đ</span>
-                                </span>
-                            </button>
-                        @empty
-                            <p class="home-package-empty">Bảng giá đang được cập nhật.</p>
-                        @endforelse
-                    </div>
-                @endforeach
-                @error('package_id')<p class="home-field-error">{{ $message }}</p>@enderror
-            </fieldset>
+            @unless ($stepLayout)
+                @include('client.components.topup-package-selector', compact('games', 'initialGame', 'requestedPackage', 'stepLayout'))
+            @endunless
 
             <select name="server_id" data-server-source hidden>
                 <option value="">Chọn máy chủ</option>
@@ -164,6 +121,17 @@
                     @endforeach
                 @endforeach
             </select>
+
+            @if ($stepLayout)
+                <section class="grid gap-4 rounded-[8px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5" data-topup-step="1" data-topup-step-card aria-labelledby="topup-account-step-title">
+                    <header class="flex items-center gap-3">
+                        <b class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-cyan-700 text-sm text-white">1</b>
+                        <div>
+                            <h2 id="topup-account-step-title" class="text-base font-extrabold text-slate-950">Bước 1: Nhập tài khoản</h2>
+                            <p class="text-sm text-slate-500">Chọn nạp 1 acc hoặc nạp nhiều acc.</p>
+                        </div>
+                    </header>
+            @endif
 
             <div class="home-purchase-tabs" role="tablist" aria-label="Hình thức nạp">
                 <button
@@ -188,21 +156,6 @@
             @error('purchase_mode')<p class="home-field-error">{{ $message }}</p>@enderror
 
             <div id="purchase-panel-single" role="tabpanel" aria-labelledby="purchase-tab-single" data-purchase-panel="single" @if ($initialPurchaseMode !== 'single') hidden @endif>
-                <section class="grid w-full min-w-0 gap-4 rounded-[5px] border border-slate-200 bg-slate-50 p-4" data-topup-server-section="single" aria-label="Chọn máy chủ">
-                    <div class="home-field">
-                        <label class="inline-flex items-center gap-1.5" for="topup-server-single"><i class="bx bx-server text-lg text-cyan-700" aria-hidden="true"></i>Máy chủ <span aria-hidden="true">*</span></label>
-                        <select id="topup-server-single" class="client-input" data-server-picker="single" @disabled($initialPurchaseMode !== 'single') @if ($initialPurchaseMode === 'single') required @endif>
-                            <option value="">Chọn máy chủ</option>
-                            @foreach ($games as $game)
-                                @foreach ($game->servers as $server)
-                                    <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }} - ID: {{ $server->id }}</option>
-                                @endforeach
-                            @endforeach
-                        </select>
-                        @error('server_id')<p class="home-field-error">{{ $message }}</p>@enderror
-                    </div>
-                </section>
-
                 <section class="grid w-full min-w-0 gap-4 rounded-[5px] border border-slate-200 bg-white p-4" data-topup-payload-section="single" aria-label="Thông tin tài khoản nhận">
                     @foreach ($games as $game)
                         <div class="home-recipient-grid w-full grid-cols-1" data-recipient-fields="{{ $game->id }}" data-single-confirm-recipient-label="{{ collect($game->checkoutFields())->pluck('label')->implode(' | ') }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
@@ -247,13 +200,11 @@
                     </div>
                     @error('recipient_fields')<p class="home-field-error">{{ $message }}</p>@enderror
                 </section>
-            </div>
 
-            <div id="purchase-panel-bulk" role="tabpanel" aria-labelledby="purchase-tab-bulk" data-purchase-panel="bulk" @if ($initialPurchaseMode !== 'bulk') hidden @endif>
-                <section class="grid w-full min-w-0 gap-4 rounded-[5px] border border-slate-200 bg-slate-50 p-4" data-topup-server-section="bulk" aria-label="Chọn máy chủ cho danh sách">
+                <section class="grid w-full min-w-0 gap-4 rounded-[5px] border border-slate-200 bg-slate-50 p-4" data-topup-server-section="single" aria-label="Chọn máy chủ">
                     <div class="home-field">
-                        <label class="inline-flex items-center gap-1.5" for="topup-server-bulk"><i class="bx bx-server text-lg text-cyan-700" aria-hidden="true"></i>Máy chủ áp dụng cho danh sách <span aria-hidden="true">*</span></label>
-                        <select id="topup-server-bulk" class="client-input" data-server-picker="bulk" @disabled($initialPurchaseMode !== 'bulk') @if ($initialPurchaseMode === 'bulk') required @endif>
+                        <label class="inline-flex items-center gap-1.5" for="topup-server-single"><i class="bx bx-server text-lg text-cyan-700" aria-hidden="true"></i>Máy chủ <span aria-hidden="true">*</span></label>
+                        <select id="topup-server-single" class="client-input" data-server-picker="single" @disabled($initialPurchaseMode !== 'single') @if ($initialPurchaseMode === 'single') required @endif>
                             <option value="">Chọn máy chủ</option>
                             @foreach ($games as $game)
                                 @foreach ($game->servers as $server)
@@ -261,11 +212,12 @@
                                 @endforeach
                             @endforeach
                         </select>
-                        <p class="home-field-help">Máy chủ này được áp dụng cho toàn bộ tài khoản bên dưới.</p>
                         @error('server_id')<p class="home-field-error">{{ $message }}</p>@enderror
                     </div>
                 </section>
+            </div>
 
+            <div id="purchase-panel-bulk" role="tabpanel" aria-labelledby="purchase-tab-bulk" data-purchase-panel="bulk" @if ($initialPurchaseMode !== 'bulk') hidden @endif>
                 <section class="grid w-full min-w-0 gap-3 rounded-[5px] border border-slate-200 bg-white p-4" data-topup-payload-section="bulk" aria-label="Danh sách tài khoản nhận">
                     <label class="inline-flex items-center gap-1.5 text-sm font-semibold text-slate-800" for="topup-bulk-recipients"><i class="bx bx-list text-lg text-cyan-700" aria-hidden="true"></i>Danh sách tài khoản</label>
                     @foreach ($games as $game)
@@ -301,6 +253,22 @@
                     <p class="home-field-error" data-bulk-format-error role="alert" aria-live="polite" hidden></p>
                     @error('bulk_recipients')<p class="home-field-error">{{ $message }}</p>@enderror
                 </section>
+
+                <section class="grid w-full min-w-0 gap-4 rounded-[5px] border border-slate-200 bg-slate-50 p-4" data-topup-server-section="bulk" aria-label="Chọn máy chủ cho danh sách">
+                    <div class="home-field">
+                        <label class="inline-flex items-center gap-1.5" for="topup-server-bulk"><i class="bx bx-server text-lg text-cyan-700" aria-hidden="true"></i>Máy chủ áp dụng cho danh sách <span aria-hidden="true">*</span></label>
+                        <select id="topup-server-bulk" class="client-input" data-server-picker="bulk" @disabled($initialPurchaseMode !== 'bulk') @if ($initialPurchaseMode === 'bulk') required @endif>
+                            <option value="">Chọn máy chủ</option>
+                            @foreach ($games as $game)
+                                @foreach ($game->servers as $server)
+                                    <option value="{{ $server->id }}" data-game="{{ $game->id }}" @selected((string) old('server_id') === (string) $server->id)>{{ $server->name }} - ID: {{ $server->id }}</option>
+                                @endforeach
+                            @endforeach
+                        </select>
+                        <p class="home-field-help">Máy chủ này được áp dụng cho toàn bộ tài khoản phía trên.</p>
+                        @error('server_id')<p class="home-field-error">{{ $message }}</p>@enderror
+                    </div>
+                </section>
             </div>
 
             @guest
@@ -312,10 +280,31 @@
                 </div>
 
             @endguest
+
+            @if ($stepLayout)
+                </section>
+
+                @include('client.components.topup-package-selector', compact('games', 'initialGame', 'requestedPackage', 'stepLayout'))
+            @endif
         </div>
 
-        <aside class="home-order-summary" aria-labelledby="order-summary-title">
-            <h2 id="order-summary-title" class="flex items-center gap-2"><i class="bx bx-receipt text-xl text-cyan-700" aria-hidden="true"></i>Tóm tắt đơn</h2>
+        <aside @class([
+            'home-order-summary',
+            '!rounded-[8px] !border !border-slate-200 !bg-white shadow-sm' => $stepLayout,
+        ]) aria-labelledby="order-summary-title" data-topup-step="{{ $stepLayout ? '3' : null }}" @if ($stepLayout) data-topup-step-card @endif>
+            @if ($stepLayout)
+                <header class="mb-4 flex items-center gap-3">
+                    <b class="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-cyan-700 text-sm text-white">3</b>
+                    <div>
+                        <h2 id="order-summary-title" class="text-base font-extrabold text-slate-950">Bước 3: Thanh toán <strong class="text-cyan-800" data-order-total>{{ number_format($initialPaymentTotal, 0, ',', '.') }}đ</strong></h2>
+                        <p class="text-sm text-slate-500">Chọn phương thức thanh toán để tiếp tục.</p>
+                    </div>
+                </header>
+            @else
+                <h2 id="order-summary-title" class="flex items-center gap-2"><i class="bx bx-receipt text-xl text-cyan-700" aria-hidden="true"></i>Tóm tắt đơn</h2>
+            @endif
+
+            @unless ($stepLayout)
             <dl class="home-summary-list">
                 <div><dt>Gói nạp</dt><dd data-summary-package>{{ $initialPackage?->denomination ? number_format($initialPackage->denomination, 0, ',', '.').'đ' : ($initialPackage?->name ?? 'Chưa chọn') }}</dd></div>
                 <div><dt data-summary-quantity-label>{{ $initialPurchaseMode === 'bulk' ? 'Tổng số thẻ' : 'Số lượng thẻ' }}</dt><dd data-summary-quantity>{{ $initialQuantity }}</dd></div>
@@ -330,6 +319,7 @@
                 <span data-summary-reward-x2 @if ($initialPackage?->rewardDisplay('reward_x2_amount', $initialQuantity, $initialGameModel?->reward_label) === null) hidden @endif>KM X2: {{ $initialPackage?->rewardDisplay('reward_x2_amount', $initialQuantity, $initialGameModel?->reward_label) }}</span>
                 <span data-summary-reward-x3 @if ($initialPackage?->rewardDisplay('reward_x3_amount', $initialQuantity, $initialGameModel?->reward_label) === null) hidden @endif>KM X3: {{ $initialPackage?->rewardDisplay('reward_x3_amount', $initialQuantity, $initialGameModel?->reward_label) }}</span>
             </div>
+            @endunless
 
             <fieldset class="home-field home-payment-field">
                 <legend id="topup-payment-label" class="inline-flex items-center gap-1.5"><i class="bx bx-credit-card text-lg text-cyan-700" aria-hidden="true"></i>Phương thức thanh toán</legend>
@@ -405,7 +395,7 @@
 
             <button class="home-checkout-submit" type="submit" data-submit-button @disabled(! $initialCanSubmit)>
                 <i class="bx bx-bolt text-xl" aria-hidden="true"></i>
-                <span data-submit-text>{{ ! $initialPackage ? 'CHỌN GÓI NẠP' : ($initialCanSubmit ? 'NẠP NGAY '.number_format($initialPaymentTotal, 0, ',', '.').'đ' : ($initialQuantity === 0 ? 'NHẬP DANH SÁCH TÀI KHOẢN' : 'KIỂM TRA SỐ LƯỢNG')) }}</span>
+                <span data-submit-text>{{ ! $initialPackage ? 'CHỌN GÓI NẠP' : ($initialCanSubmit ? ($stepLayout ? 'THANH TOÁN ' : 'NẠP NGAY ').number_format($initialPaymentTotal, 0, ',', '.').'đ' : ($initialQuantity === 0 ? 'NHẬP DANH SÁCH TÀI KHOẢN' : 'KIỂM TRA SỐ LƯỢNG')) }}</span>
             </button>
             <p class="home-checkout-note">Hệ thống không yêu cầu cung cấp mật khẩu game.</p>
         </aside>

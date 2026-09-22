@@ -126,7 +126,7 @@ test('client mobile navigation uses an accessible off canvas drawer', function (
         ->and($wallet)
         ->toContain('flex flex-col gap-3 p-4 sm:flex-row')
         ->and($topupGame)
-        ->toContain('class="client-container py-8 sm:py-10 lg:py-12"')
+        ->toContain('class="client-container grid gap-5 py-5 sm:py-7"')
         ->toContain("'selectedGame' => \$game")
         ->and($payment)
         ->toContain('<x-client.bank-transfer-payment')

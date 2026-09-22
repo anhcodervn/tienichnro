@@ -2,6 +2,7 @@
 
 namespace App\Support;
 
+use App\Models\Game;
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use Illuminate\Database\Eloquent\Builder;
@@ -44,14 +45,34 @@ class SitemapUrlService
             ->values();
     }
 
-    /** @return Collection<int, array{loc: string, lastmod: null}> */
+    /** @return Collection<int, array{loc: string, lastmod: mixed}> */
     public function gameUrls(): Collection
     {
-        return collect(config('seo.home_game_landings', []))
-            ->map(fn (string $slug): array => [
-                'loc' => route('seo.landing', ['landingSlug' => $slug]),
-                'lastmod' => null,
-            ])
+        return Game::query()
+            ->active()
+            ->with('seoSetting')
+            ->orderBy('sort_order')
+            ->orderBy('id')
+            ->get(['id', 'slug', 'updated_at'])
+            ->map(function (Game $game): ?array {
+                $setting = $game->seoSetting;
+                $localUrl = route('topup.game', ['game' => $game]);
+
+                if ($setting?->is_published && $setting->robots !== 'index,follow') {
+                    return null;
+                }
+
+                if ($setting?->is_published && filled($setting->canonical_url)
+                    && rtrim((string) $setting->canonical_url, '/') !== rtrim($localUrl, '/')) {
+                    return null;
+                }
+
+                return [
+                    'loc' => $localUrl,
+                    'lastmod' => $setting?->updated_at ?? $game->updated_at,
+                ];
+            })
+            ->filter()
             ->values();
     }
 

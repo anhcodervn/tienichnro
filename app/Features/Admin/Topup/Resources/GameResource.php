@@ -15,9 +15,10 @@ class GameResource extends JsonResource
             'reward_label' => $this->reward_label,
             'provider_service_code' => $this->provider_service_code,
             'package_mode' => $this->package_mode,
+            'min_quantity' => $this->min_quantity,
+            'max_quantity' => $this->max_quantity,
             'checkout_fields' => $this->checkoutFields(),
-            'content' => $this->content, 'status' => $this->status, 'sort_order' => $this->sort_order,
-            'seo_title' => $this->seo_title, 'seo_description' => $this->seo_description,
+            'status' => $this->status, 'sort_order' => $this->sort_order,
             'metadata' => $this->metadata ?? [], 'servers_count' => $this->whenCounted('servers'),
             'packages_count' => $this->whenCounted('packages'), 'created_at' => $this->created_at?->toISOString(),
         ];

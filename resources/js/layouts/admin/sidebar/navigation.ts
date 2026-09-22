@@ -205,6 +205,14 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 href: '/admin/seo',
             },
             {
+                label: 'SEO trang chủ',
+                href: '/admin/seo/home',
+            },
+            {
+                label: 'SEO từng game',
+                href: '/admin/seo/games',
+            },
+            {
                 label: 'Danh mục SEO',
                 href: '/admin/seo/categories',
             },

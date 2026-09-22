@@ -31,8 +31,6 @@ function guestAffiliateCatalog(): array
     $package = TopupPackage::factory()->for($game)->create([
         'price' => 90000,
         'provider_price' => 75000,
-        'min_quantity' => 1,
-        'max_quantity' => 10,
     ]);
 
     return [$game, $server, $package];

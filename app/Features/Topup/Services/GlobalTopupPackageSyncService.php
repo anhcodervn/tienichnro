@@ -68,8 +68,6 @@ class GlobalTopupPackageSyncService
             'original_price' => $globalPackage->denomination,
             'description' => $globalPackage->description,
             'bonus_text' => $globalPackage->bonus_text,
-            'min_quantity' => $globalPackage->min_quantity,
-            'max_quantity' => $globalPackage->max_quantity,
             'status' => $globalPackage->status === 'active' && $isReady ? 'active' : 'inactive',
             'sort_order' => $globalPackage->sort_order,
             'metadata' => [

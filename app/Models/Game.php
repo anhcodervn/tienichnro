@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class Game extends Model
 {
@@ -19,14 +20,27 @@ class Game extends Model
 
     protected $fillable = [
         'name', 'slug', 'short_name', 'reward_label', 'provider_service_code', 'image', 'description', 'content', 'status',
-        'package_mode', 'sort_order', 'seo_title', 'seo_description', 'metadata', 'checkout_fields',
+        'package_mode', 'min_quantity', 'max_quantity', 'sort_order', 'seo_title', 'seo_description', 'metadata', 'checkout_fields',
     ];
 
-    protected $attributes = ['reward_label' => 'Thực nhận', 'package_mode' => 'custom', 'status' => 'active', 'sort_order' => 0];
+    protected $attributes = [
+        'reward_label' => 'Thực nhận',
+        'package_mode' => 'custom',
+        'min_quantity' => 1,
+        'max_quantity' => 10,
+        'status' => 'active',
+        'sort_order' => 0,
+    ];
 
     protected function casts(): array
     {
-        return ['metadata' => 'array', 'checkout_fields' => 'array', 'sort_order' => 'integer'];
+        return [
+            'metadata' => 'array',
+            'checkout_fields' => 'array',
+            'min_quantity' => 'integer',
+            'max_quantity' => 'integer',
+            'sort_order' => 'integer',
+        ];
     }
 
     /** @return array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string}> */
@@ -74,5 +88,10 @@ class Game extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function seoSetting(): HasOne
+    {
+        return $this->hasOne(GameSeoSetting::class);
     }
 }

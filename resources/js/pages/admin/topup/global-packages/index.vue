@@ -17,8 +17,6 @@ const form = reactive({
     price: '' as string | number,
     description: '',
     bonus_text: '',
-    min_quantity: 1,
-    max_quantity: '' as string | number,
     status: 'active' as 'active' | 'inactive',
     sort_order: 0,
 });
@@ -27,8 +25,6 @@ const formFieldClass =
     'min-h-11 w-full rounded-md border-2 border-slate-300 bg-slate-50 px-3 py-2 text-slate-950 outline-none transition hover:border-slate-400 focus:border-violet-500 focus:bg-white focus:ring-4 focus:ring-violet-100';
 const money = (value: number | null): string => `${new Intl.NumberFormat('vi-VN').format(value ?? 0)}đ`;
 const notify = (message: string): void => handleSuccessResponse({ data: { status: true, message } });
-const nullableNumber = (value: string | number): number | null => (value === '' ? null : Number(value));
-
 const resetForm = (): void => {
     editingId.value = null;
     Object.assign(form, {
@@ -40,8 +36,6 @@ const resetForm = (): void => {
         price: '',
         description: '',
         bonus_text: '',
-        min_quantity: 1,
-        max_quantity: '',
         status: 'active',
         sort_order: catalog.value.global_packages.length,
     });
@@ -69,8 +63,6 @@ const edit = (globalPackage: GlobalTopupPackage): void => {
         price: globalPackage.price,
         description: globalPackage.description ?? '',
         bonus_text: globalPackage.bonus_text ?? '',
-        min_quantity: globalPackage.min_quantity,
-        max_quantity: globalPackage.max_quantity ?? '',
         status: globalPackage.status,
         sort_order: globalPackage.sort_order,
     });
@@ -87,8 +79,6 @@ const save = async (): Promise<void> => {
             price: Number(form.price),
             description: form.description || null,
             bonus_text: form.bonus_text || null,
-            min_quantity: Number(form.min_quantity),
-            max_quantity: nullableNumber(form.max_quantity),
             metadata: {},
             sort_order: Number(form.sort_order),
         });
@@ -127,7 +117,7 @@ onMounted(async () => {
             <div>
                 <p class="text-xs font-bold uppercase tracking-[0.16em] text-violet-600">Gói hoàn chỉnh dùng chung cho mọi game Global</p>
                 <h1 class="mt-1 text-2xl font-black text-slate-950">Gói nạp Global</h1>
-                <p class="mt-1 text-sm text-slate-500">Quản lý mệnh giá, giá bán chung, giá vốn provider và giới hạn cho mọi game dùng Global.</p>
+                <p class="mt-1 text-sm text-slate-500">Quản lý mệnh giá, giá bán chung và giá vốn provider cho mọi game dùng Global.</p>
             </div>
             <button
                 type="button"
@@ -177,12 +167,6 @@ onMounted(async () => {
                 <div class="grid gap-3 sm:grid-cols-2">
                     <label class="grid gap-1 text-sm font-bold"
                         >Giá bán chung<input v-model="form.price" required min="0" type="number" :class="formFieldClass"
-                    /></label>
-                    <label class="grid gap-1 text-sm font-bold"
-                        >Số lượng tối thiểu<input v-model.number="form.min_quantity" required min="1" max="10" type="number" :class="formFieldClass"
-                    /></label>
-                    <label class="grid gap-1 text-sm font-bold"
-                        >Số lượng tối đa<input v-model="form.max_quantity" min="1" max="10" type="number" :class="formFieldClass"
                     /></label>
                 </div>
 

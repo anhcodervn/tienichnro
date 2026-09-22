@@ -41,8 +41,6 @@ class TopupCatalogSeeder extends Seeder
                         'provider_price' => $price - ($carot * 50),
                         'price' => $price,
                         'original_price' => $carot * 1000,
-                        'min_quantity' => 1,
-                        'max_quantity' => 10,
                         'status' => 'active',
                         'sort_order' => $carot,
                     ],

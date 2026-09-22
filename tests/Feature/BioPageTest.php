@@ -23,7 +23,7 @@ test('bio page is a standalone blade page with a home link', function (): void {
     expect(route('bio.show', [], false))->toBe('/community');
 });
 
-test('homepage shows the community call to action before the topup form', function (): void {
+test('homepage shows the community call to action without the topup form', function (): void {
     $response = $this->get(route('home'))->assertOk();
 
     $response
@@ -31,7 +31,7 @@ test('homepage shows the community call to action before the topup form', functi
         ->assertSee('Tham gia cộng đồng')
         ->assertSee('Nổi bật')
         ->assertSee('href="'.route('bio.show').'"', false)
-        ->assertSeeInOrder(['data-community-cta', 'home-checkout-card'], false);
+        ->assertDontSee('data-topup-form', false);
 });
 
 test('only admins can manage bio settings', function (): void {

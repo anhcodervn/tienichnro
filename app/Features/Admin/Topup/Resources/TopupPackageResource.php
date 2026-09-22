@@ -15,8 +15,7 @@ class TopupPackageResource extends JsonResource
             'name' => $this->name, 'denomination' => $this->denomination,
             'provider_price' => $this->provider_price, 'price' => $this->price, 'original_price' => $this->original_price,
             'discount_percent' => $this->discount_percent, 'description' => $this->description,
-            'bonus_text' => $this->bonus_text, 'min_quantity' => $this->min_quantity,
-            'max_quantity' => $this->max_quantity, 'status' => $this->status, 'sort_order' => $this->sort_order,
+            'bonus_text' => $this->bonus_text, 'status' => $this->status, 'sort_order' => $this->sort_order,
             'metadata' => $this->metadata ?? [], 'created_at' => $this->created_at?->toISOString(),
         ];
     }

@@ -17,7 +17,10 @@ test('audit log api only allows administrators', function (): void {
 });
 
 test('all authenticated admin reads and writes are recorded with sensitive values redacted', function (): void {
-    $admin = User::factory()->create(['role' => 'admin']);
+    $admin = User::factory()->create([
+        'role' => 'admin',
+        'full_name' => 'Quản trị Audit',
+    ]);
 
     $this->actingAs($admin)
         ->withHeader('User-Agent', 'AdminAuditLogTest')
@@ -56,6 +59,11 @@ test('all authenticated admin reads and writes are recorded with sensitive value
         ->assertJsonPath('data.logs.total', 1)
         ->assertJsonPath('data.logs.data.0.id', $writeLog->id)
         ->assertJsonPath('data.logs.data.0.admin.id', $admin->id)
+        ->assertJsonPath('data.logs.data.0.admin.full_name', 'Quản trị Audit')
+        ->assertJsonPath('data.logs.data.0.admin.name', 'Quản trị Audit')
+        ->assertJsonPath('data.filter_options.admins.0.id', $admin->id)
+        ->assertJsonPath('data.filter_options.admins.0.full_name', 'Quản trị Audit')
+        ->assertJsonPath('data.filter_options.admins.0.name', 'Quản trị Audit')
         ->assertJsonPath('data.filter_options.actions.0', 'admin_request_write');
 
     expect(AdminAuditLog::query()->where('action', 'admin_request_read')->count())->toBe(1);

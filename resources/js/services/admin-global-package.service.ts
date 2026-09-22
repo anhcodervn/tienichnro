@@ -14,8 +14,6 @@ export type GlobalTopupPackage = {
     discount_percent: number;
     description: string | null;
     bonus_text: string | null;
-    min_quantity: number;
-    max_quantity: number | null;
     status: 'active' | 'inactive';
     sort_order: number;
     metadata: Record<string, unknown>;

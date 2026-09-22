@@ -38,16 +38,14 @@ function topupApiCredentials(User $user, array $permissions = ['balance:read', '
     ];
 }
 
-function topupApiCatalog(array $packageAttributes = []): array
+function topupApiCatalog(array $packageAttributes = [], array $gameAttributes = []): array
 {
-    $game = Game::factory()->create();
+    $game = Game::factory()->create($gameAttributes);
     $server = GameServer::factory()->for($game)->create();
     $package = TopupPackage::factory()->for($game)->create([
         'denomination' => 100000,
         'price' => 90000,
         'original_price' => 100000,
-        'min_quantity' => 1,
-        'max_quantity' => 10,
         ...$packageAttributes,
     ]);
 
@@ -124,7 +122,10 @@ test('balance endpoint returns only the useful wallet fields', function (): void
 });
 
 test('catalog returns active games servers packages sale prices and game payload fields', function (): void {
-    [$game, $server, $package] = topupApiCatalog();
+    [$game, $server, $package] = topupApiCatalog(gameAttributes: [
+        'min_quantity' => 2,
+        'max_quantity' => 4,
+    ]);
     $game->update(['checkout_fields' => [
         ['key' => 'account', 'label' => 'Tài khoản', 'placeholder' => 'Nhập tài khoản', 'required' => true],
     ]]);
@@ -139,11 +140,15 @@ test('catalog returns active games servers packages sale prices and game payload
         ->assertJsonPath('status', true)
         ->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.id', $game->id)
+        ->assertJsonPath('data.0.min_amount', 2)
+        ->assertJsonPath('data.0.max_amount', 4)
         ->assertJsonPath('data.0.servers.0.id', $server->id)
         ->assertJsonPath('data.0.payload_fields.0.key', 'account')
         ->assertJsonPath('data.0.packages.0.id', $package->id)
         ->assertJsonPath('data.0.packages.0.price', 100000)
         ->assertJsonPath('data.0.packages.0.sale_price', 90000)
+        ->assertJsonPath('data.0.packages.0.min_amount', 2)
+        ->assertJsonPath('data.0.packages.0.max_amount', 4)
         ->assertJsonMissingPath('data.0.packages.0.server_id')
         ->assertJsonMissingPath('data.0.packages.0.provider_id')
         ->assertJsonMissingPath('data.0.packages.0.provider_price');

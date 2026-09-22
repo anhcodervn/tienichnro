@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Game;
 use App\Models\Setting;
 use App\Models\User;
 use App\Support\SettingStore;
@@ -125,7 +126,7 @@ test('homepage does not invent an announcement when admin content is empty', fun
         ->assertDontSee('Nạp Carot tối đa 10 gói mỗi lần');
 });
 
-test('admin can write homepage notice with tinymce content and homepage renders it safely', function (): void {
+test('admin can write notice content that stays off homepage and renders safely on game landing', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $settings = $this->actingAs($admin)
         ->getJson('/api/admin-api/settings/homepage')
@@ -176,6 +177,13 @@ test('admin can write homepage notice with tinymce content and homepage renders 
 
     $this->get(route('home'))
         ->assertOk()
+        ->assertDontSee('Ưu đãi hôm nay')
+        ->assertDontSee('class="home-notice-header"', false);
+
+    $game = Game::factory()->create();
+
+    $this->get(route('topup.game', ['game' => $game]))
+        ->assertOk()
         ->assertSee('Ưu đãi hôm nay')
         ->assertSee('class="home-notice-header"', false)
         ->assertSee('<strong>Khuyến mãi 15%</strong>', false)
@@ -218,7 +226,7 @@ test('homepage notice rejects unsafe tinymce links', function (string $href): vo
     'whitespace obfuscation' => "java\nscript:alert(1)",
 ]);
 
-test('homepage notice accepts a bare domain and renders a clickable https link', function (): void {
+test('game landing notice accepts a bare domain and renders a clickable https link', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $settings = $this->actingAs($admin)
         ->getJson('/api/admin-api/settings/homepage')
@@ -239,7 +247,9 @@ test('homepage notice accepts a bare domain and renders a clickable https link',
         ])
         ->assertOk();
 
-    $this->get(route('home'))
+    $game = Game::factory()->create();
+
+    $this->get(route('topup.game', ['game' => $game]))
         ->assertOk()
         ->assertSee(
             '<a href="https://facebook.com/napcarot" target="_blank" rel="noopener noreferrer">Mở cộng đồng</a>',

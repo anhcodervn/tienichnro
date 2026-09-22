@@ -16,11 +16,10 @@ class GlobalTopupPackage extends Model
     protected $fillable = [
         'provider_id', 'provider_service_codes', 'name', 'code', 'denomination', 'carot_amount',
         'reward_x2_amount', 'reward_x3_amount', 'first_topup_reward_amount', 'provider_price',
-        'price', 'original_price', 'description', 'bonus_text', 'min_quantity', 'max_quantity',
-        'status', 'sort_order', 'metadata',
+        'price', 'original_price', 'description', 'bonus_text', 'status', 'sort_order', 'metadata',
     ];
 
-    protected $attributes = ['provider_price' => 0, 'min_quantity' => 1, 'status' => 'active', 'sort_order' => 0];
+    protected $attributes = ['provider_price' => 0, 'status' => 'active', 'sort_order' => 0];
 
     protected function casts(): array
     {
@@ -33,8 +32,6 @@ class GlobalTopupPackage extends Model
             'provider_price' => 'integer',
             'price' => 'integer',
             'original_price' => 'integer',
-            'min_quantity' => 'integer',
-            'max_quantity' => 'integer',
             'sort_order' => 'integer',
             'provider_service_codes' => 'array',
             'metadata' => 'array',

@@ -10,7 +10,12 @@ use Illuminate\Support\Facades\Route;
 Route::middleware('site.active')->group(function (): void {
     Route::get('/', HomeController::class)->name('home');
     Route::redirect('/nap-game', '/')->name('topup.index');
-    Route::get('/nap-game/{game:slug}', [TopupController::class, 'show'])->name('topup.game');
+    Route::get('/nap-game-{game:slug}', [TopupController::class, 'show'])
+        ->where('game', '[a-z0-9]+(?:-[a-z0-9]+)*')
+        ->name('topup.game');
+    Route::get('/nap-game/{game:slug}', [TopupController::class, 'legacy'])
+        ->where('game', '[a-z0-9]+(?:-[a-z0-9]+)*')
+        ->name('topup.game.legacy');
     Route::get('/bang-gia', [TopupController::class, 'index'])->name('pricing');
     Route::post('/dat-hang', [CheckoutController::class, 'store'])
         ->middleware('throttle:10,1')

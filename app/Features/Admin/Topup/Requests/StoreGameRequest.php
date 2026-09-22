@@ -3,6 +3,7 @@
 namespace App\Features\Admin\Topup\Requests;
 
 use App\Features\Topup\Support\RecipientFieldPattern;
+use App\Models\Game;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Validator;
@@ -30,12 +31,13 @@ class StoreGameRequest extends FormRequest
             'reward_label' => ['required', 'string', 'max:60'],
             'provider_service_code' => ['nullable', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/'],
             'package_mode' => ['required', Rule::in(['custom', 'global'])],
+            'min_quantity' => ['sometimes', 'required', 'integer', 'min:1', 'max:10'],
+            'max_quantity' => ['sometimes', 'required', 'integer', 'min:1', 'max:10'],
             'image' => ['nullable', 'string', 'max:255'],
-            'description' => ['nullable', 'string'], 'content' => ['nullable', 'string'],
+            'description' => ['nullable', 'string'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'sort_order' => ['required', 'integer', 'min:0'],
-            'seo_title' => ['nullable', 'string', 'max:255'],
-            'seo_description' => ['nullable', 'string'], 'metadata' => ['nullable', 'array'],
+            'metadata' => ['nullable', 'array'],
             'checkout_fields' => ['required', 'array', 'min:1', 'max:6'],
             'checkout_fields.*' => ['required', 'array:key,label,placeholder,required,regex'],
             'checkout_fields.*.key' => [
@@ -65,6 +67,18 @@ class StoreGameRequest extends FormRequest
     public function after(): array
     {
         return [function (Validator $validator): void {
+            $game = $this->route('game');
+            $minimum = $this->exists('min_quantity')
+                ? $this->integer('min_quantity')
+                : ($game instanceof Game ? $game->min_quantity : 1);
+            $maximum = $this->exists('max_quantity')
+                ? $this->integer('max_quantity')
+                : ($game instanceof Game ? $game->max_quantity : 10);
+
+            if ($minimum > $maximum) {
+                $validator->errors()->add('max_quantity', 'Số lượng tối đa cho mỗi tài khoản phải lớn hơn hoặc bằng số lượng tối thiểu.');
+            }
+
             $fields = $this->input('checkout_fields', []);
 
             if (is_array($fields) && ! collect($fields)->contains(
@@ -74,5 +88,13 @@ class StoreGameRequest extends FormRequest
                 $validator->errors()->add('checkout_fields', 'Phải có ít nhất một trường bắt buộc.');
             }
         }];
+    }
+
+    public function attributes(): array
+    {
+        return [
+            'min_quantity' => 'số lượng tối thiểu cho mỗi tài khoản',
+            'max_quantity' => 'số lượng tối đa cho mỗi tài khoản',
+        ];
     }
 }
