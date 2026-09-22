@@ -32,20 +32,14 @@ beforeEach(function (): void {
     Queue::fake();
 });
 
-test('the9p submission uses a stable request id and queues status synchronization', function (): void {
-    [$order, $recipient, $provider] = the9pOrderFixture();
+test('the9p submits all units in one request using account quantity', function (): void {
+    [$order, $recipient, $provider] = the9pOrderFixture(['quantity' => 8]);
     Http::fake([
-        'https://the9p.com/api/rechargews' => Http::sequence()
-            ->push([
-                'status' => 'success',
-                'message' => 'accepted',
-                'data' => ['order_code' => 'THE9P-1001', 'status' => 'pending'],
-            ], 200, ['X-Provider-Trace' => 'the9p-create-1'])
-            ->push([
-                'status' => 'success',
-                'message' => 'accepted',
-                'data' => ['order_code' => 'THE9P-1002', 'status' => 'pending'],
-            ]),
+        'https://the9p.com/api/rechargews' => Http::response([
+            'status' => 'success',
+            'message' => 'accepted',
+            'data' => ['order_code' => 'THE9P-1001', 'status' => 'pending'],
+        ], 200, ['X-Provider-Trace' => 'the9p-create-1']),
     ]);
 
     app(RecipientFulfillmentService::class)->submit($recipient->id);
@@ -56,22 +50,23 @@ test('the9p submission uses a stable request id and queues status synchronizatio
         ->and($recipient->provider_status)->toBe('processing')
         ->and($recipient->status)->toBe('processing')
         ->and($recipient->submitted_at)->not->toBeNull()
-        ->and($recipient->provider_response['items'][1]['request_id'])->toBe($order->code.'-R001-U001')
+        ->and($recipient->provider_response['items'][1]['request_id'])->toBe($order->code.'-R001')
+        ->and($recipient->provider_response['items'][1]['quantity'])->toBe(8)
         ->and($recipient->provider_response['items'][1]['submission']['request']['payload'])->toBe([
             'command' => 'topup',
             'partner_id' => 'partner-123',
-            'request_id' => $order->code.'-R001-U001',
+            'request_id' => $order->code.'-R001',
             'service_code' => 'nr',
             'amount' => 10000,
-            'account_info' => ['server' => 3, 'username' => 'player-one'],
-            'sign' => md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001-U001'),
+            'account_info' => ['server' => 3, 'username' => 'player-one', 'qty' => 8],
+            'sign' => md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001'),
         ])
         ->and($recipient->provider_response['items'][1]['submission']['request']['headers'])->toMatchArray([
             'Accept' => ['application/json'],
             'Content-Type' => ['application/json'],
         ])
         ->and($recipient->provider_response['items'][1]['submission']['request']['raw_body'])
-        ->toContain('"sign":"'.md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001-U001').'"')
+        ->toContain('"sign":"'.md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001').'"')
         ->and($recipient->provider_response['items'][1]['submission']['response']['http_status'])->toBe(200)
         ->and($recipient->provider_response['items'][1]['submission']['response']['headers'])
         ->toMatchArray(['X-Provider-Trace' => ['the9p-create-1']])
@@ -81,10 +76,10 @@ test('the9p submission uses a stable request id and queues status synchronizatio
             'status' => 'success',
             'message' => 'accepted',
         ])
-        ->and($order->refresh()->provider_reference)->toBeNull();
+        ->and($order->refresh()->provider_reference)->toBe('THE9P-1001');
     expect(json_encode($recipient->provider_response, JSON_THROW_ON_ERROR))
         ->not->toContain('secret-key')
-        ->toContain(md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001-U001'));
+        ->toContain(md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001'));
 
     Http::assertSent(function (Request $request) use ($order, $provider): bool {
         $payload = $request->data();
@@ -92,11 +87,11 @@ test('the9p submission uses a stable request id and queues status synchronizatio
         return $request->url() === 'https://the9p.com/api/rechargews'
             && $payload['command'] === 'topup'
             && $payload['partner_id'] === 'partner-123'
-            && $payload['request_id'] === $order->code.'-R001-U001'
+            && $payload['request_id'] === $order->code.'-R001'
             && $payload['service_code'] === 'nr'
             && $payload['amount'] === 10000
-            && $payload['account_info'] === ['server' => 3, 'username' => 'player-one']
-            && $payload['sign'] === md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001-U001');
+            && $payload['account_info'] === ['server' => 3, 'username' => 'player-one', 'qty' => 8]
+            && $payload['sign'] === md5('secret-key'.$provider->connection_config['partner_id'].'topup'.$order->code.'-R001');
     });
     Queue::assertPushed(SyncTopupRecipientStatus::class, 1);
 
@@ -104,12 +99,8 @@ test('the9p submission uses a stable request id and queues status synchronizatio
     Http::assertSentCount(1);
 
     app(RecipientFulfillmentService::class)->submit($recipient->id, 2);
-    $recipient->refresh();
-
-    expect($recipient->provider_response['items'][2]['request_id'])->toBe($order->code.'-R001-U002')
-        ->and($recipient->provider_response['items'][2]['reference'])->toBe('THE9P-1002');
-    Http::assertSentCount(2);
-    Queue::assertPushed(SyncTopupRecipientStatus::class, 2);
+    Http::assertSentCount(1);
+    Queue::assertPushed(SyncTopupRecipientStatus::class, 1);
 });
 
 test('multiple recipients submit once each with the same selected denomination', function (): void {
@@ -135,6 +126,7 @@ test('multiple recipients submit once each with the same selected denomination',
 
     expect($topupRequests)->toHaveCount(2)
         ->and($topupRequests->pluck('amount')->all())->toBe([10000, 10000])
+        ->and($topupRequests->pluck('account_info.qty')->all())->toBe([1, 1])
         ->and($topupRequests->pluck('account_info.username')->all())->toBe(['player-one', 'player-two'])
         ->and($topupRequests->pluck('request_id')->all())->toBe([
             $order->code.'-R001',
@@ -459,8 +451,8 @@ test('admin can refresh provider data for a completed order without reopening it
     Http::assertSentCount(1);
 });
 
-test('paid multi recipient order is split into queue jobs without provider create http in the request flow', function (): void {
-    [$order] = the9pOrderFixture();
+test('paid multi recipient order queues one batch job per recipient without provider create http in the request flow', function (): void {
+    [$order] = the9pOrderFixture(['quantity' => 8]);
     $order->package()->update(['provider_price' => 10000]);
     Http::fake([
         'https://the9p.com/api/rechargews' => Http::response([
@@ -478,9 +470,9 @@ test('paid multi recipient order is split into queue jobs without provider creat
     app(TopupService::class)->process($order->id);
 
     expect($order->refresh()->order_status)->toBe(OrderStatus::Processing);
-    Queue::assertPushed(ProcessTopupRecipient::class, 5);
+    Queue::assertPushed(ProcessTopupRecipient::class, 2);
     Queue::assertPushed(ProcessTopupRecipient::class, fn (ProcessTopupRecipient $job): bool => $job->recipientId === $order->recipients()->first()->id
-        && $job->unit === 2);
+        && $job->unit === 1);
     Http::assertSentCount(1);
     Http::assertSent(fn (Request $request): bool => $request['command'] === 'getbalance');
 });
@@ -519,7 +511,8 @@ test('insufficient provider balance diverts the whole order to manual handling w
         ])
         ->and(data_get($recipient->provider_response, 'items.1.message'))
         ->toBe('Chờ admin xử lý thủ công; chưa gửi yêu cầu sang provider.')
-        ->and(data_get($recipient->provider_response, 'items.2.failure_reason'))
+        ->and(data_get($recipient->provider_response, 'items.1.quantity'))->toBe(2)
+        ->and(data_get($recipient->provider_response, 'items.1.failure_reason'))
         ->toContain('Provider không đủ số dư');
     Queue::assertNotPushed(ProcessTopupRecipient::class);
     Queue::assertPushed(SendDiscordReport::class, 1);
@@ -561,7 +554,7 @@ test('sufficient provider balance keeps automatic recipient dispatch enabled', f
 
     app(TopupService::class)->process($order->id);
 
-    Queue::assertPushed(ProcessTopupRecipient::class, 2);
+    Queue::assertPushed(ProcessTopupRecipient::class, 1);
     Queue::assertNotPushed(SendDiscordReport::class);
     Http::assertSentCount(1);
     Http::assertSent(fn (Request $request): bool => $request['command'] === 'getbalance');

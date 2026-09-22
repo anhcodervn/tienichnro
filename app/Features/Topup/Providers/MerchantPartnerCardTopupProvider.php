@@ -103,6 +103,7 @@ class MerchantPartnerCardTopupProvider implements TopupProviderBalanceInterface,
                 'server' => is_numeric($serverCode) ? (int) $serverCode : $serverCode,
                 'username' => $username,
                 ...$providerFields,
+                'qty' => $quantity ?? $recipient->quantity,
             ],
             'sign' => $this->signature($config['partner_key'], $config['partner_id'], 'topup', $requestId),
         ];
@@ -131,7 +132,7 @@ class MerchantPartnerCardTopupProvider implements TopupProviderBalanceInterface,
 
     public function supportsBatchQuantity(): bool
     {
-        return false;
+        return true;
     }
 
     public function balance(TopupProvider $provider): TopupProviderBalanceDto
