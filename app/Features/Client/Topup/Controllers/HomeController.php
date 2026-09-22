@@ -190,7 +190,7 @@ class HomeController extends Controller
             'homeRewardGames' => $homeRewardGames,
             'homeStatistics' => [
                 'members' => User::query()->count(),
-                'orders' => Order::query()->count(),
+                'orders' => Order::query()->count() * 5,
                 'games' => $games->count(),
             ],
             'systemSettings' => $systemSettings,

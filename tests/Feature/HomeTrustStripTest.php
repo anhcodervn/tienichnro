@@ -5,7 +5,7 @@ use App\Models\Order;
 use App\Models\TopupPackage;
 use App\Models\User;
 
-test('home trust strip shows accurate member game and order counts', function (): void {
+test('home trust strip shows member and game counts with orders multiplied by five', function (): void {
     User::factory()->count(3)->create();
     $activeGames = Game::factory()->count(2)->create();
     Game::factory()->inactive()->create();
@@ -22,7 +22,7 @@ test('home trust strip shows accurate member game and order counts', function ()
         ->assertSee('data-home-stat="orders"', false)
         ->assertSee('data-home-stat="games"', false)
         ->assertSeeInOrder(['>3</strong>', '<span>Thành viên</span>'], false)
-        ->assertSeeInOrder(['>4</strong>', '<span>Đơn hàng</span>'], false)
+        ->assertSeeInOrder(['>20</strong>', '<span>Đơn hàng</span>'], false)
         ->assertSeeInOrder(['>2</strong>', '<span>Game</span>'], false);
 });
 
