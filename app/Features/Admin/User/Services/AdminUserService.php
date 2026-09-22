@@ -33,6 +33,10 @@ class AdminUserService
                 'new_today' => User::query()->whereDate('created_at', today())->count(),
                 'active_users' => User::query()->where('status', 'active')->count(),
                 'blocked_users' => User::query()->where('status', 'banned')->count(),
+                'total_user_wallet_balance' => (float) Wallet::query()
+                    ->where('type', Wallet::TYPE_MAIN)
+                    ->whereIn('user_id', User::query()->where('role', '!=', 'admin')->select('id'))
+                    ->sum('balance'),
             ],
         ];
     }

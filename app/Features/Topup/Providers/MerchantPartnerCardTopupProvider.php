@@ -327,6 +327,9 @@ class MerchantPartnerCardTopupProvider implements TopupProviderBalanceInterface,
         $data = is_array($body['data'] ?? null) ? $body['data'] : [];
         $transactionStatus = strtolower(trim((string) ($data['status'] ?? '')));
         $envelopeStatus = strtolower(trim((string) ($body['status'] ?? '')));
+        if ($transactionStatus === '' && $fallbackReference !== null && $envelopeStatus === '1') {
+            $transactionStatus = $envelopeStatus;
+        }
         $providerTopupId = is_scalar($data['topup_id'] ?? null) && filled($data['topup_id'])
             ? trim((string) $data['topup_id'])
             : null;

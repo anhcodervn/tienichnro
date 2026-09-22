@@ -28,6 +28,7 @@ export type AdminUserListResponse = {
         new_today: number;
         active_users: number;
         blocked_users: number;
+        total_user_wallet_balance: number;
     };
 };
 

@@ -55,6 +55,7 @@ const stats = reactive({
     new_today: 0,
     active_users: 0,
     blocked_users: 0,
+    total_user_wallet_balance: 0,
 });
 
 const filters = reactive<UserFilters>({
@@ -166,6 +167,15 @@ const summaryCards = computed<SummaryCard[]>(() => {
             iconClass: 'bg-[linear-gradient(135deg,_#ffbb63_0%,_#ff8a1f_100%)] text-white',
             accentClass: 'text-orange-600',
         },
+        {
+            key: 'wallet',
+            label: 'Tổng số dư user',
+            value: formatCurrency(stats.total_user_wallet_balance),
+            description: 'Tổng tiền còn trong ví user, không bao gồm tài khoản admin.',
+            icon: Wallet,
+            iconClass: 'bg-[linear-gradient(135deg,_#38bdf8_0%,_#0f766e_100%)] text-white',
+            accentClass: 'text-teal-700',
+        },
     ];
 });
 
@@ -218,6 +228,7 @@ const fetchUsers = async (): Promise<void> => {
         stats.new_today = response.stats.new_today;
         stats.active_users = response.stats.active_users;
         stats.blocked_users = response.stats.blocked_users;
+        stats.total_user_wallet_balance = response.stats.total_user_wallet_balance;
     } catch (error) {
         handleErrorResponse(error);
     } finally {
@@ -321,7 +332,7 @@ onMounted(async () => {
             </div>
         </section>
 
-        <section class="grid gap-3 xl:grid-cols-4">
+        <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
             <article
                 v-for="card in summaryCards"
                 :key="card.key"
@@ -330,7 +341,12 @@ onMounted(async () => {
                 <div class="flex items-start justify-between gap-4">
                     <div class="min-w-0">
                         <p class="text-sm font-semibold text-slate-500">{{ card.label }}</p>
-                        <p class="mt-1 text-[28px] font-black tracking-tight text-slate-950">{{ card.value }}</p>
+                        <p
+                            class="mt-1 break-words font-black tracking-tight text-slate-950"
+                            :class="card.key === 'wallet' ? 'text-xl' : 'text-[28px]'"
+                        >
+                            {{ card.value }}
+                        </p>
                     </div>
                     <div class="flex h-11 w-11 items-center justify-center rounded-[10px]" :class="card.iconClass">
                         <component :is="card.icon" class="h-5 w-5" />

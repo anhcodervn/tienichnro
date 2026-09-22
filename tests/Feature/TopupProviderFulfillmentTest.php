@@ -103,6 +103,39 @@ test('the9p submits all units in one request using account quantity', function (
     Queue::assertPushed(SyncTopupRecipientStatus::class, 1);
 });
 
+test('the9p accepts a legacy numeric success status for a batch order', function (): void {
+    [$order, $recipient] = the9pOrderFixture(['quantity' => 8]);
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::sequence()
+            ->push([
+                'status' => 'success',
+                'data' => ['order_code' => 'THE9P-BATCH-8', 'status' => 'pending'],
+            ])
+            ->push([
+                'status' => 1,
+                'message' => 'Thành công',
+                'data' => ['order_code' => 'THE9P-BATCH-8', 'topup_id' => 'THE9P-TOPUP-BATCH-8'],
+            ]),
+    ]);
+
+    $fulfillmentService = app(RecipientFulfillmentService::class);
+    $fulfillmentService->submit($recipient->id);
+    $fulfillmentService->syncStatus($recipient->id, 1, 1);
+
+    $recipient->refresh();
+    expect($recipient->status)->toBe('completed')
+        ->and($recipient->provider_status)->toBe('completed')
+        ->and($recipient->provider_response['items'][1]['quantity'])->toBe(8)
+        ->and($recipient->provider_response['items'][1]['status'])->toBe('completed')
+        ->and($recipient->provider_response['items'][1]['response']['provider_status'])->toBe('1')
+        ->and($recipient->provider_response['items'][1]['response']['envelope_status'])->toBe('1')
+        ->and($order->refresh()->order_status)->toBe(OrderStatus::Completed)
+        ->and($order->topup_id)->toBe('THE9P-TOPUP-BATCH-8');
+    Http::assertSentCount(2);
+    Queue::assertPushed(SyncTopupRecipientStatus::class, 1);
+    Mail::assertQueued(OrderCompletedMail::class, 1);
+});
+
 test('multiple recipients submit once each with the same selected denomination', function (): void {
     [$order, $firstRecipient] = the9pOrderFixture(['quantity' => 1]);
     $secondRecipient = $order->recipients()->create([
