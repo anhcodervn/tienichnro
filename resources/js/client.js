@@ -9,6 +9,67 @@ const guestOrderHistoryKey = 'napcarot.guest-order-history.v1';
 const guestOrderLifetime = 365 * 24 * 60 * 60 * 1000;
 const guestOrderLimit = 30;
 
+const initializeSeoCollapsibles = () => {
+    const collapsibles = Array.from(document.querySelectorAll('[data-seo-collapsible]'));
+
+    const refresh = (collapsible) => {
+        const content = collapsible.querySelector('[data-seo-collapsible-content]');
+        const toggle = collapsible.querySelector('[data-seo-collapsible-toggle]');
+        const fade = collapsible.querySelector('[data-seo-collapsible-fade]');
+
+        if (!content || !toggle) return;
+
+        const isExpanded = collapsible.dataset.expanded === 'true';
+        collapsible.dataset.collapsible = 'true';
+        collapsible.dataset.expanded = 'false';
+        const isOverflowing = content.scrollHeight > content.clientHeight + 1;
+        collapsible.dataset.expanded = String(isExpanded);
+
+        if (!isOverflowing) {
+            delete collapsible.dataset.collapsible;
+            toggle.hidden = true;
+            if (fade) fade.hidden = true;
+            return;
+        }
+
+        toggle.hidden = false;
+        if (fade) fade.hidden = isExpanded;
+    };
+
+    collapsibles.forEach((collapsible) => {
+        const toggle = collapsible.querySelector('[data-seo-collapsible-toggle]');
+        const label = collapsible.querySelector('[data-seo-collapsible-label]');
+
+        refresh(collapsible);
+
+        toggle?.addEventListener('click', () => {
+            const isExpanded = collapsible.dataset.expanded !== 'true';
+            collapsible.dataset.expanded = String(isExpanded);
+            toggle.setAttribute('aria-expanded', String(isExpanded));
+            if (label) label.textContent = isExpanded ? 'Thu gọn' : 'Xem thêm';
+
+            const fade = collapsible.querySelector('[data-seo-collapsible-fade]');
+            if (fade) fade.hidden = isExpanded;
+
+            if (!isExpanded) {
+                window.requestAnimationFrame(() => toggle.scrollIntoView({ block: 'nearest', behavior: prefersReducedMotion ? 'auto' : 'smooth' }));
+            }
+        });
+    });
+
+    if (collapsibles.length > 0) {
+        window.addEventListener('load', () => collapsibles.forEach(refresh), { once: true });
+
+        let resizeFrame;
+        window.addEventListener('resize', () => {
+            window.cancelAnimationFrame(resizeFrame);
+            resizeFrame = window.requestAnimationFrame(() => collapsibles.forEach(refresh));
+        });
+    }
+};
+
+initializeSeoCollapsibles();
+
 const removeGuestOrderHistory = () => {
     try {
         window.localStorage.removeItem(guestOrderHistoryKey);

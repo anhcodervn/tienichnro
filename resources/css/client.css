@@ -165,6 +165,14 @@
         @apply border border-slate-200 px-4 py-3 align-top;
     }
 
+    .seo-collapsible[data-collapsible='true'][data-expanded='false'] .seo-collapsible-content {
+        @apply max-h-[22rem] overflow-hidden sm:max-h-[28rem];
+    }
+
+    .seo-collapsible[data-expanded='true'] [data-seo-collapsible-icon] {
+        @apply rotate-180;
+    }
+
     .article-content--notice {
         @apply text-sm leading-6 text-cyan-950;
     }

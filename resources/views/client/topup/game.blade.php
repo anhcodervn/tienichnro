@@ -86,13 +86,15 @@
                 <p class="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">Thông tin nạp game</p>
                 <h2 id="game-seo-content-title" class="mt-1 text-2xl font-extrabold text-slate-950">{{ $seoArticleTitle }}</h2>
             </header>
-            <div class="article-content min-w-0 max-w-full break-words p-5 sm:p-7">
-                @if ($seoContentHtml->isNotEmpty())
-                    {!! $seoContentHtml !!}
-                @else
-                    <p>Nội dung hướng dẫn đang được cập nhật.</p>
-                @endif
-            </div>
+            <x-client.collapsible-article content-id="game-seo-content" class="pb-5 sm:pb-7">
+                <div class="article-content min-w-0 max-w-full break-words p-5 pb-0 sm:p-7 sm:pb-0">
+                    @if ($seoContentHtml->isNotEmpty())
+                        {!! $seoContentHtml !!}
+                    @else
+                        <p>Nội dung hướng dẫn đang được cập nhật.</p>
+                    @endif
+                </div>
+            </x-client.collapsible-article>
         </section>
 
         @if ($seoFaqs->isNotEmpty())

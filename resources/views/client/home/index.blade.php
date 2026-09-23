@@ -154,14 +154,16 @@
         <article id="huong-dan-nap-carot" class="home-seo-article p-5 sm:p-7" aria-labelledby="home-seo-title" data-home-seo-article>
             <p class="text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">Hướng dẫn nạp game</p>
             <h2 id="home-seo-title" class="mt-1 text-2xl font-extrabold leading-tight text-slate-950">{{ $homeSeoArticleTitle }}</h2>
-            @if ($homeSeoIsPublished)
-                <div class="article-content mt-4 text-sm leading-7 text-slate-700">{!! $homeSeoHtml !!}</div>
-            @else
-                <div class="mt-4 grid gap-4 text-sm leading-7 text-slate-700 md:grid-cols-2">
-                    <p>NapCarot hỗ trợ người chơi đi thẳng vào trang nạp của từng game. Sau khi chọn game ở đầu trang, bạn có thể nhập tài khoản, chọn mệnh giá, máy chủ và kiểm tra tổng tiền trước khi xác nhận. Cách tổ chức này giúp giảm nhầm lẫn giữa các game có trường tài khoản hoặc mức thực nhận khác nhau.</p>
-                    <p>Bảng thực nhận phía trên dùng dữ liệu hệ thống để tham khảo nhanh. Khi cần tìm hiểu thêm, xem nội dung về <a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ $napCarotUrl }}">nạp Carot</a> hoặc hướng dẫn <a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ $teamobiUrl }}">nạp game Teamobi</a>. Giá cuối cùng luôn được xác nhận tại trang nạp của game bạn chọn.</p>
-                </div>
-            @endif
+            <x-client.collapsible-article content-id="home-seo-content" class="mt-4">
+                @if ($homeSeoIsPublished)
+                    <div class="article-content text-sm leading-7 text-slate-700">{!! $homeSeoHtml !!}</div>
+                @else
+                    <div class="grid gap-4 text-sm leading-7 text-slate-700 md:grid-cols-2">
+                        <p>NapCarot hỗ trợ người chơi đi thẳng vào trang nạp của từng game. Sau khi chọn game ở đầu trang, bạn có thể nhập tài khoản, chọn mệnh giá, máy chủ và kiểm tra tổng tiền trước khi xác nhận. Cách tổ chức này giúp giảm nhầm lẫn giữa các game có trường tài khoản hoặc mức thực nhận khác nhau.</p>
+                        <p>Bảng thực nhận phía trên dùng dữ liệu hệ thống để tham khảo nhanh. Khi cần tìm hiểu thêm, xem nội dung về <a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ $napCarotUrl }}">nạp Carot</a> hoặc hướng dẫn <a class="font-bold text-emerald-700 hover:text-emerald-800" href="{{ $teamobiUrl }}">nạp game Teamobi</a>. Giá cuối cùng luôn được xác nhận tại trang nạp của game bạn chọn.</p>
+                    </div>
+                @endif
+            </x-client.collapsible-article>
         </article>
 
         <section class="grid gap-4 lg:grid-cols-2" aria-label="Lợi ích và quy trình nạp Carot" data-home-supporting-blocks>
