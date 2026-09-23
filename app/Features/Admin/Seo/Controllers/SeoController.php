@@ -108,11 +108,16 @@ class SeoController extends Controller
 
     public function destroyCategory(SeoCategory $seoCategory): JsonResponse
     {
-        $seoCategory->delete();
+        $detachedPostCount = $this->seoService->deleteCategory($seoCategory);
 
         return response()->json([
             'status' => true,
-            'message' => 'Đã xóa danh mục SEO.',
+            'message' => $detachedPostCount > 0
+                ? "Đã xóa danh mục SEO và chuyển {$detachedPostCount} bài viết về trạng thái chưa phân loại."
+                : 'Đã xóa danh mục SEO.',
+            'data' => [
+                'detached_post_count' => $detachedPostCount,
+            ],
         ]);
     }
 

@@ -8,6 +8,7 @@ use App\Models\SeoPost;
 use App\Support\SettingStore;
 use App\Support\SitemapUrlService;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class SeoService
 {
@@ -146,6 +147,16 @@ class SeoService
         $category->save();
 
         return $category->fresh()->loadCount('posts');
+    }
+
+    public function deleteCategory(SeoCategory $category): int
+    {
+        return DB::transaction(function () use ($category): int {
+            $detachedPostCount = $category->posts()->update(['seo_category_id' => null]);
+            $category->delete();
+
+            return $detachedPostCount;
+        });
     }
 
     public function listPosts(array $filters = []): Collection

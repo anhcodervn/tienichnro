@@ -68,6 +68,14 @@ const scrollToBottom = async (behavior: ScrollBehavior = 'smooth'): Promise<void
     showNewMessageButton.value = false;
 };
 
+const focusComposerOnDesktop = async (): Promise<void> => {
+    await nextTick();
+
+    if (window.matchMedia('(min-width: 1024px)').matches) {
+        composer.value?.focus();
+    }
+};
+
 const sortConversations = (): void => {
     conversations.value.sort((left, right) => {
         const leftTime = left.last_message_at ? new Date(left.last_message_at).getTime() : 0;
@@ -154,14 +162,14 @@ const openConversation = async (conversationId: number, updateUrl = true): Promi
         supportStore.applyStats(response.stats);
         await scrollToBottom('auto');
         await markSelectedRead();
-        await nextTick();
-        composer.value?.focus();
+        await focusComposerOnDesktop();
 
         if (updateUrl) {
             await router.replace({ query: { ...route.query, conversation: String(conversationId) } });
         }
     } catch (error) {
         selectedConversation.value = null;
+        mobileShowingConversation.value = false;
         handleErrorResponse(error);
     } finally {
         loadingMessages.value = false;
@@ -300,7 +308,7 @@ const startConversation = async (): Promise<void> => {
         mobileShowingConversation.value = true;
         await router.replace({ query: { ...route.query, conversation: String(response.conversation.id) } });
         await scrollToBottom('auto');
-        composer.value?.focus();
+        await focusComposerOnDesktop();
         void openConversation(response.conversation.id, false);
     } catch (error) {
         handleErrorResponse(error);
@@ -398,9 +406,10 @@ onBeforeUnmount(() => {
 
 <template>
     <section
-        class="grid h-[calc(100dvh-7rem)] min-h-[560px] overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_55px_-34px_rgba(15,23,42,0.3)] lg:grid-cols-[360px_minmax(0,1fr)]"
+        class="grid h-[calc(100dvh-7rem)] min-h-0 min-w-0 overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_55px_-34px_rgba(15,23,42,0.3)] lg:grid-cols-[360px_minmax(0,1fr)]"
+        data-admin-support
     >
-        <aside class="min-h-0 border-r border-slate-200 bg-slate-50/70" :class="mobileShowingConversation ? 'hidden lg:flex' : 'flex'">
+        <aside class="min-h-0 min-w-0 bg-slate-50/70 lg:border-r lg:border-slate-200" :class="mobileShowingConversation ? 'hidden lg:flex' : 'flex'">
             <div class="flex min-h-0 w-full flex-col">
                 <div class="shrink-0 border-b border-slate-200 bg-white p-3">
                     <div class="flex items-center justify-between gap-3">
@@ -492,7 +501,7 @@ onBeforeUnmount(() => {
             </div>
         </aside>
 
-        <div class="min-h-0" :class="mobileShowingConversation ? 'flex' : 'hidden lg:flex'">
+        <div class="min-h-0 min-w-0" :class="mobileShowingConversation ? 'flex' : 'hidden lg:flex'" data-admin-support-thread>
             <div v-if="!selectedConversation" class="flex w-full flex-col items-center justify-center bg-slate-50/40 px-6 text-center">
                 <div class="flex h-16 w-16 items-center justify-center rounded-full bg-blue-50 text-blue-700">
                     <MessageSquarePlus class="h-8 w-8" />
@@ -502,7 +511,9 @@ onBeforeUnmount(() => {
             </div>
 
             <div v-else class="flex min-h-0 w-full flex-col">
-                <header class="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 py-3 sm:px-4">
+                <header
+                    class="flex shrink-0 items-center justify-between gap-2 border-b border-slate-200 bg-white px-2 py-2 sm:gap-3 sm:px-4 sm:py-3"
+                >
                     <div class="flex min-w-0 items-center gap-3">
                         <button
                             type="button"
@@ -512,7 +523,7 @@ onBeforeUnmount(() => {
                         >
                             <ArrowLeft class="h-5 w-5" />
                         </button>
-                        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700">
+                        <div class="hidden h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-700 sm:flex">
                             <UserRound class="h-5 w-5" />
                         </div>
                         <div class="min-w-0">
@@ -537,7 +548,12 @@ onBeforeUnmount(() => {
                 </header>
 
                 <div class="relative min-h-0 flex-1 bg-slate-50/60">
-                    <div ref="messageArea" class="h-full overflow-y-auto px-3 py-4 sm:px-5" aria-live="polite" @scroll.passive="handleMessageScroll">
+                    <div
+                        ref="messageArea"
+                        class="h-full overflow-y-auto overscroll-contain px-2 py-3 sm:px-5 sm:py-4"
+                        aria-live="polite"
+                        @scroll.passive="handleMessageScroll"
+                    >
                         <div v-if="loadingOlder" class="flex items-center justify-center gap-2 py-2 text-xs text-slate-500">
                             <LoaderCircle class="h-4 w-4 animate-spin" /> Đang tải tin cũ...
                         </div>
@@ -560,7 +576,7 @@ onBeforeUnmount(() => {
                                 class="flex"
                                 :class="message.sender_role === 'admin' ? 'justify-end' : 'justify-start'"
                             >
-                                <div class="max-w-[88%] sm:max-w-[72%]">
+                                <div class="min-w-0 max-w-[92%] sm:max-w-[72%]">
                                     <div
                                         class="rounded-[14px] px-4 py-2.5 text-sm leading-6 shadow-sm"
                                         :class="
@@ -569,7 +585,7 @@ onBeforeUnmount(() => {
                                                 : 'rounded-bl-sm border border-slate-200 bg-white text-slate-800'
                                         "
                                     >
-                                        <p class="whitespace-pre-wrap break-words">{{ message.message }}</p>
+                                        <p class="whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{{ message.message }}</p>
                                     </div>
                                     <div
                                         class="mt-1 flex items-center gap-2 px-1 text-[11px] text-slate-400"
@@ -608,7 +624,11 @@ onBeforeUnmount(() => {
                     </button>
                 </div>
 
-                <form class="shrink-0 border-t border-slate-200 bg-white p-3" @submit.prevent="sendReply()">
+                <form
+                    class="shrink-0 border-t border-slate-200 bg-white px-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-2 sm:p-3"
+                    data-admin-support-composer
+                    @submit.prevent="sendReply()"
+                >
                     <label for="admin-support-message" class="sr-only">Nội dung phản hồi</label>
                     <div
                         class="flex items-end gap-2 rounded-[14px] border border-slate-200 bg-slate-50 p-2 transition focus-within:border-blue-400 focus-within:ring-2 focus-within:ring-blue-100"
@@ -632,7 +652,7 @@ onBeforeUnmount(() => {
                             <Send class="h-5 w-5" />
                         </button>
                     </div>
-                    <p class="mt-1.5 px-1 text-[11px] text-slate-400">Enter để gửi · Shift + Enter để xuống dòng</p>
+                    <p class="mt-1.5 hidden px-1 text-[11px] text-slate-400 sm:block">Enter để gửi · Shift + Enter để xuống dòng</p>
                 </form>
             </div>
         </div>
@@ -640,10 +660,13 @@ onBeforeUnmount(() => {
         <Teleport to="body">
             <div
                 v-if="showNewConversation"
-                class="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4 backdrop-blur-sm"
+                class="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
                 @click.self="showNewConversation = false"
             >
-                <form class="w-full max-w-lg rounded-[16px] bg-white shadow-2xl" @submit.prevent="startConversation">
+                <form
+                    class="max-h-[calc(100dvh-1rem)] w-full max-w-lg overflow-y-auto rounded-t-[16px] bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl sm:rounded-[16px]"
+                    @submit.prevent="startConversation"
+                >
                     <div class="flex items-center justify-between border-b border-slate-200 px-5 py-4">
                         <div>
                             <h2 class="text-base font-black text-slate-950">Tin nhắn mới</h2>

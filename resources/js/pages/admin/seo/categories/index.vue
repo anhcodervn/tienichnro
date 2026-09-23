@@ -1,25 +1,27 @@
 <script setup lang="ts">
-import Breadcrumb from "@/components/MasterLayouts/Breadcrumb/index.vue";
-import { adminSeoService } from "@/services/admin-seo.service";
-import type { AdminSeoCategoryItem, AdminSeoCategoryPayload } from "@/types/admin-seo.type";
-import { handleErrorResponse, handleSuccessResponse } from "@/utils/response";
-import { FolderTree, Pencil, Plus, Search, Trash2 } from "lucide-vue-next";
-import { computed, onMounted, reactive, ref } from "vue";
+import Breadcrumb from '@/components/MasterLayouts/Breadcrumb/index.vue';
+import { adminSeoService } from '@/services/admin-seo.service';
+import type { AdminSeoCategoryItem, AdminSeoCategoryPayload } from '@/types/admin-seo.type';
+import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
+import { FolderTree, Pencil, Plus, Search, Trash2 } from 'lucide-vue-next';
+import Swal from 'sweetalert2';
+import { computed, onMounted, reactive, ref } from 'vue';
 
 const loading = ref(false);
 const categories = ref<AdminSeoCategoryItem[]>([]);
 const editingId = ref<number | null>(null);
+const deletingId = ref<number | null>(null);
 
 const filters = reactive({
-    search: "",
+    search: '',
 });
 
 const draft = reactive<AdminSeoCategoryPayload>({
-    name: "",
-    slug: "",
-    seo_title: "",
-    seo_description: "",
-    robots: "index,follow",
+    name: '',
+    slug: '',
+    seo_title: '',
+    seo_description: '',
+    robots: 'index,follow',
     is_active: true,
     sort_order: 0,
 });
@@ -28,11 +30,11 @@ const filteredCategories = computed(() => categories.value);
 
 const resetDraft = (): void => {
     editingId.value = null;
-    draft.name = "";
-    draft.slug = "";
-    draft.seo_title = "";
-    draft.seo_description = "";
-    draft.robots = "index,follow";
+    draft.name = '';
+    draft.slug = '';
+    draft.seo_title = '';
+    draft.seo_description = '';
+    draft.robots = 'index,follow';
     draft.is_active = true;
     draft.sort_order = 0;
 };
@@ -71,15 +73,35 @@ const editCategory = (category: AdminSeoCategoryItem): void => {
     editingId.value = category.id;
     draft.name = category.name;
     draft.slug = category.slug;
-    draft.seo_title = category.seo_title ?? "";
-    draft.seo_description = category.seo_description ?? "";
+    draft.seo_title = category.seo_title ?? '';
+    draft.seo_description = category.seo_description ?? '';
     draft.robots = category.robots;
     draft.is_active = category.is_active;
     draft.sort_order = category.sort_order;
 };
 
 const removeCategory = async (id: number): Promise<void> => {
+    const category = categories.value.find((item) => item.id === id);
+    const postCount = Number(category?.posts_count ?? 0);
+    const confirmation = await Swal.fire({
+        icon: 'warning',
+        title: 'Xóa danh mục SEO?',
+        text:
+            postCount > 0
+                ? `Danh mục ${category?.name ?? 'này'} đang có ${postCount} bài viết. Các bài sẽ được giữ lại và chuyển về trạng thái chưa phân loại.`
+                : `Danh mục ${category?.name ?? 'này'} sẽ bị xóa.`,
+        showCancelButton: true,
+        confirmButtonText: 'Xóa danh mục',
+        cancelButtonText: 'Hủy',
+        confirmButtonColor: '#e11d48',
+    });
+
+    if (!confirmation.isConfirmed) {
+        return;
+    }
+
     try {
+        deletingId.value = id;
         const response = await adminSeoService.removeCategory(id);
         handleSuccessResponse(response);
 
@@ -90,6 +112,8 @@ const removeCategory = async (id: number): Promise<void> => {
         await fetchCategories();
     } catch (error) {
         handleErrorResponse(error);
+    } finally {
+        deletingId.value = null;
     }
 };
 
@@ -100,10 +124,7 @@ onMounted(async () => {
 
 <template>
     <div class="space-y-4">
-        <Breadcrumb
-            title="Danh mục SEO"
-            description="Quản lý taxonomy, slug, robots và metadata của các nhóm nội dung sẽ được index."
-        />
+        <Breadcrumb title="Danh mục SEO" description="Quản lý taxonomy, slug, robots và metadata của các nhóm nội dung sẽ được index." />
 
         <section class="grid gap-4 xl:grid-cols-[minmax(0,1.35fr)_380px]">
             <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
@@ -154,14 +175,14 @@ onMounted(async () => {
                                         </div>
                                         <div>
                                             <p class="font-semibold text-slate-900">{{ item.name }}</p>
-                                            <p class="mt-1 text-xs text-slate-500 line-clamp-2">
-                                                {{ item.seo_description || "Chưa có mô tả ngắn cho danh mục này." }}
+                                            <p class="mt-1 line-clamp-2 text-xs text-slate-500">
+                                                {{ item.seo_description || 'Chưa có mô tả ngắn cho danh mục này.' }}
                                             </p>
                                         </div>
                                     </div>
                                 </td>
                                 <td class="px-4 py-3 font-mono text-sm text-slate-600">{{ item.slug }}</td>
-                                <td class="px-4 py-3 text-sm text-slate-600">{{ item.seo_title || "-" }}</td>
+                                <td class="px-4 py-3 text-sm text-slate-600">{{ item.seo_title || '-' }}</td>
                                 <td class="px-4 py-3">
                                     <span
                                         class="rounded-full border px-2.5 py-1 text-xs font-semibold"
@@ -187,11 +208,12 @@ onMounted(async () => {
                                         </button>
                                         <button
                                             type="button"
-                                            class="inline-flex items-center gap-1 rounded-[8px] border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
+                                            :disabled="deletingId === item.id"
+                                            class="inline-flex items-center gap-1 rounded-[8px] border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
                                             @click="removeCategory(item.id)"
                                         >
                                             <Trash2 class="h-3.5 w-3.5" />
-                                            Xóa
+                                            {{ deletingId === item.id ? 'Đang xóa...' : 'Xóa' }}
                                         </button>
                                     </div>
                                 </td>
@@ -208,7 +230,7 @@ onMounted(async () => {
                     </div>
                     <div>
                         <h3 class="text-lg font-semibold text-slate-950">
-                            {{ editingId ? "Cập nhật danh mục" : "Tạo danh mục mới" }}
+                            {{ editingId ? 'Cập nhật danh mục' : 'Tạo danh mục mới' }}
                         </h3>
                         <p class="text-sm text-slate-500">Dùng cho cluster nội dung hoặc chủ đề cần index riêng.</p>
                     </div>
@@ -217,28 +239,47 @@ onMounted(async () => {
                 <div class="mt-5 space-y-4">
                     <div>
                         <label class="text-sm font-medium text-slate-700">Tên danh mục</label>
-                        <input v-model="draft.name" type="text" class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-300" />
+                        <input
+                            v-model="draft.name"
+                            type="text"
+                            class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-300"
+                        />
                     </div>
 
                     <div>
                         <label class="text-sm font-medium text-slate-700">Slug</label>
-                        <input v-model="draft.slug" type="text" class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 font-mono text-sm outline-none focus:border-violet-300" />
+                        <input
+                            v-model="draft.slug"
+                            type="text"
+                            class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 font-mono text-sm outline-none focus:border-violet-300"
+                        />
                     </div>
 
                     <div>
                         <label class="text-sm font-medium text-slate-700">SEO title</label>
-                        <input v-model="draft.seo_title" type="text" class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-300" />
+                        <input
+                            v-model="draft.seo_title"
+                            type="text"
+                            class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-300"
+                        />
                     </div>
 
                     <div>
                         <label class="text-sm font-medium text-slate-700">SEO description</label>
-                        <textarea v-model="draft.seo_description" rows="4" class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-300" />
+                        <textarea
+                            v-model="draft.seo_description"
+                            rows="4"
+                            class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-300"
+                        />
                     </div>
 
                     <div class="grid gap-4 md:grid-cols-2">
                         <div>
                             <label class="text-sm font-medium text-slate-700">Robots</label>
-                            <select v-model="draft.robots" class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-300">
+                            <select
+                                v-model="draft.robots"
+                                class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-300"
+                            >
                                 <option value="index,follow">index,follow</option>
                                 <option value="noindex,follow">noindex,follow</option>
                             </select>
@@ -246,12 +287,21 @@ onMounted(async () => {
 
                         <div>
                             <label class="text-sm font-medium text-slate-700">Thứ tự</label>
-                            <input v-model.number="draft.sort_order" type="number" min="0" class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-300" />
+                            <input
+                                v-model.number="draft.sort_order"
+                                type="number"
+                                min="0"
+                                class="mt-2 w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-300"
+                            />
                         </div>
                     </div>
 
                     <label class="flex items-center gap-3 rounded-[10px] border border-slate-200 px-3 py-3 text-sm text-slate-700">
-                        <input v-model="draft.is_active" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500" />
+                        <input
+                            v-model="draft.is_active"
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-slate-300 text-violet-600 focus:ring-violet-500"
+                        />
                         Danh mục đang hoạt động
                     </label>
 
@@ -261,7 +311,7 @@ onMounted(async () => {
                             class="inline-flex flex-1 items-center justify-center rounded-[10px] bg-violet-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-violet-500"
                             @click="submitCategory"
                         >
-                            {{ editingId ? "Lưu thay đổi" : "Thêm danh mục" }}
+                            {{ editingId ? 'Lưu thay đổi' : 'Thêm danh mục' }}
                         </button>
                         <button
                             v-if="editingId"
