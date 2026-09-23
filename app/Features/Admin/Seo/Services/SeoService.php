@@ -184,6 +184,7 @@ class SeoService
             'cover_image' => $payload['cover_image'] ?? null,
             'seo_title' => $payload['seo_title'] ?? null,
             'seo_description' => $payload['seo_description'] ?? null,
+            'meta_keywords' => $payload['meta_keywords'] ?? null,
             'canonical_url' => $payload['canonical_url'] ?? null,
             'robots' => $payload['robots'],
             'focus_keyword' => $payload['focus_keyword'] ?? null,

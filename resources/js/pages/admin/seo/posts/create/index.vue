@@ -38,6 +38,7 @@ const form = reactive<AdminSeoPostPayload>({
     cover_alt: '',
     seo_title: '',
     seo_description: '',
+    meta_keywords: '',
     canonical_url: null,
     robots: 'index,follow',
     focus_keyword: '',
@@ -160,6 +161,7 @@ const fetchPost = async (): Promise<void> => {
     form.cover_alt = post.cover_alt ?? '';
     form.seo_title = post.seo_title ?? '';
     form.seo_description = post.seo_description ?? '';
+    form.meta_keywords = post.meta_keywords ?? '';
     form.canonical_url = post.canonical_url ?? null;
     form.robots = post.robots as SeoRobotsValue;
     form.focus_keyword = post.focus_keyword ?? '';
@@ -206,6 +208,7 @@ const handleSave = async (): Promise<void> => {
             cover_alt: form.cover_alt?.trim() ?? '',
             seo_title: form.seo_title?.trim() ?? '',
             seo_description: form.seo_description?.trim() ?? '',
+            meta_keywords: form.meta_keywords?.trim() ?? '',
             focus_keyword: form.focus_keyword?.trim() ?? '',
             canonical_url: canonicalMode.value === 'custom' ? form.canonical_url?.trim() || null : null,
             content: form.content ?? [],
@@ -565,14 +568,29 @@ onMounted(async () => {
                             />
                         </label>
                         <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Keywords</span>
+                            <span class="text-sm font-semibold text-slate-700">Focus keyword</span>
                             <input
                                 v-model="form.focus_keyword"
                                 type="text"
                                 maxlength="255"
                                 class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                placeholder="nạp ngọc rồng online, bảng giá nạp game"
+                                placeholder="nạp ngọc rồng online"
                             />
+                            <span class="text-xs leading-5 text-slate-500">Một từ khóa chính dùng để kiểm tra mức độ tối ưu của bài.</span>
+                        </label>
+                        <label class="grid gap-2">
+                            <span class="flex items-center justify-between gap-2 text-sm font-semibold text-slate-700">
+                                <span>Meta keywords</span>
+                                <span class="text-xs font-normal text-slate-400">{{ form.meta_keywords?.length ?? 0 }}/1000</span>
+                            </span>
+                            <textarea
+                                v-model="form.meta_keywords"
+                                rows="3"
+                                maxlength="1000"
+                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
+                                placeholder="nạp ngọc rồng online, bảng giá nạp game, nạp game teamobi"
+                            />
+                            <span class="text-xs leading-5 text-slate-500">Danh sách từ khóa đưa vào thẻ meta, cách nhau bằng dấu phẩy.</span>
                         </label>
                     </div>
                 </article>

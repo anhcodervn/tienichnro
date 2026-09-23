@@ -23,6 +23,7 @@ class SeoPost extends Model
         'cover_image',
         'seo_title',
         'seo_description',
+        'meta_keywords',
         'canonical_url',
         'robots',
         'focus_keyword',

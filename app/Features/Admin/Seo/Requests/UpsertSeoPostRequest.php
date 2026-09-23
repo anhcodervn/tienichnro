@@ -58,6 +58,7 @@ class UpsertSeoPostRequest extends FormRequest
             'cover_image' => ['nullable', 'string', 'max:2048', $this->safeCoverImageRule()],
             'seo_title' => ['nullable', 'string', 'max:255'],
             'seo_description' => ['nullable', 'string', 'max:320'],
+            'meta_keywords' => ['nullable', 'string', 'max:1000'],
             'canonical_url' => ['nullable', 'string', 'max:2048', $this->absoluteHttpUrlRule()],
             'robots' => ['required', Rule::in(['index,follow', 'noindex,follow'])],
             'focus_keyword' => ['nullable', 'string', 'max:255'],
@@ -95,6 +96,7 @@ class UpsertSeoPostRequest extends FormRequest
             'cover_image' => 'ảnh đại diện',
             'seo_title' => 'SEO title',
             'seo_description' => 'SEO description',
+            'meta_keywords' => 'meta keywords',
             'canonical_url' => 'canonical URL',
             'robots' => 'robots',
             'focus_keyword' => 'focus keyword',
@@ -118,7 +120,7 @@ class UpsertSeoPostRequest extends FormRequest
             'type' => $this->input('type', 'knowledge'),
         ];
 
-        foreach (['title', 'slug', 'excerpt', 'cover_image', 'cover_alt', 'seo_title', 'seo_description', 'canonical_url', 'focus_keyword'] as $field) {
+        foreach (['title', 'slug', 'excerpt', 'cover_image', 'cover_alt', 'seo_title', 'seo_description', 'meta_keywords', 'canonical_url', 'focus_keyword'] as $field) {
             if (! $this->exists($field) || ! is_string($this->input($field))) {
                 continue;
             }

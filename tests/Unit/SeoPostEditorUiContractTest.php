@@ -17,6 +17,9 @@ test('seo post editor exposes direct cover upload and clear canonical controls',
         ->toContain('Xem trước kết quả Google')
         ->toContain('v-model="form.type"')
         ->toContain('v-model="form.service_id"')
+        ->toContain('v-model="form.focus_keyword"')
+        ->toContain('v-model="form.meta_keywords"')
+        ->toContain('meta_keywords: form.meta_keywords?.trim()')
         ->toContain('Không nhập giá vào nội dung')
         ->toContain('Preview URL:')
         ->toContain('v-model="item.question"')
@@ -29,5 +32,7 @@ test('seo post editor exposes direct cover upload and clear canonical controls',
         ->toContain('cover_image?: string | null')
         ->toContain("export type SeoPageType = 'knowledge' | 'guide' | 'price'")
         ->toContain('service_id?: number | null')
+        ->toContain('meta_keywords: string | null')
+        ->toContain('meta_keywords?: string')
         ->toContain('faq?: SeoFaqItem[]');
 });

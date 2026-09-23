@@ -1,7 +1,7 @@
 @extends('client.layouts.app')
 @section('title', $pageMetaTitle)
 @section('description', $pageMetaDescription)
-@section('keywords'){{ $post->focus_keyword }}@endsection
+@section('keywords'){{ $post->meta_keywords ?: $post->focus_keyword }}@endsection
 @section('canonical', $pageMetaCanonical)
 @section('robots', $post->robots)
 @section('image'){{ $pageMetaImage }}@endsection

@@ -43,6 +43,62 @@ test('admin can save a dedicated cover image and custom canonical for an seo pos
         ->and($post->canonical_url)->toBe('https://napcarot.com/tin-tuc/nap-ngoc-rong-online');
 });
 
+test('seo posts store focus and meta keywords separately with legacy public fallback', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $category = SeoCategory::query()->create([
+        'name' => 'Kiến thức game',
+        'slug' => 'kien-thuc-game',
+        'robots' => 'index,follow',
+        'is_active' => true,
+    ]);
+
+    $response = $this->actingAs($admin)
+        ->postJson('/api/admin-api/seo/posts', [
+            'seo_category_id' => $category->id,
+            'title' => 'Cách nạp game an toàn',
+            'slug' => 'cach-nap-game-an-toan',
+            'content' => [],
+            'robots' => 'index,follow',
+            'focus_keyword' => 'nạp game an toàn',
+            'meta_keywords' => 'nạp game an toàn, nạp game teamobi, nạp carot',
+            'status' => 'published',
+        ])
+        ->assertCreated()
+        ->assertJsonPath('data.focus_keyword', 'nạp game an toàn')
+        ->assertJsonPath('data.meta_keywords', 'nạp game an toàn, nạp game teamobi, nạp carot');
+
+    $post = SeoPost::query()->findOrFail($response->json('data.id'));
+
+    expect($post->focus_keyword)->toBe('nạp game an toàn')
+        ->and($post->meta_keywords)->toBe('nạp game an toàn, nạp game teamobi, nạp carot');
+
+    $publicUrl = route('seo.show', ['categorySlug' => $category->slug, 'postSlug' => $post->slug]);
+    $this->get($publicUrl)
+        ->assertOk()
+        ->assertSee('<meta name="keywords" content="nạp game an toàn, nạp game teamobi, nạp carot">', false);
+
+    $post->update(['meta_keywords' => null]);
+
+    $this->get($publicUrl)
+        ->assertOk()
+        ->assertSee('<meta name="keywords" content="nạp game an toàn">', false);
+});
+
+test('seo post meta keywords are limited to one thousand characters', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $this->actingAs($admin)
+        ->postJson('/api/admin-api/seo/posts', [
+            'title' => 'Bài viết keyword dài',
+            'slug' => 'bai-viet-keyword-dai',
+            'content' => [],
+            'robots' => 'index,follow',
+            'meta_keywords' => str_repeat('a', 1001),
+            'status' => 'draft',
+        ])
+        ->assertUnprocessable();
+});
+
 test('admin can update seo content and the public page renders the saved body', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $category = SeoCategory::query()->create([

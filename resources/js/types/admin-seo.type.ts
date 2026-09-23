@@ -106,6 +106,7 @@ export interface AdminSeoPostItem {
     cover_image: string | null;
     seo_title: string | null;
     seo_description: string | null;
+    meta_keywords: string | null;
     canonical_url: string | null;
     robots: SeoRobotsValue;
     focus_keyword: string | null;
@@ -145,6 +146,7 @@ export interface AdminSeoPostPayload {
     cover_image?: string | null;
     seo_title?: string;
     seo_description?: string;
+    meta_keywords?: string;
     canonical_url?: string | null;
     robots: SeoRobotsValue;
     focus_keyword?: string;
