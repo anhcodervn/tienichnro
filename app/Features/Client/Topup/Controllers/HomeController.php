@@ -204,6 +204,9 @@ class HomeController extends Controller
             'homeFaqs' => $homeFaqs,
             'homeSeoMetaTitle' => $homeSeoIsPublished ? $homeSeo['meta_title'] : config('seo.homepage.title'),
             'homeSeoMetaDescription' => $homeSeoIsPublished ? $homeSeo['meta_description'] : config('seo.homepage.description'),
+            'homeSeoMetaKeywords' => $homeSeoIsPublished && filled($homeSeo['meta_keywords'])
+                ? $homeSeo['meta_keywords']
+                : config('seo.homepage.keywords', ''),
             'homeSeoH1' => $homeSeoIsPublished ? $homeSeo['h1'] : 'Nạp Carot Game Teamobi Nhanh Chóng, Giá Tốt',
             'homeSeoArticleTitle' => $homeSeoIsPublished ? $homeSeo['article_title'] : 'Nạp Carot game Teamobi: chọn đúng game, rõ giá trước khi thanh toán',
             'homeSeoHtml' => $homeSeoHtml,

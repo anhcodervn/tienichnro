@@ -10,6 +10,7 @@ export interface SeoFaqItem {
 export interface AdminHomeSeoSettings {
     meta_title: string;
     meta_description: string;
+    meta_keywords: string;
     h1: string;
     article_title: string;
     content: unknown[];

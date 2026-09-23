@@ -27,6 +27,7 @@ test('homepage targets carot and exposes visible seo sections with matching sche
         ->assertOk()
         ->assertSee('<title>'.config('seo.homepage.title').'</title>', false)
         ->assertSee('<meta name="description" content="'.config('seo.homepage.description').'">', false)
+        ->assertSee('<meta name="keywords" content="'.config('seo.homepage.keywords').'">', false)
         ->assertSee('<link rel="canonical" href="'.$homeUrl.'">', false)
         ->assertSee('Nạp Carot Game Teamobi Nhanh Chóng, Giá Tốt')
         ->assertSee('Nạp Carot cho các game Teamobi')

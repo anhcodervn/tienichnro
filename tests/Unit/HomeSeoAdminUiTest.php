@@ -19,5 +19,7 @@ test('admin home seo page is wired to navigation api and safe editor upload flow
         ->and($page)
         ->toContain('contentEditor.value?.flush()')
         ->toContain('uploadEditorImages(form.content)')
+        ->toContain('v-model="form.meta_keywords"')
+        ->toContain('meta_keywords: form.meta_keywords.trim()')
         ->toContain('v-model="form.is_published"');
 });

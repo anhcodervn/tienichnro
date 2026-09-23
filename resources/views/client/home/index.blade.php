@@ -2,6 +2,7 @@
 
 @section('document_title', $homeSeoMetaTitle)
 @section('description', $homeSeoMetaDescription)
+@section('keywords', $homeSeoMetaKeywords)
 @section('canonical', $homeCanonicalUrl)
 
 @push('head')

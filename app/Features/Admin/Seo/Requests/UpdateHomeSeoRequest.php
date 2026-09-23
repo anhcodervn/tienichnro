@@ -29,6 +29,7 @@ class UpdateHomeSeoRequest extends FormRequest
         return [
             'meta_title' => [Rule::requiredIf($isPublished), 'nullable', 'string', 'max:255'],
             'meta_description' => [Rule::requiredIf($isPublished), 'nullable', 'string', 'max:320'],
+            'meta_keywords' => ['nullable', 'string', 'max:1000'],
             'h1' => [Rule::requiredIf($isPublished), 'nullable', 'string', 'max:255'],
             'article_title' => [Rule::requiredIf($isPublished), 'nullable', 'string', 'max:255'],
             'content' => [Rule::requiredIf($isPublished), 'nullable', 'array', new ValidSeoPostContent],
@@ -51,6 +52,7 @@ class UpdateHomeSeoRequest extends FormRequest
         return [
             'meta_title' => 'meta title trang chủ',
             'meta_description' => 'meta description trang chủ',
+            'meta_keywords' => 'từ khóa SEO trang chủ',
             'h1' => 'tiêu đề H1 trang chủ',
             'article_title' => 'tiêu đề bài hướng dẫn',
             'content' => 'nội dung bài SEO',
@@ -70,7 +72,7 @@ class UpdateHomeSeoRequest extends FormRequest
     {
         $normalized = [];
 
-        foreach (['meta_title', 'meta_description', 'h1', 'article_title'] as $field) {
+        foreach (['meta_title', 'meta_description', 'meta_keywords', 'h1', 'article_title'] as $field) {
             if (! $this->exists($field) || ! is_string($this->input($field))) {
                 continue;
             }

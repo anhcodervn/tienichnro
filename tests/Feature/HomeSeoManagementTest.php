@@ -16,6 +16,7 @@ test('admin can save and load dedicated home seo settings', function (): void {
     $payload = [
         'meta_title' => 'Nạp game Teamobi an toàn tại NapCarot',
         'meta_description' => 'Trang nạp game Teamobi có bảng giá rõ ràng và hỗ trợ nhanh chóng.',
+        'meta_keywords' => 'nạp game teamobi, nạp carot, napcarot',
         'h1' => 'Nạp game Teamobi nhanh chóng',
         'article_title' => 'Hướng dẫn nạp game tại NapCarot',
         'content' => [
@@ -31,14 +32,17 @@ test('admin can save and load dedicated home seo settings', function (): void {
         ->patchJson('/api/admin-api/seo/home', $payload)
         ->assertOk()
         ->assertJsonPath('data.meta_title', $payload['meta_title'])
+        ->assertJsonPath('data.meta_keywords', $payload['meta_keywords'])
         ->assertJsonPath('data.is_published', true);
 
     expect(Setting::query()->where('key', 'home_seo_meta_title')->value('value'))->toBe($payload['meta_title'])
+        ->and(Setting::query()->where('key', 'home_seo_meta_keywords')->value('value'))->toBe($payload['meta_keywords'])
         ->and(Setting::query()->where('key', 'home_seo_content')->value('type'))->toBe('json');
 
     $this->actingAs($admin)
         ->getJson('/api/admin-api/seo/home')
         ->assertOk()
+        ->assertJsonPath('data.meta_keywords', $payload['meta_keywords'])
         ->assertJsonPath('data.h1', $payload['h1'])
         ->assertJsonPath('data.faqs.0.question', $payload['faqs'][0]['question']);
 });
@@ -57,6 +61,7 @@ test('published home seo is rendered safely with matching faq schema', function 
     $this->actingAs($admin)->patchJson('/api/admin-api/seo/home', [
         'meta_title' => 'Meta trang chủ tùy chỉnh',
         'meta_description' => 'Mô tả trang chủ tùy chỉnh cho kết quả tìm kiếm.',
+        'meta_keywords' => 'nạp carot tùy chỉnh, nạp game nhanh',
         'h1' => 'H1 trang chủ tùy chỉnh',
         'article_title' => 'Bài hướng dẫn tùy chỉnh',
         'content' => [
@@ -75,6 +80,7 @@ test('published home seo is rendered safely with matching faq schema', function 
         ->assertOk()
         ->assertSee('<title>Meta trang chủ tùy chỉnh</title>', false)
         ->assertSee('content="Mô tả trang chủ tùy chỉnh cho kết quả tìm kiếm."', false)
+        ->assertSee('<meta name="keywords" content="nạp carot tùy chỉnh, nạp game nhanh">', false)
         ->assertSee('H1 trang chủ tùy chỉnh')
         ->assertSee('Bài hướng dẫn tùy chỉnh')
         ->assertSee('Nội dung SEO an toàn')

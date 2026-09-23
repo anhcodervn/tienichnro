@@ -14,6 +14,7 @@ const contentEditor = ref<{ flush: () => unknown[] | string } | null>(null);
 const form = reactive<AdminHomeSeoSettings>({
     meta_title: '',
     meta_description: '',
+    meta_keywords: '',
     h1: '',
     article_title: '',
     content: [],
@@ -58,6 +59,7 @@ const save = async (): Promise<void> => {
             ...form,
             meta_title: form.meta_title.trim(),
             meta_description: form.meta_description.trim(),
+            meta_keywords: form.meta_keywords.trim(),
             h1: form.h1.trim(),
             article_title: form.article_title.trim(),
             faqs: form.faqs
@@ -112,6 +114,19 @@ onMounted(loadSettings);
                                 class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
                                 placeholder="Nạp game Teamobi nhanh chóng, giá tốt"
                             />
+                        </label>
+                        <label class="grid gap-2">
+                            <span class="flex justify-between text-sm font-semibold text-slate-700"
+                                ><span>Meta keywords</span><small>{{ form.meta_keywords.length }}/1000</small></span
+                            >
+                            <textarea
+                                v-model="form.meta_keywords"
+                                rows="3"
+                                maxlength="1000"
+                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                                placeholder="nạp carot, nạp game teamobi, nạp ngọc rồng online"
+                            />
+                            <small class="text-xs leading-5 text-slate-500">Nhập các từ khóa cách nhau bằng dấu phẩy.</small>
                         </label>
                         <label class="grid gap-2">
                             <span class="flex justify-between text-sm font-semibold text-slate-700"

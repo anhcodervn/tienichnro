@@ -6,6 +6,7 @@ return [
     'homepage' => [
         'title' => 'Nạp Carot Game Teamobi Nhanh Chóng, Giá Tốt | NapCarot',
         'description' => 'Nạp Carot cho Ngọc Rồng Online, Ninja School, Avatar, Hải Tặc Tí Hon, Hiệp Sĩ Online và các game Teamobi tại NapCarot, bảng giá rõ ràng, dễ tra cứu.',
+        'keywords' => 'nạp carot, nạp game teamobi, nạp ngọc rồng online, nạp ninja school online, nạp avatar, nạp hải tặc tí hon, nạp hiệp sĩ online',
     ],
 
     'home_game_landings' => [
