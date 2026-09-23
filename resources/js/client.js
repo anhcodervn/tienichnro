@@ -1233,6 +1233,49 @@ document.querySelectorAll('[data-topup-form]').forEach((form) => {
                     return true;
                 }
 
+                if (value !== '' && field.type === 'select') {
+                    const allowedValues = Array.isArray(field.options) ? field.options.map((option) => String(option.value)) : [];
+
+                    if (!allowedValues.includes(value)) {
+                        formatMessage = `Dòng ${index + 1}, cột ${fieldIndex + 1} (${field.label}): không thuộc danh sách lựa chọn hợp lệ.`;
+
+                        return true;
+                    }
+                }
+
+                if (value !== '' && field.type === 'number') {
+                    if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(value)) {
+                        formatMessage = `Dòng ${index + 1}, cột ${fieldIndex + 1} (${field.label}): phải là một số.`;
+
+                        return true;
+                    }
+
+                    const numericValue = Number(value);
+                    if (field.min !== null && field.min !== undefined && numericValue < Number(field.min)) {
+                        formatMessage = `Dòng ${index + 1}, cột ${fieldIndex + 1} (${field.label}): phải lớn hơn hoặc bằng ${field.min}.`;
+
+                        return true;
+                    }
+
+                    if (field.max !== null && field.max !== undefined && numericValue > Number(field.max)) {
+                        formatMessage = `Dòng ${index + 1}, cột ${fieldIndex + 1} (${field.label}): phải nhỏ hơn hoặc bằng ${field.max}.`;
+
+                        return true;
+                    }
+
+                    if (field.step !== null && field.step !== undefined) {
+                        const step = Number(field.step);
+                        const stepBase = field.min === null || field.min === undefined ? 0 : Number(field.min);
+                        const stepOffset = (numericValue - stepBase) / step;
+
+                        if (Math.abs(stepOffset - Math.round(stepOffset)) > 0.000000001) {
+                            formatMessage = `Dòng ${index + 1}, cột ${fieldIndex + 1} (${field.label}): phải theo bước ${field.step}.`;
+
+                            return true;
+                        }
+                    }
+                }
+
                 if (value !== '' && regex === false) {
                     formatMessage = `Dòng ${index + 1}, cột ${fieldIndex + 1} (${field.label}): cấu hình regex không hợp lệ.`;
 

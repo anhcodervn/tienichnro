@@ -164,24 +164,47 @@
                                     <label for="recipient-{{ $game->id }}-{{ $field['key'] }}">
                                         {{ $field['label'] }} @if ($field['required'])<span aria-hidden="true">*</span>@endif
                                     </label>
-                                    <input
-                                        id="recipient-{{ $game->id }}-{{ $field['key'] }}"
-                                        class="client-input block w-full"
-                                        type="text"
-                                        name="recipient_fields[{{ $field['key'] }}]"
-                                        maxlength="191"
-                                        value="{{ old('recipient_fields.'.$field['key']) }}"
-                                        placeholder="{{ $field['placeholder'] }}"
-                                        autocomplete="off"
-                                        autocapitalize="none"
-                                        spellcheck="false"
-                                        data-recipient-input
-                                        data-required="{{ $field['required'] ? 'true' : 'false' }}"
-                                        data-validation-regex="{{ $field['regex'] }}"
-                                        data-validation-label="{{ $field['label'] }}"
-                                        @disabled((string) $initialGame !== (string) $game->id || $initialPurchaseMode !== 'single')
-                                        @if ($field['required'] && (string) $initialGame === (string) $game->id && $initialPurchaseMode === 'single') required @endif
-                                    >
+                                    @if ($field['type'] === 'select')
+                                        <select
+                                            id="recipient-{{ $game->id }}-{{ $field['key'] }}"
+                                            class="client-input block w-full"
+                                            name="recipient_fields[{{ $field['key'] }}]"
+                                            data-recipient-input
+                                            data-required="{{ $field['required'] ? 'true' : 'false' }}"
+                                            data-validation-regex="{{ $field['regex'] }}"
+                                            data-validation-label="{{ $field['label'] }}"
+                                            @disabled((string) $initialGame !== (string) $game->id || $initialPurchaseMode !== 'single')
+                                            @if ($field['required'] && (string) $initialGame === (string) $game->id && $initialPurchaseMode === 'single') required @endif
+                                        >
+                                            <option value="">{{ $field['placeholder'] !== '' ? $field['placeholder'] : 'Chọn '.$field['label'] }}</option>
+                                            @foreach ($field['options'] as $option)
+                                                <option value="{{ $option['value'] }}" @selected((string) old('recipient_fields.'.$field['key']) === (string) $option['value'])>{{ $option['text'] }}</option>
+                                            @endforeach
+                                        </select>
+                                    @else
+                                        <input
+                                            id="recipient-{{ $game->id }}-{{ $field['key'] }}"
+                                            class="client-input block w-full"
+                                            type="{{ $field['type'] === 'number' ? 'number' : 'text' }}"
+                                            name="recipient_fields[{{ $field['key'] }}]"
+                                            maxlength="191"
+                                            value="{{ old('recipient_fields.'.$field['key']) }}"
+                                            placeholder="{{ $field['placeholder'] }}"
+                                            autocomplete="off"
+                                            autocapitalize="none"
+                                            spellcheck="false"
+                                            @if ($field['type'] === 'number') inputmode="decimal" @endif
+                                            @if ($field['type'] === 'number' && $field['min'] !== null) min="{{ $field['min'] }}" @endif
+                                            @if ($field['type'] === 'number' && $field['max'] !== null) max="{{ $field['max'] }}" @endif
+                                            @if ($field['type'] === 'number' && $field['step'] !== null) step="{{ $field['step'] }}" @endif
+                                            data-recipient-input
+                                            data-required="{{ $field['required'] ? 'true' : 'false' }}"
+                                            data-validation-regex="{{ $field['regex'] }}"
+                                            data-validation-label="{{ $field['label'] }}"
+                                            @disabled((string) $initialGame !== (string) $game->id || $initialPurchaseMode !== 'single')
+                                            @if ($field['required'] && (string) $initialGame === (string) $game->id && $initialPurchaseMode === 'single') required @endif
+                                        >
+                                    @endif
                                     @if ($loop->first)<p class="home-field-help">Nhập đúng thông tin để hệ thống xử lý tự động.</p>@endif
                                     <p class="home-field-error" data-recipient-format-error role="alert" aria-live="polite" hidden></p>
                                     @error('recipient_fields.'.$field['key'])<p class="home-field-error">{{ $message }}</p>@enderror
@@ -229,7 +252,7 @@
                                 ->push('Số lượng thẻ')
                                 ->implode('|');
                         @endphp
-                        <p class="home-bulk-schema" data-bulk-schema="{{ $game->id }}" data-bulk-placeholder="{{ $fieldPlaceholders }}" data-bulk-confirm-recipient-label="{{ $fieldLabels }}" data-bulk-fields="{{ $checkoutFields->map(fn ($field) => ['label' => $field['label'], 'required' => $field['required'], 'regex' => $field['regex']])->values()->toJson() }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
+                        <p class="home-bulk-schema" data-bulk-schema="{{ $game->id }}" data-bulk-placeholder="{{ $fieldPlaceholders }}" data-bulk-confirm-recipient-label="{{ $fieldLabels }}" data-bulk-fields="{{ $checkoutFields->map(fn ($field) => ['label' => $field['label'], 'required' => $field['required'], 'regex' => $field['regex'], 'type' => $field['type'], 'options' => $field['options'], 'min' => $field['min'], 'max' => $field['max'], 'step' => $field['step']])->values()->toJson() }}" @if ((string) $initialGame !== (string) $game->id) hidden @endif>
                             Mỗi dòng 1 tài khoản theo đúng định dạng: <strong>{{ $fieldLabels }}</strong>
                         </p>
                     @endforeach

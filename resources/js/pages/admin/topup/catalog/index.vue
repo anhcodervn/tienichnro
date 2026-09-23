@@ -14,12 +14,60 @@ type OptionRow = {
 };
 type CatalogRow = Record<string, any> & { id: number; name: string; status: 'active' | 'inactive' };
 type PaginationMeta = { current_page: number; last_page: number; per_page: number; total: number; from: number | null; to: number | null };
-type CheckoutField = { key: string; label: string; placeholder: string; required: boolean; regex: string };
+type CheckoutFieldType = 'text' | 'number' | 'select';
+type CheckoutFieldOption = { value: string; text: string };
+type CheckoutField = {
+    key: string;
+    label: string;
+    placeholder: string;
+    required: boolean;
+    regex: string;
+    type: CheckoutFieldType;
+    options: CheckoutFieldOption[];
+    min: number | string | null;
+    max: number | string | null;
+    step: number | string | null;
+};
 
 const defaultCheckoutFields = (): CheckoutField[] => [
-    { key: 'game_account', label: 'Tài khoản game', placeholder: 'Tài khoản đăng nhập game', required: true, regex: '' },
-    { key: 'character_name', label: 'Tên nhân vật', placeholder: 'Không bắt buộc', required: false, regex: '' },
+    {
+        key: 'game_account',
+        label: 'Tài khoản game',
+        placeholder: 'Tài khoản đăng nhập game',
+        required: true,
+        regex: '',
+        type: 'text',
+        options: [],
+        min: null,
+        max: null,
+        step: null,
+    },
+    {
+        key: 'character_name',
+        label: 'Tên nhân vật',
+        placeholder: 'Không bắt buộc',
+        required: false,
+        regex: '',
+        type: 'text',
+        options: [],
+        min: null,
+        max: null,
+        step: null,
+    },
 ];
+
+const normalizeCheckoutField = (field: Partial<CheckoutField>): CheckoutField => ({
+    key: field.key || '',
+    label: field.label || '',
+    placeholder: field.placeholder || '',
+    required: Boolean(field.required),
+    regex: field.regex || '',
+    type: ['text', 'number', 'select'].includes(field.type || '') ? (field.type as CheckoutFieldType) : 'text',
+    options: Array.isArray(field.options) ? field.options.map((option) => ({ value: option.value || '', text: option.text || '' })) : [],
+    min: field.min ?? null,
+    max: field.max ?? null,
+    step: field.step ?? null,
+});
 
 const props = defineProps<{ catalogType: CatalogType }>();
 const route = useRoute();
@@ -242,7 +290,7 @@ const edit = (row: CatalogRow): void => {
     });
     if (props.catalogType === 'games') {
         form.checkout_fields = (row.checkout_fields?.length ? row.checkout_fields : defaultCheckoutFields()).map(
-            (field: CheckoutField): CheckoutField => ({ ...field, regex: field.regex || '' }),
+            (field: CheckoutField): CheckoutField => normalizeCheckoutField(field),
         );
     }
 };
@@ -252,7 +300,17 @@ const addCheckoutField = (): void => {
         return;
     }
 
-    form.checkout_fields.push({ key: '', label: '', placeholder: '', required: false, regex: '' });
+    form.checkout_fields.push(normalizeCheckoutField({ key: '', label: '', placeholder: '', required: false, regex: '', type: 'text' }));
+};
+
+const addCheckoutFieldOption = (field: CheckoutField): void => {
+    if (field.options.length >= 50) return;
+
+    field.options.push({ value: '', text: '' });
+};
+
+const removeCheckoutFieldOption = (field: CheckoutField, optionIndex: number): void => {
+    field.options.splice(optionIndex, 1);
 };
 
 const removeCheckoutField = (index: number): void => {
@@ -285,6 +343,11 @@ const payload = (): Record<string, unknown> => {
                 placeholder: field.placeholder?.trim() || null,
                 required: Boolean(field.required),
                 regex: field.regex?.trim() || null,
+                type: field.type,
+                options: field.type === 'select' ? field.options.map((option) => ({ value: option.value.trim(), text: option.text.trim() })) : [],
+                min: field.type === 'number' && field.min !== null && field.min !== '' ? Number(field.min) : null,
+                max: field.type === 'number' && field.max !== null && field.max !== '' ? Number(field.max) : null,
+                step: field.type === 'number' && field.step !== null && field.step !== '' ? Number(field.step) : null,
             })),
         };
     }
@@ -742,7 +805,7 @@ watch(() => props.catalogType, load, { immediate: true });
                                     :key="index"
                                     class="rounded-md border border-slate-200 bg-white p-3"
                                 >
-                                    <div class="grid gap-3 sm:grid-cols-2">
+                                    <div class="grid gap-3 sm:grid-cols-3">
                                         <label class="text-xs font-semibold text-slate-600">
                                             Mã trường
                                             <input
@@ -764,6 +827,17 @@ watch(() => props.catalogType, load, { immediate: true });
                                                 class="mt-1 min-h-10 w-full rounded-md border border-slate-300 px-3 font-normal"
                                             />
                                         </label>
+                                        <label class="text-xs font-semibold text-slate-600">
+                                            Kiểu dữ liệu
+                                            <select
+                                                v-model="field.type"
+                                                class="mt-1 min-h-10 w-full rounded-md border border-slate-300 bg-white px-3 font-normal"
+                                            >
+                                                <option value="text">Text</option>
+                                                <option value="number">Number</option>
+                                                <option value="select">Select</option>
+                                            </select>
+                                        </label>
                                     </div>
                                     <label class="mt-3 block text-xs font-semibold text-slate-600">
                                         Chữ gợi ý
@@ -773,6 +847,87 @@ watch(() => props.catalogType, load, { immediate: true });
                                             class="mt-1 min-h-10 w-full rounded-md border border-slate-300 px-3 font-normal"
                                         />
                                     </label>
+                                    <div v-if="field.type === 'number'" class="mt-3 grid gap-3 sm:grid-cols-3">
+                                        <label class="text-xs font-semibold text-slate-600">
+                                            Giá trị nhỏ nhất
+                                            <input
+                                                v-model.number="field.min"
+                                                type="number"
+                                                step="any"
+                                                placeholder="Không giới hạn"
+                                                class="mt-1 min-h-10 w-full rounded-md border border-slate-300 px-3 font-normal"
+                                            />
+                                        </label>
+                                        <label class="text-xs font-semibold text-slate-600">
+                                            Giá trị lớn nhất
+                                            <input
+                                                v-model.number="field.max"
+                                                type="number"
+                                                step="any"
+                                                placeholder="Không giới hạn"
+                                                class="mt-1 min-h-10 w-full rounded-md border border-slate-300 px-3 font-normal"
+                                            />
+                                        </label>
+                                        <label class="text-xs font-semibold text-slate-600">
+                                            Bước nhảy
+                                            <input
+                                                v-model.number="field.step"
+                                                type="number"
+                                                min="0.000000001"
+                                                step="any"
+                                                placeholder="Ví dụ: 1"
+                                                class="mt-1 min-h-10 w-full rounded-md border border-slate-300 px-3 font-normal"
+                                            />
+                                        </label>
+                                    </div>
+                                    <div v-if="field.type === 'select'" class="mt-3 rounded-md border border-slate-200 bg-slate-50 p-3">
+                                        <div class="flex items-center justify-between gap-3">
+                                            <div>
+                                                <p class="text-xs font-bold text-slate-700">Danh sách lựa chọn</p>
+                                                <p class="mt-1 text-xs text-slate-500">
+                                                    Value được lưu và gửi provider; text là nội dung khách nhìn thấy.
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                class="rounded-md border border-emerald-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-emerald-700 disabled:opacity-40"
+                                                :disabled="field.options.length >= 50"
+                                                @click="addCheckoutFieldOption(field)"
+                                            >
+                                                + Thêm lựa chọn
+                                            </button>
+                                        </div>
+                                        <div v-if="field.options.length" class="mt-3 space-y-2">
+                                            <div
+                                                v-for="(option, optionIndex) in field.options"
+                                                :key="optionIndex"
+                                                class="grid gap-2 sm:grid-cols-[1fr_1fr_auto]"
+                                            >
+                                                <input
+                                                    v-model.trim="option.value"
+                                                    required
+                                                    maxlength="191"
+                                                    placeholder="Value gửi provider"
+                                                    class="min-h-10 rounded-md border border-slate-300 bg-white px-3 font-mono text-xs"
+                                                />
+                                                <input
+                                                    v-model.trim="option.text"
+                                                    required
+                                                    maxlength="120"
+                                                    placeholder="Text hiển thị"
+                                                    class="min-h-10 rounded-md border border-slate-300 bg-white px-3 text-xs"
+                                                />
+                                                <button
+                                                    type="button"
+                                                    class="px-2 text-xs font-semibold text-rose-600"
+                                                    @click="removeCheckoutFieldOption(field, optionIndex)"
+                                                >
+                                                    Xóa
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <p v-else class="mt-3 text-xs text-amber-700">Cần thêm ít nhất một lựa chọn.</p>
+                                    </div>
                                     <label class="mt-3 block text-xs font-semibold text-slate-600">
                                         Regex kiểm tra định dạng
                                         <input

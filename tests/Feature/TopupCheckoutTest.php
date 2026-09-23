@@ -215,6 +215,90 @@ test('game landing renders the checkout fields configured for its game', functio
         ->assertSee('data-bulk-placeholder="Nhập ID số|Ví dụ: Asia|Số lượng thẻ"', false);
 });
 
+test('game landing renders and checkout stores number and select fields', function (): void {
+    [$game, $server, $package] = topupCatalog();
+    $game->update(['checkout_fields' => [
+        ['key' => 'account', 'label' => 'Tài khoản', 'placeholder' => 'Nhập tài khoản', 'required' => true, 'type' => 'text'],
+        ['key' => 'level', 'label' => 'Cấp độ', 'placeholder' => 'Nhập cấp', 'required' => true, 'type' => 'number', 'min' => 10, 'max' => 100, 'step' => 5],
+        [
+            'key' => 'region',
+            'label' => 'Khu vực',
+            'placeholder' => 'Chọn khu vực',
+            'required' => true,
+            'type' => 'select',
+            'options' => [
+                ['value' => 'VN-1', 'text' => 'Việt Nam 1'],
+                ['value' => 'SEA', 'text' => 'Đông Nam Á'],
+            ],
+        ],
+    ]]);
+
+    $this->get(route('topup.game', ['game' => $game]))
+        ->assertOk()
+        ->assertSee('type="number"', false)
+        ->assertSee('name="recipient_fields[level]"', false)
+        ->assertSee('min="10"', false)
+        ->assertSee('max="100"', false)
+        ->assertSee('step="5"', false)
+        ->assertSee('name="recipient_fields[region]"', false)
+        ->assertSee('<option value="VN-1"', false)
+        ->assertSee('Việt Nam 1');
+
+    $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+        'recipient_fields' => ['account' => 'Player-One', 'level' => '15', 'region' => 'VN-1'],
+    ]))->assertRedirect();
+
+    $order = Order::query()->sole();
+
+    expect($order->recipients()->sole()->recipient_data)->toBe([
+        'account' => 'player-one',
+        'level' => '15',
+        'region' => 'VN-1',
+    ])->and($order->checkout_fields_snapshot[1])->toMatchArray([
+        'type' => 'number',
+        'min' => 10.0,
+        'max' => 100.0,
+        'step' => 5.0,
+    ])->and($order->checkout_fields_snapshot[2]['options'][0])->toBe([
+        'value' => 'VN-1',
+        'text' => 'Việt Nam 1',
+    ]);
+});
+
+test('checkout rejects invalid number constraints and select values in single and bulk modes', function (): void {
+    [$game, $server, $package] = topupCatalog();
+    $game->update(['checkout_fields' => [
+        ['key' => 'account', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true, 'type' => 'text'],
+        ['key' => 'level', 'label' => 'Cấp độ', 'placeholder' => '', 'required' => true, 'type' => 'number', 'min' => 10, 'max' => 100, 'step' => 5],
+        [
+            'key' => 'region',
+            'label' => 'Khu vực',
+            'placeholder' => '',
+            'required' => true,
+            'type' => 'select',
+            'options' => [['value' => 'VN-1', 'text' => 'Việt Nam 1']],
+        ],
+    ]]);
+
+    $this->from(route('topup.game', $game))->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+        'recipient_fields' => ['account' => 'player', 'level' => '13', 'region' => 'VN-1'],
+    ]))->assertRedirect(route('topup.game', $game))
+        ->assertSessionHasErrors('recipient_fields.level');
+
+    $this->from(route('topup.game', $game))->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+        'recipient_fields' => ['account' => 'player', 'level' => '15', 'region' => 'forged'],
+    ]))->assertRedirect(route('topup.game', $game))
+        ->assertSessionHasErrors('recipient_fields.region');
+
+    $this->from(route('topup.game', $game))->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+        'purchase_mode' => 'bulk',
+        'bulk_recipients' => 'player|13|VN-1|1',
+    ]))->assertRedirect(route('topup.game', $game))
+        ->assertSessionHasErrors('bulk_recipients');
+
+    expect(Order::query()->count())->toBe(0);
+});
+
 function topupCatalog(array $packageAttributes = []): array
 {
     $game = Game::factory()->create([
@@ -360,6 +444,11 @@ test('checkout accepts the legacy game character alias and stores canonical reci
         'placeholder' => 'Không bắt buộc',
         'required' => false,
         'regex' => '',
+        'type' => 'text',
+        'options' => [],
+        'min' => null,
+        'max' => null,
+        'step' => null,
     ])->and($order->recipients()->firstOrFail()->recipient_data)->toBe([
         'game_account' => 'legacy-player',
         'character_name' => 'legacy hero',

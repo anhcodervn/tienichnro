@@ -12,10 +12,10 @@ class Game extends Model
 {
     use HasFactory;
 
-    /** @var array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string}> */
+    /** @var array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string,type:string,options:array<int, array{value:string,text:string}>,min:float|null,max:float|null,step:float|null}> */
     public const DEFAULT_CHECKOUT_FIELDS = [
-        ['key' => 'game_account', 'label' => 'Tài khoản game', 'placeholder' => 'Tài khoản đăng nhập game', 'required' => true, 'regex' => ''],
-        ['key' => 'character_name', 'label' => 'Tên nhân vật', 'placeholder' => 'Không bắt buộc', 'required' => false, 'regex' => ''],
+        ['key' => 'game_account', 'label' => 'Tài khoản game', 'placeholder' => 'Tài khoản đăng nhập game', 'required' => true, 'regex' => '', 'type' => 'text', 'options' => [], 'min' => null, 'max' => null, 'step' => null],
+        ['key' => 'character_name', 'label' => 'Tên nhân vật', 'placeholder' => 'Không bắt buộc', 'required' => false, 'regex' => '', 'type' => 'text', 'options' => [], 'min' => null, 'max' => null, 'step' => null],
     ];
 
     protected $fillable = [
@@ -43,7 +43,7 @@ class Game extends Model
         ];
     }
 
-    /** @return array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string}> */
+    /** @return array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string,type:string,options:array<int, array{value:string,text:string}>,min:float|null,max:float|null,step:float|null}> */
     public function checkoutFields(): array
     {
         $fields = is_array($this->checkout_fields) && $this->checkout_fields !== []
@@ -52,13 +52,36 @@ class Game extends Model
 
         $normalizedFields = collect($fields)
             ->filter(fn (mixed $field): bool => is_array($field) && filled($field['key'] ?? null) && filled($field['label'] ?? null))
-            ->map(fn (array $field): array => [
-                'key' => (string) $field['key'] === 'game_character' ? 'character_name' : (string) $field['key'],
-                'label' => (string) $field['label'],
-                'placeholder' => (string) ($field['placeholder'] ?? ''),
-                'required' => (bool) ($field['required'] ?? false),
-                'regex' => (string) ($field['regex'] ?? ''),
-            ])
+            ->map(function (array $field): array {
+                $type = in_array($field['type'] ?? null, ['text', 'number', 'select'], true)
+                    ? $field['type']
+                    : 'text';
+                $options = $type === 'select' && is_array($field['options'] ?? null)
+                    ? collect($field['options'])
+                        ->filter(fn (mixed $option): bool => is_array($option) && filled($option['value'] ?? null) && filled($option['text'] ?? null))
+                        ->map(fn (array $option): array => [
+                            'value' => (string) $option['value'],
+                            'text' => (string) $option['text'],
+                        ])
+                        ->values()
+                        ->all()
+                    : [];
+
+                return [
+                    'key' => (string) $field['key'] === 'game_character' ? 'character_name' : (string) $field['key'],
+                    'label' => (string) $field['label'],
+                    'placeholder' => (string) ($field['placeholder'] ?? ''),
+                    'required' => (bool) ($field['required'] ?? false),
+                    'regex' => (string) ($field['regex'] ?? ''),
+                    'type' => $type,
+                    'options' => $options,
+                    'min' => $type === 'number' && is_numeric($field['min'] ?? null) ? (float) $field['min'] : null,
+                    'max' => $type === 'number' && is_numeric($field['max'] ?? null) ? (float) $field['max'] : null,
+                    'step' => $type === 'number' && is_numeric($field['step'] ?? null) && (float) $field['step'] > 0
+                        ? (float) $field['step']
+                        : null,
+                ];
+            })
             ->values()
             ->all();
 

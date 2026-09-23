@@ -755,6 +755,89 @@ test('game checkout field schema rejects unsafe and ambiguous definitions', func
     ])->assertUnprocessable()->assertJsonValidationErrors('checkout_fields.0.regex');
 });
 
+test('admin can configure text number and select checkout fields', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $response = $this->actingAs($admin)->postJson('/api/admin-api/games', [
+        'name' => 'Game typed fields',
+        'slug' => 'game-typed-fields',
+        'reward_label' => 'Xu',
+        'status' => 'active',
+        'sort_order' => 1,
+        'checkout_fields' => [
+            ['key' => 'account', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true, 'type' => 'text'],
+            [
+                'key' => 'level',
+                'label' => 'Cấp độ',
+                'placeholder' => 'Chọn cấp',
+                'required' => true,
+                'type' => 'number',
+                'min' => 10,
+                'max' => 100,
+                'step' => 5,
+            ],
+            [
+                'key' => 'region',
+                'label' => 'Khu vực',
+                'placeholder' => 'Chọn khu vực',
+                'required' => true,
+                'type' => 'select',
+                'options' => [
+                    ['value' => 'VN-1', 'text' => 'Việt Nam 1'],
+                    ['value' => 'SEA', 'text' => 'Đông Nam Á'],
+                ],
+            ],
+        ],
+    ])->assertCreated()
+        ->assertJsonPath('data.checkout_fields.0.type', 'text')
+        ->assertJsonPath('data.checkout_fields.1.min', 10)
+        ->assertJsonPath('data.checkout_fields.1.step', 5)
+        ->assertJsonPath('data.checkout_fields.2.options.0.value', 'VN-1')
+        ->assertJsonPath('data.checkout_fields.2.options.0.text', 'Việt Nam 1');
+
+    $game = Game::query()->findOrFail($response->json('data.id'));
+
+    expect($game->checkout_fields[0])->toMatchArray(['type' => 'text', 'options' => [], 'min' => null, 'max' => null, 'step' => null])
+        ->and($game->checkout_fields[2]['options'])->toHaveCount(2);
+});
+
+test('typed checkout field schema rejects invalid options and number limits', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $basePayload = [
+        'name' => 'Invalid typed fields',
+        'slug' => 'invalid-typed-fields',
+        'reward_label' => 'Xu',
+        'status' => 'active',
+        'sort_order' => 1,
+    ];
+
+    $this->actingAs($admin)->postJson('/api/admin-api/games', [
+        ...$basePayload,
+        'checkout_fields' => [[
+            'key' => 'region', 'label' => 'Khu vực', 'placeholder' => '', 'required' => true, 'type' => 'select', 'options' => [],
+        ]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('checkout_fields.0.options');
+
+    $this->actingAs($admin)->postJson('/api/admin-api/games', [
+        ...$basePayload,
+        'checkout_fields' => [[
+            'key' => 'region',
+            'label' => 'Khu vực',
+            'placeholder' => '',
+            'required' => true,
+            'type' => 'select',
+            'options' => [['value' => 'VN|1', 'text' => 'Việt Nam']],
+        ]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('checkout_fields.0.options.0.value');
+
+    $this->actingAs($admin)->postJson('/api/admin-api/games', [
+        ...$basePayload,
+        'checkout_fields' => [[
+            'key' => 'level', 'label' => 'Cấp độ', 'placeholder' => '', 'required' => true, 'type' => 'number', 'min' => 20, 'max' => 10,
+        ]],
+    ])->assertUnprocessable()->assertJsonValidationErrors('checkout_fields.0.max');
+});
+
 test('admin stores provider field names directly in the game checkout schema', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $payload = [
