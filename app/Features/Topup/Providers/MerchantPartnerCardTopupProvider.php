@@ -11,6 +11,7 @@ use App\Features\Topup\DTOs\TopupProviderResultDto;
 use App\Features\Topup\Enums\TopupProviderStatus;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Services\TopupProviderHttpClientFactory;
+use App\Features\Topup\Services\TopupProviderPayloadFieldMapperService;
 use App\Models\GameServer;
 use App\Models\Order;
 use App\Models\OrderRecipient;
@@ -30,7 +31,10 @@ class MerchantPartnerCardTopupProvider implements TopupProviderBalanceInterface,
         'Content-Type' => 'application/json',
     ];
 
-    public function __construct(private readonly TopupProviderHttpClientFactory $httpClientFactory) {}
+    public function __construct(
+        private readonly TopupProviderHttpClientFactory $httpClientFactory,
+        private readonly TopupProviderPayloadFieldMapperService $fieldMapper,
+    ) {}
 
     public function assertConfigured(TopupProvider $provider, TopupPackage $package, GameServer $server): void
     {
@@ -82,10 +86,12 @@ class MerchantPartnerCardTopupProvider implements TopupProviderBalanceInterface,
         $config = $this->configuration($provider);
         $serviceCode = (string) data_get($order->metadata, 'provider.service_code');
         $serverCode = (string) data_get($order->metadata, 'provider.server_code', $order->server?->code);
-        $providerFields = $this->providerFields($recipient);
-        unset($providerFields['server']);
-        [$username, $primaryKey] = $this->primaryRecipientField($order, $providerFields, 'username');
-        unset($providerFields['username'], $providerFields[$primaryKey]);
+        $recipientFields = $this->providerFields($recipient);
+        unset($recipientFields['server']);
+        [$username, $primaryKey] = $this->primaryRecipientField($order, $recipientFields, 'username');
+        unset($recipientFields['username'], $recipientFields[$primaryKey]);
+        $providerFields = $this->fieldMapper->map($order, $provider, $recipientFields);
+        $usernameKey = $this->fieldMapper->outputKey($order, $provider, $primaryKey ?: 'username', 'username');
 
         if ($serverCode === '' || $username === '') {
             throw ValidationException::withMessages([
@@ -101,7 +107,7 @@ class MerchantPartnerCardTopupProvider implements TopupProviderBalanceInterface,
             'amount' => (int) ($order->denomination ?? 0),
             'account_info' => [
                 'server' => is_numeric($serverCode) ? (int) $serverCode : $serverCode,
-                'username' => $username,
+                $usernameKey => $username,
                 ...$providerFields,
                 'qty' => $quantity ?? $recipient->quantity,
             ],
@@ -187,8 +193,8 @@ class MerchantPartnerCardTopupProvider implements TopupProviderBalanceInterface,
         );
     }
 
-    /** @return Collection<int, TopupProviderProductDto> */
-    public function products(TopupProvider $provider): Collection
+    /** @return array<string, mixed> */
+    public function catalogResponse(TopupProvider $provider): array
     {
         $config = $this->configuration($provider);
 
@@ -227,6 +233,15 @@ class MerchantPartnerCardTopupProvider implements TopupProviderBalanceInterface,
                 'Provider trả về danh sách sản phẩm không đúng định dạng.',
             );
         }
+
+        return $body;
+    }
+
+    /** @return Collection<int, TopupProviderProductDto> */
+    public function products(TopupProvider $provider): Collection
+    {
+        $body = $this->catalogResponse($provider);
+        $catalog = $body['data'];
 
         return collect($catalog)
             ->filter(fn (mixed $product): bool => is_array($product))

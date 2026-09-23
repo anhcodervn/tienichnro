@@ -296,7 +296,7 @@ test('guest can create a bank transfer order and backend recalculates price', fu
     });
 });
 
-test('checkout snapshots direct provider field names without provider-specific mapping', function (): void {
+test('checkout snapshots canonical fields and provider payload mapping', function (): void {
     [$game, $server, $package] = topupCatalog();
     $provider = TopupProvider::factory()->create([
         'slug' => 'accnrovn',
@@ -304,6 +304,10 @@ test('checkout snapshots direct provider field names without provider-specific m
             'base_url' => 'https://accnro.vn/api/v1/partner/recharge',
             'partner_id' => 'pk_test',
             'secret_key' => 'sk_test',
+        ],
+        'payload_field_mapping' => [
+            'default' => [],
+            'services' => ['nr' => ['account' => 'user_account']],
         ],
     ]);
     $game->update([
@@ -331,6 +335,10 @@ test('checkout snapshots direct provider field names without provider-specific m
             'type' => 'merchant_partner_card',
             'service_code' => 'nr',
             'server_code' => '16',
+            'payload_field_mapping' => [
+                'default' => [],
+                'services' => ['nr' => ['account' => 'user_account']],
+            ],
         ]);
 });
 

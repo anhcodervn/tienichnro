@@ -4,6 +4,7 @@ namespace App\Features\Admin\Topup\Requests;
 
 use App\Enums\TopupProviderType;
 use App\Models\TopupProvider;
+use App\Rules\ValidProviderPayloadFieldMapping;
 use App\Rules\ValidTopupProviderConnectionConfig;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
@@ -45,6 +46,7 @@ class StoreTopupProviderRequest extends FormRequest
             ],
             'type' => ['required', Rule::enum(TopupProviderType::class)],
             'connection_config' => ['required', 'array', 'min:1', new ValidTopupProviderConnectionConfig],
+            'payload_field_mapping' => ['nullable', 'array', new ValidProviderPayloadFieldMapping],
         ];
     }
 
@@ -55,6 +57,7 @@ class StoreTopupProviderRequest extends FormRequest
             'slug' => 'slug provider',
             'type' => 'loại kết nối provider',
             'connection_config' => 'cấu hình kết nối',
+            'payload_field_mapping' => 'mapping field payload',
         ];
     }
 }

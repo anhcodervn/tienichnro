@@ -214,6 +214,7 @@ class OrderService
                             'type' => $package->provider?->type?->value ?? 'manual',
                             'service_code' => $package->providerServiceCode(),
                             'server_code' => $quote['server']->code,
+                            'payload_field_mapping' => $package->provider?->payload_field_mapping ?? [],
                         ],
                     ],
                 ];

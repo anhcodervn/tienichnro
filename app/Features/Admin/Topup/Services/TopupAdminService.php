@@ -414,6 +414,7 @@ class TopupAdminService
                 'name' => $model->name,
                 'slug' => $model->slug,
                 'has_connection_config' => filled($model->getRawOriginal('connection_config')),
+                'payload_field_mapping' => $model->payload_field_mapping ?? [],
             ];
         }
 

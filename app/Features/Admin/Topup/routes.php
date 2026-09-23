@@ -25,6 +25,9 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin-api')->name('admin.t
         Route::get('global-topup-rewards', [GlobalTopupRewardController::class, 'index'])->name('global-topup-rewards.index');
         Route::put('global-topup-rewards/{game}', [GlobalTopupRewardController::class, 'update'])->name('global-topup-rewards.update');
         Route::post('topup-providers/refresh-balances', [TopupProviderController::class, 'refreshBalances'])->name('topup-providers.refresh-balances');
+        Route::post('topup-providers/{topupProvider}/services', [TopupProviderController::class, 'services'])
+            ->middleware('throttle:10,1')
+            ->name('topup-providers.services');
         Route::apiResource('topup-providers', TopupProviderController::class)->parameters(['topup-providers' => 'topupProvider']);
         Route::get('provider-prices', [ProviderPriceController::class, 'index'])->name('provider-prices.index');
         Route::post('provider-prices/refresh', [ProviderPriceController::class, 'refresh'])->name('provider-prices.refresh');

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import Modal from '@/components/shared/Modal/index.vue';
 import { adminTopupService } from '@/services/admin-topup.service';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
@@ -17,6 +18,7 @@ type ProviderRow = {
     balance_checked_at: string | null;
     balance_error_code: string | null;
     balance_error_message: string | null;
+    payload_field_mapping?: Record<string, unknown>;
 };
 
 type ProviderConfigGuide = {
@@ -39,6 +41,13 @@ const saving = ref(false);
 const refreshingBalances = ref(false);
 const editingId = ref<number | null>(null);
 const connectionJsonError = ref('');
+const mappingJsonError = ref('');
+const servicesModalOpen = ref(false);
+const servicesLoading = ref(false);
+const servicesCopied = ref(false);
+const selectedServicesProvider = ref<ProviderRow | null>(null);
+const servicesResponse = ref<unknown>(null);
+const servicesError = ref('');
 const filters = reactive({
     search: typeof route.query.search === 'string' ? route.query.search : '',
     per_page: typeof route.query.per_page === 'string' ? route.query.per_page : '20',
@@ -52,7 +61,13 @@ const form = reactive({
     balance_warning_threshold: 1000000,
     minimum_profit_percent: 5,
     connection_config_text: '',
+    payload_field_mapping_text: '',
 });
+
+const payloadFieldMappingTemplate = (): string => JSON.stringify({ default: {}, services: {} }, null, 2);
+const servicesResponseText = computed(() => (servicesResponse.value === null ? '' : JSON.stringify(servicesResponse.value, null, 2)));
+let servicesCopiedTimer: ReturnType<typeof setTimeout> | null = null;
+let servicesRequestSequence = 0;
 
 const providerConfigGuides: Record<ProviderRow['type'], ProviderConfigGuide> = {
     merchant_partner_card: {
@@ -152,12 +167,14 @@ const connectionConfigTemplate = (slug: string, type: ProviderRow['type'] = form
 const reset = (): void => {
     editingId.value = null;
     connectionJsonError.value = '';
+    mappingJsonError.value = '';
     form.name = '';
     form.slug = '';
     form.type = 'merchant_partner_card';
     form.balance_warning_threshold = 1000000;
     form.minimum_profit_percent = 5;
     form.connection_config_text = connectionConfigTemplate(form.slug);
+    form.payload_field_mapping_text = payloadFieldMappingTemplate();
 };
 
 const load = async (): Promise<void> => {
@@ -202,6 +219,52 @@ const formatBalance = (provider: ProviderRow): string =>
 const formatCheckedAt = (value: string | null): string =>
     value ? new Intl.DateTimeFormat('vi-VN', { dateStyle: 'short', timeStyle: 'short' }).format(new Date(value)) : 'Chưa kiểm tra';
 
+const openServices = (provider: ProviderRow): void => {
+    servicesRequestSequence += 1;
+    selectedServicesProvider.value = provider;
+    servicesLoading.value = false;
+    servicesResponse.value = null;
+    servicesError.value = '';
+    servicesCopied.value = false;
+    servicesModalOpen.value = true;
+};
+
+const fetchServices = async (): Promise<void> => {
+    if (!selectedServicesProvider.value || servicesLoading.value) return;
+
+    const requestSequence = ++servicesRequestSequence;
+    servicesLoading.value = true;
+    servicesError.value = '';
+    servicesCopied.value = false;
+
+    try {
+        const response = await adminTopupService.providerServices(selectedServicesProvider.value.id);
+        if (requestSequence === servicesRequestSequence) servicesResponse.value = response.data;
+    } catch (error) {
+        if (requestSequence !== servicesRequestSequence) return;
+
+        const apiError = error as { response?: { data?: { message?: string } }; message?: string };
+        servicesResponse.value = null;
+        servicesError.value = apiError.response?.data?.message || apiError.message || 'Không thể lấy services từ provider.';
+    } finally {
+        if (requestSequence === servicesRequestSequence) servicesLoading.value = false;
+    }
+};
+
+const copyServicesResponse = async (): Promise<void> => {
+    if (!servicesResponseText.value) return;
+
+    try {
+        await navigator.clipboard.writeText(servicesResponseText.value);
+        servicesCopied.value = true;
+
+        if (servicesCopiedTimer) clearTimeout(servicesCopiedTimer);
+        servicesCopiedTimer = setTimeout(() => (servicesCopied.value = false), 1800);
+    } catch {
+        servicesError.value = 'Không thể sao chép tự động. Hãy chọn nội dung JSON và sao chép thủ công.';
+    }
+};
+
 const syncQuery = async (): Promise<void> => {
     const query: Record<string, string | number> = {};
     if (filters.search) query.search = filters.search;
@@ -228,6 +291,7 @@ const changePage = async (page: number): Promise<void> => {
 
 const edit = async (row: ProviderRow): Promise<void> => {
     connectionJsonError.value = '';
+    mappingJsonError.value = '';
     const response = await adminTopupService.provider(row.id);
     const provider = response.data.data;
     editingId.value = provider.id;
@@ -240,6 +304,7 @@ const edit = async (row: ProviderRow): Promise<void> => {
     delete connectionConfig.balance_warning_threshold;
     delete connectionConfig.minimum_profit_percent;
     form.connection_config_text = JSON.stringify(connectionConfig, null, 2);
+    form.payload_field_mapping_text = JSON.stringify(provider.payload_field_mapping || { default: {}, services: {} }, null, 2);
 };
 
 const connectionConfig = (): Record<string, unknown> | null => {
@@ -257,9 +322,25 @@ const connectionConfig = (): Record<string, unknown> | null => {
     }
 };
 
+const payloadFieldMapping = (): Record<string, unknown> | null => {
+    mappingJsonError.value = '';
+    try {
+        const parsed = JSON.parse(form.payload_field_mapping_text);
+        if (parsed === null || Array.isArray(parsed) || typeof parsed !== 'object') {
+            mappingJsonError.value = 'Mapping field phải là một JSON object.';
+            return null;
+        }
+        return parsed;
+    } catch {
+        mappingJsonError.value = 'JSON mapping field không hợp lệ.';
+        return null;
+    }
+};
+
 const save = async (): Promise<void> => {
     const parsedConnectionConfig = connectionConfig();
-    if (!parsedConnectionConfig) return;
+    const parsedPayloadFieldMapping = payloadFieldMapping();
+    if (!parsedConnectionConfig || !parsedPayloadFieldMapping) return;
     if (!Number.isInteger(form.balance_warning_threshold) || form.balance_warning_threshold < 0 || form.balance_warning_threshold > 1000000000000) {
         connectionJsonError.value = 'Ngưỡng cảnh báo phải là số nguyên từ 0 đến 1.000.000.000.000đ.';
         return;
@@ -279,6 +360,7 @@ const save = async (): Promise<void> => {
                 balance_warning_threshold: form.balance_warning_threshold,
                 minimum_profit_percent: form.minimum_profit_percent,
             },
+            payload_field_mapping: parsedPayloadFieldMapping,
         });
         reset();
         await load();
@@ -366,7 +448,7 @@ onMounted(load);
                     <div v-if="loading" class="p-10 text-center text-slate-500">Đang tải provider...</div>
                     <div v-else-if="providers.length === 0" class="p-10 text-center text-slate-500">Không tìm thấy provider phù hợp.</div>
                     <div v-else class="overflow-x-auto">
-                        <table class="w-full min-w-[900px] text-sm">
+                        <table class="w-full min-w-[1040px] text-sm">
                             <thead class="bg-slate-50 text-left text-xs uppercase tracking-wider text-slate-500">
                                 <tr>
                                     <th class="p-4">Tên provider</th>
@@ -374,6 +456,7 @@ onMounted(load);
                                     <th class="p-4">Loại kết nối</th>
                                     <th class="p-4">Kết nối</th>
                                     <th class="p-4">Số dư provider</th>
+                                    <th class="p-4">Services</th>
                                     <th class="p-4">Gói nạp</th>
                                     <th
                                         class="sticky right-0 z-10 whitespace-nowrap bg-slate-50 p-4 text-right shadow-[-8px_0_12px_-12px_rgba(15,23,42,0.35)]"
@@ -443,6 +526,16 @@ onMounted(load);
                                                 Kết nối tốt
                                             </span>
                                         </div>
+                                    </td>
+                                    <td class="p-4">
+                                        <button
+                                            type="button"
+                                            class="whitespace-nowrap rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs font-bold text-indigo-700 hover:bg-indigo-100 disabled:cursor-not-allowed disabled:opacity-50"
+                                            :disabled="provider.type === 'manual'"
+                                            @click="openServices(provider)"
+                                        >
+                                            {{ provider.type === 'manual' ? 'Không hỗ trợ' : 'Xem services' }}
+                                        </button>
                                     </td>
                                     <td class="p-4 font-semibold">{{ provider.packages_count || 0 }}</td>
                                     <td
@@ -597,6 +690,20 @@ onMounted(load);
                             >Secret hiển thị ******** khi sửa. Giữ nguyên chuỗi này để bảo toàn giá trị cũ.</small
                         ><small v-if="connectionJsonError" class="mt-1.5 block font-semibold text-rose-600">{{ connectionJsonError }}</small></label
                     >
+                    <label class="text-sm font-semibold text-slate-700"
+                        >JSON mapping field payload<textarea
+                            v-model="form.payload_field_mapping_text"
+                            rows="10"
+                            required
+                            spellcheck="false"
+                            class="mt-2 w-full rounded-md border border-slate-300 px-3 py-3 font-mono text-xs leading-5"
+                        ></textarea
+                        ><small class="mt-1.5 block font-normal leading-5 text-slate-500">
+                            Field trong game giữ nguyên; provider đổi tên khi gửi. Ví dụ service HSO:
+                            <code>{ "services": { "hso": { "username": "user_account", "character": "charactor" } } }</code>
+                        </small>
+                        <small v-if="mappingJsonError" class="mt-1.5 block font-semibold text-rose-600">{{ mappingJsonError }}</small></label
+                    >
                     <button
                         type="submit"
                         class="min-h-11 rounded-md bg-emerald-600 px-4 font-semibold text-white hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
@@ -607,5 +714,69 @@ onMounted(load);
                 </div>
             </form>
         </div>
+
+        <Modal v-model="servicesModalOpen" panel-class="max-w-5xl">
+            <template #header>
+                <header class="border-b border-slate-200 px-5 py-4 pr-14">
+                    <p class="text-xs font-bold uppercase tracking-wider text-indigo-600">Provider services</p>
+                    <h2 class="mt-1 text-lg font-bold text-slate-950">
+                        {{ selectedServicesProvider?.name || 'Provider' }}
+                    </h2>
+                    <p v-if="selectedServicesProvider" class="mt-1 font-mono text-xs text-slate-500">
+                        {{ selectedServicesProvider.slug }}
+                    </p>
+                </header>
+            </template>
+
+            <div class="grid gap-4 p-5">
+                <div class="rounded-md border border-sky-200 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-900">
+                    Request được gửi từ server của website để dùng IP đã whitelist. Response provider được lọc các khóa nhạy cảm trước khi hiển thị.
+                </div>
+                <div
+                    v-if="servicesError"
+                    class="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700"
+                    role="alert"
+                >
+                    {{ servicesError }}
+                </div>
+                <pre
+                    v-if="servicesResponse !== null"
+                    class="max-h-[60vh] overflow-auto rounded-md bg-slate-950 p-4 text-xs leading-5 text-slate-100"
+                    >{{ servicesResponseText }}</pre
+                >
+                <div v-else class="rounded-md border border-dashed border-slate-300 px-5 py-12 text-center text-sm text-slate-500">
+                    {{ servicesLoading ? 'Đang gọi API provider...' : 'Bấm “Lấy services” để gọi API provider.' }}
+                </div>
+            </div>
+
+            <template #footer>
+                <footer class="flex flex-wrap justify-end gap-2 border-t border-slate-200 px-5 py-4">
+                    <button
+                        type="button"
+                        class="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700"
+                        @click="servicesModalOpen = false"
+                    >
+                        Đóng
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-md border border-indigo-200 bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        :disabled="servicesResponse === null"
+                        @click="copyServicesResponse"
+                    >
+                        {{ servicesCopied ? 'Đã sao chép' : 'Sao chép response' }}
+                    </button>
+                    <button
+                        type="button"
+                        class="rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
+                        :disabled="servicesLoading"
+                        @click="fetchServices"
+                    >
+                        {{ servicesLoading ? 'Đang lấy...' : 'Lấy services' }}
+                    </button>
+                </footer>
+            </template>
+        </Modal>
+        <p class="sr-only" aria-live="polite">{{ servicesCopied ? 'Đã sao chép response.' : '' }}</p>
     </section>
 </template>

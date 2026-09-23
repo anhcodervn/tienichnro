@@ -9,6 +9,7 @@ export const adminTopupService = {
         id ? axios.put(`${root}/topup-providers/${id}`, payload) : axios.post(`${root}/topup-providers`, payload),
     deleteProvider: (id: number) => axios.delete(`${root}/topup-providers/${id}`),
     refreshProviderBalances: (providerIds: number[]) => axios.post(`${root}/topup-providers/refresh-balances`, { provider_ids: providerIds }),
+    providerServices: (id: number) => axios.post(`${root}/topup-providers/${id}/services`),
     providerPrices: (params = {}) => axios.get(`${root}/provider-prices`, { params }),
     refreshProviderPrices: (params = {}) => axios.post(`${root}/provider-prices/refresh`, params),
     updateProviderQuote: (scope: 'package' | 'global', id: number, providerId: number, providerPrice: number | null) =>

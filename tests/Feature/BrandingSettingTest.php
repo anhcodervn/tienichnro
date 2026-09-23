@@ -47,7 +47,7 @@ test('branding settings render the correct logo favicon and shared image on blad
     $this->get(route('auth.login'))
         ->assertOk()
         ->assertSee('<img src="'.$branding['dark_logo'].'" alt="', false)
-        ->assertSee('class="h-auto w-32 shrink-0 object-contain object-left sm:w-40"', false)
+        ->assertSee('class="h-10 w-auto max-w-[8rem] shrink-0 object-contain object-left sm:h-12 sm:max-w-[12rem] lg:h-14 lg:max-w-none"', false)
         ->assertDontSee($branding['light_logo'])
         ->assertSee('<link rel="icon" href="'.$branding['favicon'].'">', false)
         ->assertSee('<link rel="shortcut icon" href="'.$branding['favicon'].'">', false)

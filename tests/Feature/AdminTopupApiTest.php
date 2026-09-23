@@ -2,6 +2,7 @@
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Enums\TopupProviderType;
 use App\Models\AdminAuditLog;
 use App\Models\Game;
 use App\Models\GameServer;
@@ -10,14 +11,18 @@ use App\Models\PaymentTransaction;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
 use App\Models\User;
+use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
 
 test('topup admin api rejects guests and ordinary users', function (): void {
+    $provider = TopupProvider::factory()->create();
+
     $this->getJson('/api/admin-api/games')->assertUnauthorized();
     $this->getJson('/api/admin-api/topup-providers')->assertUnauthorized();
     $this->postJson('/api/admin-api/topup-providers/refresh-balances', ['provider_ids' => [1]])->assertUnauthorized();
+    $this->postJson('/api/admin-api/topup-providers/1/services')->assertUnauthorized();
 
     $this->actingAs(User::factory()->create())
         ->getJson('/api/admin-api/games')
@@ -26,6 +31,84 @@ test('topup admin api rejects guests and ordinary users', function (): void {
     $this->actingAs(User::factory()->create())
         ->getJson('/api/admin-api/topup-providers')
         ->assertForbidden();
+
+    $this->actingAs(User::factory()->create())
+        ->postJson("/api/admin-api/topup-providers/{$provider->id}/services")
+        ->assertForbidden();
+});
+
+test('admin fetches and copies a sanitized provider services response through the server', function (): void {
+    Http::preventStrayRequests();
+
+    $admin = User::factory()->create(['role' => 'admin']);
+    $provider = TopupProvider::factory()->create([
+        'type' => TopupProviderType::MerchantPartnerCard,
+        'connection_config' => [
+            'base_url' => 'https://provider.test/api/rechargews',
+            'partner_id' => 'partner-123',
+            'partner_key' => 'secret-key',
+        ],
+    ]);
+
+    Http::fake([
+        'https://provider.test/api/rechargews' => Http::response([
+            'status' => 'success',
+            'message' => 'OK',
+            'partner_key' => 'echoed-secret',
+            'data' => [[
+                'name' => 'Hiệp Sĩ Online',
+                'service_code' => 'HSO',
+                'metadata' => ['access_token' => 'echoed-token'],
+                'items' => [[
+                    'name' => 'Gói 100.000đ',
+                    'value' => 100000,
+                    'price' => 100000,
+                    'discount' => 19.7,
+                ]],
+            ]],
+        ]),
+    ]);
+
+    $response = $this->actingAs($admin)
+        ->postJson("/api/admin-api/topup-providers/{$provider->id}/services")
+        ->assertSuccessful()
+        ->assertJsonPath('status', true)
+        ->assertJsonPath('data.provider.id', $provider->id)
+        ->assertJsonPath('data.response.status', 'success')
+        ->assertJsonPath('data.response.data.0.service_code', 'HSO')
+        ->assertJsonPath('data.response.data.0.items.0.value', 100000)
+        ->assertJsonPath('data.response.partner_key', '[REDACTED]')
+        ->assertJsonPath('data.response.data.0.metadata.access_token', '[REDACTED]');
+
+    expect($response->getContent())
+        ->not->toContain('echoed-secret')
+        ->not->toContain('echoed-token')
+        ->not->toContain('secret-key');
+
+    Http::assertSent(function (ClientRequest $request): bool {
+        return $request->url() === 'https://provider.test/api/rechargews'
+            && $request['command'] === 'productlist'
+            && $request['partner_id'] === 'partner-123'
+            && $request['sign'] === md5('secret-key'.'partner-123'.'productlist');
+    });
+});
+
+test('manual provider cannot fetch services', function (): void {
+    Http::preventStrayRequests();
+
+    $admin = User::factory()->create(['role' => 'admin']);
+    $provider = TopupProvider::factory()->create([
+        'type' => TopupProviderType::Manual,
+        'connection_config' => ['mode' => 'manual'],
+    ]);
+
+    $this->actingAs($admin)
+        ->postJson("/api/admin-api/topup-providers/{$provider->id}/services")
+        ->assertUnprocessable()
+        ->assertJsonPath('status', false)
+        ->assertJsonPath('message', '[catalog_unsupported] Provider này không hỗ trợ lấy danh sách services tự động.');
+
+    Http::assertNothingSent();
 });
 
 test('admin card statistics sum quantities from orders created today', function (): void {
@@ -340,11 +423,16 @@ test('admin manages encrypted provider connection config without leaking secrets
         'balance_warning_threshold' => 1000000,
         'minimum_profit_percent' => 7.5,
     ];
+    $payloadFieldMapping = [
+        'default' => ['character' => 'charactor'],
+        'services' => ['hso' => ['username' => 'user_account']],
+    ];
 
     $created = $this->actingAs($admin)->postJson('/api/admin-api/topup-providers', [
         'name' => 'Provider Carot',
         'slug' => 'provider-carot',
         'connection_config' => $connectionConfig,
+        'payload_field_mapping' => $payloadFieldMapping,
     ])->assertCreated()
         ->assertJsonPath('data.name', 'Provider Carot')
         ->assertJsonPath('data.slug', 'provider-carot')
@@ -356,6 +444,7 @@ test('admin manages encrypted provider connection config without leaking secrets
     $rawConfig = DB::table($provider->getTable())->where('id', $provider->id)->value('connection_config');
 
     expect($provider->connection_config)->toBe($connectionConfig)
+        ->and($provider->payload_field_mapping)->toBe($payloadFieldMapping)
         ->and($provider->toArray())->not->toHaveKey('connection_config')
         ->and($rawConfig)->not->toContain('very-secret-value')
         ->and($rawConfig)->not->toContain('api.provider.example');
@@ -369,6 +458,7 @@ test('admin manages encrypted provider connection config without leaking secrets
         ->assertJsonPath('data.connection_config.timeout', 30)
         ->assertJsonPath('data.connection_config.balance_warning_threshold', 1000000)
         ->assertJsonPath('data.connection_config.minimum_profit_percent', 7.5);
+    $shown->assertJsonPath('data.payload_field_mapping.services.hso.username', 'user_account');
 
     expect($shown->getContent())->not->toContain('public-key-123')
         ->not->toContain('very-secret-value')
@@ -386,6 +476,10 @@ test('admin manages encrypted provider connection config without leaking secrets
             'balance_warning_threshold' => 2000000,
             'minimum_profit_percent' => 10,
         ],
+        'payload_field_mapping' => [
+            'default' => ['character' => 'character_name'],
+            'services' => [],
+        ],
     ])->assertOk();
 
     expect($provider->refresh()->connection_config)->toBe([
@@ -396,6 +490,9 @@ test('admin manages encrypted provider connection config without leaking secrets
         'timeout' => 45,
         'balance_warning_threshold' => 2000000,
         'minimum_profit_percent' => 10,
+    ])->and($provider->payload_field_mapping)->toBe([
+        'default' => ['character' => 'character_name'],
+        'services' => [],
     ]);
 
     $this->actingAs($admin)->patchJson("/api/admin-api/topup-providers/{$provider->id}", [
@@ -404,6 +501,10 @@ test('admin manages encrypted provider connection config without leaking secrets
     ])->assertOk();
 
     expect($provider->refresh()->connection_config['api_secret'])->toBe('very-secret-value');
+    expect($provider->payload_field_mapping)->toBe([
+        'default' => ['character' => 'character_name'],
+        'services' => [],
+    ]);
 
     $auditJson = AdminAuditLog::query()
         ->where('subject_type', TopupProvider::class)
@@ -464,6 +565,35 @@ test('provider validation rejects unsafe connection config and duplicate slugs',
             'proxy' => 'file://proxy.example:8080',
         ],
     ])->assertUnprocessable()->assertJsonValidationErrors('connection_config');
+
+    $this->actingAs($admin)->postJson('/api/admin-api/topup-providers', [
+        'name' => 'Mapping trùng field đích',
+        'slug' => 'invalid-field-mapping',
+        'connection_config' => ['base_url' => 'https://provider.example'],
+        'payload_field_mapping' => [
+            'default' => ['username' => 'provider_account', 'character' => 'provider_account'],
+            'services' => [],
+        ],
+    ])->assertUnprocessable()->assertJsonValidationErrors('payload_field_mapping');
+
+    $this->actingAs($admin)->postJson('/api/admin-api/topup-providers', [
+        'name' => 'Mapping ghi đè field hệ thống',
+        'slug' => 'reserved-field-mapping',
+        'connection_config' => ['base_url' => 'https://provider.example'],
+        'payload_field_mapping' => [
+            'default' => ['username' => 'server'],
+            'services' => [],
+        ],
+    ])->assertUnprocessable()->assertJsonValidationErrors('payload_field_mapping');
+
+    $this->actingAs($admin)->postJson('/api/admin-api/topup-providers', [
+        'name' => 'Provider không cần mapping',
+        'slug' => 'empty-field-mapping',
+        'connection_config' => ['base_url' => 'https://provider.example'],
+        'payload_field_mapping' => ['default' => [], 'services' => []],
+    ])->assertCreated()
+        ->assertJsonPath('data.payload_field_mapping.default', [])
+        ->assertJsonPath('data.payload_field_mapping.services', []);
 });
 
 test('assigned provider cannot be deleted until packages are detached', function (): void {

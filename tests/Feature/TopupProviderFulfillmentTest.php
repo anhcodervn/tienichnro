@@ -103,6 +103,64 @@ test('the9p submits all units in one request using account quantity', function (
     Queue::assertPushed(SyncTopupRecipientStatus::class, 1);
 });
 
+test('merchant provider maps canonical fields with the order mapping snapshot', function (): void {
+    [$order, $recipient, $provider] = the9pOrderFixture([
+        'recipient_data' => [
+            'username' => 'hso-player',
+            'character' => 'hso-hero',
+        ],
+    ]);
+    $provider->update([
+        'payload_field_mapping' => [
+            'default' => [],
+            'services' => ['hso' => ['username' => 'wrong_live_key']],
+        ],
+    ]);
+    $order->forceFill([
+        'checkout_fields_snapshot' => [
+            ['key' => 'username', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
+            ['key' => 'character', 'label' => 'Nhân vật', 'placeholder' => '', 'required' => true],
+        ],
+        'metadata' => ['provider' => [
+            'slug' => 'the9p',
+            'service_code' => 'hso',
+            'payload_field_mapping' => [
+                'default' => ['character' => 'character_name'],
+                'services' => ['hso' => [
+                    'username' => 'user_account',
+                    'character' => 'charactor',
+                ]],
+            ],
+        ]],
+    ])->save();
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::response([
+            'status' => 'success',
+            'data' => ['order_code' => 'THE9P-HSO-1', 'status' => 'pending'],
+        ]),
+    ]);
+
+    app(RecipientFulfillmentService::class)->submit($recipient->id);
+
+    Http::assertSent(function (Request $request): bool {
+        return ($request->data()['service_code'] ?? null) === 'hso'
+            && ($request->data()['account_info'] ?? null) === [
+                'server' => 3,
+                'user_account' => 'hso-player',
+                'charactor' => 'hso-hero',
+                'qty' => 2,
+            ];
+    });
+
+    expect(data_get($recipient->refresh()->provider_response, 'items.1.submission.request.payload.account_info'))
+        ->toBe([
+            'server' => 3,
+            'user_account' => 'hso-player',
+            'charactor' => 'hso-hero',
+            'qty' => 2,
+        ]);
+});
+
 test('the9p accepts a legacy numeric success status for a batch order', function (): void {
     [$order, $recipient] = the9pOrderFixture(['quantity' => 8]);
     Http::fake([

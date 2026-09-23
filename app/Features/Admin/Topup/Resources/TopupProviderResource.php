@@ -19,6 +19,7 @@ class TopupProviderResource extends JsonResource
             'slug' => $this->slug,
             'type' => $this->type?->value,
             'has_connection_config' => filled($this->getRawOriginal('connection_config')),
+            'payload_field_mapping' => $this->payload_field_mapping ?? [],
             'connection_config' => $this->when(
                 $request->routeIs('admin.topup.topup-providers.show'),
                 fn (): array => $this->maskedConnectionConfig(),

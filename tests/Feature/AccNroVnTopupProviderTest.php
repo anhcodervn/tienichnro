@@ -360,6 +360,48 @@ test('accnrovn maps each game checkout setting to account and extra fields', fun
     });
 });
 
+test('accnrovn applies provider field mapping to its account and extra payload', function (): void {
+    [$order, $recipient, $provider] = accNroVnOrderFixture();
+    $provider->update([
+        'payload_field_mapping' => [
+            'default' => [],
+            'services' => ['hso' => [
+                'username' => 'user_account',
+                'character' => 'charactor',
+            ]],
+        ],
+    ]);
+    $order->forceFill([
+        'checkout_fields_snapshot' => [
+            ['key' => 'username', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
+            ['key' => 'character', 'label' => 'Nhân vật', 'placeholder' => '', 'required' => true],
+        ],
+        'metadata' => ['provider' => ['slug' => 'accnrovn', 'service_code' => 'hso']],
+    ])->save();
+    $recipient->forceFill([
+        'recipient_data' => ['username' => 'hso-player', 'character' => 'hso-hero'],
+    ])->save();
+    Http::fake([
+        'https://accnro.vn/api/v1/partner/recharge/create' => Http::response([
+            'success' => true,
+            'data' => ['order_id' => 'ACC-HSO-1', 'status' => 'pending'],
+        ]),
+    ]);
+
+    app(AccNroVnTopupProvider::class)->submit(
+        $order->fresh('server'),
+        $recipient->fresh(),
+        $provider->fresh(),
+        $order->code.'-R001',
+    );
+
+    Http::assertSent(function (Request $request): bool {
+        return ($request->data()['user_account'] ?? null) === 'hso-player'
+            && ($request->data()['extra'] ?? null) === ['charactor' => 'hso-hero']
+            && ! array_key_exists('account', $request->data());
+    });
+});
+
 test('accnrovn maps an arbitrary canonical game field to provider account', function (): void {
     [$order, $recipient, $provider] = accNroVnOrderFixture();
     $order->forceFill(['checkout_fields_snapshot' => [

@@ -6,6 +6,7 @@ use App\Features\Admin\Topup\Requests\ListTopupProviderRequest;
 use App\Features\Admin\Topup\Requests\StoreTopupProviderRequest;
 use App\Features\Admin\Topup\Requests\UpdateTopupProviderRequest;
 use App\Features\Admin\Topup\Resources\TopupProviderResource;
+use App\Features\Admin\Topup\Services\ProviderServiceCatalogService;
 use App\Features\Admin\Topup\Services\TopupAdminService;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Services\TopupProviderBalanceService;
@@ -22,6 +23,7 @@ class TopupProviderController extends Controller
     public function __construct(
         private readonly TopupAdminService $service,
         private readonly TopupProviderBalanceService $balanceService,
+        private readonly ProviderServiceCatalogService $serviceCatalog,
     ) {}
 
     public function index(ListTopupProviderRequest $request): JsonResponse
@@ -91,6 +93,24 @@ class TopupProviderController extends Controller
             'status' => true,
             'data' => TopupProviderResource::collection($providers->map->fresh()),
         ]);
+    }
+
+    public function services(TopupProvider $topupProvider): JsonResponse
+    {
+        try {
+            return response()->json([
+                'status' => true,
+                'message' => 'Đã lấy danh sách services từ provider.',
+                'data' => $this->serviceCatalog->fetch($topupProvider),
+            ]);
+        } catch (TopupProviderConnectionException $exception) {
+            report($exception);
+
+            return response()->json([
+                'status' => false,
+                'message' => "[{$exception->errorCode}] {$exception->getMessage()}",
+            ], 422);
+        }
     }
 
     private function admin(Request $request): User

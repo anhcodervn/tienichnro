@@ -11,6 +11,7 @@ use App\Features\Topup\DTOs\TopupProviderResultDto;
 use App\Features\Topup\Enums\TopupProviderStatus;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
 use App\Features\Topup\Services\TopupProviderHttpClientFactory;
+use App\Features\Topup\Services\TopupProviderPayloadFieldMapperService;
 use App\Models\GameServer;
 use App\Models\Order;
 use App\Models\OrderRecipient;
@@ -32,7 +33,10 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
         'Content-Type' => 'application/json',
     ];
 
-    public function __construct(private readonly TopupProviderHttpClientFactory $httpClientFactory) {}
+    public function __construct(
+        private readonly TopupProviderHttpClientFactory $httpClientFactory,
+        private readonly TopupProviderPayloadFieldMapperService $fieldMapper,
+    ) {}
 
     public function assertConfigured(TopupProvider $provider, TopupPackage $package, GameServer $server): void
     {
@@ -67,10 +71,12 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
 
         $config = $this->configuration($provider);
         $game = trim((string) data_get($order->metadata, 'provider.service_code'));
-        $providerFields = $this->providerFields($recipient);
+        $recipientFields = $this->providerFields($recipient);
         $server = $this->serverCode($order);
-        [$account, $primaryKey] = $this->primaryRecipientField($order, $providerFields, 'account');
-        unset($providerFields['account'], $providerFields[$primaryKey]);
+        [$account, $primaryKey] = $this->primaryRecipientField($order, $recipientFields, 'account');
+        unset($recipientFields['account'], $recipientFields[$primaryKey]);
+        $providerFields = $this->fieldMapper->map($order, $provider, $recipientFields);
+        $accountKey = $this->fieldMapper->outputKey($order, $provider, $primaryKey ?: 'account', 'account');
 
         if ($game === '' || $account === '') {
             throw ValidationException::withMessages([
@@ -84,7 +90,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
             'request_id' => $requestId,
             'game' => $game,
             ...($server !== '' ? ['server' => $server] : []),
-            'account' => $account,
+            $accountKey => $account,
             'price' => (int) ($order->denomination ?? 0),
             'amount' => $quantity ?? $recipient->quantity,
             ...($providerFields !== [] ? ['extra' => $providerFields] : []),
@@ -158,8 +164,8 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
         );
     }
 
-    /** @return Collection<int, TopupProviderProductDto> */
-    public function products(TopupProvider $provider): Collection
+    /** @return array<string, mixed> */
+    public function catalogResponse(TopupProvider $provider): array
     {
         $config = $this->configuration($provider);
         $response = $this->request($config, 'catalog', [
@@ -186,6 +192,15 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
                 'Provider trả về danh sách sản phẩm không đúng định dạng.',
             );
         }
+
+        return $body;
+    }
+
+    /** @return Collection<int, TopupProviderProductDto> */
+    public function products(TopupProvider $provider): Collection
+    {
+        $body = $this->catalogResponse($provider);
+        $games = data_get($body, 'data.games');
 
         return collect($games)
             ->filter(fn (mixed $game): bool => is_array($game))

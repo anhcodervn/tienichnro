@@ -32,6 +32,7 @@ class TopupProviderFactory extends Factory
                 'timeout' => 20,
                 'max_status_checks' => 20,
             ],
+            'payload_field_mapping' => null,
         ];
     }
 }

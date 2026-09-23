@@ -20,6 +20,7 @@ class TopupProvider extends Model
         'slug',
         'type',
         'connection_config',
+        'payload_field_mapping',
         'balance',
         'balance_currency',
         'balance_status',
@@ -42,6 +43,7 @@ class TopupProvider extends Model
         return [
             'type' => TopupProviderType::class,
             'connection_config' => 'encrypted:array',
+            'payload_field_mapping' => 'array',
             'balance' => 'integer',
             'balance_checked_at' => 'datetime',
             'price_synced_at' => 'datetime',
