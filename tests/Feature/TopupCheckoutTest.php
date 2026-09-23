@@ -244,7 +244,7 @@ function checkoutPayload(Game $game, GameServer $server, TopupPackage $package, 
         'single_quantity' => 2,
         'recipient_fields' => [
             'game_account' => 'ninja-player',
-            'game_character' => '',
+            'character_name' => '',
         ],
         'email' => 'Guest@Example.com',
         'payment_method' => PaymentMethod::BankTransfer->value,
@@ -340,6 +340,30 @@ test('checkout snapshots canonical fields and provider payload mapping', functio
                 'services' => ['nr' => ['account' => 'user_account']],
             ],
         ]);
+});
+
+test('checkout accepts the legacy game character alias and stores canonical recipient data', function (): void {
+    [$game, $server, $package] = topupCatalog();
+
+    $this->post(route('checkout.store'), checkoutPayload($game, $server, $package, [
+        'recipient_fields' => [
+            'game_account' => 'legacy-player',
+            'game_character' => 'Legacy Hero',
+        ],
+    ]))->assertSessionHasNoErrors()->assertRedirect();
+
+    $order = Order::query()->sole();
+
+    expect($order->checkout_fields_snapshot)->toContainEqual([
+        'key' => 'character_name',
+        'label' => 'Tên nhân vật',
+        'placeholder' => 'Không bắt buộc',
+        'required' => false,
+        'regex' => '',
+    ])->and($order->recipients()->firstOrFail()->recipient_data)->toBe([
+        'game_account' => 'legacy-player',
+        'character_name' => 'legacy hero',
+    ])->and($order->game_character)->toBe('legacy hero');
 });
 
 test('guest order stays unclaimed when its email belongs to an existing user', function (): void {
@@ -580,7 +604,7 @@ test('order detail presents status progress recipients and payment summary', fun
         'order_status' => OrderStatus::Pending,
     ]);
     OrderRecipient::factory()->for($order)->create([
-        'recipient_data' => ['game_account' => 'ninja-player', 'game_character' => 'Ninja Hero'],
+        'recipient_data' => ['game_account' => 'ninja-player', 'character_name' => 'Ninja Hero'],
         'quantity' => 2,
     ]);
 
@@ -652,9 +676,9 @@ test('bulk checkout derives quantity and total from recipient card quantities', 
         ->and($order->recipients()->count())->toBe(3)
         ->and($order->recipients()->orderBy('position')->pluck('quantity')->all())->toBe([2, 3, 1])
         ->and($order->recipients()->orderBy('position')->get()->pluck('recipient_data')->all())->toBe([
-            ['game_account' => 'account-1', 'game_character' => 'hero-1'],
-            ['game_account' => 'account-2', 'game_character' => 'hero-2'],
-            ['game_account' => 'account-3', 'game_character' => ''],
+            ['game_account' => 'account-1', 'character_name' => 'hero-1'],
+            ['game_account' => 'account-2', 'character_name' => 'hero-2'],
+            ['game_account' => 'account-3', 'character_name' => ''],
         ]);
 
     $mailHtml = (new OrderCreatedMail($order->fresh()))->render();

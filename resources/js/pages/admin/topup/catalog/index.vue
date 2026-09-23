@@ -18,7 +18,7 @@ type CheckoutField = { key: string; label: string; placeholder: string; required
 
 const defaultCheckoutFields = (): CheckoutField[] => [
     { key: 'game_account', label: 'Tài khoản game', placeholder: 'Tài khoản đăng nhập game', required: true, regex: '' },
-    { key: 'game_character', label: 'Tên nhân vật', placeholder: 'Không bắt buộc', required: false, regex: '' },
+    { key: 'character_name', label: 'Tên nhân vật', placeholder: 'Không bắt buộc', required: false, regex: '' },
 ];
 
 const props = defineProps<{ catalogType: CatalogType }>();

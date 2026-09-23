@@ -106,29 +106,29 @@ test('the9p submits all units in one request using account quantity', function (
 test('merchant provider maps canonical fields with the order mapping snapshot', function (): void {
     [$order, $recipient, $provider] = the9pOrderFixture([
         'recipient_data' => [
-            'username' => 'hso-player',
-            'character' => 'hso-hero',
+            'game_account' => 'hso-player',
+            'character_name' => 'hso-hero',
         ],
     ]);
     $provider->update([
         'payload_field_mapping' => [
             'default' => [],
-            'services' => ['hso' => ['username' => 'wrong_live_key']],
+            'services' => ['hso' => ['game_account' => 'wrong_live_key']],
         ],
     ]);
     $order->forceFill([
         'checkout_fields_snapshot' => [
-            ['key' => 'username', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
-            ['key' => 'character', 'label' => 'Nhân vật', 'placeholder' => '', 'required' => true],
+            ['key' => 'game_account', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true],
+            ['key' => 'character_name', 'label' => 'Nhân vật', 'placeholder' => '', 'required' => true],
         ],
         'metadata' => ['provider' => [
             'slug' => 'the9p',
             'service_code' => 'hso',
             'payload_field_mapping' => [
-                'default' => ['character' => 'character_name'],
+                'default' => [],
                 'services' => ['hso' => [
-                    'username' => 'user_account',
-                    'character' => 'charactor',
+                    'game_account' => 'username',
+                    'character_name' => 'charname',
                 ]],
             ],
         ]],
@@ -146,8 +146,8 @@ test('merchant provider maps canonical fields with the order mapping snapshot', 
         return ($request->data()['service_code'] ?? null) === 'hso'
             && ($request->data()['account_info'] ?? null) === [
                 'server' => 3,
-                'user_account' => 'hso-player',
-                'charactor' => 'hso-hero',
+                'username' => 'hso-player',
+                'charname' => 'hso-hero',
                 'qty' => 2,
             ];
     });
@@ -155,10 +155,43 @@ test('merchant provider maps canonical fields with the order mapping snapshot', 
     expect(data_get($recipient->refresh()->provider_response, 'items.1.submission.request.payload.account_info'))
         ->toBe([
             'server' => 3,
-            'user_account' => 'hso-player',
-            'charactor' => 'hso-hero',
+            'username' => 'hso-player',
+            'charname' => 'hso-hero',
             'qty' => 2,
         ]);
+});
+
+test('merchant provider sends character name as username for a character-only game', function (): void {
+    [$order, $recipient, $provider] = the9pOrderFixture([
+        'recipient_data' => ['character_name' => 'avatar-hero'],
+    ]);
+    $order->forceFill([
+        'checkout_fields_snapshot' => [
+            ['key' => 'character_name', 'label' => 'Tên nhân vật', 'placeholder' => '', 'required' => true],
+        ],
+        'metadata' => ['provider' => [
+            'slug' => 'the9p',
+            'service_code' => 'avatar',
+            'payload_field_mapping' => [
+                'default' => [],
+                'services' => ['avatar' => ['character_name' => 'username']],
+            ],
+        ]],
+    ])->save();
+    Http::fake([
+        'https://the9p.com/api/rechargews' => Http::response([
+            'status' => 'success',
+            'data' => ['order_code' => 'THE9P-AVATAR-1', 'status' => 'pending'],
+        ]),
+    ]);
+
+    app(RecipientFulfillmentService::class)->submit($recipient->id);
+
+    Http::assertSent(fn (Request $request): bool => ($request->data()['account_info'] ?? null) === [
+        'server' => 3,
+        'username' => 'avatar-hero',
+        'qty' => 2,
+    ]);
 });
 
 test('the9p accepts a legacy numeric success status for a batch order', function (): void {
@@ -671,7 +704,7 @@ test('checkout rejects an incomplete automatic provider before creating an order
         'package_id' => $package->id,
         'purchase_mode' => 'single',
         'single_quantity' => 1,
-        'recipient_fields' => ['game_account' => 'player-one', 'game_character' => ''],
+        'recipient_fields' => ['game_account' => 'player-one', 'character_name' => ''],
         'email' => 'guest@example.com',
         'payment_method' => PaymentMethod::BankTransfer->value,
     ])->assertRedirect(route('home'))->assertSessionHasErrors([

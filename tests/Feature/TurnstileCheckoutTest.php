@@ -42,7 +42,7 @@ function turnstileCheckoutPayload(Game $game, GameServer $server, TopupPackage $
         'package_id' => $package->id,
         'purchase_mode' => 'single',
         'single_quantity' => 1,
-        'recipient_fields' => ['game_account' => 'captcha-player', 'game_character' => ''],
+        'recipient_fields' => ['game_account' => 'captcha-player', 'character_name' => ''],
         'email' => 'captcha@example.com',
         'payment_method' => PaymentMethod::BankTransfer->value,
         ...$overrides,

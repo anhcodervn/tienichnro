@@ -15,7 +15,7 @@ class Game extends Model
     /** @var array<int, array{key:string,label:string,placeholder:string,required:bool,regex:string}> */
     public const DEFAULT_CHECKOUT_FIELDS = [
         ['key' => 'game_account', 'label' => 'Tài khoản game', 'placeholder' => 'Tài khoản đăng nhập game', 'required' => true, 'regex' => ''],
-        ['key' => 'game_character', 'label' => 'Tên nhân vật', 'placeholder' => 'Không bắt buộc', 'required' => false, 'regex' => ''],
+        ['key' => 'character_name', 'label' => 'Tên nhân vật', 'placeholder' => 'Không bắt buộc', 'required' => false, 'regex' => ''],
     ];
 
     protected $fillable = [
@@ -53,7 +53,7 @@ class Game extends Model
         $normalizedFields = collect($fields)
             ->filter(fn (mixed $field): bool => is_array($field) && filled($field['key'] ?? null) && filled($field['label'] ?? null))
             ->map(fn (array $field): array => [
-                'key' => (string) $field['key'],
+                'key' => (string) $field['key'] === 'game_character' ? 'character_name' : (string) $field['key'],
                 'label' => (string) $field['label'],
                 'placeholder' => (string) ($field['placeholder'] ?? ''),
                 'required' => (bool) ($field['required'] ?? false),

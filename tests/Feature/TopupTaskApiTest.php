@@ -196,8 +196,8 @@ test('api creates a multi recipient wallet order with per-recipient amounts and 
         ->and($order->recipients()->count())->toBe(2)
         ->and($order->game_account)->toBe('player-one')
         ->and($order->recipients()->orderBy('position')->get()->pluck('recipient_data')->all())->toBe([
-            ['game_account' => 'player-one', 'game_character' => ''],
-            ['game_account' => 'player-two', 'game_character' => ''],
+            ['game_account' => 'player-one', 'character_name' => ''],
+            ['game_account' => 'player-two', 'character_name' => ''],
         ])
         ->and((int) $user->wallet()->value('balance'))->toBe(230000)
         ->and(WalletTransaction::query()->count())->toBe(1);

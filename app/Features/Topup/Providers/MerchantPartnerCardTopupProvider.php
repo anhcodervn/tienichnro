@@ -88,8 +88,7 @@ class MerchantPartnerCardTopupProvider implements TopupProviderBalanceInterface,
         $serverCode = (string) data_get($order->metadata, 'provider.server_code', $order->server?->code);
         $recipientFields = $this->providerFields($recipient);
         unset($recipientFields['server']);
-        [$username, $primaryKey] = $this->primaryRecipientField($order, $recipientFields, 'username');
-        unset($recipientFields['username'], $recipientFields[$primaryKey]);
+        [$username, $primaryKey, $recipientFields] = $this->fieldMapper->extractPrimary($order, $recipientFields, 'username');
         $providerFields = $this->fieldMapper->map($order, $provider, $recipientFields);
         $usernameKey = $this->fieldMapper->outputKey($order, $provider, $primaryKey ?: 'username', 'username');
 
@@ -444,28 +443,5 @@ class MerchantPartnerCardTopupProvider implements TopupProviderBalanceInterface,
             ->mapWithKeys(fn (mixed $value, mixed $key): array => [(string) $key => trim((string) $value)])
             ->filter(fn (string $value): bool => $value !== '')
             ->all();
-    }
-
-    /**
-     * @param  array<string, string>  $providerFields
-     * @return array{0:string,1:string}
-     */
-    private function primaryRecipientField(Order $order, array $providerFields, string $providerKey): array
-    {
-        if (filled($providerFields[$providerKey] ?? null)) {
-            return [$providerFields[$providerKey], $providerKey];
-        }
-
-        foreach ($order->checkout_fields_snapshot ?? [] as $field) {
-            $key = is_array($field) ? (string) ($field['key'] ?? '') : '';
-
-            if ($key !== '' && filled($providerFields[$key] ?? null)) {
-                return [$providerFields[$key], $key];
-            }
-        }
-
-        $key = (string) collect($providerFields)->search(fn (string $value): bool => $value !== '');
-
-        return [$key !== '' ? $providerFields[$key] : '', $key];
     }
 }

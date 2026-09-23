@@ -6,6 +6,7 @@ use App\Features\Admin\Topup\Requests\ListTopupProviderRequest;
 use App\Features\Admin\Topup\Requests\StoreTopupProviderRequest;
 use App\Features\Admin\Topup\Requests\UpdateTopupProviderRequest;
 use App\Features\Admin\Topup\Resources\TopupProviderResource;
+use App\Features\Admin\Topup\Services\ProviderPayloadMappingTemplateService;
 use App\Features\Admin\Topup\Services\ProviderServiceCatalogService;
 use App\Features\Admin\Topup\Services\TopupAdminService;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
@@ -24,6 +25,7 @@ class TopupProviderController extends Controller
         private readonly TopupAdminService $service,
         private readonly TopupProviderBalanceService $balanceService,
         private readonly ProviderServiceCatalogService $serviceCatalog,
+        private readonly ProviderPayloadMappingTemplateService $payloadMappingTemplate,
     ) {}
 
     public function index(ListTopupProviderRequest $request): JsonResponse
@@ -40,6 +42,11 @@ class TopupProviderController extends Controller
 
     public function show(TopupProvider $topupProvider): TopupProviderResource
     {
+        $topupProvider->setAttribute(
+            'payload_field_mapping_editor',
+            $this->payloadMappingTemplate->editorMapping($topupProvider),
+        );
+
         return TopupProviderResource::make($topupProvider->loadCount('packages'));
     }
 

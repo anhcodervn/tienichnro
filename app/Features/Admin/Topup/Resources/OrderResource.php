@@ -38,7 +38,7 @@ class OrderResource extends JsonResource
                 'slug' => $this->tenant->slug,
             ]),
             'user_id' => $this->user_id, 'game' => $this->game?->name, 'server' => $this->server?->name,
-            'game_account' => $this->game_account, 'game_character' => $this->game_character,
+            'game_account' => $this->game_account, 'character_name' => $this->game_character,
             'package_name' => $this->package_name, 'quantity' => $this->quantity,
             'purchase_mode' => $this->purchase_mode,
             'provider' => $this->provider === null ? null : [

@@ -249,6 +249,8 @@ test('admin order detail exposes QR reconciliation fields without raw callback p
         ->getJson("/api/admin-api/orders/{$order->code}")
         ->assertOk()
         ->assertJsonPath('data.topup_id', null)
+        ->assertJsonPath('data.character_name', null)
+        ->assertJsonMissingPath('data.game_character')
         ->assertJsonPath('data.pricing.sale_unit_price', 90000)
         ->assertJsonPath('data.pricing.sale_price', 450000)
         ->assertJsonPath('data.pricing.provider_total_cost', 75000)
@@ -515,6 +517,51 @@ test('admin manages encrypted provider connection config without leaking secrets
         ->not->toContain('very-secret-value')
         ->not->toContain('proxy-pass')
         ->not->toContain((string) $rawConfig);
+});
+
+test('provider editor appends defaults for new game services without changing saved mappings', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    Game::factory()->create([
+        'provider_service_code' => 'HSO',
+        'checkout_fields' => [
+            ['key' => 'game_account', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true, 'regex' => ''],
+        ],
+    ]);
+    Game::factory()->create([
+        'provider_service_code' => 'AVATAR',
+        'checkout_fields' => [
+            ['key' => 'character_name', 'label' => 'Tên nhân vật', 'placeholder' => '', 'required' => true, 'regex' => ''],
+        ],
+    ]);
+    Game::factory()->create([
+        'provider_service_code' => 'NRO',
+        'checkout_fields' => [
+            ['key' => 'game_account', 'label' => 'Tài khoản', 'placeholder' => '', 'required' => true, 'regex' => ''],
+            ['key' => 'game_character', 'label' => 'Tên nhân vật', 'placeholder' => '', 'required' => false, 'regex' => ''],
+        ],
+    ]);
+    $savedMapping = [
+        'default' => ['zone' => 'server_zone'],
+        'services' => ['hso' => ['game_account' => 'player_id']],
+    ];
+    $provider = TopupProvider::factory()->create([
+        'type' => TopupProviderType::MerchantPartnerCard,
+        'payload_field_mapping' => $savedMapping,
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson("/api/admin-api/topup-providers/{$provider->id}")
+        ->assertSuccessful()
+        ->assertJsonPath('data.payload_field_mapping', $savedMapping)
+        ->assertJsonPath('data.payload_field_mapping_editor.default.zone', 'server_zone')
+        ->assertJsonPath('data.payload_field_mapping_editor.services.hso', ['game_account' => 'player_id'])
+        ->assertJsonPath('data.payload_field_mapping_editor.services.avatar', ['character_name' => 'username'])
+        ->assertJsonPath('data.payload_field_mapping_editor.services.nro', [
+            'game_account' => 'username',
+            'character_name' => 'charname',
+        ]);
+
+    expect($provider->refresh()->payload_field_mapping)->toBe($savedMapping);
 });
 
 test('provider validation rejects unsafe connection config and duplicate slugs', function (): void {

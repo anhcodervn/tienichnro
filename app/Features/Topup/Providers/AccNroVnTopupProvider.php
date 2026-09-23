@@ -73,8 +73,7 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
         $game = trim((string) data_get($order->metadata, 'provider.service_code'));
         $recipientFields = $this->providerFields($recipient);
         $server = $this->serverCode($order);
-        [$account, $primaryKey] = $this->primaryRecipientField($order, $recipientFields, 'account');
-        unset($recipientFields['account'], $recipientFields[$primaryKey]);
+        [$account, $primaryKey, $recipientFields] = $this->fieldMapper->extractPrimary($order, $recipientFields, 'account');
         $providerFields = $this->fieldMapper->map($order, $provider, $recipientFields);
         $accountKey = $this->fieldMapper->outputKey($order, $provider, $primaryKey ?: 'account', 'account');
 
@@ -462,28 +461,5 @@ class AccNroVnTopupProvider implements TopupProviderBalanceInterface, TopupProvi
             ->mapWithKeys(fn (mixed $value, mixed $key): array => [(string) $key => trim((string) $value)])
             ->filter(fn (string $value): bool => $value !== '')
             ->all();
-    }
-
-    /**
-     * @param  array<string, string>  $providerFields
-     * @return array{0:string,1:string}
-     */
-    private function primaryRecipientField(Order $order, array $providerFields, string $providerKey): array
-    {
-        if (filled($providerFields[$providerKey] ?? null)) {
-            return [$providerFields[$providerKey], $providerKey];
-        }
-
-        foreach ($order->checkout_fields_snapshot ?? [] as $field) {
-            $key = is_array($field) ? (string) ($field['key'] ?? '') : '';
-
-            if ($key !== '' && filled($providerFields[$key] ?? null)) {
-                return [$providerFields[$key], $key];
-            }
-        }
-
-        $key = (string) collect($providerFields)->search(fn (string $value): bool => $value !== '');
-
-        return [$key !== '' ? $providerFields[$key] : '', $key];
     }
 }

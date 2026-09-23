@@ -59,8 +59,8 @@ class OrderRecipientService
             'fields' => $fields,
             'recipients' => $recipients,
             'game_account' => $firstRecipient['game_account'] ?? $primaryValue ?? 'recipient-1',
-            'game_character' => filled($firstRecipient['game_character'] ?? null)
-                ? $firstRecipient['game_character']
+            'game_character' => filled($firstRecipient['character_name'] ?? $firstRecipient['game_character'] ?? null)
+                ? ($firstRecipient['character_name'] ?? $firstRecipient['game_character'])
                 : null,
         ];
     }
@@ -199,6 +199,14 @@ class OrderRecipientService
         }
 
         $allowedKeys = collect($fields)->pluck('key')->all();
+        if (in_array('character_name', $allowedKeys, true) && array_key_exists('game_character', $input)) {
+            if (! array_key_exists('character_name', $input)) {
+                $input['character_name'] = $input['game_character'];
+            }
+
+            unset($input['game_character']);
+        }
+
         if (array_diff(array_keys($input), $allowedKeys) !== []) {
             throw ValidationException::withMessages([$errorKey => 'Thông tin chứa trường không được cấu hình cho game này.']);
         }

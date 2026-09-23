@@ -296,7 +296,7 @@ it('uses every global package value and provider across games while keeping each
         'package_id' => $package->id,
         'purchase_mode' => 'single',
         'single_quantity' => 1,
-        'recipient_fields' => ['game_account' => 'global-player', 'game_character' => ''],
+        'recipient_fields' => ['game_account' => 'global-player', 'character_name' => ''],
         'payment_method' => PaymentMethod::BankTransfer->value,
     ], $user, '127.0.0.1', 'Pest');
 
@@ -446,7 +446,7 @@ it('snapshots the global package source while keeping the game package on new or
         'package_id' => $package->id,
         'purchase_mode' => 'single',
         'single_quantity' => 1,
-        'recipient_fields' => ['game_account' => 'global-player', 'game_character' => ''],
+        'recipient_fields' => ['game_account' => 'global-player', 'character_name' => ''],
         'payment_method' => PaymentMethod::Wallet->value,
     ], $user, '127.0.0.1', 'Pest');
 

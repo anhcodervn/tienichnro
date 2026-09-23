@@ -70,7 +70,7 @@ export type OrderRow = {
     game?: string | null;
     server?: string | null;
     game_account?: string | null;
-    game_character?: string | null;
+    character_name?: string | null;
     package_name: string;
     quantity: number;
     purchase_mode?: string | null;

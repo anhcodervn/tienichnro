@@ -304,7 +304,11 @@ const edit = async (row: ProviderRow): Promise<void> => {
     delete connectionConfig.balance_warning_threshold;
     delete connectionConfig.minimum_profit_percent;
     form.connection_config_text = JSON.stringify(connectionConfig, null, 2);
-    form.payload_field_mapping_text = JSON.stringify(provider.payload_field_mapping || { default: {}, services: {} }, null, 2);
+    form.payload_field_mapping_text = JSON.stringify(
+        provider.payload_field_mapping_editor || provider.payload_field_mapping || { default: {}, services: {} },
+        null,
+        2,
+    );
 };
 
 const connectionConfig = (): Record<string, unknown> | null => {
@@ -699,8 +703,9 @@ onMounted(load);
                             class="mt-2 w-full rounded-md border border-slate-300 px-3 py-3 font-mono text-xs leading-5"
                         ></textarea
                         ><small class="mt-1.5 block font-normal leading-5 text-slate-500">
-                            Field trong game giữ nguyên; provider đổi tên khi gửi. Ví dụ service HSO:
-                            <code>{ "services": { "hso": { "username": "user_account", "character": "charactor" } } }</code>
+                            Website dùng <code>game_account</code> cho tài khoản đăng nhập và <code>character_name</code> cho tên nhân vật. Khi mở sửa,
+                            hệ thống chỉ thêm mapping mặc định cho game mới và giữ nguyên service đã lưu. Ví dụ:
+                            <code>{ "services": { "hso": { "game_account": "username", "character_name": "charname" } } }</code>
                         </small>
                         <small v-if="mappingJsonError" class="mt-1.5 block font-semibold text-rose-600">{{ mappingJsonError }}</small></label
                     >

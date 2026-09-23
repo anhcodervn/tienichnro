@@ -76,7 +76,7 @@ it('creates new orders without member level pricing snapshots or credits', funct
         'package_id' => $package->id,
         'purchase_mode' => 'single',
         'single_quantity' => 2,
-        'recipient_fields' => ['game_account' => 'legacy-level-player', 'game_character' => ''],
+        'recipient_fields' => ['game_account' => 'legacy-level-player', 'character_name' => ''],
         'payment_method' => PaymentMethod::Wallet->value,
     ], $user, '127.0.0.1', 'Pest');
 
