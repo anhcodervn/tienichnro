@@ -41,6 +41,7 @@ class SharedViewServiceProvider extends ServiceProvider
                 'game_service_items' => [],
                 'game_service_url' => '',
                 'footer_game_links' => [],
+                'support_channels' => [],
                 'gtm_id' => '',
                 'meta_pixel_id' => '',
                 'custom_head_tags' => '',
@@ -60,6 +61,7 @@ class SharedViewServiceProvider extends ServiceProvider
             ]);
             $gameServiceItems = $this->normalizeNavigationItems($storedSettings['game_service_items']);
             $footerGameLinks = $this->normalizeNavigationItems($storedSettings['footer_game_links']);
+            $supportChannels = $this->normalizeSupportChannels($storedSettings['support_channels']);
 
             if ($gameServiceItems === [] && SafeNavigationUrl::passes($storedSettings['game_service_url'])) {
                 $gameServiceItems = [[
@@ -104,6 +106,7 @@ class SharedViewServiceProvider extends ServiceProvider
                 ...(is_array($viewSettings) ? $viewSettings : []),
                 'game_service_items' => $gameServiceItems,
                 'footer_game_links' => $footerGameLinks,
+                'support_channels' => $supportChannels,
             ]);
             $view->with('navigationGames', $navigationGames);
             $view->with('customCodeAssets', [
@@ -160,6 +163,29 @@ class SharedViewServiceProvider extends ServiceProvider
         $gtmId = is_string($value) ? trim($value) : '';
 
         return preg_match('/\AGTM-[A-Z0-9]+\z/', $gtmId) === 1 ? $gtmId : '';
+    }
+
+    /**
+     * @return array<int, array{icon: string, url: string}>
+     */
+    private function normalizeSupportChannels(mixed $channels): array
+    {
+        if (! is_array($channels)) {
+            return [];
+        }
+
+        return collect($channels)
+            ->filter(fn (mixed $channel): bool => is_array($channel)
+                && ($channel['is_active'] ?? false) === true
+                && SafeNavigationUrl::passes($channel['icon'] ?? null)
+                && SafeNavigationUrl::passes($channel['url'] ?? null))
+            ->take(10)
+            ->map(fn (array $channel): array => [
+                'icon' => trim($channel['icon']),
+                'url' => trim($channel['url']),
+            ])
+            ->values()
+            ->all();
     }
 
     private function normalizeMetaPixelId(mixed $value): string

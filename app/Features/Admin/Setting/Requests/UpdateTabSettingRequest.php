@@ -106,6 +106,13 @@ class UpdateTabSettingRequest extends FormRequest
                 'zalo' => ['nullable', 'string', 'max:255'],
                 'youtube' => ['nullable', 'string', 'max:255'],
             ],
+            'support-channels' => [
+                'support_channels' => ['present', 'array', 'max:10'],
+                'support_channels.*' => ['required', 'array:icon,url,is_active'],
+                'support_channels.*.icon' => ['required', 'string', 'max:2048', $this->safeSupportUrlRule('icon')],
+                'support_channels.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeSupportUrlRule('link')],
+                'support_channels.*.is_active' => ['required', 'boolean'],
+            ],
             'seo' => [
                 'meta_title' => ['nullable', 'string', 'max:255'],
                 'meta_description' => ['nullable', 'string', 'max:1000'],
@@ -212,6 +219,10 @@ class UpdateTabSettingRequest extends FormRequest
             'bio_links.*.label.required' => 'Vui lòng nhập tên liên kết bio.',
             'bio_links.*.url.required' => 'Vui lòng nhập URL liên kết bio.',
             'bio_links.*.url.distinct' => 'URL liên kết bio không được trùng nhau.',
+            'support_channels.max' => 'Chỉ được cấu hình tối đa 10 kênh hỗ trợ.',
+            'support_channels.*.icon.required' => 'Vui lòng nhập icon cho kênh hỗ trợ.',
+            'support_channels.*.url.required' => 'Vui lòng nhập liên kết hỗ trợ.',
+            'support_channels.*.url.distinct' => 'Liên kết hỗ trợ không được trùng nhau.',
         ];
     }
 
@@ -251,6 +262,10 @@ class UpdateTabSettingRequest extends FormRequest
             'facebook' => 'liên kết Facebook',
             'zalo' => 'liên kết Zalo',
             'youtube' => 'liên kết YouTube',
+            'support_channels' => 'danh sách kênh hỗ trợ',
+            'support_channels.*.icon' => 'icon kênh hỗ trợ',
+            'support_channels.*.url' => 'liên kết kênh hỗ trợ',
+            'support_channels.*.is_active' => 'trạng thái kênh hỗ trợ',
             'meta_title' => 'meta title',
             'meta_description' => 'meta description',
             'robots' => 'robots',
@@ -297,6 +312,12 @@ class UpdateTabSettingRequest extends FormRequest
 
         if ((string) $this->route('tab') === 'bio') {
             $this->prepareBioSettings();
+
+            return;
+        }
+
+        if ((string) $this->route('tab') === 'support-channels') {
+            $this->prepareSupportChannels();
 
             return;
         }
@@ -369,6 +390,40 @@ class UpdateTabSettingRequest extends FormRequest
                 $fail('Liên kết bio phải là URL http/https hoặc đường dẫn nội bộ bắt đầu bằng /.');
             }
         };
+    }
+
+    private function safeSupportUrlRule(string $field): Closure
+    {
+        return function (string $attribute, mixed $value, Closure $fail) use ($field): void {
+            if ($value !== null && $value !== '' && ! SafeNavigationUrl::passes($value)) {
+                $fail($field === 'icon'
+                    ? 'Icon hỗ trợ phải là URL http/https hoặc đường dẫn nội bộ bắt đầu bằng /.'
+                    : 'Liên kết hỗ trợ phải là URL http/https hoặc đường dẫn nội bộ bắt đầu bằng /.');
+            }
+        };
+    }
+
+    private function prepareSupportChannels(): void
+    {
+        $channels = $this->input('support_channels');
+
+        if (! is_array($channels)) {
+            return;
+        }
+
+        $this->merge([
+            'support_channels' => array_map(static function (mixed $channel): mixed {
+                if (! is_array($channel)) {
+                    return $channel;
+                }
+
+                return [
+                    ...$channel,
+                    'icon' => is_string($channel['icon'] ?? null) ? trim($channel['icon']) : ($channel['icon'] ?? null),
+                    'url' => is_string($channel['url'] ?? null) ? trim($channel['url']) : ($channel['url'] ?? null),
+                ];
+            }, $channels),
+        ]);
     }
 
     private function prepareBioSettings(): void

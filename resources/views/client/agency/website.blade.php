@@ -25,7 +25,7 @@
                 <h1 class="mt-4 max-w-3xl text-3xl font-extrabold tracking-tight sm:text-4xl">Kinh doanh bằng thương hiệu và domain của bạn</h1>
                 <p class="mt-4 max-w-3xl text-sm leading-7 text-slate-300 sm:text-base">NapCarot vận hành hệ thống nạp, provider và cập nhật đơn. Bạn quản lý khách hàng, giao diện cơ bản và tự đặt giá bán ra trên website đại lý.</p>
                 <div class="mt-6 flex flex-col gap-3 sm:flex-row">
-                    <a class="client-button min-h-12 justify-center" href="{{ route('client.support.chat') }}"><i class="bx bx-message-circle-dots text-xl" aria-hidden="true"></i>Đăng ký với hỗ trợ</a>
+                    <a class="client-button min-h-12 justify-center" href="{{ route('content.contact') }}"><i class="bx bx-message-circle-dots text-xl" aria-hidden="true"></i>Đăng ký với hỗ trợ</a>
                     <a class="inline-flex min-h-12 items-center justify-center gap-2 rounded-[5px] border border-white/20 px-4 text-sm font-bold text-white transition hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400" href="#quy-trinh"><i class="bx bx-checklist text-xl" aria-hidden="true"></i>Xem quy trình</a>
                 </div>
             </div>
@@ -92,7 +92,7 @@
                 <li class="flex gap-2"><i class="bx bx-check mt-1 text-lg text-amber-700" aria-hidden="true"></i><span>Tài khoản NapCarot đang hoạt động và có số dư để thanh toán đơn.</span></li>
                 <li class="flex gap-2"><i class="bx bx-check mt-1 text-lg text-amber-700" aria-hidden="true"></i><span>Tên website, logo và thông tin hỗ trợ khách hàng.</span></li>
             </ul>
-            <a class="client-button mt-5 min-h-11 w-full justify-center" href="{{ route('client.support.chat') }}">Trao đổi với hỗ trợ<i class="bx bx-arrow-right text-xl" aria-hidden="true"></i></a>
+            <a class="client-button mt-5 min-h-11 w-full justify-center" href="{{ route('content.contact') }}">Trao đổi với hỗ trợ<i class="bx bx-arrow-right text-xl" aria-hidden="true"></i></a>
         </aside>
     </div>
 </section>

@@ -136,6 +136,16 @@ export interface ContactSettingType {
     [key: string]: unknown;
 }
 
+export interface SupportChannelItemType {
+    icon: string;
+    url: string;
+    is_active: boolean;
+}
+
+export interface SupportChannelSettingType {
+    support_channels: SupportChannelItemType[];
+}
+
 export interface DiscordWebhookSettingItemType {
     name: string;
     url: string;

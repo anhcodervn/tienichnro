@@ -5,9 +5,6 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    @if (request()->routeIs('client.support.chat'))
-        <meta name="robots" content="noindex,nofollow">
-    @endif
     @php
         $settings = $systemSettings ?? [];
         $siteName = $settings['site_name'] ?? config('app.name', 'Laravel');
@@ -89,9 +86,7 @@
 <body class="font-sans antialiased">
     <div id="app" data-site-name="{{ $siteName }}"></div>
 
-    @unless (request()->routeIs('client.support.chat'))
-        <script src="{{ asset('assets/libs/tinymce/tinymce.min.js') }}"></script>
-    @endunless
+    <script src="{{ asset('assets/libs/tinymce/tinymce.min.js') }}"></script>
 
     <!-- Google Tag Manager (noscript) -->
     @if (!empty($settings['gtm_id']))

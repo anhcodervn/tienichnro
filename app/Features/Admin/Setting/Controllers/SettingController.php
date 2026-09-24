@@ -76,6 +76,9 @@ class SettingController extends Controller
                 'zalo' => '',
                 'youtube' => '',
             ],
+            'support-channels' => [
+                'support_channels' => [],
+            ],
             'seo' => [
                 'meta_title' => '',
                 'meta_description' => '',
@@ -256,6 +259,9 @@ class SettingController extends Controller
                 'facebook' => 'facebook',
                 'zalo' => 'zalo',
                 'youtube' => 'youtube',
+            ],
+            'support-channels' => [
+                'support_channels' => 'support_channels',
             ],
             'seo' => [
                 'meta_title' => 'meta_title',
@@ -533,7 +539,7 @@ class SettingController extends Controller
         }
 
         abort_unless(in_array($tab, [
-            'system', 'general', 'homepage', 'popup-notice', 'service-articles', 'bio', 'branding',
+            'system', 'general', 'homepage', 'popup-notice', 'service-articles', 'bio', 'branding', 'support-channels',
             'contact', 'seo', 'options', 'content-pages', 'slider-images',
         ], true), 403, 'Website đại lý không được thay đổi cấu hình hệ thống này.');
     }

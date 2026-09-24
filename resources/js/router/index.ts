@@ -3,15 +3,7 @@ import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import adminRouter from './modules/admin';
 import affiliateRouter from './modules/affiliate';
 
-const routes: RouteRecordRaw[] = [
-    adminRouter,
-    affiliateRouter,
-    {
-        path: '/chat',
-        name: 'client.support.chat',
-        component: () => import('@/pages/client/support/index.vue'),
-    },
-];
+const routes: RouteRecordRaw[] = [adminRouter, affiliateRouter];
 
 const routeTitles: Record<string, string> = {
     'admin.dashboard': 'Tổng quan quản trị',
@@ -55,7 +47,6 @@ const routeTitles: Record<string, string> = {
     'affiliate.home': 'Trang chủ cộng tác viên',
     'affiliate.dashboard': 'Tổng quan hoa hồng',
     'affiliate.rates': 'Bảng giá chiết khấu',
-    'client.support.chat': 'Chat hỗ trợ',
 };
 
 const router = createRouter({
@@ -66,7 +57,7 @@ const router = createRouter({
 router.beforeEach(async (to) => {
     const routeName = typeof to.name === 'string' ? to.name : '';
 
-    if (!routeName.startsWith('admin.') && !routeName.startsWith('affiliate.') && routeName !== 'client.support.chat') {
+    if (!routeName.startsWith('admin.') && !routeName.startsWith('affiliate.')) {
         return true;
     }
 
@@ -74,12 +65,6 @@ router.beforeEach(async (to) => {
     const user = await userStore.bootstrap({ silent: true });
 
     if (!user) {
-        if (routeName === 'client.support.chat') {
-            window.location.assign(`/dang-nhap?redirect=${encodeURIComponent(to.fullPath)}`);
-
-            return false;
-        }
-
         return {
             path: '/login',
             query: {

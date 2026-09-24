@@ -1,22 +1,45 @@
-@props(['raised' => false])
+@props(['channels' => [], 'raised' => false])
 
-<a
-    @class([
-        'group fixed right-3 z-30 inline-flex min-h-14 items-center gap-2.5 rounded-full border border-emerald-400/70 bg-emerald-600 p-2 pr-3 text-white shadow-[0_12px_32px_rgba(5,150,105,0.35)] transition duration-200 hover:-translate-y-1 hover:bg-emerald-700 hover:shadow-[0_16px_36px_rgba(5,150,105,0.42)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 sm:bottom-6 sm:right-6 sm:pr-4',
-        'bottom-[calc(env(safe-area-inset-bottom)+6rem)]' => $raised,
-        'bottom-[calc(env(safe-area-inset-bottom)+1rem)]' => ! $raised,
-    ])
-    href="{{ route('client.support.chat') }}"
-    aria-label="Chat với hỗ trợ"
-    title="Chat với hỗ trợ"
-    data-floating-support
->
-    <span class="relative grid h-10 w-10 shrink-0 place-items-center rounded-full bg-white text-xl text-emerald-700 shadow-sm">
-        <span class="absolute inset-0 rounded-full bg-white/70 motion-safe:animate-ping motion-reduce:hidden" aria-hidden="true"></span>
-        <i class="bx bx-message-circle-dots relative" aria-hidden="true"></i>
-    </span>
-    <span class="hidden min-[390px]:block">
-        <strong class="block text-sm leading-5">Chat hỗ trợ</strong>
-        <span class="block text-[11px] font-medium text-emerald-100">Trò chuyện realtime</span>
-    </span>
-</a>
+@php
+    $channels = collect($channels)
+        ->filter(fn (mixed $channel): bool => is_array($channel) && isset($channel['icon'], $channel['url']))
+        ->values();
+@endphp
+
+@if ($channels->isNotEmpty())
+    <div
+        @class([
+            'fixed right-4 z-[60] flex flex-col items-center gap-3 sm:right-6',
+            'bottom-[calc(env(safe-area-inset-bottom)+6rem)]' => $raised,
+            'bottom-[calc(env(safe-area-inset-bottom)+1rem)]' => ! $raised,
+        ])
+        data-floating-support
+    >
+        <div id="floating-support-channels" class="hidden flex-col items-center gap-3" data-floating-support-list>
+            @foreach ($channels as $channel)
+                <a
+                    href="{{ $channel['url'] }}"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="grid h-14 w-14 place-items-center overflow-hidden rounded-full border border-white/80 bg-white p-2 shadow-[0_10px_28px_rgba(15,23,42,0.22)] transition duration-200 hover:-translate-y-0.5 hover:shadow-[0_14px_32px_rgba(15,23,42,0.28)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-600 focus-visible:ring-offset-2 sm:h-16 sm:w-16"
+                    aria-label="Mở kênh hỗ trợ"
+                    data-floating-support-link
+                >
+                    <img src="{{ $channel['icon'] }}" alt="" class="h-full w-full object-contain" loading="lazy">
+                </a>
+            @endforeach
+        </div>
+
+        <button
+            type="button"
+            class="group grid h-16 w-16 place-items-center rounded-full bg-fuchsia-600 text-white shadow-[0_12px_32px_rgba(192,38,211,0.38)] transition duration-200 hover:-translate-y-0.5 hover:bg-fuchsia-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-fuchsia-600 focus-visible:ring-offset-2 sm:h-[4.5rem] sm:w-[4.5rem]"
+            aria-label="Mở danh sách hỗ trợ"
+            aria-controls="floating-support-channels"
+            aria-expanded="false"
+            data-floating-support-toggle
+        >
+            <i class="bx bx-headphone text-3xl group-aria-expanded:hidden" aria-hidden="true"></i>
+            <i class="bx bx-x hidden text-4xl group-aria-expanded:block" aria-hidden="true"></i>
+        </button>
+    </div>
+@endif

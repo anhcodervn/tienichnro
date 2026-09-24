@@ -16,6 +16,7 @@ import type {
     ServiceArticlesSettingType,
     SettingApiResponse,
     SliderImageSettingType,
+    SupportChannelSettingType,
     SystemSettingType,
     TaxSettingType,
 } from '@/types/setting.type';
@@ -90,6 +91,12 @@ export const adminSettingService = {
     },
     updateContact(payload: ContactSettingType) {
         return updateTab<ContactSettingType>('contact', payload);
+    },
+    getSupportChannels() {
+        return getTab<SupportChannelSettingType>('support-channels');
+    },
+    updateSupportChannels(payload: SupportChannelSettingType) {
+        return updateTab<SupportChannelSettingType>('support-channels', payload);
     },
     getSeo() {
         return getTab<SeoSettingType>('seo');

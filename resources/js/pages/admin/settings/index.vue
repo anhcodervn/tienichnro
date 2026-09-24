@@ -5,6 +5,7 @@ import UploadImage from '@/components/shared/UpladImage/index.vue';
 import { useSystemSetting } from '@/composables/useSystemSetting';
 import CustomCodeSettings from '@/pages/admin/settings/CustomCodeSettings.vue';
 import SecuritySettings from '@/pages/admin/settings/SecuritySettings.vue';
+import SupportChannelSettings from '@/pages/admin/settings/SupportChannelSettings.vue';
 import TaxSettings from '@/pages/admin/settings/TaxSettings.vue';
 import { adminSettingService } from '@/services/admin-setting.service';
 import { useUserStore } from '@/stores/user.store';
@@ -30,6 +31,7 @@ type TabKey =
     | 'service-articles'
     | 'branding'
     | 'contact'
+    | 'support-channels'
     | 'seo'
     | 'custom-code'
     | 'monitoring'
@@ -66,6 +68,11 @@ const tabs: Array<{ key: TabKey; label: string; description: string }> = [
         key: 'contact',
         label: 'Liên hệ',
         description: 'Các kênh hỗ trợ hiển thị trên website.',
+    },
+    {
+        key: 'support-channels',
+        label: 'Nút hỗ trợ',
+        description: 'Cấu hình icon và liên kết hiển thị trong nút hỗ trợ cố định trên website.',
     },
     {
         key: 'seo',
@@ -107,6 +114,7 @@ const saving = ref<Record<TabKey, boolean>>({
     'service-articles': false,
     branding: false,
     contact: false,
+    'support-channels': false,
     seo: false,
     'custom-code': false,
     monitoring: false,
@@ -1152,6 +1160,8 @@ onMounted(async () => {
                         </div>
                     </aside>
                 </div>
+
+                <SupportChannelSettings v-show="activeTab === 'support-channels'" />
 
                 <div v-show="activeTab === 'contact'" class="grid gap-4 xl:grid-cols-[minmax(0,1fr)_320px]">
                     <article class="rounded-[10px] border border-slate-200 bg-white p-4">

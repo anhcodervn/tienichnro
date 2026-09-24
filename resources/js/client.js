@@ -9,6 +9,47 @@ const guestOrderHistoryKey = 'napcarot.guest-order-history.v1';
 const guestOrderLifetime = 365 * 24 * 60 * 60 * 1000;
 const guestOrderLimit = 30;
 
+const initializeFloatingSupport = () => {
+    document.querySelectorAll('[data-floating-support]').forEach((widget) => {
+        const toggle = widget.querySelector('[data-floating-support-toggle]');
+        const list = widget.querySelector('[data-floating-support-list]');
+
+        if (!(toggle instanceof HTMLButtonElement) || !(list instanceof HTMLElement)) return;
+
+        const setExpanded = (expanded) => {
+            toggle.setAttribute('aria-expanded', String(expanded));
+            toggle.setAttribute('aria-label', expanded ? 'Đóng danh sách hỗ trợ' : 'Mở danh sách hỗ trợ');
+            list.classList.toggle('hidden', !expanded);
+            list.classList.toggle('flex', expanded);
+
+            if (expanded && !prefersReducedMotion) {
+                list.querySelectorAll('[data-floating-support-link]').forEach((link, index) => {
+                    link.animate(
+                        [
+                            { opacity: 0, transform: 'translateY(12px) scale(0.86)' },
+                            { opacity: 1, transform: 'translateY(0) scale(1)' },
+                        ],
+                        { duration: 180, delay: index * 35, easing: 'cubic-bezier(0.16, 1, 0.3, 1)', fill: 'both' },
+                    );
+                });
+            }
+        };
+
+        toggle.addEventListener('click', () => setExpanded(toggle.getAttribute('aria-expanded') !== 'true'));
+        document.addEventListener('click', (event) => {
+            if (!widget.contains(event.target)) setExpanded(false);
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && toggle.getAttribute('aria-expanded') === 'true') {
+                setExpanded(false);
+                toggle.focus();
+            }
+        });
+    });
+};
+
+initializeFloatingSupport();
+
 const initializeSeoCollapsibles = () => {
     const collapsibles = Array.from(document.querySelectorAll('[data-seo-collapsible]'));
 
