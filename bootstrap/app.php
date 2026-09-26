@@ -6,6 +6,7 @@ use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsureSiteIsActive;
 use App\Http\Middleware\EnsureTenancyIsActive;
 use App\Http\Middleware\EnsureTenantSession;
+use App\Http\Middleware\EnsureTopupIsAvailable;
 use App\Http\Middleware\RecordAdminActivity;
 use App\Http\Middleware\ResolveTenant;
 use App\Support\SettingStore;
@@ -31,6 +32,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prependToGroup('web', ResolveTenant::class);
         $middleware->prependToGroup('api', ResolveTenant::class);
         $middleware->appendToGroup('web', EnsureTenantSession::class);
+        $middleware->appendToGroup('web', EnsureSiteIsActive::class);
         $middleware->appendToGroup('web', CaptureAffiliateReferral::class);
         $middleware->appendToGroup('web', RecordAdminActivity::class);
         $middleware->appendToGroup('api', EnsureTenantSession::class);
@@ -46,6 +48,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'platform.admin' => EnsurePlatformAdmin::class,
             'tenancy.active' => EnsureTenancyIsActive::class,
             'site.active' => EnsureSiteIsActive::class,
+            'topup.available' => EnsureTopupIsAvailable::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

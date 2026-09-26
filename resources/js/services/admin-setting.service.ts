@@ -8,6 +8,7 @@ import type {
     GeneralSettingType,
     HomeCategorySettingType,
     HomepageNoticeSettingType,
+    MaintenanceSettingType,
     MonitoringSettingType,
     OptionSettingType,
     PopupNoticeSettingType,
@@ -43,6 +44,12 @@ export const adminSettingService = {
     },
     updateGeneral(payload: GeneralSettingType) {
         return updateTab<GeneralSettingType>('general', payload);
+    },
+    getMaintenance() {
+        return getTab<MaintenanceSettingType>('maintenance');
+    },
+    updateMaintenance(payload: MaintenanceSettingType) {
+        return updateTab<MaintenanceSettingType>('maintenance', payload);
     },
     getHomepage() {
         return getTab<HomepageNoticeSettingType>('homepage');

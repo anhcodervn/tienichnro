@@ -15,6 +15,13 @@
         <legend class="inline-flex items-center gap-1.5"><i class="bx bx-coins text-lg text-cyan-700" aria-hidden="true"></i>Chọn mệnh giá <span aria-hidden="true">*</span></legend>
     @endif
 
+    @if ($topupMaintenanceEnabled ?? false)
+        <div class="mt-4 rounded-[10px] border border-amber-200 bg-amber-50 px-4 py-5 text-center" data-topup-maintenance>
+            <i class="bx bx-wrench mb-2 text-3xl text-amber-600" aria-hidden="true"></i>
+            <p class="font-bold text-amber-900">Cổng nạp game đang bảo trì</p>
+            <p class="mt-1 whitespace-pre-line text-sm leading-6 text-amber-800">{{ $topupMaintenanceMessage }}</p>
+        </div>
+    @else
     <label class="sr-only" for="topup-package">Gói nạp</label>
     <select id="topup-package" name="package_id" class="sr-only" aria-required="true" data-package-select>
         <option value="">Chọn gói nạp</option>
@@ -72,4 +79,6 @@
         </div>
     @endforeach
     @error('package_id')<p class="home-field-error">{{ $message }}</p>@enderror
+    @endif
+    @error('topup')<p class="home-field-error">{{ $message }}</p>@enderror
 </fieldset>

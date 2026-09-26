@@ -44,6 +44,12 @@ export interface GeneralSettingType {
     [key: string]: unknown;
 }
 
+export interface MaintenanceSettingType {
+    site_active: boolean;
+    topup_maintenance_enabled: boolean;
+    topup_maintenance_message: string;
+}
+
 export interface HomepageNoticeSettingType {
     home_notice_title: string;
     home_notice_content: unknown[];

@@ -13,6 +13,7 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\BioPageController;
 use App\Http\Controllers\Client\CrawlerFileController;
 use App\Http\Controllers\Client\SitemapController;
+use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\PublicContentPageController;
 use App\Http\Controllers\PublicSeoPageController;
 use App\Http\Controllers\SeoLandingPageController;
@@ -20,6 +21,8 @@ use App\Models\User;
 use App\Support\SettingStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
+Route::get('/bao-tri', MaintenanceController::class)->name('maintenance');
 
 Route::get('/site-custom.css', [SiteCustomAssetController::class, 'css'])->name('site_custom.css');
 Route::get('/site-custom.js', [SiteCustomAssetController::class, 'javascript'])->name('site_custom.js');

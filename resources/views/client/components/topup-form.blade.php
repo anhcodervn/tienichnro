@@ -7,6 +7,8 @@
     $useH1 = (bool) ($useH1 ?? ! $selectedGame);
     $stepLayout = (bool) ($stepLayout ?? false);
     $affiliateReferrerUsername = (string) ($affiliateReferrerUsername ?? '');
+    $topupMaintenanceEnabled = (bool) ($topupMaintenanceEnabled ?? false);
+    $topupMaintenanceMessage = (string) ($topupMaintenanceMessage ?? 'Cổng nạp game đang bảo trì. Vui lòng quay lại sau.');
     $requestedGame = old('game_id', $selectedGame?->id ?? $games->first()?->id);
     $initialGame = $games->contains(fn ($game) => (string) $game->id === (string) $requestedGame)
         ? $requestedGame
@@ -110,7 +112,7 @@
             </div>
 
             @unless ($stepLayout)
-                @include('client.components.topup-package-selector', compact('games', 'initialGame', 'requestedPackage', 'stepLayout'))
+                @include('client.components.topup-package-selector', compact('games', 'initialGame', 'requestedPackage', 'stepLayout', 'topupMaintenanceEnabled', 'topupMaintenanceMessage'))
             @endunless
 
             <select name="server_id" data-server-source hidden>
@@ -307,7 +309,7 @@
             @if ($stepLayout)
                 </section>
 
-                @include('client.components.topup-package-selector', compact('games', 'initialGame', 'requestedPackage', 'stepLayout'))
+                @include('client.components.topup-package-selector', compact('games', 'initialGame', 'requestedPackage', 'stepLayout', 'topupMaintenanceEnabled', 'topupMaintenanceMessage'))
             @endif
         </div>
 

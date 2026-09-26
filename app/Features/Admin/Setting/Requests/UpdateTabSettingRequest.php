@@ -29,6 +29,11 @@ class UpdateTabSettingRequest extends FormRequest
     public function rules(): array
     {
         return match ((string) $this->route('tab')) {
+            'maintenance' => [
+                'site_active' => ['required', 'boolean'],
+                'topup_maintenance_enabled' => ['required', 'boolean'],
+                'topup_maintenance_message' => ['nullable', 'string', 'max:2000', 'required_if:topup_maintenance_enabled,true'],
+            ],
             'general' => [
                 'site_name' => ['required', 'string', 'max:190'],
                 'site_domain' => ['nullable', 'string', 'max:190'],
@@ -223,6 +228,7 @@ class UpdateTabSettingRequest extends FormRequest
             'support_channels.*.icon.required' => 'Vui lòng nhập icon cho kênh hỗ trợ.',
             'support_channels.*.url.required' => 'Vui lòng nhập liên kết hỗ trợ.',
             'support_channels.*.url.distinct' => 'Liên kết hỗ trợ không được trùng nhau.',
+            'topup_maintenance_message.required_if' => 'Vui lòng nhập nội dung thông báo bảo trì cổng nạp game.',
         ];
     }
 
@@ -236,6 +242,8 @@ class UpdateTabSettingRequest extends FormRequest
             'site_domain' => 'domain website',
             'site_description' => 'mô tả hệ thống',
             'site_active' => 'trạng thái website',
+            'topup_maintenance_enabled' => 'trạng thái bảo trì cổng nạp game',
+            'topup_maintenance_message' => 'nội dung bảo trì cổng nạp game',
             'allow_register' => 'trạng thái đăng ký',
             'game_service_enabled' => 'trạng thái dịch vụ game',
             'game_service_items' => 'danh sách dịch vụ game',

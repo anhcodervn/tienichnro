@@ -36,6 +36,11 @@ class SettingController extends Controller
                 'allow_register' => false,
                 'footer_game_links' => [],
             ],
+            'maintenance' => [
+                'site_active' => true,
+                'topup_maintenance_enabled' => false,
+                'topup_maintenance_message' => 'Cổng nạp game đang bảo trì. Vui lòng quay lại sau.',
+            ],
             'homepage' => [
                 'home_notice_title' => 'Thông báo quan trọng',
                 'home_notice_content' => [],
@@ -219,6 +224,11 @@ class SettingController extends Controller
                 'site_active' => 'site_active',
                 'allow_register' => 'allow_register',
                 'footer_game_links' => 'footer_game_links',
+            ],
+            'maintenance' => [
+                'site_active' => 'site_active',
+                'topup_maintenance_enabled' => 'topup_maintenance_enabled',
+                'topup_maintenance_message' => 'topup_maintenance_message',
             ],
             'homepage' => [
                 'home_notice_title' => 'home_notice_title',

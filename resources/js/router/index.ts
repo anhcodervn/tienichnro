@@ -40,6 +40,7 @@ const routeTitles: Record<string, string> = {
     'admin.seo.sitemaps': 'Sitemap và index',
     'admin.settings.general': 'Cấu hình chung',
     'admin.settings.content': 'Cấu hình nội dung',
+    'admin.settings.maintenance': 'Bảo trì hệ thống',
     'admin.settings.recharge': 'Cấu hình nạp tiền',
     'admin.recharge.config': 'Cấu hình nạp tiền',
     'admin.recharge.history': 'Lịch sử nạp tiền',

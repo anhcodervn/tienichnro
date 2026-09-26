@@ -40,22 +40,6 @@ export type AdminMenuGroup = {
 
 export const adminMenuGroups: AdminMenuGroup[] = [
     {
-        key: 'tenant-sites',
-        label: 'Website đại lý',
-        icon: Globe2,
-        href: '/admin/sites',
-        platformOnly: true,
-        tenancyOnly: true,
-    },
-    {
-        key: 'tenant-prices',
-        label: 'Giá bán website',
-        icon: BadgeDollarSign,
-        href: '/admin/site-prices',
-        childOnly: true,
-        tenancyOnly: true,
-    },
-    {
         key: 'dashboard',
         label: 'Dashboard',
         icon: LayoutDashboard,
@@ -74,26 +58,10 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         href: '/admin/audit-logs',
     },
     {
-        key: 'affiliate',
-        label: 'Affiliate',
-        icon: HandCoins,
-        children: [
-            {
-                label: 'Tổng quan',
-                href: '/admin/affiliate',
-            },
-            {
-                label: 'Thông báo',
-                href: '/admin/affiliate/announcements',
-            },
-        ],
-    },
-    {
-        key: 'support',
-        label: 'Tin nhắn hỗ trợ',
-        icon: MessagesSquare,
-        href: '/admin/support',
-        badge: 'support',
+        key: 'topup-orders',
+        label: 'Đơn nạp game',
+        icon: ShoppingCart,
+        href: '/admin/topup/orders',
     },
     {
         key: 'topup-catalog',
@@ -138,12 +106,6 @@ export const adminMenuGroups: AdminMenuGroup[] = [
             },
         ],
         platformOnly: true,
-    },
-    {
-        key: 'topup-orders',
-        label: 'Đơn nạp game',
-        icon: ShoppingCart,
-        href: '/admin/topup/orders',
     },
     {
         key: 'recharge',
@@ -248,7 +210,42 @@ export const adminMenuGroups: AdminMenuGroup[] = [
                 label: 'Cấu hình Bio',
                 href: '/admin/settings/bio',
             },
+            {
+                label: 'Bảo trì hệ thống',
+                href: '/admin/settings/maintenance',
+            },
         ],
+    },
+    {
+        key: 'affiliate',
+        label: 'Affiliate',
+        icon: HandCoins,
+        children: [
+            {
+                label: 'Tổng quan',
+                href: '/admin/affiliate',
+            },
+            {
+                label: 'Thông báo',
+                href: '/admin/affiliate/announcements',
+            },
+        ],
+    },
+    {
+        key: 'tenant-sites',
+        label: 'Website đại lý',
+        icon: Globe2,
+        href: '/admin/sites',
+        platformOnly: true,
+        tenancyOnly: true,
+    },
+    {
+        key: 'tenant-prices',
+        label: 'Giá bán website',
+        icon: BadgeDollarSign,
+        href: '/admin/site-prices',
+        childOnly: true,
+        tenancyOnly: true,
     },
     {
         key: 'mail',
@@ -256,6 +253,13 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         icon: Mail,
         href: '/admin/mail',
         platformOnly: true,
+    },
+    {
+        key: 'support',
+        label: 'Tin nhắn hỗ trợ',
+        icon: MessagesSquare,
+        href: '/admin/support',
+        badge: 'support',
     },
     {
         key: 'queues',

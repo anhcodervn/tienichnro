@@ -27,9 +27,14 @@ class GameLandingService
     /** @return array<string, mixed> */
     public function data(Game $game, ?User $user): array
     {
-        $this->loadSaleData($game, $user);
-        $landing = $this->seoLanding($game);
         $settings = $this->settings();
+        $this->loadSaleData($game, $user);
+
+        if ((bool) $settings['topup_maintenance_enabled']) {
+            $game->setRelation('packages', collect());
+        }
+
+        $landing = $this->seoLanding($game);
         $seoSetting = $game->seoSetting;
         $legacyHasSeo = filled($game->seo_title) || filled($game->seo_description) || filled($game->content);
         $usesCustomSeo = $seoSetting?->is_published ?? $legacyHasSeo;
@@ -70,6 +75,8 @@ class GameLandingService
                 is_array($settings['home_notice_content']) ? $settings['home_notice_content'] : [],
             ),
             'homeNoticeIsPublished' => (bool) $settings['home_notice_is_published'],
+            'topupMaintenanceEnabled' => (bool) $settings['topup_maintenance_enabled'],
+            'topupMaintenanceMessage' => (string) $settings['topup_maintenance_message'],
             'pageTitle' => $pageTitle,
             'pageDescription' => $pageDescription,
             'pageKeywords' => $usesCustomSeo ? (string) ($seoSetting?->meta_keywords ?? '') : '',
@@ -192,6 +199,8 @@ class GameLandingService
             'home_notice_title' => 'Thông báo quan trọng',
             'home_notice_content' => [],
             'home_notice_is_published' => true,
+            'topup_maintenance_enabled' => false,
+            'topup_maintenance_message' => 'Cổng nạp game đang bảo trì. Vui lòng quay lại sau.',
         ]);
     }
 

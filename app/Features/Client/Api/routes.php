@@ -18,7 +18,7 @@ Route::prefix('v1')
             ->name('catalog');
 
         Route::post('/orders', [TopupOrderController::class, 'store'])
-            ->middleware([AuthenticateApiCredentials::class.':orders:create', 'site.active', 'throttle:10,1'])
+            ->middleware([AuthenticateApiCredentials::class.':orders:create', 'site.active', 'topup.available', 'throttle:10,1'])
             ->name('orders.store');
         Route::get('/orders/{order}', [TopupOrderController::class, 'show'])
             ->whereAlphaNumeric('order')

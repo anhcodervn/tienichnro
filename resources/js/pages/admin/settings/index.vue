@@ -531,13 +531,6 @@ onMounted(async () => {
                             <label
                                 class="flex items-center justify-between rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700"
                             >
-                                <span>Website đang hoạt động</span>
-                                <input v-model="generalForm.site_active" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
-                            </label>
-
-                            <label
-                                class="flex items-center justify-between rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700"
-                            >
                                 <span>Cho phép đăng ký tài khoản</span>
                                 <input v-model="generalForm.allow_register" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
                             </label>

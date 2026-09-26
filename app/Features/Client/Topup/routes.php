@@ -18,7 +18,7 @@ Route::middleware('site.active')->group(function (): void {
         ->name('topup.game.legacy');
     Route::get('/bang-gia', [TopupController::class, 'index'])->name('pricing');
     Route::post('/dat-hang', [CheckoutController::class, 'store'])
-        ->middleware('throttle:10,1')
+        ->middleware(['topup.available', 'throttle:10,1'])
         ->name('checkout.store');
 
     Route::get('/tra-cuu-don-hang', [OrderController::class, 'lookup'])->name('orders.lookup');
