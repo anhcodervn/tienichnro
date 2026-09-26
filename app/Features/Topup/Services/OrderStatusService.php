@@ -15,9 +15,9 @@ class OrderStatusService
     private array $transitions = [
         'pending' => ['processing', 'failed', 'cancelled'],
         'processing' => ['completed', 'failed', 'cancelled'],
-        'failed' => ['processing', 'completed', 'cancelled'],
+        'failed' => ['processing', 'cancelled'],
         'completed' => [],
-        'cancelled' => [],
+        'cancelled' => ['completed'],
     ];
 
     public function transition(Order $order, OrderStatus $target, ?string $reason = null): Order

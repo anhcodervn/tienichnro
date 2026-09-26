@@ -525,7 +525,7 @@ const formatDebug = (value: unknown): string => {
                     Kiểm tra lại trạng thái
                 </button>
                 <button
-                    v-if="displayOrder.order_status === 'failed'"
+                    v-if="displayOrder.order_status === 'cancelled'"
                     type="button"
                     class="inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="acting"

@@ -176,7 +176,7 @@ test('admin can find a completed order by topup id', function (): void {
         ->assertJsonPath('data.data.0.topup_id', $order->topup_id);
 });
 
-test('platform admin can manually complete a failed topup order', function (): void {
+test('platform admin can manually complete a failed topup order after cancelling it', function (): void {
     Mail::fake();
 
     $admin = User::factory()->create(['role' => 'admin']);
@@ -207,6 +207,22 @@ test('platform admin can manually complete a failed topup order', function (): v
 
     $this->actingAs($admin)
         ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'complete'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('complete');
+
+    expect($order->refresh()->order_status)->toBe(OrderStatus::Failed);
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/orders/{$order->code}", [
+            'action' => 'cancel',
+            'reason' => 'Đã đối soát và chờ xác nhận hoàn thành thủ công.',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('data.order_status', 'cancelled')
+        ->assertJsonPath('data.recipients.0.status', 'cancelled');
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'complete'])
         ->assertSuccessful()
         ->assertJsonPath('data.order_status', 'completed')
         ->assertJsonPath('data.failure_reason', null)
@@ -224,6 +240,12 @@ test('platform admin can manually complete a failed topup order', function (): v
         ->and(AdminAuditLog::query()->where([
             'admin_id' => $admin->id,
             'action' => 'order_complete',
+            'subject_type' => Order::class,
+            'subject_id' => $order->id,
+        ])->exists())->toBeTrue()
+        ->and(AdminAuditLog::query()->where([
+            'admin_id' => $admin->id,
+            'action' => 'order_cancel',
             'subject_type' => Order::class,
             'subject_id' => $order->id,
         ])->exists())->toBeTrue();

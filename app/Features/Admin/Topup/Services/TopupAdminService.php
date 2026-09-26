@@ -315,7 +315,7 @@ class TopupAdminService
             match ($action) {
                 'mark_paid' => $this->markPaid($order),
                 'process' => $this->orderStatusService->transition($order, OrderStatus::Processing),
-                'complete' => $this->orderStatusService->transition($order, OrderStatus::Completed),
+                'complete' => $this->completeOrder($order),
                 'fail' => $this->orderStatusService->transition($order, OrderStatus::Failed, $reason),
                 'cancel' => $this->orderStatusService->transition($order, OrderStatus::Cancelled, $reason),
             };
@@ -392,6 +392,17 @@ class TopupAdminService
         }
 
         $order->forceFill(['payment_status' => PaymentStatus::Paid, 'paid_at' => now()])->save();
+    }
+
+    private function completeOrder(Order $order): void
+    {
+        if (! in_array($order->order_status, [OrderStatus::Processing, OrderStatus::Cancelled], true)) {
+            throw ValidationException::withMessages([
+                'complete' => 'Chỉ có thể hoàn thành đơn đang xử lý hoặc đơn lỗi đã được hủy.',
+            ]);
+        }
+
+        $this->orderStatusService->transition($order, OrderStatus::Completed);
     }
 
     /** @param array<string, mixed> $old @param array<string, mixed> $new */
