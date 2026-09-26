@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import Modal from '@/components/shared/Modal/index.vue';
-import { ArrowDownToLine, Copy, LoaderCircle, PackageOpen, RefreshCcw, Send } from 'lucide-vue-next';
+import { ArrowDownToLine, BadgeCheck, Copy, LoaderCircle, PackageOpen, RefreshCcw, Send } from 'lucide-vue-next';
 import { computed } from 'vue';
 import type { ActionOption, OrderAction, OrderRow, ProviderExchange, ProviderItemRow, RecipientRow } from '../types';
 import OrderStatusBadge from './OrderStatusBadge.vue';
@@ -523,6 +523,17 @@ const formatDebug = (value: unknown): string => {
                     <LoaderCircle v-if="acting" class="mr-2 h-4 w-4 animate-spin" />
                     <RefreshCcw v-else class="mr-2 h-4 w-4" />
                     Kiểm tra lại trạng thái
+                </button>
+                <button
+                    v-if="displayOrder.order_status === 'failed'"
+                    type="button"
+                    class="inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="acting"
+                    @click="emit('action', 'complete')"
+                >
+                    <LoaderCircle v-if="acting" class="mr-2 h-4 w-4 animate-spin" />
+                    <BadgeCheck v-else class="mr-2 h-4 w-4" />
+                    Hoàn thành thủ công
                 </button>
                 <button
                     v-if="primaryAction && !['detail', 'sync_provider'].includes(primaryAction.action)"

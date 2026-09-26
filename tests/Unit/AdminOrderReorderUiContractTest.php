@@ -8,7 +8,7 @@ test('admin order page provides responsive table actions dropdown and detail mod
     $service = file_get_contents($projectRoot.'/resources/js/services/admin-topup.service.ts');
 
     expect($page)
-        ->toContain('<table class="w-full min-w-[1180px]')
+        ->toContain('<table class="w-full min-w-[1380px]')
         ->toContain('Đơn hàng')
         ->toContain('Game / Tài khoản')
         ->toContain('Xử lý provider')
@@ -33,6 +33,7 @@ test('admin order page provides responsive table actions dropdown and detail mod
         ->toContain('Tiếp tục đẩy lại')
         ->toContain('forceReorderWarning(error)')
         ->toContain('Kiểm tra lại trạng thái')
+        ->toContain("order.order_status === 'failed'")
         ->not->toContain("if (order.can_sync_provider) return { action: 'sync_provider'")
         ->toContain('Hoàn thành thủ công')
         ->not->toContain('window.confirm')
@@ -73,6 +74,8 @@ test('admin order page provides responsive table actions dropdown and detail mod
         ->toContain('item.last_error')
         ->toContain('displayOrder.can_sync_provider')
         ->toContain("@click=\"emit('action', 'sync_provider')\"")
+        ->toContain("displayOrder.order_status === 'failed'")
+        ->toContain("@click=\"emit('action', 'complete')\"")
         ->toContain("!['detail', 'sync_provider'].includes(primaryAction.action)")
         ->and($badge)
         ->toContain("kind: 'payment' | 'order'")

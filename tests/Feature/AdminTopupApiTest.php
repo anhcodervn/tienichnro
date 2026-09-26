@@ -3,10 +3,12 @@
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
 use App\Enums\TopupProviderType;
+use App\Mail\Orders\OrderCompletedMail;
 use App\Models\AdminAuditLog;
 use App\Models\Game;
 use App\Models\GameServer;
 use App\Models\Order;
+use App\Models\OrderRecipient;
 use App\Models\PaymentTransaction;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
@@ -15,6 +17,7 @@ use Illuminate\Http\Client\Request as ClientRequest;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Mail;
 
 test('topup admin api rejects guests and ordinary users', function (): void {
     $provider = TopupProvider::factory()->create();
@@ -171,6 +174,61 @@ test('admin can find a completed order by topup id', function (): void {
         ->assertJsonPath('data.meta.total', 1)
         ->assertJsonPath('data.data.0.code', $order->code)
         ->assertJsonPath('data.data.0.topup_id', $order->topup_id);
+});
+
+test('platform admin can manually complete a failed topup order', function (): void {
+    Mail::fake();
+
+    $admin = User::factory()->create(['role' => 'admin']);
+    $order = Order::factory()->create([
+        'payment_status' => PaymentStatus::Paid,
+        'order_status' => OrderStatus::Failed,
+        'failed_at' => now()->subMinute(),
+        'failure_reason' => 'Provider trả về trạng thái failed sau khi đã nhận đơn.',
+    ]);
+    $recipient = OrderRecipient::factory()->for($order)->create([
+        'status' => 'failed',
+        'failure_reason' => 'Provider trả về failed.',
+        'failed_at' => now()->subMinute(),
+        'provider_response' => [
+            'items' => [
+                '1' => [
+                    'status' => 'failed',
+                    'response' => [
+                        'body' => [
+                            'status' => 'success',
+                            'data' => ['request_id' => 'TOP260926Y25SS9-R001', 'status' => 'failed'],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ]);
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'complete'])
+        ->assertSuccessful()
+        ->assertJsonPath('data.order_status', 'completed')
+        ->assertJsonPath('data.failure_reason', null)
+        ->assertJsonPath('data.recipients.0.status', 'completed');
+
+    $order->refresh();
+    $recipient->refresh();
+
+    expect($order->order_status)->toBe(OrderStatus::Completed)
+        ->and($order->completed_at)->not->toBeNull()
+        ->and($order->failure_reason)->toBeNull()
+        ->and($recipient->status)->toBe('completed')
+        ->and($recipient->failure_reason)->toBeNull()
+        ->and(data_get($recipient->provider_response, 'items.1.status'))->toBe('failed')
+        ->and(AdminAuditLog::query()->where([
+            'admin_id' => $admin->id,
+            'action' => 'order_complete',
+            'subject_type' => Order::class,
+            'subject_id' => $order->id,
+        ])->exists())->toBeTrue();
+
+    Mail::assertQueued(OrderCompletedMail::class, fn (OrderCompletedMail $mail): bool => $mail->hasTo($order->email));
 });
 
 test('admin order list exposes and searches bank transfer payment codes', function (): void {

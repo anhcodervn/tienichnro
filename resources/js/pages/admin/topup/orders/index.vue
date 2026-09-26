@@ -159,7 +159,9 @@ const primaryActionFor = (order: OrderRow): ActionOption => {
 
 const secondaryActionsFor = (order: OrderRow): ActionOption[] => {
     const actions: ActionOption[] = [{ action: 'detail', label: 'Xem chi tiết', tone: 'neutral' }];
-    if (order.can_sync_provider) actions.push({ action: 'complete', label: 'Hoàn thành thủ công', tone: 'neutral' });
+    if (order.order_status === 'failed' || (order.order_status === 'processing' && order.can_sync_provider)) {
+        actions.push({ action: 'complete', label: 'Hoàn thành thủ công', tone: 'neutral' });
+    }
     if (['pending', 'processing'].includes(order.order_status)) actions.push({ action: 'fail', label: 'Báo lỗi đơn', tone: 'danger' });
     if (!['completed', 'cancelled'].includes(order.order_status)) actions.push({ action: 'cancel', label: 'Hủy đơn', tone: 'danger' });
     return actions;
