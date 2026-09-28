@@ -56,7 +56,7 @@
             </button>
         </header>
 
-        <div class="article-content home-popup-content min-h-0 overflow-y-auto px-4 py-4 text-sm leading-7 text-slate-700 sm:px-5">
+        <div class="article-content home-popup-content min-h-0 overflow-y-auto px-4 py-4 text-sm leading-7 text-slate-700 sm:px-5" data-client-image-viewer>
             {!! $content->toHtml() !!}
         </div>
 

@@ -140,6 +140,71 @@
         @apply mx-auto my-8 h-auto max-w-full rounded-[10px] border border-slate-200 bg-slate-50 object-contain shadow-sm;
     }
 
+    .article-content--service > * + * {
+        @apply mt-3;
+    }
+
+    .article-content--service h2,
+    .article-content--service h3,
+    .article-content--service h4,
+    .article-content--service h5,
+    .article-content--service h6 {
+        @apply mt-5 border-0 p-0 text-lg text-slate-950;
+    }
+
+    .article-content--service [style*='color'] * {
+        color: inherit;
+    }
+
+    .article-content--service ul,
+    .article-content--service ol,
+    .article-content--service blockquote,
+    .article-content--service table,
+    .article-content--service img {
+        @apply my-4;
+    }
+
+    [data-client-image-viewer] img {
+        @apply cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2;
+    }
+
+    body.client-image-lightbox-open {
+        @apply overflow-hidden;
+    }
+
+    .client-image-lightbox {
+        @apply fixed inset-0 z-[100] grid place-items-center overflow-hidden p-3 sm:p-6;
+    }
+
+    .client-image-lightbox[hidden] {
+        @apply hidden;
+    }
+
+    .client-image-lightbox__backdrop {
+        @apply absolute inset-0 bg-slate-950/90 backdrop-blur-sm;
+    }
+
+    .client-image-lightbox__panel {
+        @apply pointer-events-none relative flex h-full w-full items-center justify-center overflow-auto;
+    }
+
+    .client-image-lightbox__image {
+        @apply max-h-[calc(100dvh-7rem)] max-w-[calc(100vw-2rem)] select-none object-contain transition-transform duration-150 sm:max-w-[calc(100vw-4rem)];
+        transform-origin: center;
+    }
+
+    .client-image-lightbox__toolbar {
+        @apply pointer-events-auto fixed bottom-4 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border border-white/20 bg-slate-950/80 p-1.5 text-white shadow-2xl backdrop-blur sm:bottom-6;
+    }
+
+    .client-image-lightbox__toolbar button {
+        @apply grid h-10 min-w-10 place-items-center rounded-full px-2 text-lg font-bold transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white;
+    }
+
+    .client-image-lightbox__toolbar [data-image-viewer-reset] {
+        @apply min-w-16 text-xs;
+    }
+
     .article-content code {
         @apply rounded bg-sky-50 px-1.5 py-0.5 font-mono text-[0.95em] text-sky-800;
     }
@@ -313,7 +378,7 @@
     }
 
     .home-package-grid {
-        @apply grid min-w-0 grid-cols-2 gap-2 min-[390px]:grid-cols-3 sm:grid-cols-4;
+        @apply grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4;
     }
 
     .home-package-option {

@@ -155,12 +155,14 @@ class EditorContentRenderer
      */
     protected function renderImage(array $block): string
     {
-        $src = isset($block['src']) ? e((string) $block['src']) : '';
-        $alt = isset($block['alt']) ? e((string) $block['alt']) : '';
+        $source = isset($block['src']) ? (string) $block['src'] : '';
 
-        if ($src === '') {
+        if (! SafeImageSource::isRootRelative($source)) {
             return '';
         }
+
+        $src = e($source);
+        $alt = isset($block['alt']) ? e((string) $block['alt']) : '';
 
         return sprintf(
             '<img src="%s" alt="%s" class="my-6 rounded-[14px] border border-slate-200 bg-white shadow-sm" />',

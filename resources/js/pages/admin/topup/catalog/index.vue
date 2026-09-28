@@ -1,6 +1,8 @@
 <script setup lang="ts">
+import Editor from '@/components/shared/Editor/index.vue';
 import UploadImage from '@/components/shared/UpladImage/index.vue';
 import { adminTopupService } from '@/services/admin-topup.service';
+import { uploadEditorImagesInHtml } from '@/utils/editor-image-upload';
 import { computed, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 
@@ -78,6 +80,7 @@ const providers = ref<OptionRow[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const editingId = ref<number | null>(null);
+const descriptionEditor = ref<{ flush: () => unknown[] | string } | null>(null);
 const pagination = reactive<PaginationMeta>({ current_page: 1, last_page: 1, per_page: 20, total: 0, from: null, to: null });
 const filters = reactive({
     search: '',
@@ -380,6 +383,14 @@ const payload = (): Record<string, unknown> => {
 const save = async (): Promise<void> => {
     saving.value = true;
     try {
+        if (props.catalogType === 'games') {
+            const latestDescription = descriptionEditor.value?.flush();
+
+            if (typeof latestDescription === 'string') {
+                form.description = await uploadEditorImagesInHtml(latestDescription);
+            }
+        }
+
         if (props.catalogType === 'games') {
             await adminTopupService.saveGame(editingId.value, payload());
         } else if (props.catalogType === 'servers') {
@@ -957,13 +968,13 @@ watch(() => props.catalogType, load, { immediate: true });
                                 </div>
                             </div>
                         </fieldset>
-                        <label class="text-sm font-semibold text-slate-700"
-                            >Mô tả<textarea
-                                v-model="form.description"
-                                rows="4"
-                                class="mt-1.5 w-full rounded-md border border-slate-300 px-3 py-2 font-normal"
-                            ></textarea>
-                        </label>
+                        <div class="grid gap-2 text-sm font-semibold text-slate-700">
+                            <span>Mô tả hiển thị ngoài client</span>
+                            <Editor ref="descriptionEditor" v-model="form.description" format="html" :debounce="0" :height="360" />
+                            <small class="font-normal leading-5 text-slate-500">
+                                Có thể kéo thả, Ctrl+V hoặc chọn ảnh từ máy. Ảnh URL ngoài NapCarot sẽ được tải về trước khi lưu.
+                            </small>
+                        </div>
                     </template>
                     <template v-else-if="catalogType === 'servers'">
                         <label class="text-sm font-semibold text-slate-700"

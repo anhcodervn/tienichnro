@@ -55,7 +55,7 @@ class StoreGameRequest extends FormRequest
             'min_quantity' => ['sometimes', 'required', 'integer', 'min:1', 'max:10'],
             'max_quantity' => ['sometimes', 'required', 'integer', 'min:1', 'max:10'],
             'image' => ['nullable', 'string', 'max:255'],
-            'description' => ['nullable', 'string'],
+            'description' => ['nullable', 'string', 'max:100000'],
             'status' => ['required', Rule::in(['active', 'inactive'])],
             'sort_order' => ['required', 'integer', 'min:0'],
             'metadata' => ['nullable', 'array'],

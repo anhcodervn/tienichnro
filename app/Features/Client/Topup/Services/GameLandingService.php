@@ -10,6 +10,7 @@ use App\Models\Order;
 use App\Models\SeoPost;
 use App\Models\User;
 use App\Support\EditorContentRenderer;
+use App\Support\RichTextSanitizer;
 use App\Support\SettingStore;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
@@ -22,6 +23,7 @@ class GameLandingService
         private readonly EditorContentRenderer $contentRenderer,
         private readonly TopupPackagePricingService $topupPackagePricingService,
         private readonly GameRewardService $gameRewardService,
+        private readonly RichTextSanitizer $richTextSanitizer,
     ) {}
 
     /** @return array<string, mixed> */
@@ -45,9 +47,10 @@ class GameLandingService
         $pageTitle = $usesCustomSeo
             ? ($seoSetting?->meta_title ?: $game->seo_title ?: ($landing['title'] ?? 'Nạp game '.$game->name.' nhanh chóng'))
             : ($landing['title'] ?? 'Nạp game '.$game->name.' nhanh chóng');
+        $plainGameDescription = $this->plainText($game->description);
         $pageDescription = $usesCustomSeo
-            ? ($seoSetting?->meta_description ?: $game->seo_description ?: ($landing['description'] ?? $game->description))
-            : ($landing['description'] ?? $game->description);
+            ? ($seoSetting?->meta_description ?: $game->seo_description ?: ($landing['description'] ?? $plainGameDescription))
+            : ($landing['description'] ?? $plainGameDescription);
         $pageImage = $usesCustomSeo && filled($seoSetting?->og_image)
             ? (string) $seoSetting->og_image
             : (string) $settings['og_image'];
@@ -237,9 +240,18 @@ class GameLandingService
             return new HtmlString('<p>'.nl2br(e((string) $game->content)).'</p>');
         }
 
-        $fallback = trim((string) ($landing['intro'] ?? $game->description ?? ''));
+        $landingIntro = trim((string) ($landing['intro'] ?? ''));
 
-        return new HtmlString($fallback !== '' ? '<p>'.nl2br(e($fallback)).'</p>' : '');
+        if ($landingIntro !== '') {
+            return new HtmlString('<p>'.nl2br(e($landingIntro)).'</p>');
+        }
+
+        return new HtmlString($this->richTextSanitizer->sanitize($game->description));
+    }
+
+    private function plainText(?string $html): string
+    {
+        return trim(html_entity_decode(strip_tags((string) $html), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
     }
 
     /** @return Collection<int, array{question: string, answer: string}> */

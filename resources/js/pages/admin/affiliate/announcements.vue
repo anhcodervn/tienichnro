@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import Editor from '@/components/shared/Editor/index.vue';
 import { adminAffiliateService, type AffiliateAnnouncement, type AffiliateAnnouncementData } from '@/services/admin-affiliate.service';
+import { uploadEditorImages } from '@/utils/editor-image-upload';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { sanitizeRichText } from '@/utils/rich-text';
 import { BellRing, LoaderCircle, Pencil, Pin, PinOff, Plus, Save, Trash2, X } from 'lucide-vue-next';
@@ -48,9 +49,10 @@ const edit = (announcement: AffiliateAnnouncement): void => {
 const save = async (): Promise<void> => {
     if (!selectedSiteId.value) return;
     saving.value = true;
-    const payload = { site_id: selectedSiteId.value, ...form };
 
     try {
+        form.content = await uploadEditorImages(form.content);
+        const payload = { site_id: selectedSiteId.value, ...form };
         const response = editingId.value
             ? await adminAffiliateService.updateAnnouncement(editingId.value, payload)
             : await adminAffiliateService.createAnnouncement(payload);

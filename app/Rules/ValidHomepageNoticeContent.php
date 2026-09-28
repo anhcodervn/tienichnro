@@ -2,6 +2,7 @@
 
 namespace App\Rules;
 
+use App\Support\SafeImageSource;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Translation\PotentiallyTranslatedString;
@@ -46,23 +47,51 @@ class ValidHomepageNoticeContent implements ValidationRule
 
     private function isValidNode(mixed $node): bool
     {
-        if (! is_array($node) || array_diff(array_keys($node), ['type', 'level', 'children', 'ordered', 'items']) !== []) {
+        if (! is_array($node)) {
             return false;
         }
 
         return match ($node['type'] ?? null) {
-            'heading' => isset($node['level'])
+            'heading' => $this->hasOnlyKeys($node, ['type', 'level', 'children'])
+                && isset($node['level'])
                 && is_int($node['level'])
                 && $node['level'] >= 1
                 && $node['level'] <= 6
                 && $this->isValidInlineCollection($node['children'] ?? null),
-            'paragraph' => $this->isValidInlineCollection($node['children'] ?? null),
-            'list' => is_bool($node['ordered'] ?? null)
+            'paragraph' => $this->hasOnlyKeys($node, ['type', 'children'])
+                && $this->isValidInlineCollection($node['children'] ?? null),
+            'list' => $this->hasOnlyKeys($node, ['type', 'ordered', 'items'])
+                && is_bool($node['ordered'] ?? null)
                 && is_array($node['items'] ?? null)
                 && count($node['items']) <= self::MAX_NODES
                 && collect($node['items'])->every(fn (mixed $item): bool => $this->isValidInlineCollection($item)),
+            'image' => $this->hasOnlyKeys($node, ['type', 'src', 'alt', 'width', 'height']) && $this->isValidImage($node),
             default => false,
         };
+    }
+
+    /**
+     * @param  array<string, mixed>  $node
+     * @param  array<int, string>  $allowedKeys
+     */
+    private function hasOnlyKeys(array $node, array $allowedKeys): bool
+    {
+        return array_diff(array_keys($node), $allowedKeys) === [];
+    }
+
+    /** @param array<string, mixed> $node */
+    private function isValidImage(array $node): bool
+    {
+        return is_string($node['src'] ?? null)
+            && SafeImageSource::isRootRelative($node['src'])
+            && (! array_key_exists('alt', $node) || $node['alt'] === null || (is_string($node['alt']) && mb_strlen($node['alt']) <= 500))
+            && $this->isValidImageDimension($node['width'] ?? null)
+            && $this->isValidImageDimension($node['height'] ?? null);
+    }
+
+    private function isValidImageDimension(mixed $value): bool
+    {
+        return $value === null || (is_int($value) && $value >= 1 && $value <= 8000);
     }
 
     private function isValidInlineCollection(mixed $children): bool

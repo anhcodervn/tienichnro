@@ -35,9 +35,6 @@
                 <div class="min-w-0">
                     <p class="text-[10px] font-extrabold uppercase tracking-[0.1em] text-emerald-700 sm:text-sm sm:tracking-[0.14em]">NapCarot · Nạp game tự động</p>
                     <h1 class="mt-1 break-words text-xl font-extrabold leading-snug tracking-tight text-slate-950 sm:mt-2 sm:text-4xl sm:leading-tight">{{ $pageH1 }}</h1>
-                    @if ($game->description)
-                        <p class="mt-1.5 line-clamp-2 max-w-4xl break-words text-xs leading-5 text-slate-600 sm:mt-3 sm:line-clamp-none sm:text-base sm:leading-6 sm:text-slate-700">{{ $game->description }}</p>
-                    @endif
                 </div>
             </div>
         </header>
@@ -87,7 +84,7 @@
                 <h2 id="game-seo-content-title" class="mt-1 text-2xl font-extrabold text-slate-950">{{ $seoArticleTitle }}</h2>
             </header>
             <x-client.collapsible-article content-id="game-seo-content" class="pb-5 sm:pb-7">
-                <div class="article-content min-w-0 max-w-full break-words p-5 pb-0 sm:p-7 sm:pb-0">
+                <div class="article-content min-w-0 max-w-full break-words p-5 pb-0 sm:p-7 sm:pb-0" data-game-description="{{ $game->id }}" data-client-image-viewer>
                     @if ($seoContentHtml->isNotEmpty())
                         {!! $seoContentHtml !!}
                     @else

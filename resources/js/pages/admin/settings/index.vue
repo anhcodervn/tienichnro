@@ -20,6 +20,7 @@ import type {
     SeoSettingType,
     ServiceArticlesSettingType,
 } from '@/types/setting.type';
+import { uploadEditorImages } from '@/utils/editor-image-upload';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { Gamepad2, Plus, Trash2 } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
@@ -102,6 +103,8 @@ const tabs: Array<{ key: TabKey; label: string; description: string }> = [
 ];
 
 const activeTab = ref<TabKey>('general');
+const homepageEditor = ref<{ flush: () => unknown[] | string } | null>(null);
+const popupNoticeEditor = ref<{ flush: () => unknown[] | string } | null>(null);
 const userStore = useUserStore();
 const isPlatformAdmin = computed(() => userStore.user?.capabilities?.platform_admin === true);
 const visibleTabs = computed(() => tabs.filter((tab) => tab.key !== 'tax' || isPlatformAdmin.value));
@@ -297,6 +300,12 @@ const saveGeneral = async (): Promise<void> => {
 
 const saveHomepage = async (): Promise<void> => {
     await withSaving('homepage', async () => {
+        const latestContent = homepageEditor.value?.flush();
+
+        if (Array.isArray(latestContent)) {
+            homepageForm.value.home_notice_content = await uploadEditorImages(latestContent);
+        }
+
         const response = await adminSettingService.updateHomepage(homepageForm.value);
         homepageForm.value = {
             ...homepageForm.value,
@@ -309,6 +318,12 @@ const saveHomepage = async (): Promise<void> => {
 
 const savePopupNotice = async (): Promise<void> => {
     await withSaving('popup-notice', async () => {
+        const latestContent = popupNoticeEditor.value?.flush();
+
+        if (Array.isArray(latestContent)) {
+            popupNoticeForm.value.home_popup_content = await uploadEditorImages(latestContent);
+        }
+
         const response = await adminSettingService.updatePopupNotice(popupNoticeForm.value);
         popupNoticeForm.value = {
             ...popupNoticeForm.value,
@@ -668,7 +683,7 @@ onMounted(async () => {
                             <div class="space-y-1">
                                 <span class="text-xs font-semibold text-slate-600">Nội dung thông báo</span>
                                 <div class="overflow-hidden rounded-[10px] border border-slate-200 p-2">
-                                    <Editor v-model="homepageForm.home_notice_content" :allow-images="false" :debounce="0" />
+                                    <Editor ref="homepageEditor" v-model="homepageForm.home_notice_content" :allow-images="true" :debounce="0" />
                                 </div>
                             </div>
 
@@ -734,7 +749,13 @@ onMounted(async () => {
                             <div class="space-y-1">
                                 <span class="text-xs font-semibold text-slate-600">Nội dung popup</span>
                                 <div class="overflow-hidden rounded-[10px] border border-slate-300 bg-white p-2">
-                                    <Editor v-model="popupNoticeForm.home_popup_content" :allow-images="false" :debounce="0" :height="360" />
+                                    <Editor
+                                        ref="popupNoticeEditor"
+                                        v-model="popupNoticeForm.home_popup_content"
+                                        :allow-images="true"
+                                        :debounce="0"
+                                        :height="360"
+                                    />
                                 </div>
                             </div>
 

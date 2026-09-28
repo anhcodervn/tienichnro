@@ -47,3 +47,40 @@ test('image upload service stores an existing webp on the public disk', function
         @unlink($temporaryWebpPath);
     }
 });
+
+test('image upload service preserves a png when gd webp conversion is unavailable', function (): void {
+    Storage::fake('public');
+
+    $temporaryPngPath = tempnam(sys_get_temp_dir(), 'png-test-');
+    file_put_contents(
+        $temporaryPngPath,
+        base64_decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', true),
+    );
+
+    $uploadedFile = new UploadedFile($temporaryPngPath, 'photo.png', 'image/png', null, true);
+    $service = new class extends ImageUploadService
+    {
+        protected function supportsServerSideWebpConversion(): bool
+        {
+            return false;
+        }
+
+        protected function publicUploadRelativePath(string $filename): string
+        {
+            return 'uploads/testing/image/'.$filename;
+        }
+    };
+
+    try {
+        $uploaded = $service->store($uploadedFile, 'Ảnh PNG');
+
+        expect($uploaded['extension'])->toBe('png')
+            ->and($uploaded['mime_type'])->toBe('image/png')
+            ->and($uploaded['url'])->toStartWith('/storage/uploads/testing/image/')
+            ->not->toContain('://');
+
+        Storage::disk('public')->assertExists($uploaded['path']);
+    } finally {
+        @unlink($temporaryPngPath);
+    }
+});

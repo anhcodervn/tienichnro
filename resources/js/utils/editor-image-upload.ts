@@ -24,8 +24,45 @@ type EditorContentNode = {
     [key: string]: unknown;
 };
 
-const isBase64ImageSource = (src: unknown): src is string => {
-    return typeof src === 'string' && src.startsWith('data:image/');
+const isPendingImageSource = (src: unknown): src is string => {
+    return typeof src === 'string' && /^(?:data:image\/|blob:)/i.test(src);
+};
+
+const isRemoteImageSource = (src: unknown): src is string => {
+    return typeof src === 'string' && /^(?:https?:)?\/\//i.test(src);
+};
+
+const rootRelativeUrl = (url: string): string => {
+    try {
+        const parsedUrl = new URL(url, window.location.origin);
+
+        return `${parsedUrl.pathname}${parsedUrl.search}${parsedUrl.hash}`;
+    } catch {
+        return url;
+    }
+};
+
+export const normalizeNapcarotImageUrl = (source: string): string | null => {
+    if (source.startsWith('/') && !source.startsWith('//')) {
+        return source;
+    }
+
+    if (!isRemoteImageSource(source)) {
+        return null;
+    }
+
+    try {
+        const parsedUrl = new URL(source, window.location.origin);
+        const hostname = parsedUrl.hostname.toLowerCase().replace(/\.$/, '');
+
+        if (hostname === 'napcarot.com' || hostname.endsWith('.napcarot.com')) {
+            return rootRelativeUrl(parsedUrl.toString());
+        }
+    } catch {
+        return null;
+    }
+
+    return null;
 };
 
 const dataUrlToBlob = async (dataUrl: string): Promise<Blob> => {
@@ -146,7 +183,42 @@ export const uploadEditorImageFile = async (
             throw new Error('Không nhận được URL ảnh sau khi tải lên.');
         }
 
-        return uploadedUrl;
+        return rootRelativeUrl(uploadedUrl);
+    } catch (error) {
+        throw new Error(uploadErrorMessage(error));
+    }
+};
+
+export const importEditorImageUrl = async (source: string): Promise<string> => {
+    const localUrl = normalizeNapcarotImageUrl(source);
+
+    if (localUrl !== null) {
+        return localUrl;
+    }
+
+    if (!isRemoteImageSource(source)) {
+        return source;
+    }
+
+    const remoteUrl = source.startsWith('//') ? `${window.location.protocol}${source}` : source;
+
+    try {
+        const response = await api.post(
+            '/api/uploads/image/import',
+            { url: remoteUrl },
+            {
+                headers: {
+                    Accept: 'application/json',
+                },
+            },
+        );
+        const uploadedUrl = response.data?.data?.url ?? response.data?.url;
+
+        if (typeof uploadedUrl !== 'string' || uploadedUrl === '') {
+            throw new Error('Không nhận được URL ảnh sau khi tải về.');
+        }
+
+        return rootRelativeUrl(uploadedUrl);
     } catch (error) {
         throw new Error(uploadErrorMessage(error));
     }
@@ -171,8 +243,10 @@ const transformNode = async (node: EditorContentNode, cache: Map<string, string>
         ...node,
     };
 
-    if (isBase64ImageSource(clonedNode.src)) {
+    if (isPendingImageSource(clonedNode.src)) {
         clonedNode.src = await uploadEditorImage(clonedNode.src, cache);
+    } else if (typeof clonedNode.src === 'string') {
+        clonedNode.src = await importEditorImageUrl(clonedNode.src);
     }
 
     if (Array.isArray(clonedNode.children) && clonedNode.children.length > 0) {
@@ -193,4 +267,25 @@ export const uploadEditorImages = async (nodes: unknown[]): Promise<unknown[]> =
     const cache = new Map<string, string>();
 
     return Promise.all(normalizedNodes.map((node) => transformNode(node, cache)));
+};
+
+export const uploadEditorImagesInHtml = async (html: string): Promise<string> => {
+    const root = document.createElement('div');
+    const cache = new Map<string, string>();
+    root.innerHTML = html;
+
+    await Promise.all(
+        Array.from(root.querySelectorAll<HTMLImageElement>('img[src]')).map(async (image) => {
+            const source = image.getAttribute('src')?.trim() ?? '';
+
+            if (isPendingImageSource(source)) {
+                image.setAttribute('src', await uploadEditorImage(source, cache));
+                return;
+            }
+
+            image.setAttribute('src', await importEditorImageUrl(source));
+        }),
+    );
+
+    return root.innerHTML;
 };

@@ -62,16 +62,23 @@ test('admin can configure the homepage popup notice', function (): void {
 test('homepage popup renders safely for guests and authenticated users', function (): void {
     app(SettingStore::class)->putMany([
         'home_popup_title' => 'Ưu đãi thành viên',
-        'home_popup_content' => [[
-            'type' => 'paragraph',
-            'children' => [[
-                'text' => 'Xem chi tiết',
-                'bold' => true,
-                'color' => '#dc2626',
-                'href' => 'https://napcarot.com/uu-dai',
-                'target' => '_blank',
-            ]],
-        ]],
+        'home_popup_content' => [
+            [
+                'type' => 'paragraph',
+                'children' => [[
+                    'text' => 'Xem chi tiết',
+                    'bold' => true,
+                    'color' => '#dc2626',
+                    'href' => 'https://napcarot.com/uu-dai',
+                    'target' => '_blank',
+                ]],
+            ],
+            [
+                'type' => 'image',
+                'src' => '/storage/editor/popup.webp',
+                'alt' => 'Popup image',
+            ],
+        ],
         'home_popup_is_published' => true,
         'home_popup_display_mode' => 'modal',
         'home_popup_allow_dismiss' => true,
@@ -85,6 +92,8 @@ test('homepage popup renders safely for guests and authenticated users', functio
             ->assertSee('data-dismiss-enabled="true"', false)
             ->assertSee('data-dismiss-hours="48"', false)
             ->assertSee('data-display-mode="modal"', false)
+            ->assertSee('data-client-image-viewer', false)
+            ->assertSee('src="/storage/editor/popup.webp"', false)
             ->assertSee('Ưu đãi thành viên')
             ->assertSeeText('Đã hiểu')
             ->assertSeeText('Đóng trong 48 giờ')
@@ -255,6 +264,36 @@ test('game landing notice accepts a bare domain and renders a clickable https li
             '<a href="https://facebook.com/napcarot" target="_blank" rel="noopener noreferrer">Mở cộng đồng</a>',
             false,
         );
+});
+
+test('homepage notice accepts uploaded editor images and renders them safely', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $settings = $this->actingAs($admin)
+        ->getJson('/api/admin-api/settings/homepage')
+        ->assertOk()
+        ->json('data.settings');
+
+    $this->actingAs($admin)
+        ->patchJson('/api/admin-api/settings/homepage', [
+            ...$settings,
+            'home_notice_content' => [[
+                'type' => 'image',
+                'src' => '/storage/editor/notice.webp',
+                'alt' => '',
+                'width' => 720,
+                'height' => 480,
+            ]],
+        ])
+        ->assertOk()
+        ->assertJsonPath('data.settings.home_notice_content.0.src', '/storage/editor/notice.webp')
+        ->assertJsonPath('data.settings.home_notice_content.0.alt', null);
+
+    $game = Game::factory()->create();
+
+    $this->get(route('topup.game', ['game' => $game]))
+        ->assertOk()
+        ->assertSee('src="/storage/editor/notice.webp"', false)
+        ->assertSee('alt=""', false);
 });
 
 test('homepage tab reads existing setting keys and content pages no longer own them', function (): void {

@@ -46,7 +46,7 @@ test('tinymce matches the complete local configuration used by the reference pro
 
     expect($editor)
         ->toContain("language_url: '/assets/libs/tinymce/langs/vi.js'")
-        ->toContain("'advlist autolink lists link image charmap print preview anchor'")
+        ->toContain("'advlist autolink lists link image imagetools charmap print preview anchor'")
         ->toContain("'searchreplace visualblocks code fullscreen'")
         ->toContain("'insertdatetime media table paste code help wordcount'")
         ->toContain("'emoticons hr pagebreak nonbreaking toc'")
@@ -96,7 +96,7 @@ test('tinymce uploads pasted and dropped images as optimized webp files', functi
     $uploader = file_get_contents($projectRoot.'/resources/js/utils/editor-image-upload.ts');
 
     expect($editor)
-        ->toContain("import { uploadEditorImageFile } from '@/utils/editor-image-upload';")
+        ->toContain('importEditorImageUrl, normalizeNapcarotImageUrl, uploadEditorImageFile')
         ->toContain('paste_data_images: true')
         ->toContain('automatic_uploads: true')
         ->toContain("images_file_types: 'jpg,jpeg,png,webp'")
@@ -117,6 +117,38 @@ test('tinymce uploads pasted and dropped images as optimized webp files', functi
         ->toContain('formData.append')
         ->toContain("'Content-Type': 'multipart/form-data'")
         ->toContain('onUploadProgress');
+
+    expect($editor)
+        ->toContain('processEditorImageSources')
+        ->toContain("editor.on('Paste Drop SetContent'")
+        ->toContain('importEditorImageUrl(source)');
+
+    expect($uploader)
+        ->toContain('export const normalizeNapcarotImageUrl')
+        ->toContain("hostname === 'napcarot.com'")
+        ->toContain("hostname.endsWith('.napcarot.com')")
+        ->toContain("'/api/uploads/image/import'")
+        ->toContain("source.startsWith('//') ? `\${window.location.protocol}\${source}` : source")
+        ->toContain('export const uploadEditorImagesInHtml = async');
+});
+
+test('tinymce exposes visible image actions and editable image controls', function (): void {
+    $editorPath = dirname(__DIR__, 2).'/resources/js/components/shared/Editor/index.vue';
+    $source = file_get_contents($editorPath);
+
+    expect($source)
+        ->toContain('data-editor-image-actions')
+        ->toContain('data-editor-image-upload')
+        ->toContain('data-editor-image-url')
+        ->toContain('Chèn ảnh từ máy')
+        ->toContain('Ảnh từ URL')
+        ->toContain('const handleImageSelection = async')
+        ->toContain('const insertImageFromUrl = async')
+        ->toContain('editorInstance.insertContent(imageHtml)')
+        ->toContain('image imagetools charmap')
+        ->toContain("object_resizing: 'img'")
+        ->toContain("imagetools_toolbar: 'rotateleft rotateright | flipv fliph | editimage imageoptions'")
+        ->toContain("contextmenu: 'link image inserttable | cell row column deletetable'");
 });
 
 test('client blade pages apply article typography to rendered editor content', function (): void {
@@ -132,7 +164,29 @@ test('client blade pages apply article typography to rendered editor content', f
         ->toContain('.article-content table')
         ->toContain(".home-notice-content span[style*='color'] *")
         ->toContain('color: inherit;')
+        ->toContain('[data-client-image-viewer] img')
         ->and($seoPage)->toContain('article-content client-card')
+        ->toContain('data-client-image-viewer')
         ->and($contentPage)->toContain('class="article-content mt-8')
-        ->and($homePage)->toContain('article-content article-content--notice home-notice-content');
+        ->toContain('data-client-image-viewer')
+        ->and($homePage)->toContain('article-content text-sm leading-7 text-slate-700')
+        ->toContain('data-client-image-viewer');
+});
+
+test('client rich text images open in an accessible lightbox with zoom controls', function (): void {
+    $projectRoot = dirname(__DIR__, 2);
+    $clientScript = file_get_contents($projectRoot.'/resources/js/client.js');
+    $clientCss = file_get_contents($projectRoot.'/resources/css/client.css');
+    $gamePage = file_get_contents($projectRoot.'/resources/views/client/topup/game.blade.php');
+
+    expect($clientScript)
+        ->toContain("document.querySelectorAll('[data-client-image-viewer]')")
+        ->toContain('data-image-viewer-zoom-in')
+        ->toContain('data-image-viewer-zoom-out')
+        ->toContain("event.key === 'Escape'")
+        ->toContain("event.key === 'ArrowLeft'")
+        ->toContain("event.key === 'ArrowRight'")
+        ->and($clientCss)->toContain('.client-image-lightbox')
+        ->toContain('cursor-zoom-in')
+        ->and($gamePage)->toContain('data-client-image-viewer');
 });

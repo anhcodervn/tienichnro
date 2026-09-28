@@ -14,7 +14,7 @@
             <i class="bx bx-announcement shrink-0 text-xl text-cyan-700" aria-hidden="true"></i>
             <p id="home-notice-title" class="min-w-0"><strong>Thông báo:</strong> {{ $title }}</p>
         </div>
-        <div class="article-content article-content--notice home-notice-content">
+        <div class="article-content article-content--notice home-notice-content" data-client-image-viewer>
             {!! $noticeHtml !!}
         </div>
     </div>

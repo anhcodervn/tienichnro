@@ -23,7 +23,7 @@ class ImageUploadService
                 return $this->storeExistingWebp($file, $name);
             }
 
-            throw new RuntimeException('Máy chủ chưa cài GD để xử lý ảnh WebP. Vui lòng bật GD hoặc gửi ảnh WebP từ trình duyệt.');
+            return $this->storeOriginalImage($file, $name);
         }
 
         $imageResource = $this->createImageResource($file);
@@ -71,7 +71,7 @@ class ImageUploadService
             throw new RuntimeException('Không thể chuyển đổi ảnh sang WebP.');
         }
 
-        return $this->persistBinary($binary, $file, $name);
+        return $this->persistBinary($binary, $file, $name, 'image/webp', 'webp');
     }
 
     protected function supportsServerSideWebpConversion(): bool
@@ -104,19 +104,45 @@ class ImageUploadService
             throw new RuntimeException('Không thể đọc nội dung ảnh tải lên.');
         }
 
-        return $this->persistBinary($binary, $file, $name);
+        return $this->persistBinary($binary, $file, $name, 'image/webp', 'webp');
     }
 
     /**
      * @return array{path: string, url: string, mime_type: string, extension: string, size: int}
      */
-    private function persistBinary(string $binary, UploadedFile $file, ?string $name = null): array
+    private function storeOriginalImage(UploadedFile $file, ?string $name = null): array
     {
-        $filename = $this->buildFilename($file, $name);
+        $binary = file_get_contents($file->getRealPath());
+
+        if (! is_string($binary) || $binary === '') {
+            throw new RuntimeException('Không thể đọc nội dung ảnh tải lên.');
+        }
+
+        $mimeType = Str::lower((string) $file->getMimeType());
+        $extension = match ($mimeType) {
+            'image/jpeg' => 'jpg',
+            'image/png' => 'png',
+            default => throw new RuntimeException('Định dạng ảnh không được hỗ trợ.'),
+        };
+
+        return $this->persistBinary($binary, $file, $name, $mimeType, $extension);
+    }
+
+    /**
+     * @return array{path: string, url: string, mime_type: string, extension: string, size: int}
+     */
+    private function persistBinary(
+        string $binary,
+        UploadedFile $file,
+        ?string $name,
+        string $mimeType,
+        string $extension,
+    ): array {
+        $filename = $this->buildFilename($file, $name, $extension);
         $path = $this->publicUploadRelativePath($filename);
         $stored = Storage::disk('public')->put($path, $binary, [
             'visibility' => 'public',
-            'mimetype' => 'image/webp',
+            'mimetype' => $mimeType,
         ]);
 
         if (! $stored) {
@@ -125,11 +151,22 @@ class ImageUploadService
 
         return [
             'path' => $path,
-            'url' => Storage::disk('public')->url($path),
-            'mime_type' => 'image/webp',
-            'extension' => 'webp',
+            'url' => $this->rootRelativeUrl(Storage::disk('public')->url($path)),
+            'mime_type' => $mimeType,
+            'extension' => $extension,
             'size' => strlen($binary),
         ];
+    }
+
+    private function rootRelativeUrl(string $url): string
+    {
+        $path = parse_url($url, PHP_URL_PATH);
+
+        if (! is_string($path) || $path === '') {
+            throw new RuntimeException('Không thể tạo URL ảnh đã tải lên.');
+        }
+
+        return '/'.ltrim($path, '/');
     }
 
     private function createImageResource(UploadedFile $file): mixed
@@ -164,7 +201,7 @@ class ImageUploadService
         ];
     }
 
-    private function buildFilename(UploadedFile $file, ?string $name = null): string
+    private function buildFilename(UploadedFile $file, ?string $name, string $extension): string
     {
         $baseName = $name !== null && trim($name) !== ''
             ? trim($name)
@@ -176,6 +213,6 @@ class ImageUploadService
             $slug = 'image';
         }
 
-        return $slug.'-'.Str::lower((string) Str::uuid()).'.webp';
+        return $slug.'-'.Str::lower((string) Str::uuid()).'.'.$extension;
     }
 }

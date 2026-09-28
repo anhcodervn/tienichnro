@@ -93,6 +93,8 @@ test('client reward table is configurable and synchronized with the topup form',
         ->toContain("['ArrowLeft', 'ArrowRight', 'Home', 'End']")
         ->and($styles)
         ->toContain('.home-checkout-layout')
+        ->toContain('@apply grid min-w-0 grid-cols-2 gap-2 sm:grid-cols-4;')
+        ->not->toContain('min-[390px]:grid-cols-3')
         ->toContain(".home-purchase-tabs [role='tab'][aria-selected='true']")
         ->toContain(".home-package-option[aria-pressed='true']")
         ->toContain('.home-package-discount')

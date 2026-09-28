@@ -157,7 +157,7 @@
             <h2 id="home-seo-title" class="mt-1 text-2xl font-extrabold leading-tight text-slate-950">{{ $homeSeoArticleTitle }}</h2>
             <x-client.collapsible-article content-id="home-seo-content" class="mt-4">
                 @if ($homeSeoIsPublished)
-                    <div class="article-content text-sm leading-7 text-slate-700">{!! $homeSeoHtml !!}</div>
+                    <div class="article-content text-sm leading-7 text-slate-700" data-client-image-viewer>{!! $homeSeoHtml !!}</div>
                 @else
                     <div class="grid gap-4 text-sm leading-7 text-slate-700 md:grid-cols-2">
                         <p>NapCarot hỗ trợ người chơi đi thẳng vào trang nạp của từng game. Sau khi chọn game ở đầu trang, bạn có thể nhập tài khoản, chọn mệnh giá, máy chủ và kiểm tra tổng tiền trước khi xác nhận. Cách tổ chức này giúp giảm nhầm lẫn giữa các game có trường tài khoản hoặc mức thực nhận khác nhau.</p>

@@ -1,5 +1,31 @@
 <template>
-    <div>
+    <div class="grid gap-2">
+        <div
+            v-if="allowImages"
+            class="flex flex-wrap items-center gap-2 rounded-[8px] border border-slate-200 bg-slate-50 p-2"
+            data-editor-image-actions
+        >
+            <input ref="imageInput" class="hidden" type="file" accept="image/jpeg,image/png,image/webp" @change="handleImageSelection" />
+            <button
+                type="button"
+                class="inline-flex min-h-9 items-center rounded-[7px] bg-emerald-600 px-3 text-xs font-bold text-white transition hover:bg-emerald-700 disabled:cursor-wait disabled:opacity-60"
+                :disabled="isUploadingImage"
+                data-editor-image-upload
+                @click="openImagePicker"
+            >
+                {{ isUploadingImage ? 'Đang tải ảnh...' : 'Chèn ảnh từ máy' }}
+            </button>
+            <button
+                type="button"
+                class="inline-flex min-h-9 items-center rounded-[7px] border border-slate-300 bg-white px-3 text-xs font-bold text-slate-700 transition hover:border-emerald-400 hover:text-emerald-700 disabled:cursor-wait disabled:opacity-60"
+                :disabled="isUploadingImage"
+                data-editor-image-url
+                @click="insertImageFromUrl"
+            >
+                Ảnh từ URL
+            </button>
+            <span class="text-xs leading-5 text-slate-500">Có thể kéo thả hoặc Ctrl+V ảnh trực tiếp vào vùng soạn thảo.</span>
+        </div>
         <textarea
             v-if="useFallback"
             v-model="fallbackContent"
@@ -13,7 +39,7 @@
 </template>
 
 <script lang="ts">
-import { uploadEditorImageFile } from '@/utils/editor-image-upload';
+import { importEditorImageUrl, normalizeNapcarotImageUrl, uploadEditorImageFile } from '@/utils/editor-image-upload';
 import Swal from 'sweetalert2';
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
@@ -47,6 +73,15 @@ type EditorValue = EditorContentNode[] | string;
 type TinyMceBlobInfo = {
     blob: () => Blob;
     filename: () => string;
+};
+
+type TinyMceEditorInstance = {
+    focus: () => void;
+    getBody: () => HTMLElement;
+    getContent: () => string;
+    insertContent: (value: string) => void;
+    setContent: (value: string) => void;
+    on: (event: string, callback: () => void) => void;
 };
 
 declare global {
@@ -109,17 +144,16 @@ export default {
         },
     ) {
         const editorContainer = ref<HTMLElement | null>(null);
+        const imageInput = ref<HTMLInputElement | null>(null);
+        const isUploadingImage = ref(false);
         const useFallback = ref(false);
         const fallbackContent = ref('');
-        let editorInstance: {
-            getContent: () => string;
-            setContent: (value: string) => void;
-            on: (event: string, callback: () => void) => void;
-        } | null = null;
+        let editorInstance: TinyMceEditorInstance | null = null;
         let isApplyingExternalValue = false;
         let lastEmittedFingerprint: string | null = null;
         let saveTimer: ReturnType<typeof setTimeout> | null = null;
         let uploadedImageSyncTimer: ReturnType<typeof setTimeout> | null = null;
+        const remoteImageUploads = new Map<string, Promise<string>>();
 
         const getTinyMce = () =>
             typeof window !== 'undefined' && window.tinymce && typeof window.tinymce.init === 'function' ? window.tinymce : null;
@@ -165,7 +199,57 @@ export default {
             }, props.debounce);
         };
 
-        const hasPendingLocalImages = (html: string): boolean => /<img\b[^>]*\bsrc=["'](?:data:image\/|blob:)/i.test(html);
+        const hasPendingLocalImages = (html: string): boolean =>
+            /<img\b[^>]*\bsrc=["'](?:data:image\/|blob:)/i.test(html) || /<img\b[^>]*\bdata-image-importing=["']true["']/i.test(html);
+
+        const processEditorImageSources = (): void => {
+            if (!editorInstance || !props.allowImages) {
+                return;
+            }
+
+            const images = Array.from(editorInstance.getBody().querySelectorAll<HTMLImageElement>('img[src]'));
+
+            images.forEach((image) => {
+                const source = image.getAttribute('src')?.trim() ?? '';
+
+                if (source === '' || /^(?:data:image\/|blob:)/i.test(source) || image.dataset.imageImporting === 'true') {
+                    return;
+                }
+
+                const localUrl = normalizeNapcarotImageUrl(source);
+
+                if (localUrl !== null) {
+                    if (localUrl !== source) {
+                        image.setAttribute('src', localUrl);
+                    }
+
+                    return;
+                }
+
+                if (!/^(?:https?:)?\/\//i.test(source) || image.dataset.imageImportFailed === source) {
+                    return;
+                }
+
+                image.dataset.imageImporting = 'true';
+                const upload = remoteImageUploads.get(source) ?? importEditorImageUrl(source);
+                remoteImageUploads.set(source, upload);
+
+                upload
+                    .then((uploadedUrl) => {
+                        image.setAttribute('src', uploadedUrl);
+                        delete image.dataset.imageImportFailed;
+                    })
+                    .catch((error: unknown) => {
+                        image.dataset.imageImportFailed = source;
+                        void Swal.fire('', error instanceof Error ? error.message : 'Không thể tải ảnh từ URL về máy chủ.', 'error');
+                    })
+                    .finally(() => {
+                        delete image.dataset.imageImporting;
+                        remoteImageUploads.delete(source);
+                        syncUploadedImageContent();
+                    });
+            });
+        };
 
         const emitCurrentEditorContent = (): void => {
             if (!editorInstance || isApplyingExternalValue) {
@@ -184,6 +268,8 @@ export default {
             if (!editorInstance) {
                 return;
             }
+
+            processEditorImageSources();
 
             if (hasPendingLocalImages(editorInstance.getContent()) && attempt < 40) {
                 uploadedImageSyncTimer = window.setTimeout(() => syncUploadedImageContent(attempt + 1), 50);
@@ -241,6 +327,77 @@ export default {
             });
 
             input.click();
+        };
+
+        const insertImage = (uploadedUrl: string, alt = ''): void => {
+            const imageHtml = `<img src="${escapeHtml(uploadedUrl)}" alt="${escapeHtml(alt)}" />`;
+
+            if (editorInstance) {
+                editorInstance.focus();
+                editorInstance.insertContent(imageHtml);
+                syncUploadedImageContent();
+
+                return;
+            }
+
+            fallbackContent.value = `${fallbackContent.value}${fallbackContent.value.trim() === '' ? '' : '\n'}${imageHtml}`;
+            handleFallbackInput();
+        };
+
+        const openImagePicker = (): void => {
+            if (imageInput.value) {
+                imageInput.value.value = '';
+                imageInput.value.click();
+            }
+        };
+
+        const handleImageSelection = async (event: Event): Promise<void> => {
+            const input = event.target as HTMLInputElement;
+            const file = input.files?.[0];
+
+            if (!file) {
+                return;
+            }
+
+            isUploadingImage.value = true;
+
+            try {
+                const uploadedUrl = await uploadEditorImageFile(file, file.name);
+                insertImage(uploadedUrl, file.name.replace(/\.[^.]+$/, ''));
+            } catch (error) {
+                await Swal.fire('', error instanceof Error ? error.message : 'Không thể tải ảnh lên. Vui lòng thử lại.', 'error');
+            } finally {
+                isUploadingImage.value = false;
+                input.value = '';
+            }
+        };
+
+        const insertImageFromUrl = async (): Promise<void> => {
+            const result = await Swal.fire({
+                title: 'Chèn ảnh từ URL',
+                input: 'url',
+                inputLabel: 'NapCarot sẽ tải ảnh ngoài hệ thống về máy chủ trước khi chèn.',
+                inputPlaceholder: 'https://example.com/image.jpg',
+                showCancelButton: true,
+                confirmButtonText: 'Tải và chèn ảnh',
+                cancelButtonText: 'Hủy',
+                inputValidator: (value) => (value.trim() === '' ? 'Vui lòng nhập URL ảnh.' : undefined),
+            });
+
+            if (!result.isConfirmed || typeof result.value !== 'string') {
+                return;
+            }
+
+            isUploadingImage.value = true;
+
+            try {
+                const uploadedUrl = await importEditorImageUrl(result.value.trim());
+                insertImage(uploadedUrl);
+            } catch (error) {
+                await Swal.fire('', error instanceof Error ? error.message : 'Không thể tải ảnh từ URL về máy chủ.', 'error');
+            } finally {
+                isUploadingImage.value = false;
+            }
         };
 
         const normalizeValue = (value: unknown): EditorContentNode[] => (Array.isArray(value) ? (value as EditorContentNode[]) : []);
@@ -597,7 +754,7 @@ export default {
                 menubar: true,
                 plugins: props.allowImages
                     ? [
-                          'advlist autolink lists link image charmap print preview anchor',
+                          'advlist autolink lists link image imagetools charmap print preview anchor',
                           'searchreplace visualblocks code fullscreen',
                           'insertdatetime media table paste code help wordcount',
                           'emoticons hr pagebreak nonbreaking toc',
@@ -629,13 +786,24 @@ export default {
                           images_upload_handler: handleImageUpload,
                           file_picker_types: 'image',
                           file_picker_callback: pickAndUploadImage,
+                          image_advtab: true,
+                          image_dimensions: true,
+                          image_title: true,
+                          object_resizing: 'img',
+                          imagetools_toolbar: 'rotateleft rotateright | flipv fliph | editimage imageoptions',
+                          contextmenu: 'link image inserttable | cell row column deletetable',
                       }
                     : {}),
                 setup(editor: typeof editorInstance) {
                     editorInstance = editor;
 
                     editor.on('input change keyup undo redo ExecCommand NodeChange', () => {
+                        processEditorImageSources();
                         emitCurrentEditorContent();
+                    });
+
+                    editor.on('Paste Drop SetContent', () => {
+                        window.setTimeout(processEditorImageSources, 0);
                     });
 
                     editor.on('blur', () => {
@@ -646,6 +814,7 @@ export default {
                     const initialHtml = valueToHtml(currentValue());
                     if (initialHtml) {
                         editor?.setContent(initialHtml);
+                        processEditorImageSources();
                     }
                 },
             });
@@ -684,6 +853,11 @@ export default {
             editorContainer,
             fallbackContent,
             handleFallbackInput,
+            handleImageSelection,
+            imageInput,
+            insertImageFromUrl,
+            isUploadingImage,
+            openImagePicker,
             useFallback,
         };
     },

@@ -24,6 +24,7 @@ use App\Models\Tenant;
 use App\Models\TopupPackage;
 use App\Models\TopupProvider;
 use App\Models\User;
+use App\Support\RichTextSanitizer;
 use App\Support\TenantContext;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -42,6 +43,7 @@ class TopupAdminService
         private readonly RecipientFulfillmentService $recipientFulfillmentService,
         private readonly GlobalTopupPackageSyncService $globalPackageSyncService,
         private readonly TenantContext $tenantContext,
+        private readonly RichTextSanitizer $richTextSanitizer,
     ) {}
 
     /** @param array<string, mixed> $filters */
@@ -185,8 +187,13 @@ class TopupAdminService
     /** @param array<string, mixed> $payload */
     public function create(Model $model, array $payload, User $admin, Request $request): Model
     {
+        if ($model instanceof Game) {
+            $payload['description'] = $this->richTextSanitizer->sanitize($payload['description'] ?? null);
+        }
+
         if ($model instanceof TopupPackage) {
             $payload['game_server_id'] = null;
+            $payload['description'] = $this->richTextSanitizer->sanitize($payload['description'] ?? null);
         }
 
         $model->fill($payload)->save();
@@ -205,8 +212,13 @@ class TopupAdminService
     {
         $old = $this->auditSnapshot($model);
 
+        if ($model instanceof Game) {
+            $payload['description'] = $this->richTextSanitizer->sanitize($payload['description'] ?? null);
+        }
+
         if ($model instanceof TopupPackage) {
             $payload['game_server_id'] = null;
+            $payload['description'] = $this->richTextSanitizer->sanitize($payload['description'] ?? null);
         }
 
         $model->fill($payload)->save();

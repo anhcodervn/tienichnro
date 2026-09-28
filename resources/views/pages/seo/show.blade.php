@@ -99,7 +99,7 @@
                 </section>
             @endif
 
-            <div class="article-content client-card min-w-0 max-w-full break-words p-5 sm:p-8 lg:p-10">{!! $contentHtml !!}</div>
+            <div class="article-content client-card min-w-0 max-w-full break-words p-5 sm:p-8 lg:p-10" data-client-image-viewer>{!! $contentHtml !!}</div>
 
             @if ($faq->isNotEmpty())
                 <section class="client-card mt-5 p-5 sm:p-8" aria-labelledby="seo-faq-title">

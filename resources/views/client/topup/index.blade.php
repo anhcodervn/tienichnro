@@ -14,7 +14,7 @@
                     href="{{ route('topup.game', $game) }}"><span
                         class="grid h-12 w-12 place-items-center rounded-[5px] bg-emerald-50 font-extrabold text-emerald-700">{{ mb_substr($game->short_name ?: $game->name, 0, 2) }}</span>
                     <h2 class="mt-5 text-xl font-bold">{{ $game->name }}</h2>
-                    <p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">{{ $game->description }}</p><span
+                    <p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-500">{{ trim(html_entity_decode(strip_tags((string) $game->description), ENT_QUOTES | ENT_HTML5, 'UTF-8')) }}</p><span
                         class="mt-5 inline-block text-sm font-bold text-emerald-700">Chọn game →</span>
                 </a>
             @endforeach
