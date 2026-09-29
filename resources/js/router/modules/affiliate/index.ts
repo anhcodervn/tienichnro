@@ -1,11 +1,11 @@
 export default {
-    path: '/cong-tac-vien',
-    component: () => import('@/layouts/AffiliateLayout.vue'),
+    path: '/dashboard',
+    component: () => import('@/layouts/AffiliateCommissionLayout.vue'),
     children: [
         {
             path: '',
-            name: 'affiliate.collaborator.dashboard',
-            component: () => import('@/pages/affiliate/collaborator-dashboard/index.vue'),
+            name: 'affiliate.dashboard',
+            component: () => import('@/pages/affiliate/index.vue'),
         },
         {
             path: 'thong-bao',
@@ -13,19 +13,8 @@ export default {
             component: () => import('@/pages/affiliate/home.vue'),
         },
         {
-            path: 'doanh-thu',
-            name: 'affiliate.revenue',
-            component: () => import('@/pages/affiliate/revenue/index.vue'),
-        },
-        {
-            path: 'rut-tien',
-            name: 'affiliate.withdrawal',
-            component: () => import('@/pages/affiliate/withdrawal/index.vue'),
-        },
-        {
             path: 'tong-quan',
-            name: 'affiliate.dashboard',
-            component: () => import('@/pages/affiliate/index.vue'),
+            redirect: { name: 'affiliate.dashboard' },
         },
         {
             path: 'bang-gia-chiet-khau',
@@ -33,13 +22,8 @@ export default {
             component: () => import('@/pages/affiliate/rates.vue'),
         },
         {
-            path: 'don-dich-vu',
-            name: 'affiliate.game-service-orders',
-            component: () => import('@/pages/affiliate/game-service-orders/index.vue'),
-        },
-        {
             path: ':pathMatch(.*)*',
-            redirect: { name: 'affiliate.collaborator.dashboard' },
+            redirect: { name: 'affiliate.dashboard' },
         },
     ],
 };

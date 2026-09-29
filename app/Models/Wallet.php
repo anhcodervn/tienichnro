@@ -16,6 +16,8 @@ class Wallet extends Model
 
     public const TYPE_AFFILIATE = 'affiliate';
 
+    public const TYPE_COLLABORATOR = 'collaborator';
+
     protected $fillable = [
         'tenant_id',
         'user_id',

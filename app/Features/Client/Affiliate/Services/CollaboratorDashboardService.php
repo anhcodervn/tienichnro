@@ -2,9 +2,11 @@
 
 namespace App\Features\Client\Affiliate\Services;
 
+use App\Features\Affiliate\Services\AffiliateWalletService;
 use App\Models\AffiliateAnnouncement;
 use App\Models\AffiliateAnnouncementRead;
 use App\Models\AffiliateProfile;
+use App\Models\AffiliateWithdrawal;
 use App\Models\GameServiceOrder;
 use App\Models\User;
 use App\Models\Wallet;
@@ -19,7 +21,7 @@ class CollaboratorDashboardService
         $this->assertActive($user);
         $orders = GameServiceOrder::query()->whereBelongsTo($user, 'collaborator');
         $wallet = Wallet::query()->firstOrCreate(
-            ['user_id' => $user->id, 'type' => Wallet::TYPE_AFFILIATE],
+            ['user_id' => $user->id, 'type' => Wallet::TYPE_COLLABORATOR],
             ['tenant_id' => $user->tenant_id, 'balance' => 0, 'hold_balance' => 0, 'total_recharge' => 0, 'total_spent' => 0],
         );
 
@@ -41,6 +43,51 @@ class CollaboratorDashboardService
             'unread_announcements' => $this->unreadAnnouncements($user),
             'recent_orders' => (clone $orders)->latest('id')->limit(5)->get()->map(fn (GameServiceOrder $order): array => $this->orderPayload($order))->all(),
         ];
+    }
+
+    /** @return array<string, mixed> */
+    public function financialData(User $user): array
+    {
+        $this->assertActive($user);
+        $profile = AffiliateProfile::query()->where('user_id', $user->id)->firstOrFail();
+        $wallet = Wallet::query()->firstOrCreate(
+            ['user_id' => $user->id, 'type' => Wallet::TYPE_COLLABORATOR],
+            ['tenant_id' => $user->tenant_id, 'balance' => 0, 'hold_balance' => 0, 'total_recharge' => 0, 'total_spent' => 0],
+        );
+        $withdrawals = AffiliateWithdrawal::query()
+            ->where('user_id', $user->id)
+            ->where('wallet_type', AffiliateWithdrawal::WALLET_COLLABORATOR)
+            ->latest('id')->limit(20)->get();
+
+        return [
+            'minimum_withdrawal' => AffiliateWalletService::MINIMUM_COLLABORATOR_WITHDRAWAL,
+            'wallet' => ['balance' => (int) $wallet->balance, 'hold_balance' => (int) $wallet->hold_balance],
+            'profile' => [
+                'status' => $profile->status,
+                'bank_name' => $profile->bank_name,
+                'bank_account_name' => $profile->bank_account_name,
+                'bank_account_number_masked' => $this->mask((string) $profile->bank_account_number),
+                'has_payout_account' => filled($profile->bank_name) && filled($profile->bank_account_name) && filled($profile->bank_account_number),
+            ],
+            'withdrawals' => $withdrawals->map(fn (AffiliateWithdrawal $withdrawal): array => [
+                'id' => $withdrawal->id,
+                'amount' => $withdrawal->amount,
+                'status' => $withdrawal->status,
+                'bank_name' => $withdrawal->bank_name,
+                'account_number' => $this->mask((string) $withdrawal->bank_account_number),
+                'created_at' => $withdrawal->created_at?->toISOString(),
+            ])->all(),
+        ];
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function updatePayout(User $user, array $payload): AffiliateProfile
+    {
+        $this->assertActive($user);
+        $profile = AffiliateProfile::query()->where('user_id', $user->id)->firstOrFail();
+        $profile->fill($payload)->save();
+
+        return $profile->refresh();
     }
 
     /** @param array<string, mixed> $filters */
@@ -118,6 +165,11 @@ class CollaboratorDashboardService
     private function assertActive(User $user): void
     {
         abort_unless($user->status === 'active' && AffiliateProfile::query()->where('user_id', $user->id)->where('status', 'active')->exists(), 403);
+    }
+
+    private function mask(string $value): string
+    {
+        return $value === '' ? '' : str_repeat('*', max(0, mb_strlen($value) - 4)).mb_substr($value, -4);
     }
 
     /** @return array<string, mixed> */

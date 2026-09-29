@@ -24,15 +24,19 @@ class AffiliateWithdrawal extends Model
 
     public const STATUS_CANCELLED = 'cancelled';
 
+    public const WALLET_AFFILIATE = 'affiliate';
+
+    public const WALLET_COLLABORATOR = 'collaborator';
+
     protected $fillable = [
-        'tenant_id', 'user_id', 'admin_id', 'amount', 'status', 'bank_name', 'bank_account_name',
+        'tenant_id', 'user_id', 'admin_id', 'amount', 'wallet_type', 'status', 'bank_name', 'bank_account_name',
         'bank_account_number', 'idempotency_key', 'bank_transaction_reference', 'admin_note',
         'approved_at', 'paid_at', 'rejected_at', 'cancelled_at',
     ];
 
     protected $hidden = ['bank_account_name', 'bank_account_number'];
 
-    protected $attributes = ['status' => self::STATUS_REQUESTED];
+    protected $attributes = ['status' => self::STATUS_REQUESTED, 'wallet_type' => self::WALLET_AFFILIATE];
 
     protected static function booted(): void
     {

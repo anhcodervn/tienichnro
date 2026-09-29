@@ -96,6 +96,19 @@ export type CollaboratorOrdersData = {
     meta: { current_page: number; last_page: number; total: number };
 };
 
+export type CollaboratorFinanceData = {
+    minimum_withdrawal: number;
+    wallet: { balance: number; hold_balance: number };
+    profile: {
+        status: 'active' | 'suspended';
+        bank_name: string | null;
+        bank_account_name: string | null;
+        bank_account_number_masked: string;
+        has_payout_account: boolean;
+    };
+    withdrawals: Array<{ id: number; amount: number; status: string; bank_name: string; account_number: string; created_at: string }>;
+};
+
 export const clientAffiliateService = {
     home: async (): Promise<ClientAffiliateHomeData> => (await api.get(`${root}/home`)).data.data,
     data: async (): Promise<ClientAffiliateData> => (await api.get(root)).data.data,
@@ -105,6 +118,11 @@ export const clientAffiliateService = {
     convert: (amount: number, idempotencyKey: string) => api.post(`${root}/convert`, { amount, idempotency_key: idempotencyKey }),
     withdraw: (amount: number, idempotencyKey: string) => api.post(`${root}/withdrawals`, { amount, idempotency_key: idempotencyKey }),
     collaboratorDashboard: async (): Promise<CollaboratorDashboardData> => (await api.get(`${root}/game-service-dashboard`)).data.data,
+    collaboratorFinance: async (): Promise<CollaboratorFinanceData> => (await api.get(`${root}/game-service-finance`)).data.data,
+    updateCollaboratorPayout: (payload: { bank_name: string; bank_account_name: string; bank_account_number: string }) =>
+        api.put(`${root}/game-service-payout-account`, payload),
+    withdrawCollaborator: (amount: number, idempotencyKey: string) =>
+        api.post(`${root}/game-service-withdrawals`, { amount, idempotency_key: idempotencyKey }),
     gameServiceOrders: async (params: Record<string, unknown> = {}): Promise<CollaboratorOrdersData> =>
         (await api.get(`${root}/game-service-orders`, { params })).data.data,
     startGameServiceOrder: (code: string) => api.post(`${root}/game-service-orders/${code}/start`),

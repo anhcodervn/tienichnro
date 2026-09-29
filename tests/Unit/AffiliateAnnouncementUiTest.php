@@ -4,8 +4,10 @@ test('affiliate navigation separates overview announcements and partner home', f
     $projectRoot = dirname(__DIR__, 2);
     $adminRouter = file_get_contents($projectRoot.'/resources/js/router/modules/admin/index.ts');
     $affiliateRouter = file_get_contents($projectRoot.'/resources/js/router/modules/affiliate/index.ts');
+    $collaboratorRouter = file_get_contents($projectRoot.'/resources/js/router/modules/collaborator/index.ts');
     $adminNavigation = file_get_contents($projectRoot.'/resources/js/layouts/admin/sidebar/navigation.ts');
     $affiliateLayout = file_get_contents($projectRoot.'/resources/js/layouts/AffiliateLayout.vue');
+    $affiliateCommissionLayout = file_get_contents($projectRoot.'/resources/js/layouts/AffiliateCommissionLayout.vue');
     $adminPage = file_get_contents($projectRoot.'/resources/js/pages/admin/affiliate/announcements.vue');
     $affiliateHome = file_get_contents($projectRoot.'/resources/js/pages/affiliate/home.vue');
     $collaboratorDashboard = file_get_contents($projectRoot.'/resources/js/pages/affiliate/collaborator-dashboard/index.vue');
@@ -25,15 +27,26 @@ test('affiliate navigation separates overview announcements and partner home', f
         ->toContain('<Editor v-model="form.content"')
         ->toContain('sanitizeRichText(announcement.content_html)')
         ->and($affiliateRouter)
-        ->toContain("name: 'affiliate.collaborator.dashboard'")
+        ->toContain("path: '/dashboard'")
+        ->toContain("name: 'affiliate.dashboard'")
         ->toContain("name: 'affiliate.notifications'")
-        ->toContain("name: 'affiliate.revenue'")
-        ->toContain("name: 'affiliate.withdrawal'")
+        ->toContain("name: 'affiliate.rates'")
+        ->and($collaboratorRouter)
+        ->toContain("path: '/cong-tac-vien'")
+        ->toContain("name: 'collaborator.dashboard'")
+        ->toContain("name: 'collaborator.orders'")
+        ->toContain("name: 'collaborator.revenue'")
+        ->toContain("name: 'collaborator.withdrawal'")
         ->and($affiliateLayout)
         ->toContain('Quản lý đơn')
         ->toContain('Quản lý doanh thu')
         ->toContain('summary.orders.pending')
         ->toContain('summary.unread_announcements')
+        ->toContain('Dashboard hoa hồng')
+        ->and($affiliateCommissionLayout)
+        ->toContain('Tổng quan hoa hồng')
+        ->toContain('Bảng giá chiết khấu')
+        ->toContain('Công việc CTV')
         ->and($affiliateHome)
         ->toContain('Thông báo từ quản trị viên')
         ->toContain('sanitizeRichText(announcement.content_html)')

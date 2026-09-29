@@ -2,6 +2,7 @@
 
 use App\Models\AffiliateGlobalPackageRate;
 use App\Models\AffiliatePackageRate;
+use App\Models\AffiliateProfile;
 use App\Models\AffiliateProgram;
 use App\Models\Game;
 use App\Models\GlobalTopupPackage;
@@ -9,6 +10,7 @@ use App\Models\Tenant;
 use App\Models\TenantDomain;
 use App\Models\TopupPackage;
 use App\Models\User;
+use Illuminate\Support\Facades\Event;
 
 test('guest sees the public affiliate policy and rates when the program is enabled', function (): void {
     $main = Tenant::query()->where('is_main', true)->firstOrFail();
@@ -28,7 +30,7 @@ test('guest sees the public affiliate policy and rates when the program is enabl
         'is_active' => true,
     ]);
 
-    $this->get('http://napcarot.com/cong-tac-vien')
+    $this->get('http://napcarot.com/dashboard')
         ->assertSuccessful()
         ->assertViewIs('client.affiliate.introduction')
         ->assertSeeText('Chương trình cộng tác viên')
@@ -66,7 +68,7 @@ test('public affiliate policy only exposes rates from the current site', functio
         'percentage_basis_points' => 525,
     ]);
 
-    $this->get('http://affiliate-public.test/cong-tac-vien')
+    $this->get('http://affiliate-public.test/dashboard')
         ->assertSuccessful()
         ->assertViewIs('client.affiliate.introduction')
         ->assertSeeText('Gói Riêng Site Con')
@@ -101,7 +103,7 @@ test('public affiliate policy shows inherited global rates for every mapped game
         'percentage_basis_points' => 375,
     ]);
 
-    $this->get('http://napcarot.com/cong-tac-vien')
+    $this->get('http://napcarot.com/dashboard')
         ->assertSuccessful()
         ->assertSeeText('Game Global Alpha')
         ->assertSeeText('Game Global Beta')
@@ -114,7 +116,7 @@ test('authenticated user still receives the affiliate vue dashboard shell', func
     AffiliateProgram::factory()->create(['tenant_id' => $main->id, 'is_enabled' => true]);
 
     $this->actingAs($user)
-        ->get('http://napcarot.com/cong-tac-vien')
+        ->get('http://napcarot.com/dashboard')
         ->assertSuccessful()
         ->assertViewIs('app')
         ->assertSee('id="app"', false)
@@ -126,8 +128,27 @@ test('affiliate page stays unavailable when the current site program is disabled
     $user = User::factory()->create(['tenant_id' => $main->id]);
     AffiliateProgram::factory()->create(['tenant_id' => $main->id, 'is_enabled' => false]);
 
-    $this->get('http://napcarot.com/cong-tac-vien')->assertNotFound();
-    $this->actingAs($user)->get('http://napcarot.com/cong-tac-vien')->assertNotFound();
+    $this->get('http://napcarot.com/dashboard')->assertNotFound();
+    $this->actingAs($user)->get('http://napcarot.com/dashboard')->assertNotFound();
+});
+
+test('collaborator work dashboard is separate and requires an active collaborator profile', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $collaborator = User::factory()->create(['tenant_id' => $main->id]);
+    $regularUser = User::factory()->create(['tenant_id' => $main->id]);
+    Event::fake();
+    AffiliateProfile::factory()->create([
+        'tenant_id' => $main->id,
+        'user_id' => $collaborator->id,
+        'status' => 'active',
+    ]);
+
+    $this->get('http://napcarot.com/cong-tac-vien')->assertRedirect('http://napcarot.com/login');
+    $this->actingAs($regularUser)->get('http://napcarot.com/cong-tac-vien')->assertForbidden();
+    $this->actingAs($collaborator)
+        ->get('http://napcarot.com/cong-tac-vien')
+        ->assertSuccessful()
+        ->assertViewIs('app');
 });
 
 test('guest access to the affiliate dashboard api remains protected', function (): void {

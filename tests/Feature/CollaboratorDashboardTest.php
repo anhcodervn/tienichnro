@@ -4,12 +4,14 @@ use App\Features\Affiliate\Events\AffiliateDashboardUpdated;
 use App\Models\AffiliateAnnouncement;
 use App\Models\AffiliateProfile;
 use App\Models\AffiliateProgram;
+use App\Models\AffiliateWithdrawal;
 use App\Models\Game;
 use App\Models\GameServiceOrder;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Str;
 
 function activeCollaborator(): User
 {
@@ -152,10 +154,66 @@ test('admin completion settles collaborator income once', function (): void {
 
     $wallet = Wallet::query()->withoutGlobalScopes()
         ->where('user_id', $collaborator->id)
-        ->where('type', Wallet::TYPE_AFFILIATE)
+        ->where('type', Wallet::TYPE_COLLABORATOR)
         ->firstOrFail();
+    $affiliateBalance = (int) Wallet::query()->withoutGlobalScopes()
+        ->where('user_id', $collaborator->id)
+        ->where('type', Wallet::TYPE_AFFILIATE)
+        ->value('balance');
 
     expect((int) $wallet->balance)->toBe(42000)
+        ->and($affiliateBalance)->toBe(0)
         ->and($order->refresh()->collaborator_settlement_amount)->toBe(42000)
         ->and($order->collaborator_settled_at)->not->toBeNull();
+});
+
+test('collaborator finance and withdrawals use a separate wallet from affiliate commissions', function (): void {
+    $collaborator = activeCollaborator();
+    AffiliateProgram::factory()->create([
+        'tenant_id' => $collaborator->tenant_id,
+        'is_enabled' => true,
+    ]);
+    Wallet::query()->create([
+        'tenant_id' => $collaborator->tenant_id,
+        'user_id' => $collaborator->id,
+        'type' => Wallet::TYPE_AFFILIATE,
+        'balance' => 70000,
+    ]);
+    Wallet::query()->create([
+        'tenant_id' => $collaborator->tenant_id,
+        'user_id' => $collaborator->id,
+        'type' => Wallet::TYPE_COLLABORATOR,
+        'balance' => 150000,
+    ]);
+
+    $this->actingAs($collaborator)
+        ->getJson('/api/client/affiliate/game-service-finance')
+        ->assertSuccessful()
+        ->assertJsonPath('data.wallet.balance', 150000)
+        ->assertJsonPath('data.wallet.hold_balance', 0)
+        ->assertJsonPath('data.minimum_withdrawal', 100000);
+
+    $this->actingAs($collaborator)
+        ->postJson('/api/client/affiliate/game-service-withdrawals', [
+            'amount' => 100000,
+            'idempotency_key' => (string) Str::uuid(),
+        ])
+        ->assertCreated();
+
+    $this->actingAs($collaborator)
+        ->getJson('/api/client/affiliate')
+        ->assertSuccessful()
+        ->assertJsonPath('data.wallets.affiliate.balance', 70000)
+        ->assertJsonCount(0, 'data.withdrawals');
+
+    $collaboratorWallet = Wallet::query()->withoutGlobalScopes()
+        ->where('user_id', $collaborator->id)->where('type', Wallet::TYPE_COLLABORATOR)->firstOrFail();
+    $affiliateWallet = Wallet::query()->withoutGlobalScopes()
+        ->where('user_id', $collaborator->id)->where('type', Wallet::TYPE_AFFILIATE)->firstOrFail();
+    $withdrawal = AffiliateWithdrawal::query()->withoutGlobalScopes()->latest('id')->firstOrFail();
+
+    expect((int) $collaboratorWallet->balance)->toBe(50000)
+        ->and((int) $collaboratorWallet->hold_balance)->toBe(100000)
+        ->and((int) $affiliateWallet->balance)->toBe(70000)
+        ->and($withdrawal->wallet_type)->toBe(AffiliateWithdrawal::WALLET_COLLABORATOR);
 });

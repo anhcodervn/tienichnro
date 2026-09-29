@@ -1,10 +1,10 @@
 <script setup lang="ts">
-import { clientAffiliateService, type ClientAffiliateData } from '@/services/client-affiliate.service';
+import { clientAffiliateService, type CollaboratorFinanceData } from '@/services/client-affiliate.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { Banknote, Clock3, LoaderCircle, ShieldAlert, WalletCards } from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref } from 'vue';
 
-const data = ref<ClientAffiliateData | null>(null);
+const data = ref<CollaboratorFinanceData | null>(null);
 const loading = ref(true);
 const submitting = ref(false);
 const withdrawalAmount = ref<number | null>(null);
@@ -23,7 +23,7 @@ const statusLabels: Record<string, string> = {
 const load = async (): Promise<void> => {
     loading.value = true;
     try {
-        data.value = await clientAffiliateService.data();
+        data.value = await clientAffiliateService.collaboratorFinance();
         payout.bank_name = data.value.profile.bank_name ?? '';
         payout.bank_account_name = data.value.profile.bank_account_name ?? '';
     } catch (error) {
@@ -35,7 +35,7 @@ const load = async (): Promise<void> => {
 const savePayout = async (): Promise<void> => {
     submitting.value = true;
     try {
-        const response = await clientAffiliateService.updatePayout(payout);
+        const response = await clientAffiliateService.updateCollaboratorPayout(payout);
         handleSuccessResponse(response, 'Đã lưu tài khoản nhận tiền.');
         payout.bank_account_number = '';
         await load();
@@ -49,7 +49,7 @@ const withdraw = async (): Promise<void> => {
     if (!withdrawalAmount.value) return;
     submitting.value = true;
     try {
-        const response = await clientAffiliateService.withdraw(withdrawalAmount.value, crypto.randomUUID());
+        const response = await clientAffiliateService.withdrawCollaborator(withdrawalAmount.value, crypto.randomUUID());
         handleSuccessResponse(response, 'Yêu cầu rút tiền đã được gửi cho admin.');
         withdrawalAmount.value = null;
         await load();
@@ -91,8 +91,8 @@ onMounted(load);
                             >Số tiền muốn rút<input
                                 v-model.number="withdrawalAmount"
                                 type="number"
-                                :min="data.program.minimum_withdrawal"
-                                :max="data.wallets.affiliate.balance"
+                                :min="data.minimum_withdrawal"
+                                :max="data.wallet.balance"
                                 step="1000"
                                 required
                                 class="min-h-12 rounded-xl border-2 border-slate-200 px-4 outline-none focus:border-emerald-500"
@@ -100,10 +100,10 @@ onMounted(load);
                         /></label>
                         <div class="grid gap-2 rounded-xl bg-slate-50 p-4 text-sm">
                             <p class="flex justify-between gap-4">
-                                <span>Số dư khả dụng</span><strong>{{ money(data.wallets.affiliate.balance) }}</strong>
+                                <span>Số dư khả dụng</span><strong>{{ money(data.wallet.balance) }}</strong>
                             </p>
                             <p class="flex justify-between gap-4">
-                                <span>Mức rút tối thiểu</span><strong>{{ money(data.program.minimum_withdrawal) }}</strong>
+                                <span>Mức rút tối thiểu</span><strong>{{ money(data.minimum_withdrawal) }}</strong>
                             </p>
                             <p class="flex justify-between gap-4">
                                 <span>Tài khoản nhận</span><strong>{{ data.profile.bank_account_number_masked || 'Chưa thiết lập' }}</strong>

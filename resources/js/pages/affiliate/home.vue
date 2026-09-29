@@ -3,11 +3,15 @@ import { clientAffiliateService, type ClientAffiliateHomeData } from '@/services
 import { handleErrorResponse } from '@/utils/response';
 import { sanitizeRichText } from '@/utils/rich-text';
 import { ArrowRight, BellRing, Eye, HandCoins, LoaderCircle, Pin } from 'lucide-vue-next';
-import { onMounted, ref } from 'vue';
+import { computed, onMounted, ref } from 'vue';
+import { useRoute } from 'vue-router';
 
 const data = ref<ClientAffiliateHomeData | null>(null);
 const loading = ref(true);
 const expandedAnnouncements = ref(new Set<number>());
+const route = useRoute();
+const dashboardTarget = computed(() => (String(route.name ?? '').startsWith('collaborator.') ? '/cong-tac-vien' : '/dashboard'));
+const dashboardLabel = computed(() => (String(route.name ?? '').startsWith('collaborator.') ? 'Xem công việc CTV' : 'Xem dashboard hoa hồng'));
 const dateTime = (value: string | null): string => (value ? new Date(value).toLocaleString('vi-VN') : '—');
 
 const load = async (): Promise<void> => {
@@ -52,10 +56,10 @@ onMounted(load);
                     </p>
                 </div>
                 <RouterLink
-                    to="/cong-tac-vien"
+                    :to="dashboardTarget"
                     class="inline-flex min-h-12 w-fit items-center justify-center gap-2 rounded-xl bg-white px-5 font-bold text-emerald-800 shadow-sm transition hover:bg-emerald-50"
                 >
-                    Xem dashboard <ArrowRight class="size-5" />
+                    {{ dashboardLabel }} <ArrowRight class="size-5" />
                 </RouterLink>
             </div>
         </section>

@@ -1,7 +1,19 @@
 <script setup lang="ts">
 import { clientAffiliateService, type CollaboratorDashboardData } from '@/services/client-affiliate.service';
 import { useUserStore } from '@/stores/user.store';
-import { BellRing, ChartNoAxesCombined, HandCoins, Home, LayoutDashboard, ListChecks, LogOut, Menu, WalletCards, X } from 'lucide-vue-next';
+import {
+    BadgePercent,
+    BellRing,
+    ChartNoAxesCombined,
+    HandCoins,
+    Home,
+    LayoutDashboard,
+    ListChecks,
+    LogOut,
+    Menu,
+    WalletCards,
+    X,
+} from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
@@ -14,24 +26,22 @@ let refreshTimer: number | null = null;
 const routeName = computed(() => String(route.name ?? ''));
 const pageTitle = computed(() => {
     const titles: Record<string, string> = {
-        'affiliate.collaborator.dashboard': 'Dashboard cộng tác viên',
-        'affiliate.game-service-orders': 'Quản lý đơn',
-        'affiliate.notifications': 'Thông báo',
-        'affiliate.revenue': 'Quản lý doanh thu',
-        'affiliate.withdrawal': 'Rút tiền',
-        'affiliate.dashboard': 'Tổng quan Affiliate',
-        'affiliate.rates': 'Bảng giá chiết khấu',
+        'collaborator.dashboard': 'Dashboard công việc',
+        'collaborator.orders': 'Quản lý đơn',
+        'collaborator.notifications': 'Thông báo công việc',
+        'collaborator.revenue': 'Doanh thu công việc',
+        'collaborator.withdrawal': 'Rút tiền công việc',
     };
 
     return titles[routeName.value] ?? 'Cộng tác viên';
 });
 const pageDescription = computed(() => {
     const descriptions: Record<string, string> = {
-        'affiliate.collaborator.dashboard': 'Theo dõi tiến độ đơn dịch vụ và thu nhập của bạn',
-        'affiliate.game-service-orders': 'Nhận đơn, xử lý, gửi duyệt và trao đổi với khách hàng',
-        'affiliate.notifications': 'Thông tin và cập nhật mới nhất từ quản trị viên',
-        'affiliate.revenue': 'Theo dõi doanh thu, tiền treo và tiền đã kết toán',
-        'affiliate.withdrawal': 'Tạo và theo dõi yêu cầu rút tiền về tài khoản',
+        'collaborator.dashboard': 'Theo dõi tiến độ đơn dịch vụ và tiền công của bạn',
+        'collaborator.orders': 'Nhận đơn, xử lý, gửi duyệt và trao đổi với khách hàng',
+        'collaborator.notifications': 'Thông tin công việc mới nhất từ quản trị viên',
+        'collaborator.revenue': 'Theo dõi tiền công, tiền treo và tiền đã kết toán',
+        'collaborator.withdrawal': 'Rút tiền công việc đã được kết toán',
     };
 
     return descriptions[routeName.value] ?? 'Trung tâm quản lý dành cho cộng tác viên';
@@ -82,7 +92,7 @@ onBeforeUnmount(() => {
                     ><span class="grid size-11 place-items-center rounded-2xl bg-emerald-600 text-white"><HandCoins class="size-6" /></span>
                     <div>
                         <p class="text-xs font-bold uppercase tracking-widest text-emerald-700">CTV dịch vụ</p>
-                        <p class="font-black text-slate-950">Partner Center</p>
+                        <p class="font-black text-slate-950">Work Center</p>
                     </div></RouterLink
                 >
                 <button class="p-2 lg:hidden" @click="closeSidebar"><X class="size-5" /></button>
@@ -91,14 +101,14 @@ onBeforeUnmount(() => {
                 <RouterLink
                     to="/cong-tac-vien"
                     class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
-                    :class="routeName === 'affiliate.collaborator.dashboard' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
+                    :class="routeName === 'collaborator.dashboard' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
                     @click="closeSidebar"
                     ><LayoutDashboard class="size-5" /> Dashboard</RouterLink
                 >
                 <RouterLink
                     to="/cong-tac-vien/don-dich-vu"
                     class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
-                    :class="routeName === 'affiliate.game-service-orders' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
+                    :class="routeName === 'collaborator.orders' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
                     @click="closeSidebar"
                     ><ListChecks class="size-5" /><span class="flex-1">Quản lý đơn</span
                     ><span
@@ -110,7 +120,7 @@ onBeforeUnmount(() => {
                 <RouterLink
                     to="/cong-tac-vien/thong-bao"
                     class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
-                    :class="routeName === 'affiliate.notifications' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
+                    :class="routeName === 'collaborator.notifications' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
                     @click="closeSidebar"
                     ><BellRing class="size-5" /><span class="flex-1">Thông báo</span
                     ><span
@@ -122,16 +132,21 @@ onBeforeUnmount(() => {
                 <RouterLink
                     to="/cong-tac-vien/doanh-thu"
                     class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
-                    :class="routeName === 'affiliate.revenue' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
+                    :class="routeName === 'collaborator.revenue' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
                     @click="closeSidebar"
                     ><ChartNoAxesCombined class="size-5" /> Quản lý doanh thu</RouterLink
                 >
                 <RouterLink
                     to="/cong-tac-vien/rut-tien"
                     class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
-                    :class="routeName === 'affiliate.withdrawal' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
+                    :class="routeName === 'collaborator.withdrawal' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
                     @click="closeSidebar"
                     ><WalletCards class="size-5" /> Rút tiền</RouterLink
+                >
+                <a
+                    href="/dashboard"
+                    class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold text-slate-600 hover:bg-violet-50 hover:text-violet-700"
+                    ><BadgePercent class="size-5" /> Dashboard hoa hồng</a
                 >
                 <a href="/" class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold text-slate-600 hover:bg-slate-50"
                     ><Home class="size-5" /> Về trang chính</a

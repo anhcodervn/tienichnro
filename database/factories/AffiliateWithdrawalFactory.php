@@ -24,6 +24,7 @@ class AffiliateWithdrawalFactory extends Factory
             'tenant_id' => Tenant::factory(),
             'user_id' => User::factory(),
             'amount' => 100000,
+            'wallet_type' => AffiliateWithdrawal::WALLET_AFFILIATE,
             'status' => AffiliateWithdrawal::STATUS_REQUESTED,
             'bank_name' => 'Vietcombank',
             'bank_account_name' => fake()->name(),

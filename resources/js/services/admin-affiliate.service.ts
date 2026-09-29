@@ -75,6 +75,7 @@ export type AffiliateCommission = {
     id: number;
     tenant_id: number;
     amount: number;
+    wallet_type: 'affiliate' | 'collaborator';
     base_amount: number;
     status: string;
     commission_type: string;
@@ -133,8 +134,7 @@ export const adminAffiliateService = {
     partners: async (params: Record<string, unknown> = {}): Promise<Paginated<AffiliatePartner>> =>
         (await api.get(`${root}/partners`, { params })).data.data,
     updatePartner: (profileId: number, payload: Record<string, unknown>) => api.patch(`${root}/partners/${profileId}`, payload),
-    assignPartnerOrder: (profileId: number, orderCode: string) =>
-        api.post(`${root}/partners/${profileId}/orders`, { order_code: orderCode }),
+    assignPartnerOrder: (profileId: number, orderCode: string) => api.post(`${root}/partners/${profileId}/orders`, { order_code: orderCode }),
     commissions: async (params: Record<string, unknown> = {}): Promise<Paginated<AffiliateCommission>> =>
         (await api.get(`${root}/commissions`, { params })).data.data,
     updateCommission: (commissionId: number, payload: Record<string, unknown>) => api.patch(`${root}/commissions/${commissionId}`, payload),

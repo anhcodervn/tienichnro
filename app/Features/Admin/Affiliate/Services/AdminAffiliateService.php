@@ -441,7 +441,7 @@ class AdminAffiliateService
         $search = trim((string) ($filters['search'] ?? ''));
 
         return AffiliateWithdrawal::query()->withoutGlobalScope(TenantScope::class)
-            ->select(['id', 'tenant_id', 'user_id', 'admin_id', 'amount', 'status', 'bank_name', 'bank_account_name', 'bank_account_number', 'bank_transaction_reference', 'admin_note', 'approved_at', 'paid_at', 'rejected_at', 'created_at'])
+            ->select(['id', 'tenant_id', 'user_id', 'admin_id', 'amount', 'wallet_type', 'status', 'bank_name', 'bank_account_name', 'bank_account_number', 'bank_transaction_reference', 'admin_note', 'approved_at', 'paid_at', 'rejected_at', 'created_at'])
             ->with(['user' => fn ($query) => $query->withoutGlobalScope(TenantScope::class)->select(['id', 'username', 'email'])])
             ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
             ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
@@ -796,7 +796,8 @@ class AdminAffiliateService
 
         return [
             'id' => $withdrawal->id, 'tenant_id' => $withdrawal->tenant_id, 'user' => $withdrawal->user,
-            'amount' => $withdrawal->amount, 'status' => $withdrawal->status, 'bank_name' => $withdrawal->bank_name,
+            'amount' => $withdrawal->amount, 'wallet_type' => $withdrawal->wallet_type,
+            'status' => $withdrawal->status, 'bank_name' => $withdrawal->bank_name,
             'bank_account_name' => $withdrawal->bank_account_name,
             'bank_account_number_masked' => str_repeat('*', max(0, mb_strlen($accountNumber) - 4)).mb_substr($accountNumber, -4),
             'bank_transaction_reference' => $withdrawal->bank_transaction_reference,

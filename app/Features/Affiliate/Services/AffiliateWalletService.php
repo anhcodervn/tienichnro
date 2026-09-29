@@ -20,6 +20,8 @@ class AffiliateWalletService
 {
     public const MINIMUM_CONVERSION = 1000;
 
+    public const MINIMUM_COLLABORATOR_WITHDRAWAL = 100000;
+
     public function wallet(User $user, string $type): Wallet
     {
         return $this->ensureWallet($user, $type, (int) $user->tenant_id);
@@ -43,7 +45,7 @@ class AffiliateWalletService
         }
 
         $collaborator = User::query()->withoutGlobalScope(TenantScope::class)->findOrFail($order->collaborator_id);
-        $wallet = $this->lockedWallet($collaborator, Wallet::TYPE_AFFILIATE, (int) $collaborator->tenant_id);
+        $wallet = $this->lockedWallet($collaborator, Wallet::TYPE_COLLABORATOR, (int) $collaborator->tenant_id);
         $amount = (int) $order->collaborator_total_cost;
         $before = (int) $wallet->balance;
         $wallet->forceFill(['balance' => $before + $amount])->save();
@@ -64,7 +66,7 @@ class AffiliateWalletService
         }
 
         $collaborator = User::query()->withoutGlobalScope(TenantScope::class)->findOrFail($order->collaborator_id);
-        $wallet = $this->lockedWallet($collaborator, Wallet::TYPE_AFFILIATE, (int) $collaborator->tenant_id);
+        $wallet = $this->lockedWallet($collaborator, Wallet::TYPE_COLLABORATOR, (int) $collaborator->tenant_id);
         $amount = (int) $order->collaborator_settlement_amount;
         $before = (int) $wallet->balance;
 
@@ -147,16 +149,22 @@ class AffiliateWalletService
         }, 3);
     }
 
-    public function requestWithdrawal(User $user, int $amount, string $idempotencyKey): AffiliateWithdrawal
-    {
-        $program = $this->assertActiveProgram($user);
+    public function requestWithdrawal(
+        User $user,
+        int $amount,
+        string $idempotencyKey,
+        string $walletType = Wallet::TYPE_AFFILIATE,
+    ): AffiliateWithdrawal {
+        $minimumWithdrawal = $walletType === Wallet::TYPE_COLLABORATOR
+            ? $this->assertActiveCollaborator($user)
+            : (int) $this->assertActiveProgram($user)->minimum_withdrawal;
 
-        return DB::transaction(function () use ($user, $amount, $idempotencyKey, $program): AffiliateWithdrawal {
+        return DB::transaction(function () use ($user, $amount, $idempotencyKey, $minimumWithdrawal, $walletType): AffiliateWithdrawal {
             $existing = AffiliateWithdrawal::query()->withoutGlobalScope(TenantScope::class)
                 ->where('idempotency_key', $idempotencyKey)->first();
 
             if ($existing instanceof AffiliateWithdrawal) {
-                if ($existing->user_id !== $user->id || $existing->amount !== $amount) {
+                if ($existing->user_id !== $user->id || $existing->amount !== $amount || $existing->wallet_type !== $walletType) {
                     throw new ApiException('Mã chống trùng không khớp với yêu cầu ban đầu.', 409);
                 }
 
@@ -169,7 +177,7 @@ class AffiliateWalletService
                 ->where('status', 'active')
                 ->first();
 
-            if ($amount < $program->minimum_withdrawal) {
+            if ($amount < $minimumWithdrawal) {
                 throw new ApiException('Số tiền chưa đạt mức rút tối thiểu của website.', 422);
             }
 
@@ -184,7 +192,7 @@ class AffiliateWalletService
                 throw new ApiException('Bạn cần xác minh email trước khi rút hoa hồng.', 422);
             }
 
-            $wallet = $this->lockedWallet($user, Wallet::TYPE_AFFILIATE, (int) $user->tenant_id);
+            $wallet = $this->lockedWallet($user, $walletType, (int) $user->tenant_id);
 
             if ((int) $wallet->balance < $amount) {
                 throw new ApiException('Số dư hoa hồng khả dụng không đủ.', 422);
@@ -194,6 +202,7 @@ class AffiliateWalletService
                 'tenant_id' => $user->tenant_id,
                 'user_id' => $user->id,
                 'amount' => $amount,
+                'wallet_type' => $walletType,
                 'bank_name' => $profile->bank_name,
                 'bank_account_name' => $profile->bank_account_name,
                 'bank_account_number' => $profile->bank_account_number,
@@ -214,7 +223,7 @@ class AffiliateWalletService
     public function releaseWithdrawal(AffiliateWithdrawal $withdrawal): void
     {
         $user = User::query()->withoutGlobalScope(TenantScope::class)->findOrFail($withdrawal->user_id);
-        $wallet = $this->lockedWallet($user, Wallet::TYPE_AFFILIATE, $withdrawal->tenant_id);
+        $wallet = $this->lockedWallet($user, $withdrawal->wallet_type, $withdrawal->tenant_id);
         $before = (int) $wallet->balance;
         $holdBefore = (int) $wallet->hold_balance;
 
@@ -232,7 +241,7 @@ class AffiliateWalletService
     public function settleWithdrawal(AffiliateWithdrawal $withdrawal): void
     {
         $user = User::query()->withoutGlobalScope(TenantScope::class)->findOrFail($withdrawal->user_id);
-        $wallet = $this->lockedWallet($user, Wallet::TYPE_AFFILIATE, $withdrawal->tenant_id);
+        $wallet = $this->lockedWallet($user, $withdrawal->wallet_type, $withdrawal->tenant_id);
         $holdBefore = (int) $wallet->hold_balance;
 
         if ($holdBefore < $withdrawal->amount) {
@@ -282,6 +291,21 @@ class AffiliateWalletService
         }
 
         return $program;
+    }
+
+    private function assertActiveCollaborator(User $user): int
+    {
+        $isActive = $user->status === 'active' && AffiliateProfile::query()->withoutGlobalScope(TenantScope::class)
+            ->where('tenant_id', $user->tenant_id)
+            ->where('user_id', $user->id)
+            ->where('status', 'active')
+            ->exists();
+
+        if (! $isActive) {
+            throw new ApiException('Tài khoản cộng tác viên chưa hoạt động hoặc đang bị tạm khóa.', 403);
+        }
+
+        return self::MINIMUM_COLLABORATOR_WITHDRAWAL;
     }
 
     /** @param array<string, mixed> $metadata */

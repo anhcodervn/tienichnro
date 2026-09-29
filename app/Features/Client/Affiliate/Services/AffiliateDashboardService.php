@@ -33,7 +33,8 @@ class AffiliateDashboardService
             ->where('referrer_id', $user->id)
             ->with(['order:id,code', 'referredUser:id,username', 'package:id,name'])
             ->latest('id')->limit(20)->get();
-        $withdrawals = AffiliateWithdrawal::query()->where('user_id', $user->id)->latest('id')->limit(20)->get();
+        $withdrawals = AffiliateWithdrawal::query()->where('user_id', $user->id)
+            ->where('wallet_type', AffiliateWithdrawal::WALLET_AFFILIATE)->latest('id')->limit(20)->get();
         $conversions = AffiliateConversion::query()->where('user_id', $user->id)->latest('id')->limit(20)->get();
 
         return [

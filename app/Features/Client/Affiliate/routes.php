@@ -19,6 +19,10 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('client/affiliate')
     Route::post('/game-service-orders/{gameServiceOrder}/messages', [GameServiceOrderChatController::class, 'store'])
         ->middleware('throttle:30,1')->name('game-service-orders.messages.store');
     Route::get('/game-service-dashboard', [CollaboratorDashboardController::class, 'index'])->name('game-service-dashboard.index');
+    Route::get('/game-service-finance', [CollaboratorDashboardController::class, 'finance'])->name('game-service-finance.index');
+    Route::put('/game-service-payout-account', [CollaboratorDashboardController::class, 'updatePayout'])->name('game-service-payout.update');
+    Route::post('/game-service-withdrawals', [CollaboratorDashboardController::class, 'withdraw'])
+        ->middleware('throttle:5,1')->name('game-service-withdrawals.store');
     Route::post('/game-service-orders/{gameServiceOrder}/start', [CollaboratorDashboardController::class, 'start'])->name('game-service-orders.start');
     Route::post('/game-service-orders/{gameServiceOrder}/submit', [CollaboratorDashboardController::class, 'submit'])->name('game-service-orders.submit');
     Route::post('/announcements/{affiliateAnnouncement}/read', [CollaboratorDashboardController::class, 'readAnnouncement'])->name('announcements.read');

@@ -3,6 +3,7 @@
 use App\Features\Admin\Setting\Controllers\SiteCustomAssetController;
 use App\Features\Auth\Controllers\AuthController;
 use App\Features\Client\Affiliate\Controllers\AffiliatePageController;
+use App\Features\Client\Affiliate\Controllers\CollaboratorPageController;
 use App\Features\Client\Profile\Controllers\ProfilePageController;
 use App\Http\Controllers\Account\WalletController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
@@ -29,7 +30,9 @@ Route::get('/site-custom.js', [SiteCustomAssetController::class, 'javascript'])-
 Route::get('/robots.txt', [CrawlerFileController::class, 'robots'])->name('robots');
 Route::get('/ads.txt', [CrawlerFileController::class, 'ads'])->name('ads');
 Route::get('/community', BioPageController::class)->name('bio.show');
-Route::get('/cong-tac-vien/{any?}', AffiliatePageController::class)
+Route::get('/cong-tac-vien/{any?}', CollaboratorPageController::class)
+    ->middleware(['auth', 'site.active'])->where('any', '.*')->name('client.collaborator.spa');
+Route::get('/dashboard/{any?}', AffiliatePageController::class)
     ->middleware('site.active')->where('any', '.*')->name('client.affiliate.spa');
 
 Route::middleware(['guest', 'site.active'])->group(function (): void {

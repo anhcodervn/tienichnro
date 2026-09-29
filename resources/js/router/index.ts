@@ -2,8 +2,9 @@ import { useUserStore } from '@/stores/user.store';
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router';
 import adminRouter from './modules/admin';
 import affiliateRouter from './modules/affiliate';
+import collaboratorRouter from './modules/collaborator';
 
-const routes: RouteRecordRaw[] = [adminRouter, affiliateRouter];
+const routes: RouteRecordRaw[] = [adminRouter, affiliateRouter, collaboratorRouter];
 
 const routeTitles: Record<string, string> = {
     'admin.dashboard': 'Tổng quan quản trị',
@@ -50,13 +51,14 @@ const routeTitles: Record<string, string> = {
     'admin.recharge.config': 'Cấu hình nạp tiền',
     'admin.recharge.history': 'Lịch sử nạp tiền',
     'admin.error.404': 'Trang quản trị không tồn tại',
-    'affiliate.collaborator.dashboard': 'Dashboard cộng tác viên',
     'affiliate.notifications': 'Thông báo cộng tác viên',
-    'affiliate.revenue': 'Doanh thu cộng tác viên',
-    'affiliate.withdrawal': 'Rút tiền cộng tác viên',
     'affiliate.dashboard': 'Tổng quan hoa hồng',
     'affiliate.rates': 'Bảng giá chiết khấu',
-    'affiliate.game-service-orders': 'Đơn dịch vụ được giao',
+    'collaborator.dashboard': 'Dashboard công việc cộng tác viên',
+    'collaborator.notifications': 'Thông báo công việc cộng tác viên',
+    'collaborator.revenue': 'Doanh thu công việc cộng tác viên',
+    'collaborator.withdrawal': 'Rút tiền cộng tác viên',
+    'collaborator.orders': 'Đơn dịch vụ được giao',
 };
 
 const router = createRouter({
@@ -67,7 +69,7 @@ const router = createRouter({
 router.beforeEach(async (to) => {
     const routeName = typeof to.name === 'string' ? to.name : '';
 
-    if (!routeName.startsWith('admin.') && !routeName.startsWith('affiliate.')) {
+    if (!routeName.startsWith('admin.') && !routeName.startsWith('affiliate.') && !routeName.startsWith('collaborator.')) {
         return true;
     }
 
