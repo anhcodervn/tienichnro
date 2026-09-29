@@ -20,7 +20,7 @@ class Game extends Model
 
     protected $fillable = [
         'name', 'slug', 'short_name', 'reward_label', 'provider_service_code', 'image', 'description', 'content', 'status',
-        'package_mode', 'min_quantity', 'max_quantity', 'sort_order', 'seo_title', 'seo_description', 'metadata', 'checkout_fields',
+        'package_mode', 'min_quantity', 'max_quantity', 'game_services_enabled', 'sort_order', 'seo_title', 'seo_description', 'metadata', 'checkout_fields',
     ];
 
     protected $attributes = [
@@ -40,6 +40,7 @@ class Game extends Model
             'min_quantity' => 'integer',
             'max_quantity' => 'integer',
             'sort_order' => 'integer',
+            'game_services_enabled' => 'boolean',
         ];
     }
 
@@ -111,6 +112,11 @@ class Game extends Model
     public function orders(): HasMany
     {
         return $this->hasMany(Order::class);
+    }
+
+    public function gameServices(): HasMany
+    {
+        return $this->hasMany(GameService::class)->orderBy('sort_order')->orderBy('id');
     }
 
     public function seoSetting(): HasOne

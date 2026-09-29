@@ -272,13 +272,13 @@ class TopupAdminService
             [$errorKey, $message, $blockingRelations] = match (true) {
                 $lockedModel instanceof Game => [
                     'game',
-                    'Không thể xóa game khi còn máy chủ, gói nạp hoặc đơn hàng. Hãy xóa dữ liệu con trước hoặc chuyển game sang Tạm tắt.',
-                    ['servers', 'packages', 'orders'],
+                    'Không thể xóa game khi còn máy chủ, gói nạp, dịch vụ game hoặc đơn hàng. Hãy xóa dữ liệu con trước hoặc chuyển game sang Tạm tắt.',
+                    ['servers', 'packages', 'orders', 'gameServices'],
                 ],
                 $lockedModel instanceof GameServer => [
                     'server',
-                    'Không thể xóa máy chủ khi còn đơn hàng. Hãy chuyển máy chủ sang Tạm tắt để giữ lịch sử.',
-                    ['orders'],
+                    'Không thể xóa máy chủ khi còn đơn hàng hoặc đang được dịch vụ game sử dụng. Hãy chuyển máy chủ sang Tạm tắt để giữ lịch sử.',
+                    ['orders', 'gameServices'],
                 ],
                 default => [
                     'package',

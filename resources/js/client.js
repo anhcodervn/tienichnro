@@ -930,6 +930,95 @@ if (gamePickerModal) {
     window.addEventListener('pagehide', () => closeGamePicker({ restoreFocus: false }));
 }
 
+const gameServicePickerModal = document.querySelector('[data-game-service-picker-modal]');
+
+if (gameServicePickerModal) {
+    const panel = gameServicePickerModal.querySelector('[data-game-service-picker-panel]');
+    const backdrop = gameServicePickerModal.querySelector('[data-game-service-picker-backdrop]');
+    const triggers = [...document.querySelectorAll('[data-game-service-picker-open]')];
+    let returnFocus = null;
+
+    const focusableElements = () =>
+        [
+            ...gameServicePickerModal.querySelectorAll(
+                'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])',
+            ),
+        ].filter((element) => !element.hidden && element.tabIndex >= 0);
+
+    const setExpanded = (expanded) => {
+        triggers.forEach((trigger) => trigger.setAttribute('aria-expanded', String(expanded)));
+    };
+
+    const closePicker = ({ restoreFocus = true } = {}) => {
+        if (gameServicePickerModal.hidden) return;
+
+        gameServicePickerModal.hidden = true;
+        gameServicePickerModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('client-game-picker-open');
+        setExpanded(false);
+
+        if (restoreFocus && returnFocus?.isConnected) {
+            returnFocus.focus({ preventScroll: true });
+        }
+    };
+
+    const openPicker = (trigger) => {
+        const openedFromMobileMenu = trigger.closest('[data-mobile-menu]');
+        returnFocus = openedFromMobileMenu ? document.querySelector('[data-mobile-sidebar-toggle]') : trigger;
+        gameServicePickerModal.hidden = false;
+        gameServicePickerModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('client-game-picker-open');
+        setExpanded(true);
+
+        animateAndRelease(backdrop, [{ opacity: 0 }, { opacity: 1 }], { duration: 180 });
+        animateAndRelease(
+            panel,
+            [
+                { opacity: 0, transform: 'translateY(-47%) scale(0.97)' },
+                { opacity: 1, transform: 'translateY(-50%) scale(1)' },
+            ],
+            { duration: 220 },
+        );
+        window.requestAnimationFrame(() => focusableElements()[0]?.focus({ preventScroll: true }));
+    };
+
+    triggers.forEach((trigger) => {
+        trigger.addEventListener('click', () => openPicker(trigger));
+    });
+
+    gameServicePickerModal.querySelectorAll('[data-game-service-picker-close]').forEach((closeButton) => {
+        closeButton.addEventListener('click', () => closePicker());
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (gameServicePickerModal.hidden) return;
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closePicker();
+            return;
+        }
+
+        if (event.key !== 'Tab') return;
+
+        const focusable = focusableElements();
+        const first = focusable[0];
+        const last = focusable.at(-1);
+
+        if (!first || !last) return;
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
+
+    window.addEventListener('pagehide', () => closePicker({ restoreFocus: false }));
+}
+
 document.querySelectorAll('[data-account-menu]').forEach((accountMenu) => {
     const button = accountMenu.querySelector('[data-account-menu-toggle]');
     const panel = accountMenu.querySelector('[data-account-menu-panel]');
@@ -2535,3 +2624,37 @@ if (realtimeOrderContainers.length > 0) {
         });
     }
 }
+
+document.querySelectorAll('[data-game-service-order-form]').forEach((form) => {
+    const packageSelect = form.querySelector('[data-game-service-package-select]');
+    const quantityField = form.querySelector('[data-game-service-quantity-field]');
+    const quantityInput = form.querySelector('[data-game-service-quantity]');
+    const quantityHelp = form.querySelector('[data-game-service-quantity-help]');
+    const total = form.querySelector('[data-game-service-total]');
+    const currency = new Intl.NumberFormat('vi-VN');
+
+    const updateQuote = () => {
+        const option = packageSelect?.selectedOptions?.[0];
+        if (!option || !quantityInput) return;
+
+        const quantityEnabled = option.dataset.quantityEnabled === '1';
+        const minimum = Number(option.dataset.minQuantity || 1);
+        const maximum = Number(option.dataset.maxQuantity || 1);
+        const price = Number(option.dataset.price || 0);
+
+        quantityInput.min = String(minimum);
+        quantityInput.max = String(maximum);
+        quantityInput.readOnly = !quantityEnabled;
+        if (!quantityEnabled) quantityInput.value = '1';
+        if (Number(quantityInput.value) < minimum) quantityInput.value = String(minimum);
+        if (Number(quantityInput.value) > maximum) quantityInput.value = String(maximum);
+
+        if (quantityField) quantityField.hidden = !quantityEnabled;
+        if (quantityHelp) quantityHelp.textContent = quantityEnabled ? `Cho phép từ ${minimum} đến ${maximum}` : '';
+        if (total) total.textContent = `${currency.format(price * Math.max(Number(quantityInput.value) || minimum, minimum))}đ`;
+    };
+
+    packageSelect?.addEventListener('change', updateQuote);
+    quantityInput?.addEventListener('input', updateQuote);
+    updateQuote();
+});

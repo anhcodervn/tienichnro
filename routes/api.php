@@ -91,3 +91,7 @@ if (file_exists(base_path('app/Features/Client/Affiliate/routes.php'))) {
 if (file_exists(base_path('app/Features/Admin/AuditLog/routes.php'))) {
     require base_path('app/Features/Admin/AuditLog/routes.php');
 }
+
+if (file_exists(base_path('app/Features/Admin/GameService/routes.php'))) {
+    require base_path('app/Features/Admin/GameService/routes.php');
+}

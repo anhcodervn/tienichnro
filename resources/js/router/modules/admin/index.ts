@@ -91,6 +91,29 @@ export default {
             component: () => import('@/pages/admin/topup/orders/index.vue'),
         },
         {
+            path: 'game-services/games',
+            name: 'admin.game-services.games',
+            component: () => import('@/pages/admin/game-services/catalog/index.vue'),
+            props: { catalogType: 'games' },
+        },
+        {
+            path: 'game-services/services',
+            name: 'admin.game-services.services',
+            component: () => import('@/pages/admin/game-services/catalog/index.vue'),
+            props: { catalogType: 'services' },
+        },
+        {
+            path: 'game-services/packages',
+            name: 'admin.game-services.packages',
+            component: () => import('@/pages/admin/game-services/catalog/index.vue'),
+            props: { catalogType: 'packages' },
+        },
+        {
+            path: 'game-services/orders',
+            name: 'admin.game-services.orders',
+            component: () => import('@/pages/admin/game-services/orders/index.vue'),
+        },
+        {
             path: 'users',
             children: [
                 {

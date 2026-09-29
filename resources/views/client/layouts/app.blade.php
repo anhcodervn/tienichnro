@@ -18,9 +18,8 @@
             ? url($shareImage)
             : $shareImage;
         $shareImageAlt = trim($__env->yieldContent('image_alt'));
-        $gameServiceItems = is_array($settings['game_service_items'] ?? null) ? $settings['game_service_items'] : [];
         $footerGameLinks = is_array($settings['footer_game_links'] ?? null) ? $settings['footer_game_links'] : [];
-        $showGameServiceMenu = ($settings['game_service_enabled'] ?? false) === true && $gameServiceItems !== [];
+        $showGameServicePicker = ($gameServiceGames ?? collect())->isNotEmpty();
         $showAgencyWebsite = app(\App\Support\TenantContext::class)->isActive() && \App\Utils\Site::isMain();
         $explicitDocumentTitle = trim($__env->yieldContent('document_title'));
         $documentTitle = $explicitDocumentTitle !== ''
@@ -135,25 +134,8 @@
                 <button type="button" @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('topup.game'), 'hover:text-emerald-700' => ! request()->routeIs('topup.game')]) data-game-picker-open data-game-picker-trigger="desktop" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-game text-lg" aria-hidden="true"></i><span>Nạp game</span></button>
                 <a @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2', 'text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i><span>Nạp tiền</span></a>
                 <a @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2', 'text-emerald-700' => $orderHistoryActive, 'hover:text-emerald-700' => ! $orderHistoryActive]) href="{{ $orderHistoryUrl }}" @if ($orderHistoryActive) aria-current="page" @endif><i class="bx bx-history text-lg" aria-hidden="true"></i><span>Đơn hàng</span></a>
-                @if ($showGameServiceMenu)
-                    <details class="group relative shrink-0" data-desktop-nav-menu data-game-service-menu>
-                        <summary class="flex min-h-11 cursor-pointer list-none items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden">
-                            <i class="bx bx-game text-lg" aria-hidden="true"></i>
-                            <span>Dịch vụ game</span>
-                            <i class="bx bx-chevron-down text-base transition-transform group-open:rotate-180" aria-hidden="true"></i>
-                        </summary>
-                        <div class="absolute left-1/2 top-full z-50 mt-2 w-72 -translate-x-1/2 rounded-[10px] border border-slate-200 bg-white p-2 shadow-xl">
-                            <p class="px-3 pb-2 pt-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-400">Chọn dịch vụ</p>
-                            <div class="grid gap-1">
-                                @foreach ($gameServiceItems as $gameServiceItem)
-                                    <a class="flex items-center justify-between gap-3 rounded-[8px] px-3 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-emerald-50 hover:text-emerald-700" href="{{ $gameServiceItem['url'] }}" data-game-service-link>
-                                        <span>{{ $gameServiceItem['label'] }}</span>
-                                        <i class="bx bx-right-arrow-alt text-lg text-slate-400" aria-hidden="true"></i>
-                                    </a>
-                                @endforeach
-                            </div>
-                        </div>
-                    </details>
+                @if ($showGameServicePicker)
+                    <button type="button" @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('game-services.*'), 'hover:text-emerald-700' => ! request()->routeIs('game-services.*')]) data-game-service-picker-open data-game-service-picker-trigger="desktop" aria-controls="game-service-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-joystick text-lg" aria-hidden="true"></i><span>Dịch vụ game</span></button>
                 @endif
                 <details class="group relative shrink-0" data-desktop-nav-menu>
                     <summary @class(['flex min-h-11 cursor-pointer list-none items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden', 'text-emerald-700' => $exploreActive])>
@@ -335,22 +317,8 @@
                         <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.affiliate.spa'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.affiliate.spa')]) href="{{ route('client.affiliate.spa') }}" @if (request()->routeIs('client.affiliate.spa')) aria-current="page" @endif><i class="bx bx-group text-xl" aria-hidden="true"></i><span>Cộng tác viên</span></a>
                     @endif
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('seo.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('seo.*')]) href="{{ route('seo.index') }}" @if (request()->routeIs('seo.*')) aria-current="page" @endif><i class="bx bx-news text-xl" aria-hidden="true"></i><span>Bài viết</span></a>
-                    @if ($showGameServiceMenu)
-                        <details class="group rounded-[8px] border border-slate-200 bg-slate-50" data-game-service-menu>
-                            <summary class="flex cursor-pointer list-none items-center gap-3 rounded-[8px] px-4 py-3 text-sm font-semibold text-slate-700 transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden">
-                                <i class="bx bx-game text-xl" aria-hidden="true"></i>
-                                <span class="flex-1">Dịch vụ game</span>
-                                <i class="bx bx-chevron-down text-xl transition-transform group-open:rotate-180" aria-hidden="true"></i>
-                            </summary>
-                            <div class="grid gap-1 border-t border-slate-200 bg-white p-2">
-                                @foreach ($gameServiceItems as $gameServiceItem)
-                                    <a data-menu-item class="flex items-center gap-3 rounded-[6px] px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700" href="{{ $gameServiceItem['url'] }}" data-game-service-link>
-                                        <i class="bx bx-subdirectory-right text-lg text-slate-400" aria-hidden="true"></i>
-                                        <span>{{ $gameServiceItem['label'] }}</span>
-                                    </a>
-                                @endforeach
-                            </div>
-                        </details>
+                    @if ($showGameServicePicker)
+                        <button type="button" data-menu-item data-game-service-picker-open data-game-service-picker-trigger="mobile-menu" @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('game-services.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('game-services.*')]) aria-controls="game-service-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-joystick text-xl" aria-hidden="true"></i><span class="flex-1">Dịch vụ game</span><i class="bx bx-chevron-right ml-auto text-xl" aria-hidden="true"></i></button>
                     @endif
                 </div>
             </nav>
@@ -411,6 +379,7 @@
     </nav>
 
     <x-client.game-picker-modal :games="$navigationGames ?? collect()" />
+    <x-client.game-service-picker-modal :games="$gameServiceGames ?? collect()" />
 
     <main id="main-content" class="min-w-0 focus:outline-none" tabindex="-1" data-page-enter>
         @include('client.partials.flash')

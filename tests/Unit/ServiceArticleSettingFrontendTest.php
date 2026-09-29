@@ -28,11 +28,13 @@ test('settings expose repeatable service and footer editors with guarded client 
         ->toContain("getTab<ServiceArticlesSettingType>('service-articles')")
         ->toContain("updateTab<ServiceArticlesSettingType>('service-articles', payload)")
         ->and($clientLayout)
-        ->toContain('$showGameServiceMenu')
-        ->toContain('data-game-service-menu')
-        ->toContain('data-game-service-link')
+        ->toContain('$showGameServicePicker')
+        ->toContain('data-game-service-picker-open')
+        ->toContain('<x-client.game-service-picker-modal')
+        ->not->toContain('data-game-service-menu')
+        ->not->toContain('data-game-service-link')
         ->toContain('data-footer-game-links')
         ->toContain('data-footer-game-link')
         ->toContain("'lg:grid-cols-5' => \$footerGameLinks !== []")
-        ->toContain('@foreach ($gameServiceItems as $gameServiceItem)');
+        ->not->toContain('@foreach ($gameServiceItems as $gameServiceItem)');
 });

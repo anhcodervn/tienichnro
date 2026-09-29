@@ -8,6 +8,7 @@ use App\Models\User;
 use App\Support\CustomHeadTags;
 use App\Support\SafeNavigationUrl;
 use App\Support\SettingStore;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View as ViewFacade;
@@ -73,12 +74,26 @@ class SharedViewServiceProvider extends ServiceProvider
             $sharedSettings['game_service_items'] = $gameServiceItems;
             $viewSettings = $view->getData()['systemSettings'] ?? [];
             $navigationGames = $view->getData()['navigationGames'] ?? null;
+            $gameServiceGames = $view->getData()['gameServiceGames'] ?? null;
             $user = auth()->user();
 
             if ($navigationGames === null) {
                 $navigationGames = Schema::hasTable('games')
                     ? Game::query()
                         ->active()
+                        ->orderBy('sort_order')
+                        ->orderBy('id')
+                        ->get(['id', 'name', 'slug', 'short_name', 'image'])
+                    : collect();
+            }
+
+            if ($gameServiceGames === null) {
+                $gameServiceGames = Schema::hasTable('games') && Schema::hasTable('game_services')
+                    ? Game::query()
+                        ->active()
+                        ->where('game_services_enabled', true)
+                        ->whereHas('gameServices', fn (Builder $query) => $query->active())
+                        ->withCount(['gameServices as active_game_services_count' => fn (Builder $query) => $query->active()])
                         ->orderBy('sort_order')
                         ->orderBy('id')
                         ->get(['id', 'name', 'slug', 'short_name', 'image'])
@@ -109,6 +124,7 @@ class SharedViewServiceProvider extends ServiceProvider
                 'support_channels' => $supportChannels,
             ]);
             $view->with('navigationGames', $navigationGames);
+            $view->with('gameServiceGames', $gameServiceGames);
             $view->with('customCodeAssets', [
                 'css' => $storedSettings['custom_css_enabled'] === true && $storedSettings['custom_css'] !== '',
                 'js' => $storedSettings['custom_js_enabled'] === true && $storedSettings['custom_js'] !== '',

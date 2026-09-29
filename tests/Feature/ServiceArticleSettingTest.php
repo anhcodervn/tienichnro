@@ -34,7 +34,7 @@ test('game service navigation defaults to a hidden empty submenu', function (): 
         ->assertDontSee('data-footer-game-links', false);
 });
 
-test('admin can configure multiple links in the game service submenu', function (): void {
+test('admin can retain legacy game service links without rendering them in client navigation', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
 
     $this->actingAs($admin)
@@ -61,15 +61,9 @@ test('admin can configure multiple links in the game service submenu', function 
 
     $response = $this->get(route('home'))->assertOk();
 
-    expect(substr_count($response->getContent(), 'data-game-service-menu'))->toBe(2)
-        ->and(substr_count($response->getContent(), 'data-game-service-link'))->toBe(4);
-
     $response
-        ->assertSee('Dịch vụ game')
-        ->assertSee('Nạp Ngọc Rồng')
-        ->assertSee('href="/bai-viet/nap-ngoc-rong"', false)
-        ->assertSee('Nạp Avatar')
-        ->assertSee('href="https://dichvu.example.com/nap-avatar?source=nav"', false);
+        ->assertDontSee('href="/bai-viet/nap-ngoc-rong"', false)
+        ->assertDontSee('href="https://dichvu.example.com/nap-avatar?source=nav"', false);
 });
 
 test('game service submenu disappears when disabled but keeps its configured items', function (): void {
@@ -174,7 +168,7 @@ test('game service submenu validates every label and link', function (array $ite
     'ftp' => [['label' => 'Dịch vụ', 'url' => 'ftp://example.com/game'], 'game_service_items.0.url'],
 ]);
 
-test('client navigation filters unsafe service links written outside the admin endpoint', function (): void {
+test('client navigation ignores legacy service links written outside the admin endpoint', function (): void {
     app(SettingStore::class)->putMany([
         'game_service_enabled' => true,
         'game_service_items' => [
@@ -186,14 +180,12 @@ test('client navigation filters unsafe service links written outside the admin e
 
     $this->get(route('home'))
         ->assertOk()
-        ->assertSee('Liên kết an toàn')
-        ->assertSee('href="/dich-vu/an-toan"', false)
+        ->assertDontSee('href="/dich-vu/an-toan"', false)
         ->assertDontSee('javascript:alert(1)', false)
-        ->assertDontSee('<script>alert(2)</script>', false)
-        ->assertSee('&lt;script&gt;alert(2)&lt;/script&gt;', false);
+        ->assertDontSee('<script>alert(2)</script>', false);
 });
 
-test('client navigation keeps a safe legacy single service link working', function (): void {
+test('client navigation ignores a legacy single service link', function (): void {
     app(SettingStore::class)->putMany([
         'game_service_enabled' => true,
         'game_service_url' => '/dich-vu-cu',
@@ -201,9 +193,7 @@ test('client navigation keeps a safe legacy single service link working', functi
 
     $response = $this->get(route('home'))->assertOk();
 
-    expect(substr_count($response->getContent(), 'href="/dich-vu-cu"'))->toBe(2);
-
     $response
-        ->assertSee('Dịch vụ game')
-        ->assertSee('data-game-service-menu', false);
+        ->assertDontSee('href="/dich-vu-cu"', false)
+        ->assertDontSee('data-game-service-menu', false);
 });
