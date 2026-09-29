@@ -2626,7 +2626,7 @@ if (realtimeOrderContainers.length > 0) {
 }
 
 document.querySelectorAll('[data-game-service-order-form]').forEach((form) => {
-    const packageSelect = form.querySelector('[data-game-service-package-select]');
+    const packageOptions = Array.from(form.querySelectorAll('[data-game-service-package-option]'));
     const quantityField = form.querySelector('[data-game-service-quantity-field]');
     const quantityInput = form.querySelector('[data-game-service-quantity]');
     const quantityHelp = form.querySelector('[data-game-service-quantity-help]');
@@ -2634,7 +2634,7 @@ document.querySelectorAll('[data-game-service-order-form]').forEach((form) => {
     const currency = new Intl.NumberFormat('vi-VN');
 
     const updateQuote = () => {
-        const option = packageSelect?.selectedOptions?.[0];
+        const option = packageOptions.find((packageOption) => packageOption.checked);
         if (!option || !quantityInput) return;
 
         const quantityEnabled = option.dataset.quantityEnabled === '1';
@@ -2654,7 +2654,7 @@ document.querySelectorAll('[data-game-service-order-form]').forEach((form) => {
         if (total) total.textContent = `${currency.format(price * Math.max(Number(quantityInput.value) || minimum, minimum))}đ`;
     };
 
-    packageSelect?.addEventListener('change', updateQuote);
+    packageOptions.forEach((packageOption) => packageOption.addEventListener('change', updateQuote));
     quantityInput?.addEventListener('input', updateQuote);
     updateQuote();
 });

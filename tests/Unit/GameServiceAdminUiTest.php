@@ -1,8 +1,9 @@
 <?php
 
 test('admin game service menu exposes all management pages', function (): void {
-    $navigation = file_get_contents(resource_path('js/layouts/admin/sidebar/navigation.ts'));
-    $router = file_get_contents(resource_path('js/router/modules/admin/index.ts'));
+    $projectRoot = dirname(__DIR__, 2);
+    $navigation = file_get_contents($projectRoot.'/resources/js/layouts/admin/sidebar/navigation.ts');
+    $router = file_get_contents($projectRoot.'/resources/js/router/modules/admin/index.ts');
 
     expect($navigation)
         ->toContain("key: 'game-services'")
@@ -11,17 +12,20 @@ test('admin game service menu exposes all management pages', function (): void {
         ->toContain("{ label: 'Quản lý dịch vụ', href: '/admin/game-services/services' }")
         ->toContain("{ label: 'Gói dịch vụ', href: '/admin/game-services/packages' }")
         ->toContain("{ label: 'Quản lý đơn order', href: '/admin/game-services/orders' }")
+        ->toContain("{ label: 'Quản lý chat', href: '/admin/game-services/chats' }")
         ->and($router)
         ->toContain("name: 'admin.game-services.games'")
         ->toContain("name: 'admin.game-services.services'")
         ->toContain("name: 'admin.game-services.packages'")
-        ->toContain("name: 'admin.game-services.orders'");
+        ->toContain("name: 'admin.game-services.orders'")
+        ->toContain("name: 'admin.game-services.chats'");
 });
 
 test('admin game service pages connect catalog payload prices servers and orders', function (): void {
-    $catalog = file_get_contents(resource_path('js/pages/admin/game-services/catalog/index.vue'));
-    $orders = file_get_contents(resource_path('js/pages/admin/game-services/orders/index.vue'));
-    $service = file_get_contents(resource_path('js/services/admin-game-service.service.ts'));
+    $projectRoot = dirname(__DIR__, 2);
+    $catalog = file_get_contents($projectRoot.'/resources/js/pages/admin/game-services/catalog/index.vue');
+    $orders = file_get_contents($projectRoot.'/resources/js/pages/admin/game-services/orders/index.vue');
+    $service = file_get_contents($projectRoot.'/resources/js/services/admin-game-service.service.ts');
 
     expect($catalog)
         ->toContain('game_services_enabled')
@@ -73,6 +77,17 @@ test('admin game service pages connect catalog payload prices servers and orders
         ->toContain('selectedOrder.payload')
         ->toContain('saveOrder')
         ->toContain('admin_note')
+        ->toContain('Chi phí trả CTV')
+        ->toContain('Thuế dự kiến')
+        ->toContain('Lãi / lỗ ròng')
+        ->toContain('settlement.net_profit')
+        ->toContain('data-order-settlement-table')
+        ->toContain('order.collaborator_total_cost')
+        ->toContain('order.gross_profit')
+        ->toContain('order.estimated_tax')
+        ->toContain('order.net_profit')
+        ->toContain("order.net_profit < 0 ? 'text-rose-700' : 'text-emerald-700'")
+        ->not->toContain('text-violet-700')
         ->and($service)
         ->toContain("'/api/admin-api/game-service-games'")
         ->toContain("'/api/admin-api/game-services'")

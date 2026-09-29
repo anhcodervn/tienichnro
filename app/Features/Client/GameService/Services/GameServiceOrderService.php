@@ -2,6 +2,8 @@
 
 namespace App\Features\Client\GameService\Services;
 
+use App\Features\Topup\Services\OrderProfitCalculatorService;
+use App\Features\Topup\Services\TaxConfigurationService;
 use App\Models\Game;
 use App\Models\GameServer;
 use App\Models\GameService;
@@ -16,6 +18,11 @@ use Illuminate\Validation\ValidationException;
 
 class GameServiceOrderService
 {
+    public function __construct(
+        private readonly TaxConfigurationService $taxConfigurationService,
+        private readonly OrderProfitCalculatorService $orderProfitCalculator,
+    ) {}
+
     /** @param array<string, mixed> $payload */
     public function create(Game $game, GameService $service, array $payload, ?User $user): GameServiceOrder
     {
@@ -72,11 +79,27 @@ class GameServiceOrderService
 
             $payloadKeys = collect($lockedService->payload_fields ?? [])->pluck('key')->filter()->all();
             $recipientPayload = Arr::only(is_array($payload['payload'] ?? null) ? $payload['payload'] : [], $payloadKeys);
+            $note = trim((string) ($payload['note'] ?? ''));
+            if ($note !== '') {
+                $recipientPayload['note'] = $note;
+            }
             $email = Str::lower(trim((string) ($user?->email ?? $payload['email'] ?? '')));
 
             if ($email === '') {
                 throw ValidationException::withMessages(['email' => 'Vui lòng nhập email để nhận thông tin đơn.']);
             }
+
+            $totalAmount = $price->price * $quantity;
+            $collaboratorTotalCost = $price->collaborator_price * $quantity;
+            $taxConfiguration = $this->taxConfigurationService->current();
+            $profit = $this->orderProfitCalculator->calculate(
+                costPrice: $collaboratorTotalCost,
+                salePrice: $totalAmount,
+                vatRate: $taxConfiguration['vat_rate'],
+                pitRate: $taxConfiguration['pit_rate'],
+                taxEnabled: $taxConfiguration['enabled'],
+                calculationType: $taxConfiguration['calculation_type'],
+            );
 
             return GameServiceOrder::query()->create([
                 'user_id' => $user?->id,
@@ -94,7 +117,19 @@ class GameServiceOrderService
                 'payload' => $recipientPayload,
                 'quantity' => $quantity,
                 'unit_price' => $price->price,
-                'total_amount' => $price->price * $quantity,
+                'total_amount' => $totalAmount,
+                'collaborator_unit_cost' => $price->collaborator_price,
+                'collaborator_total_cost' => $collaboratorTotalCost,
+                'gross_profit' => $profit['gross_profit'],
+                'tax_enabled' => $taxConfiguration['enabled'],
+                'tax_calculation_type' => $taxConfiguration['calculation_type']->value,
+                'vat_rate' => $taxConfiguration['vat_rate'],
+                'pit_rate' => $taxConfiguration['pit_rate'],
+                'estimated_vat' => $profit['estimated_vat'],
+                'estimated_pit' => $profit['estimated_pit'],
+                'estimated_tax' => $profit['estimated_tax'],
+                'net_profit' => $profit['net_profit'],
+                'profit_margin' => $profit['profit_margin'],
                 'status' => 'pending',
             ]);
         }, 3);

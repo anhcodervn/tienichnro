@@ -114,6 +114,11 @@ export default {
             component: () => import('@/pages/admin/game-services/orders/index.vue'),
         },
         {
+            path: 'game-services/chats',
+            name: 'admin.game-services.chats',
+            component: () => import('@/pages/admin/game-services/chats/index.vue'),
+        },
+        {
             path: 'users',
             children: [
                 {

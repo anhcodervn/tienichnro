@@ -27,6 +27,7 @@ class StoreGameServiceOrderRequest extends FormRequest
             'quantity' => ['required', 'integer', 'min:1', 'max:1000000'],
             'email' => [Rule::excludeIf($this->user() !== null), Rule::requiredIf($this->user() === null), 'email:rfc', 'max:255'],
             'payload' => ['required', 'array:'.implode(',', $keys)],
+            'note' => ['nullable', 'string', 'max:1000'],
         ];
 
         foreach ($fields as $field) {
@@ -118,6 +119,7 @@ class StoreGameServiceOrderRequest extends FormRequest
             'server_id' => 'máy chủ',
             'quantity' => 'số lượng',
             'email' => 'email',
+            'note' => 'ghi chú',
         ];
         $service = $this->route('gameService');
 

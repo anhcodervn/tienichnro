@@ -2,6 +2,7 @@
 
 namespace App\Features\Admin\GameService\Services;
 
+use App\Features\Affiliate\Services\AffiliateWalletService;
 use App\Models\AdminAuditLog;
 use App\Models\Game;
 use App\Models\GameService;
@@ -19,6 +20,8 @@ use Illuminate\Validation\ValidationException;
 
 class GameServiceAdminService
 {
+    public function __construct(private readonly AffiliateWalletService $affiliateWalletService) {}
+
     /** @param array<string, mixed> $filters */
     public function games(array $filters): LengthAwarePaginator
     {
@@ -173,6 +176,48 @@ class GameServiceAdminService
     /** @param array<string, mixed> $filters */
     public function orders(array $filters): LengthAwarePaginator
     {
+        return $this->orderQuery($filters)
+            ->with('collaborator:id,username,full_name')
+            ->latest()
+            ->paginate($this->perPage($filters));
+    }
+
+    /**
+     * @param  array<string, mixed>  $filters
+     * @return array<string, int>
+     */
+    public function orderSettlement(array $filters): array
+    {
+        $summary = $this->orderQuery($filters)
+            ->where('status', 'completed')
+            ->toBase()
+            ->selectRaw('COUNT(*) as approved_orders')
+            ->selectRaw('COUNT(CASE WHEN collaborator_total_cost IS NOT NULL AND net_profit IS NOT NULL THEN 1 END) as settled_orders')
+            ->selectRaw('COALESCE(SUM(CASE WHEN collaborator_total_cost IS NOT NULL AND net_profit IS NOT NULL THEN total_amount ELSE 0 END), 0) as revenue')
+            ->selectRaw('COALESCE(SUM(collaborator_total_cost), 0) as collaborator_cost')
+            ->selectRaw('COALESCE(SUM(gross_profit), 0) as gross_profit')
+            ->selectRaw('COALESCE(SUM(estimated_tax), 0) as estimated_tax')
+            ->selectRaw('COALESCE(SUM(net_profit), 0) as net_profit')
+            ->selectRaw('COUNT(CASE WHEN net_profit < 0 THEN 1 END) as loss_orders')
+            ->selectRaw('COUNT(CASE WHEN collaborator_total_cost IS NULL OR net_profit IS NULL THEN 1 END) as legacy_orders')
+            ->first();
+
+        return [
+            'approved_orders' => (int) ($summary?->approved_orders ?? 0),
+            'settled_orders' => (int) ($summary?->settled_orders ?? 0),
+            'revenue' => (int) ($summary?->revenue ?? 0),
+            'collaborator_cost' => (int) ($summary?->collaborator_cost ?? 0),
+            'gross_profit' => (int) ($summary?->gross_profit ?? 0),
+            'estimated_tax' => (int) ($summary?->estimated_tax ?? 0),
+            'net_profit' => (int) ($summary?->net_profit ?? 0),
+            'loss_orders' => (int) ($summary?->loss_orders ?? 0),
+            'legacy_orders' => (int) ($summary?->legacy_orders ?? 0),
+        ];
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function orderQuery(array $filters): Builder
+    {
         $search = trim((string) ($filters['search'] ?? ''));
 
         return GameServiceOrder::query()
@@ -183,9 +228,7 @@ class GameServiceAdminService
                 ->orWhere('package_name', 'like', "%{$search}%")))
             ->when(filled($filters['game_id'] ?? null), fn (Builder $query) => $query->where('game_id', $filters['game_id']))
             ->when(filled($filters['game_service_id'] ?? null), fn (Builder $query) => $query->where('game_service_id', $filters['game_service_id']))
-            ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
-            ->latest()
-            ->paginate($this->perPage($filters));
+            ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']));
     }
 
     /** @param array<string, mixed> $payload */
@@ -193,12 +236,24 @@ class GameServiceAdminService
     {
         return DB::transaction(function () use ($order, $payload, $admin, $request): GameServiceOrder {
             $locked = GameServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
-            $old = Arr::only($locked->getAttributes(), ['status', 'admin_note', 'processing_at', 'completed_at']);
+            $old = Arr::only($locked->getAttributes(), ['status', 'collaborator_id', 'admin_note', 'processing_at', 'completed_at']);
             $status = (string) $payload['status'];
+
+            if ($locked->collaborator_settled_at !== null
+                && array_key_exists('collaborator_id', $payload)
+                && (int) $payload['collaborator_id'] !== (int) $locked->collaborator_id) {
+                throw ValidationException::withMessages(['collaborator_id' => 'Không thể đổi CTV sau khi đơn đã được kết toán.']);
+            }
 
             $payload['processing_at'] = $status === 'processing' ? ($locked->processing_at ?? now()) : $locked->processing_at;
             $payload['completed_at'] = $status === 'completed' ? ($locked->completed_at ?? now()) : null;
             $locked->fill($payload)->save();
+
+            if ($status === 'completed') {
+                $this->affiliateWalletService->settleGameServiceOrder($locked);
+            } elseif ($locked->collaborator_settled_at !== null) {
+                $this->affiliateWalletService->reverseGameServiceOrderSettlement($locked);
+            }
             $this->audit($admin, 'game_service_order_updated', $locked, $old, Arr::only($locked->fresh()->getAttributes(), array_keys($old)), $request);
 
             return $locked->refresh();

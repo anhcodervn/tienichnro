@@ -7,6 +7,7 @@ use Database\Factories\AffiliateAnnouncementFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AffiliateAnnouncement extends Model
 {
@@ -27,5 +28,10 @@ class AffiliateAnnouncement extends Model
     public function admin(): BelongsTo
     {
         return $this->belongsTo(User::class, 'admin_id');
+    }
+
+    public function reads(): HasMany
+    {
+        return $this->hasMany(AffiliateAnnouncementRead::class);
     }
 }

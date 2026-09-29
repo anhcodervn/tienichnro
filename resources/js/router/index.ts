@@ -22,6 +22,7 @@ const routeTitles: Record<string, string> = {
     'admin.game-services.services': 'Quản lý dịch vụ game',
     'admin.game-services.packages': 'Gói dịch vụ game',
     'admin.game-services.orders': 'Đơn dịch vụ game',
+    'admin.game-services.chats': 'Chat đơn dịch vụ game',
     'admin.users.index': 'Quản lý người dùng',
     'admin.users.discounts': 'Quản lý user chiết khấu',
     'admin.users.show': 'Chi tiết người dùng',
@@ -49,9 +50,13 @@ const routeTitles: Record<string, string> = {
     'admin.recharge.config': 'Cấu hình nạp tiền',
     'admin.recharge.history': 'Lịch sử nạp tiền',
     'admin.error.404': 'Trang quản trị không tồn tại',
-    'affiliate.home': 'Trang chủ cộng tác viên',
+    'affiliate.collaborator.dashboard': 'Dashboard cộng tác viên',
+    'affiliate.notifications': 'Thông báo cộng tác viên',
+    'affiliate.revenue': 'Doanh thu cộng tác viên',
+    'affiliate.withdrawal': 'Rút tiền cộng tác viên',
     'affiliate.dashboard': 'Tổng quan hoa hồng',
     'affiliate.rates': 'Bảng giá chiết khấu',
+    'affiliate.game-service-orders': 'Đơn dịch vụ được giao',
 };
 
 const router = createRouter({

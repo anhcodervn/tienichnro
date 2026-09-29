@@ -1,15 +1,32 @@
 <script setup lang="ts">
-import { adminGameServiceService, type GameServiceOrder, type GameServiceOrderStatus } from '@/services/admin-game-service.service';
+import {
+    adminGameServiceService,
+    type GameServiceOrder,
+    type GameServiceOrderSettlement,
+    type GameServiceOrderStatus,
+} from '@/services/admin-game-service.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { ClipboardList, Eye, LoaderCircle, Save, Search, X } from 'lucide-vue-next';
+import { Banknote, ClipboardList, Eye, HandCoins, LoaderCircle, ReceiptText, Save, Scale, Search, WalletCards, X } from 'lucide-vue-next';
 import { onMounted, reactive, ref } from 'vue';
 
 const orders = ref<GameServiceOrder[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const selectedOrder = ref<GameServiceOrder | null>(null);
+const collaborators = ref<Array<{ id: number; name: string }>>([]);
+const settlement = ref<GameServiceOrderSettlement>({
+    approved_orders: 0,
+    settled_orders: 0,
+    revenue: 0,
+    collaborator_cost: 0,
+    gross_profit: 0,
+    estimated_tax: 0,
+    net_profit: 0,
+    loss_orders: 0,
+    legacy_orders: 0,
+});
 const filters = reactive({ search: '', status: '' });
-const editForm = reactive({ status: 'pending' as GameServiceOrderStatus, admin_note: '' });
+const editForm = reactive({ status: 'pending' as GameServiceOrderStatus, collaborator_id: null as number | null, admin_note: '' });
 const inputClass =
     'min-h-11 w-full rounded-md border-2 border-slate-300 bg-slate-50 px-3 py-2 text-sm text-slate-950 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-4 focus:ring-indigo-100';
 const money = (value: number): string => `${new Intl.NumberFormat('vi-VN').format(value)}đ`;
@@ -18,6 +35,7 @@ const dateTime = (value: string | null): string =>
 const statusLabels: Record<GameServiceOrderStatus, string> = {
     pending: 'Chờ xử lý',
     processing: 'Đang xử lý',
+    review: 'Chờ admin duyệt',
     completed: 'Hoàn thành',
     failed: 'Thất bại',
     cancelled: 'Đã hủy',
@@ -25,6 +43,7 @@ const statusLabels: Record<GameServiceOrderStatus, string> = {
 const statusClasses: Record<GameServiceOrderStatus, string> = {
     pending: 'bg-amber-100 text-amber-700',
     processing: 'bg-sky-100 text-sky-700',
+    review: 'bg-violet-100 text-violet-700',
     completed: 'bg-emerald-100 text-emerald-700',
     failed: 'bg-rose-100 text-rose-700',
     cancelled: 'bg-slate-100 text-slate-600',
@@ -39,6 +58,10 @@ const load = async (): Promise<void> => {
             per_page: 100,
         });
         orders.value = response.data.data.data;
+        settlement.value = response.data.data.summary;
+        if (collaborators.value.length === 0) {
+            collaborators.value = (await adminGameServiceService.chatCollaborators()).data.data;
+        }
     } catch (error) {
         handleErrorResponse(error);
     } finally {
@@ -49,6 +72,7 @@ const load = async (): Promise<void> => {
 const openOrder = (order: GameServiceOrder): void => {
     selectedOrder.value = order;
     editForm.status = order.status;
+    editForm.collaborator_id = order.collaborator_id;
     editForm.admin_note = order.admin_note ?? '';
 };
 
@@ -58,6 +82,7 @@ const saveOrder = async (): Promise<void> => {
     try {
         const response = await adminGameServiceService.updateOrder(selectedOrder.value.code, {
             status: editForm.status,
+            collaborator_id: editForm.collaborator_id,
             admin_note: editForm.admin_note || null,
         });
         selectedOrder.value = response.data.data;
@@ -101,18 +126,69 @@ onMounted(load);
             </form>
         </header>
 
+        <section class="grid gap-3 sm:grid-cols-2 xl:grid-cols-5" aria-label="Kết toán các đơn dịch vụ đã duyệt">
+            <article class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                <div class="flex items-center justify-between gap-3 text-emerald-700">
+                    <span class="text-xs font-black uppercase tracking-wide">Doanh thu</span><Banknote class="size-5" />
+                </div>
+                <p class="mt-2 text-xl font-black text-emerald-800">{{ money(settlement.revenue) }}</p>
+                <p class="mt-1 text-xs text-emerald-700">{{ settlement.settled_orders }}/{{ settlement.approved_orders }} đơn đã duyệt có snapshot</p>
+            </article>
+            <article class="rounded-lg border border-sky-200 bg-sky-50 p-4">
+                <div class="flex items-center justify-between gap-3 text-sky-700">
+                    <span class="text-xs font-black uppercase tracking-wide">Chi phí trả CTV</span><HandCoins class="size-5" />
+                </div>
+                <p class="mt-2 text-xl font-black text-sky-800">{{ money(settlement.collaborator_cost) }}</p>
+                <p class="mt-1 text-xs text-sky-700">Theo giá CTV đã snapshot</p>
+            </article>
+            <article class="rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+                <div class="flex items-center justify-between gap-3 text-indigo-700">
+                    <span class="text-xs font-black uppercase tracking-wide">Sau trả CTV</span><WalletCards class="size-5" />
+                </div>
+                <p class="mt-2 text-xl font-black text-indigo-800">{{ money(settlement.gross_profit) }}</p>
+                <p class="mt-1 text-xs text-indigo-700">Doanh thu trừ chi phí CTV</p>
+            </article>
+            <article class="rounded-lg border border-amber-200 bg-amber-50 p-4">
+                <div class="flex items-center justify-between gap-3 text-amber-700">
+                    <span class="text-xs font-black uppercase tracking-wide">Thuế dự kiến</span><ReceiptText class="size-5" />
+                </div>
+                <p class="mt-2 text-xl font-black text-amber-800">{{ money(settlement.estimated_tax) }}</p>
+                <p class="mt-1 text-xs text-amber-700">VAT và thuế TNCN</p>
+            </article>
+            <article
+                class="rounded-lg border p-4"
+                :class="settlement.net_profit < 0 ? 'border-rose-200 bg-rose-50' : 'border-emerald-200 bg-emerald-50'"
+            >
+                <div class="flex items-center justify-between gap-3" :class="settlement.net_profit < 0 ? 'text-rose-700' : 'text-emerald-700'">
+                    <span class="text-xs font-black uppercase tracking-wide">Lãi / lỗ ròng</span><Scale class="size-5" />
+                </div>
+                <p class="mt-2 text-xl font-black" :class="settlement.net_profit < 0 ? 'text-rose-800' : 'text-emerald-800'">
+                    {{ money(settlement.net_profit) }}
+                </p>
+                <p class="mt-1 text-xs" :class="settlement.net_profit < 0 ? 'text-rose-700' : 'text-emerald-700'">
+                    {{ settlement.loss_orders }} đơn lỗ<span v-if="settlement.legacy_orders">
+                        · {{ settlement.legacy_orders }} đơn cũ thiếu snapshot</span
+                    >
+                </p>
+            </article>
+        </section>
+
         <div v-if="loading" class="grid min-h-64 place-items-center rounded-lg border border-slate-200 bg-white">
             <LoaderCircle class="size-8 animate-spin text-slate-400" />
         </div>
         <section v-else class="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div class="overflow-x-auto">
-                <table class="min-w-full text-left text-sm">
+                <table class="min-w-[1320px] text-left text-sm" data-order-settlement-table>
                     <thead class="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                         <tr>
                             <th class="px-4 py-3">Đơn</th>
                             <th class="px-4 py-3">Game / dịch vụ</th>
                             <th class="px-4 py-3">Gói / giá</th>
-                            <th class="px-4 py-3">Tổng tiền</th>
+                            <th class="px-4 py-3 text-right">Doanh thu</th>
+                            <th class="px-4 py-3 text-right">Trả CTV</th>
+                            <th class="px-4 py-3 text-right">Sau CTV</th>
+                            <th class="px-4 py-3 text-right">Thuế</th>
+                            <th class="px-4 py-3 text-right">Lãi / lỗ</th>
                             <th class="px-4 py-3">Trạng thái</th>
                             <th class="px-4 py-3 text-right">Chi tiết</th>
                         </tr>
@@ -131,7 +207,22 @@ onMounted(load);
                                 <strong>{{ order.package_name }}</strong>
                                 <p class="text-xs text-slate-500">{{ order.price_label }} · SL {{ order.quantity }}</p>
                             </td>
-                            <td class="px-4 py-4 font-black text-emerald-700">{{ money(order.total_amount) }}</td>
+                            <td class="whitespace-nowrap px-4 py-4 text-right font-black text-emerald-700">{{ money(order.total_amount) }}</td>
+                            <td class="whitespace-nowrap px-4 py-4 text-right font-bold text-sky-700">
+                                {{ order.collaborator_total_cost !== null ? money(order.collaborator_total_cost) : '—' }}
+                            </td>
+                            <td class="whitespace-nowrap px-4 py-4 text-right font-bold text-indigo-700">
+                                {{ order.gross_profit !== null ? money(order.gross_profit) : '—' }}
+                            </td>
+                            <td class="whitespace-nowrap px-4 py-4 text-right font-bold text-amber-700">
+                                {{ order.estimated_tax !== null ? money(order.estimated_tax) : '—' }}
+                            </td>
+                            <td
+                                class="whitespace-nowrap px-4 py-4 text-right font-black"
+                                :class="order.net_profit === null ? 'text-slate-400' : order.net_profit < 0 ? 'text-rose-700' : 'text-emerald-700'"
+                            >
+                                {{ order.net_profit !== null ? money(order.net_profit) : '—' }}
+                            </td>
                             <td class="px-4 py-4">
                                 <span class="rounded-full px-2.5 py-1 text-xs font-bold" :class="statusClasses[order.status]">{{
                                     statusLabels[order.status]
@@ -144,7 +235,7 @@ onMounted(load);
                             </td>
                         </tr>
                         <tr v-if="orders.length === 0">
-                            <td colspan="6" class="px-4 py-12 text-center text-slate-500">Chưa có đơn dịch vụ phù hợp.</td>
+                            <td colspan="10" class="px-4 py-12 text-center text-slate-500">Chưa có đơn dịch vụ phù hợp.</td>
                         </tr>
                     </tbody>
                 </table>
@@ -184,6 +275,27 @@ onMounted(load);
                                 <dt class="font-bold">Tổng tiền</dt>
                                 <dd class="text-lg font-black text-emerald-700">{{ money(selectedOrder.total_amount) }}</dd>
                             </div>
+                            <template v-if="selectedOrder.collaborator_total_cost !== null && selectedOrder.net_profit !== null">
+                                <div class="flex justify-between gap-3">
+                                    <dt class="text-slate-500">Chi phí trả CTV</dt>
+                                    <dd class="font-bold text-sky-700">{{ money(selectedOrder.collaborator_total_cost) }}</dd>
+                                </div>
+                                <div class="flex justify-between gap-3">
+                                    <dt class="text-slate-500">Sau trả CTV</dt>
+                                    <dd class="font-bold text-indigo-700">{{ money(selectedOrder.gross_profit ?? 0) }}</dd>
+                                </div>
+                                <div class="flex justify-between gap-3">
+                                    <dt class="text-slate-500">Thuế dự kiến</dt>
+                                    <dd class="font-bold text-amber-700">{{ money(selectedOrder.estimated_tax ?? 0) }}</dd>
+                                </div>
+                                <div class="flex justify-between gap-3 border-t border-slate-200 pt-2">
+                                    <dt class="font-bold">Lãi / lỗ ròng</dt>
+                                    <dd class="font-black" :class="selectedOrder.net_profit < 0 ? 'text-rose-700' : 'text-emerald-700'">
+                                        {{ money(selectedOrder.net_profit) }}
+                                    </dd>
+                                </div>
+                            </template>
+                            <p v-else class="border-t border-slate-200 pt-2 text-xs text-slate-500">Đơn cũ chưa có snapshot kết toán.</p>
                         </dl>
                         <div>
                             <h3 class="mb-2 text-sm font-black">Payload khách gửi</h3>
@@ -196,6 +308,14 @@ onMounted(load);
                         </div>
                     </div>
                     <form class="grid content-start gap-4" @submit.prevent="saveOrder">
+                        <label class="grid gap-1 text-sm font-bold"
+                            >CTV nhận đơn<select v-model="editForm.collaborator_id" :class="inputClass">
+                                <option :value="null">Chưa giao CTV</option>
+                                <option v-for="collaborator in collaborators" :key="collaborator.id" :value="collaborator.id">
+                                    {{ collaborator.name }}
+                                </option>
+                            </select></label
+                        >
                         <label class="grid gap-1 text-sm font-bold"
                             >Trạng thái<select v-model="editForm.status" :class="inputClass">
                                 <option v-for="(label, status) in statusLabels" :key="status" :value="status">{{ label }}</option>

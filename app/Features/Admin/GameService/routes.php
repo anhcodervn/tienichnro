@@ -2,6 +2,7 @@
 
 use App\Features\Admin\GameService\Controllers\GameServiceController;
 use App\Features\Admin\GameService\Controllers\GameServiceGameController;
+use App\Features\Admin\GameService\Controllers\GameServiceOrderChatController;
 use App\Features\Admin\GameService\Controllers\GameServiceOrderController;
 use App\Features\Admin\GameService\Controllers\GameServicePackageController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,11 @@ Route::middleware(['auth:sanctum', 'admin', 'platform.admin'])
         Route::patch('game-service-games/{game}', [GameServiceGameController::class, 'update'])->name('games.update');
         Route::apiResource('game-services', GameServiceController::class)->parameters(['game-services' => 'gameService']);
         Route::apiResource('game-service-packages', GameServicePackageController::class)->parameters(['game-service-packages' => 'gameServicePackage']);
+        Route::get('game-service-order-chats/collaborators', [GameServiceOrderChatController::class, 'collaborators'])->name('chats.collaborators');
+        Route::get('game-service-order-chats', [GameServiceOrderChatController::class, 'index'])->name('chats.index');
+        Route::get('game-service-order-chats/{gameServiceOrder}', [GameServiceOrderChatController::class, 'show'])->name('chats.show');
+        Route::post('game-service-order-chats/{gameServiceOrder}/messages', [GameServiceOrderChatController::class, 'store'])
+            ->middleware('throttle:30,1')->name('chats.messages.store');
         Route::apiResource('game-service-orders', GameServiceOrderController::class)
             ->only(['index', 'show', 'update'])
             ->parameters(['game-service-orders' => 'gameServiceOrder']);

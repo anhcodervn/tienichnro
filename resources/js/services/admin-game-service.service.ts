@@ -84,7 +84,19 @@ export interface GameServicePackage {
     orders_count: number;
 }
 
-export type GameServiceOrderStatus = 'pending' | 'processing' | 'completed' | 'failed' | 'cancelled';
+export type GameServiceOrderStatus = 'pending' | 'processing' | 'review' | 'completed' | 'failed' | 'cancelled';
+
+export interface GameServiceOrderSettlement {
+    approved_orders: number;
+    settled_orders: number;
+    revenue: number;
+    collaborator_cost: number;
+    gross_profit: number;
+    estimated_tax: number;
+    net_profit: number;
+    loss_orders: number;
+    legacy_orders: number;
+}
 
 export interface GameServiceOrder {
     id: number;
@@ -101,7 +113,21 @@ export interface GameServiceOrder {
     quantity: number;
     unit_price: number;
     total_amount: number;
+    collaborator_unit_cost: number | null;
+    collaborator_total_cost: number | null;
+    gross_profit: number | null;
+    tax_enabled: boolean | null;
+    tax_calculation_type: 'revenue' | null;
+    vat_rate: number | null;
+    pit_rate: number | null;
+    estimated_vat: number | null;
+    estimated_pit: number | null;
+    estimated_tax: number | null;
+    net_profit: number | null;
+    profit_margin: number | null;
     status: GameServiceOrderStatus;
+    collaborator_id: number | null;
+    collaborator: { id: number; name: string } | null;
     admin_note: string | null;
     processing_at: string | null;
     completed_at: string | null;
@@ -123,4 +149,8 @@ export const adminGameServiceService = {
     orders: (params: Record<string, unknown> = {}) => api.get('/api/admin-api/game-service-orders', { params }),
     order: (code: string) => api.get(`/api/admin-api/game-service-orders/${code}`),
     updateOrder: (code: string, payload: Record<string, unknown>) => api.patch(`/api/admin-api/game-service-orders/${code}`, payload),
+    chatCollaborators: () => api.get('/api/admin-api/game-service-order-chats/collaborators'),
+    chatThreads: (params: Record<string, unknown> = {}) => api.get('/api/admin-api/game-service-order-chats', { params }),
+    chatThread: (code: string) => api.get(`/api/admin-api/game-service-order-chats/${code}`),
+    sendChatMessage: (code: string, message: string) => api.post(`/api/admin-api/game-service-order-chats/${code}/messages`, { message }),
 };

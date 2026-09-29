@@ -8,6 +8,7 @@ use App\Models\AffiliateConversion;
 use App\Models\AffiliateProfile;
 use App\Models\AffiliateProgram;
 use App\Models\AffiliateWithdrawal;
+use App\Models\GameServiceOrder;
 use App\Models\Scopes\TenantScope;
 use App\Models\User;
 use App\Models\Wallet;
@@ -33,6 +34,53 @@ class AffiliateWalletService
         $this->record($wallet, 'credit', $commission->amount, $before, $after, $commission, 'Hoa hồng đơn '.$commission->order_id);
 
         return $wallet;
+    }
+
+    public function settleGameServiceOrder(GameServiceOrder $order): ?WalletTransaction
+    {
+        if ($order->collaborator_id === null || $order->collaborator_total_cost === null || $order->collaborator_settled_at !== null) {
+            return null;
+        }
+
+        $collaborator = User::query()->withoutGlobalScope(TenantScope::class)->findOrFail($order->collaborator_id);
+        $wallet = $this->lockedWallet($collaborator, Wallet::TYPE_AFFILIATE, (int) $collaborator->tenant_id);
+        $amount = (int) $order->collaborator_total_cost;
+        $before = (int) $wallet->balance;
+        $wallet->forceFill(['balance' => $before + $amount])->save();
+        $transaction = $this->record($wallet, 'credit', $amount, $before, $before + $amount, $order, 'Kết toán đơn dịch vụ '.$order->code);
+        $order->forceFill([
+            'collaborator_settlement_amount' => $amount,
+            'collaborator_wallet_transaction_id' => $transaction->id,
+            'collaborator_settled_at' => now(),
+        ])->save();
+
+        return $transaction;
+    }
+
+    public function reverseGameServiceOrderSettlement(GameServiceOrder $order): ?WalletTransaction
+    {
+        if ($order->collaborator_id === null || $order->collaborator_settled_at === null) {
+            return null;
+        }
+
+        $collaborator = User::query()->withoutGlobalScope(TenantScope::class)->findOrFail($order->collaborator_id);
+        $wallet = $this->lockedWallet($collaborator, Wallet::TYPE_AFFILIATE, (int) $collaborator->tenant_id);
+        $amount = (int) $order->collaborator_settlement_amount;
+        $before = (int) $wallet->balance;
+
+        if ($before < $amount) {
+            throw new ApiException('Không thể thu hồi kết toán vì số dư khả dụng của CTV không đủ.', 422);
+        }
+
+        $wallet->forceFill(['balance' => $before - $amount])->save();
+        $transaction = $this->record($wallet, 'debit', $amount, $before, $before - $amount, $order, 'Thu hồi kết toán đơn dịch vụ '.$order->code);
+        $order->forceFill([
+            'collaborator_settlement_amount' => null,
+            'collaborator_wallet_transaction_id' => null,
+            'collaborator_settled_at' => null,
+        ])->save();
+
+        return $transaction;
     }
 
     public function reverseCommission(AffiliateCommission $commission): Wallet

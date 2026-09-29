@@ -18,7 +18,9 @@ class GameServiceOrderController extends Controller
 
     public function index(ListGameServiceOrderRequest $request): JsonResponse
     {
-        $orders = GameServiceOrderResource::collection($this->service->orders($request->validated()))->response()->getData(true);
+        $filters = $request->validated();
+        $orders = GameServiceOrderResource::collection($this->service->orders($filters))->response()->getData(true);
+        $orders['summary'] = $this->service->orderSettlement($filters);
 
         return response()->json(['status' => true, 'data' => $orders]);
     }

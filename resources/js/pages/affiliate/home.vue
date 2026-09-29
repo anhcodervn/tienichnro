@@ -2,11 +2,12 @@
 import { clientAffiliateService, type ClientAffiliateHomeData } from '@/services/client-affiliate.service';
 import { handleErrorResponse } from '@/utils/response';
 import { sanitizeRichText } from '@/utils/rich-text';
-import { ArrowRight, BellRing, HandCoins, LoaderCircle, Pin } from 'lucide-vue-next';
+import { ArrowRight, BellRing, Eye, HandCoins, LoaderCircle, Pin } from 'lucide-vue-next';
 import { onMounted, ref } from 'vue';
 
 const data = ref<ClientAffiliateHomeData | null>(null);
 const loading = ref(true);
+const expandedAnnouncements = ref(new Set<number>());
 const dateTime = (value: string | null): string => (value ? new Date(value).toLocaleString('vi-VN') : '—');
 
 const load = async (): Promise<void> => {
@@ -17,6 +18,20 @@ const load = async (): Promise<void> => {
         handleErrorResponse(error);
     } finally {
         loading.value = false;
+    }
+};
+
+const viewAnnouncement = async (id: number, isRead: boolean): Promise<void> => {
+    expandedAnnouncements.value.add(id);
+    if (isRead || !data.value) return;
+
+    try {
+        data.value.unread_count = await clientAffiliateService.readAnnouncement(id);
+        const announcement = data.value.announcements.find((item) => item.id === id);
+        if (announcement) announcement.is_read = true;
+        window.dispatchEvent(new Event('collaborator:refresh'));
+    } catch (error) {
+        handleErrorResponse(error);
     }
 };
 
@@ -37,10 +52,10 @@ onMounted(load);
                     </p>
                 </div>
                 <RouterLink
-                    to="/cong-tac-vien/tong-quan"
+                    to="/cong-tac-vien"
                     class="inline-flex min-h-12 w-fit items-center justify-center gap-2 rounded-xl bg-white px-5 font-bold text-emerald-800 shadow-sm transition hover:bg-emerald-50"
                 >
-                    Xem tổng quan hoa hồng <ArrowRight class="size-5" />
+                    Xem dashboard <ArrowRight class="size-5" />
                 </RouterLink>
             </div>
         </section>
@@ -62,7 +77,13 @@ onMounted(load);
                 v-for="announcement in data?.announcements"
                 :key="announcement.id"
                 class="grid gap-3 rounded-2xl border bg-white p-5 shadow-sm sm:p-6"
-                :class="announcement.is_pinned ? 'border-amber-300 ring-1 ring-amber-100' : 'border-slate-200'"
+                :class="
+                    !announcement.is_read
+                        ? 'border-rose-200 ring-1 ring-rose-100'
+                        : announcement.is_pinned
+                          ? 'border-amber-300 ring-1 ring-amber-100'
+                          : 'border-slate-200'
+                "
             >
                 <header class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div class="min-w-0">
@@ -71,11 +92,29 @@ onMounted(load);
                             class="mb-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-xs font-bold text-amber-800"
                             ><Pin class="size-3.5" /> Thông báo ghim</span
                         >
-                        <h3 class="break-words text-lg font-black text-slate-950">{{ announcement.title }}</h3>
+                        <div class="flex items-center gap-2">
+                            <span v-if="!announcement.is_read" class="size-2.5 shrink-0 rounded-full bg-rose-600" aria-label="Thông báo mới"></span>
+                            <h3 class="break-words text-lg font-black text-slate-950">{{ announcement.title }}</h3>
+                            <span v-if="!announcement.is_read" class="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-black text-rose-700"
+                                >Mới</span
+                            >
+                        </div>
                     </div>
                     <time class="shrink-0 text-xs font-semibold text-slate-500">{{ dateTime(announcement.published_at) }}</time>
                 </header>
-                <div class="article-content min-w-0 break-words" v-html="sanitizeRichText(announcement.content_html)"></div>
+                <div
+                    v-if="expandedAnnouncements.has(announcement.id)"
+                    class="article-content min-w-0 break-words border-t border-slate-100 pt-3"
+                    v-html="sanitizeRichText(announcement.content_html)"
+                ></div>
+                <button
+                    v-else
+                    type="button"
+                    class="inline-flex min-h-10 w-fit items-center gap-2 rounded-xl bg-slate-950 px-4 text-sm font-bold text-white"
+                    @click="viewAnnouncement(announcement.id, announcement.is_read)"
+                >
+                    <Eye class="size-4" /> Xem thông báo
+                </button>
             </article>
 
             <div

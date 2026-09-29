@@ -101,6 +101,7 @@ export const adminMenuGroups: AdminMenuGroup[] = [
             { label: 'Quản lý dịch vụ', href: '/admin/game-services/services' },
             { label: 'Gói dịch vụ', href: '/admin/game-services/packages' },
             { label: 'Quản lý đơn order', href: '/admin/game-services/orders' },
+            { label: 'Quản lý chat', href: '/admin/game-services/chats' },
         ],
         platformOnly: true,
     },

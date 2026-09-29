@@ -6,6 +6,7 @@ use App\Models\GameService;
 use App\Models\GameServiceOrder;
 use App\Models\GameServicePackage;
 use App\Models\GameServicePackagePrice;
+use App\Support\SettingStore;
 
 test('client game service item opens a game picker without submenu links', function (): void {
     $game = Game::factory()->create([
@@ -121,6 +122,27 @@ test('client opens a scoped game service detail page with active packages', func
         ->assertSee('50.000đ')
         ->assertSee('data-game-service-heading', false)
         ->assertSee('data-game-service-order-form', false)
+        ->assertSee('data-game-service-package-list', false)
+        ->assertSee('data-game-service-package-option', false)
+        ->assertSee('type="radio"', false)
+        ->assertDontSee('data-game-service-package-select', false)
+        ->assertSee('data-game-service-step-panel="1"', false)
+        ->assertSee('data-game-service-step-panel="2"', false)
+        ->assertSee('data-game-service-step-panel="3"', false)
+        ->assertSee('name="note"', false)
+        ->assertSee('Ghi chú')
+        ->assertSee('Bước 1')
+        ->assertSee('Bước 2')
+        ->assertSee('Bước 3')
+        ->assertSeeInOrder([
+            'data-game-service-step-panel="1"',
+            '<hr class="border-0 border-t border-slate-200">',
+            'data-game-service-step-panel="2"',
+            '<hr class="border-0 border-t border-slate-200">',
+            'data-game-service-step-panel="3"',
+        ], false)
+        ->assertDontSee('data-game-service-step-next', false)
+        ->assertDontSee('data-game-service-step-back', false)
         ->assertSee('5 đơn mới nhất')
         ->assertSee('Nội dung SEO riêng của dịch vụ.')
         ->assertSee('Bao lâu có kết quả?')
@@ -129,6 +151,12 @@ test('client opens a scoped game service detail page with active packages', func
 });
 
 test('guest can create a game service order from the service form', function (): void {
+    app(SettingStore::class)->putMany([
+        'tax_enabled' => true,
+        'tax_calculation_type' => 'revenue',
+        'vat_rate' => '1.0000',
+        'pit_rate' => '0.5000',
+    ]);
     $game = Game::factory()->create(['game_services_enabled' => true, 'status' => 'active']);
     $service = GameService::factory()->for($game)->create([
         'payload_fields' => [[
@@ -161,6 +189,7 @@ test('guest can create a game service order from the service form', function ():
     $package = GameServicePackage::factory()->for($service, 'service')->create(['name' => 'Gói nhiệm vụ', 'status' => 'active']);
     $price = GameServicePackagePrice::factory()->for($package, 'package')->create([
         'price' => 30000,
+        'collaborator_price' => 20000,
         'quantity_enabled' => true,
         'min_quantity' => 2,
         'max_quantity' => 5,
@@ -173,6 +202,7 @@ test('guest can create a game service order from the service form', function ():
         'quantity' => 3,
         'email' => 'PLAYER@example.com',
         'payload' => ['account' => 'player01', 'password' => 'secret123'],
+        'note' => 'Làm giúp sau 20 giờ.',
     ])->assertRedirect(route('game-services.service', ['game' => $game, 'gameService' => $service]))
         ->assertSessionHas('success');
 
@@ -186,7 +216,17 @@ test('guest can create a game service order from the service form', function ():
         'total_amount' => 90000,
         'status' => 'pending',
     ]);
-    expect(GameServiceOrder::query()->firstOrFail()->payload)->toBe(['account' => 'player01', 'password' => 'secret123']);
+    $order = GameServiceOrder::query()->firstOrFail();
+
+    expect($order->payload)->toBe([
+        'account' => 'player01',
+        'password' => 'secret123',
+        'note' => 'Làm giúp sau 20 giờ.',
+    ])->and($order->collaborator_unit_cost)->toBe(20000)
+        ->and($order->collaborator_total_cost)->toBe(60000)
+        ->and($order->gross_profit)->toBe(30000)
+        ->and($order->estimated_tax)->toBe(1350)
+        ->and($order->net_profit)->toBe(28650);
 });
 
 test('service page only displays the five latest orders', function (): void {

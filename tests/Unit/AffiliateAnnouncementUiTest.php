@@ -8,6 +8,8 @@ test('affiliate navigation separates overview announcements and partner home', f
     $affiliateLayout = file_get_contents($projectRoot.'/resources/js/layouts/AffiliateLayout.vue');
     $adminPage = file_get_contents($projectRoot.'/resources/js/pages/admin/affiliate/announcements.vue');
     $affiliateHome = file_get_contents($projectRoot.'/resources/js/pages/affiliate/home.vue');
+    $collaboratorDashboard = file_get_contents($projectRoot.'/resources/js/pages/affiliate/collaborator-dashboard/index.vue');
+    $collaboratorOrders = file_get_contents($projectRoot.'/resources/js/pages/affiliate/game-service-orders/index.vue');
     $editor = file_get_contents($projectRoot.'/resources/js/components/shared/Editor/index.vue');
 
     expect($adminRouter)
@@ -23,17 +25,29 @@ test('affiliate navigation separates overview announcements and partner home', f
         ->toContain('<Editor v-model="form.content"')
         ->toContain('sanitizeRichText(announcement.content_html)')
         ->and($affiliateRouter)
-        ->toContain("name: 'affiliate.home'")
-        ->toContain("path: 'tong-quan'")
-        ->toContain("name: 'affiliate.dashboard'")
+        ->toContain("name: 'affiliate.collaborator.dashboard'")
+        ->toContain("name: 'affiliate.notifications'")
+        ->toContain("name: 'affiliate.revenue'")
+        ->toContain("name: 'affiliate.withdrawal'")
         ->and($affiliateLayout)
-        ->toContain('Trang chủ')
-        ->toContain('Tổng quan hoa hồng')
+        ->toContain('Quản lý đơn')
+        ->toContain('Quản lý doanh thu')
+        ->toContain('summary.orders.pending')
+        ->toContain('summary.unread_announcements')
         ->and($affiliateHome)
         ->toContain('Thông báo từ quản trị viên')
         ->toContain('sanitizeRichText(announcement.content_html)')
-        ->toContain("announcement.is_pinned ? 'border-amber-300")
-        ->toContain('/cong-tac-vien/tong-quan')
+        ->toContain('viewAnnouncement(announcement.id, announcement.is_read)')
+        ->toContain('clientAffiliateService.readAnnouncement(id)')
+        ->and($collaboratorDashboard)
+        ->toContain('Dashboard tổng quan')
+        ->toContain('data.orders.pending')
+        ->toContain('data.revenue.held')
+        ->and($collaboratorOrders)
+        ->toContain("status: 'pending'")
+        ->toContain('filters.search')
+        ->toContain('filters.game_id')
+        ->toContain('openChat(order)')
         ->and($editor)
         ->toContain('images_upload_handler: handleImageUpload')
         ->toContain("'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image emoticons");

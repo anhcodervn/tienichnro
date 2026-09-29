@@ -199,6 +199,16 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         return $this->hasMany(SupportMessage::class, 'sender_id');
     }
 
+    public function assignedGameServiceOrders(): HasMany
+    {
+        return $this->hasMany(GameServiceOrder::class, 'collaborator_id');
+    }
+
+    public function gameServiceOrderMessages(): HasMany
+    {
+        return $this->hasMany(GameServiceOrderMessage::class, 'sender_id');
+    }
+
     public function notificationReads(): HasMany
     {
         return $this->hasMany(NotificationRead::class);
