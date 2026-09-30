@@ -2,8 +2,11 @@
 
 namespace App\Features\Client\Affiliate\Controllers;
 
+use App\Features\Admin\GameService\Services\GameServiceOrderProgressService;
 use App\Features\Affiliate\Services\AffiliateWalletService;
+use App\Features\Client\Affiliate\Requests\CompleteGameServiceOrderRequest;
 use App\Features\Client\Affiliate\Requests\StoreAffiliateWithdrawalRequest;
+use App\Features\Client\Affiliate\Requests\StoreGameServiceOrderProgressRequest;
 use App\Features\Client\Affiliate\Requests\UpdateAffiliatePayoutRequest;
 use App\Features\Client\Affiliate\Services\CollaboratorDashboardService;
 use App\Http\Controllers\Controller;
@@ -19,6 +22,7 @@ class CollaboratorDashboardController extends Controller
     public function __construct(
         private readonly CollaboratorDashboardService $service,
         private readonly AffiliateWalletService $walletService,
+        private readonly GameServiceOrderProgressService $progressService,
     ) {}
 
     public function index(Request $request): JsonResponse
@@ -29,6 +33,11 @@ class CollaboratorDashboardController extends Controller
     public function finance(Request $request): JsonResponse
     {
         return response()->json(['status' => true, 'data' => $this->service->financialData($this->user($request))]);
+    }
+
+    public function walletHistory(Request $request): JsonResponse
+    {
+        return response()->json(['status' => true, 'data' => $this->service->walletHistory($this->user($request))]);
     }
 
     public function announcements(Request $request): JsonResponse
@@ -77,12 +86,61 @@ class CollaboratorDashboardController extends Controller
         return response()->json(['status' => true, 'message' => 'Đã nhận xử lý đơn.', 'data' => $this->service->orderData($order, $user)]);
     }
 
-    public function submit(GameServiceOrder $gameServiceOrder, Request $request): JsonResponse
+    public function preview(GameServiceOrder $gameServiceOrder, Request $request): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'data' => $this->service->orderPreview($this->user($request), $gameServiceOrder),
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function progress(GameServiceOrder $gameServiceOrder, Request $request): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'data' => ['progress' => $this->progressService->timeline($this->user($request), $gameServiceOrder)],
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function storeProgress(
+        GameServiceOrder $gameServiceOrder,
+        StoreGameServiceOrderProgressRequest $request,
+    ): JsonResponse {
+        $user = $this->user($request);
+        $progress = $this->progressService->storeProgress(
+            $user,
+            $gameServiceOrder,
+            $request->string('description')->toString(),
+            $request->file('image'),
+        );
+
+        return response()->json([
+            'status' => true,
+            'message' => 'Đã cập nhật tiến trình đơn.',
+            'data' => ['progress' => $this->progressService->progressPayload($progress)],
+        ], 201);
+    }
+
+    public function submit(GameServiceOrder $gameServiceOrder, CompleteGameServiceOrderRequest $request): JsonResponse
     {
         $user = $this->user($request);
-        $order = $this->service->submitOrder($user, $gameServiceOrder);
+        $image = $request->file('image');
+        abort_unless($image !== null, 422, 'Phải có ảnh xác minh mới có thể báo hoàn thành.');
+        $order = $this->progressService->complete(
+            $user,
+            $gameServiceOrder,
+            $request->string('description')->toString(),
+            $image,
+        );
 
-        return response()->json(['status' => true, 'message' => 'Đã gửi đơn cho admin duyệt.', 'data' => $this->service->orderData($order, $user)]);
+        return response()->json([
+            'status' => true,
+            'message' => 'Đã gửi báo cáo hoàn thành cho admin duyệt.',
+            'data' => [
+                'order' => $this->service->orderData($order, $user),
+                'progress' => $this->progressService->timeline($user, $order),
+            ],
+        ]);
     }
 
     private function user(Request $request): User

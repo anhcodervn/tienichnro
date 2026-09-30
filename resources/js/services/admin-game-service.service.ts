@@ -98,6 +98,15 @@ export interface GameServiceOrderSettlement {
     legacy_orders: number;
 }
 
+export interface GameServiceOrderProgress {
+    id: number;
+    type: 'progress' | 'completion';
+    description: string;
+    image_url: string | null;
+    author: { id: number; name: string; role: string } | null;
+    created_at: string;
+}
+
 export interface GameServiceOrder {
     id: number;
     code: string;
@@ -132,6 +141,10 @@ export interface GameServiceOrder {
     admin_note: string | null;
     processing_at: string | null;
     completed_at: string | null;
+    collaborator_held_at: string | null;
+    collaborator_available_at: string | null;
+    collaborator_settled_at: string | null;
+    collaborator_refunded_at: string | null;
     created_at: string;
 }
 
@@ -148,10 +161,17 @@ export const adminGameServiceService = {
         id ? api.put(`/api/admin-api/game-service-packages/${id}`, payload) : api.post('/api/admin-api/game-service-packages', payload),
     deletePackage: (id: number) => api.delete(`/api/admin-api/game-service-packages/${id}`),
     orders: (params: Record<string, unknown> = {}) => api.get('/api/admin-api/game-service-orders', { params }),
+    reviewOrderCount: async (): Promise<number> => Number((await api.get('/api/admin-api/game-service-orders/review-count')).data.data.count ?? 0),
     order: (code: string) => api.get(`/api/admin-api/game-service-orders/${code}`),
     orderPayload: async (code: string): Promise<Record<string, unknown>> =>
         (await api.get(`/api/admin-api/game-service-orders/${code}/payload`)).data.data.payload,
+    orderProgress: async (code: string): Promise<GameServiceOrderProgress[]> =>
+        (await api.get(`/api/admin-api/game-service-orders/${code}/progress`)).data.data.progress,
     updateOrder: (code: string, payload: Record<string, unknown>) => api.patch(`/api/admin-api/game-service-orders/${code}`, payload),
+    approveOrderCompletion: (code: string, payload: { admin_note: string | null }) =>
+        api.patch(`/api/admin-api/game-service-orders/${code}/approve-completion`, payload),
+    refundOrder: (code: string, payload: { status: 'cancelled' | 'failed'; admin_note: string }) =>
+        api.patch(`/api/admin-api/game-service-orders/${code}/refund`, payload),
     chatCollaborators: (gameServiceId?: number | null, includeUserId?: number | null) =>
         api.get('/api/admin-api/game-service-order-chats/collaborators', {
             params: {

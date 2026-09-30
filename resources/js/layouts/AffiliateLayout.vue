@@ -3,17 +3,17 @@ import SecondaryPasswordDialog from '@/components/shared/SecondaryPasswordDialog
 import { clientAffiliateService, type CollaboratorDashboardData } from '@/services/client-affiliate.service';
 import { gameServiceSecondaryAuthService } from '@/services/game-service-secondary-auth.service';
 import { useUserStore } from '@/stores/user.store';
-import { clearGameServiceSecondaryGrant, getGameServiceSecondaryGrant } from '@/utils/game-service-secondary-auth';
+import { clearGameServiceSecondaryGrant } from '@/utils/game-service-secondary-auth';
 import { handleErrorResponse } from '@/utils/response';
 import {
     BellRing,
     ChartNoAxesCombined,
     ChevronDown,
     HandCoins,
+    History,
     Home,
     LayoutDashboard,
     ListChecks,
-    LoaderCircle,
     LogOut,
     Menu,
     MessageCircle,
@@ -28,12 +28,10 @@ const summary = ref<CollaboratorDashboardData | null>(null);
 const userStore = useUserStore();
 const route = useRoute();
 const ordersMenuOpen = ref(String(route.name ?? '') === 'collaborator.orders');
-const secondaryChecking = ref(true);
 const secondaryConfigured = ref(false);
-const secondaryUnlocked = ref(false);
 const secondaryUnlocking = ref(false);
+const secondaryDialogOpen = ref(false);
 let refreshTimer: number | null = null;
-let secondaryExpiryTimer: number | null = null;
 
 const routeName = computed(() => String(route.name ?? ''));
 const currentOrderStatus = computed(() => String(route.query.status ?? 'pending'));
@@ -62,6 +60,7 @@ const pageTitle = computed(() => {
         'collaborator.notifications': 'Thông báo công việc',
         'collaborator.revenue': 'Doanh thu công việc',
         'collaborator.withdrawal': 'Rút tiền công việc',
+        'collaborator.wallet-history': 'Lịch sử ví công việc',
     };
 
     return titles[routeName.value] ?? 'Cộng tác viên';
@@ -74,6 +73,7 @@ const pageDescription = computed(() => {
         'collaborator.notifications': 'Thông tin công việc mới nhất từ quản trị viên',
         'collaborator.revenue': 'Theo dõi tiền công, tiền treo và tiền đã kết toán',
         'collaborator.withdrawal': 'Rút tiền công việc đã được kết toán',
+        'collaborator.wallet-history': 'Theo dõi tiền treo, tiền được rút và các khoản thu hồi theo đơn',
     };
 
     return descriptions[routeName.value] ?? 'Trung tâm quản lý dành cho cộng tác viên';
@@ -81,18 +81,7 @@ const pageDescription = computed(() => {
 
 const loadSummary = async (): Promise<void> => {
     try {
-        const [dashboard, secondaryStatus] = await Promise.all([
-            clientAffiliateService.collaboratorDashboard(),
-            gameServiceSecondaryAuthService.status(),
-        ]);
-        secondaryConfigured.value = secondaryStatus.configured;
-
-        if (!secondaryStatus.unlocked) {
-            lockSecondarySession();
-            return;
-        }
-
-        summary.value = dashboard;
+        summary.value = await clientAffiliateService.collaboratorDashboard();
     } catch (error) {
         console.error('Không thể tải thống kê cộng tác viên.', error);
     }
@@ -108,59 +97,31 @@ const startSummaryRefresh = (): void => {
     void loadSummary();
     refreshTimer = window.setInterval(loadSummary, 15000);
 };
-const clearSecondaryExpiryTimer = (): void => {
-    if (secondaryExpiryTimer === null) return;
-
-    window.clearTimeout(secondaryExpiryTimer);
-    secondaryExpiryTimer = null;
-};
 const lockSecondarySession = (): void => {
     clearGameServiceSecondaryGrant();
-    clearSecondaryExpiryTimer();
-    stopSummaryRefresh();
-    summary.value = null;
-    secondaryUnlocked.value = false;
-};
-const scheduleSecondaryExpiry = (expiresAt: string): void => {
-    clearSecondaryExpiryTimer();
-    const remainingMilliseconds = new Date(expiresAt).getTime() - Date.now();
-
-    if (remainingMilliseconds <= 0) {
-        lockSecondarySession();
-        return;
-    }
-
-    secondaryExpiryTimer = window.setTimeout(lockSecondarySession, remainingMilliseconds);
+    secondaryDialogOpen.value = true;
 };
 const checkSecondaryPassword = async (): Promise<void> => {
-    secondaryChecking.value = true;
-
     try {
         const status = await gameServiceSecondaryAuthService.status();
         secondaryConfigured.value = status.configured;
-        secondaryUnlocked.value = status.unlocked;
 
-        if (status.unlocked) {
-            const grant = getGameServiceSecondaryGrant();
-            if (grant) scheduleSecondaryExpiry(grant.expires_at);
-            startSummaryRefresh();
-        } else {
+        if (!status.unlocked) {
             clearGameServiceSecondaryGrant();
         }
+        startSummaryRefresh();
     } catch (error) {
         handleErrorResponse(error);
-    } finally {
-        secondaryChecking.value = false;
     }
 };
 const unlockSecondaryPassword = async (password: string): Promise<void> => {
     secondaryUnlocking.value = true;
 
     try {
-        const grant = await gameServiceSecondaryAuthService.unlock(password);
+        await gameServiceSecondaryAuthService.unlock(password);
         secondaryConfigured.value = true;
-        secondaryUnlocked.value = true;
-        scheduleSecondaryExpiry(grant.expires_at);
+        secondaryDialogOpen.value = false;
+        window.dispatchEvent(new Event('game-service-secondary-auth:unlocked'));
         startSummaryRefresh();
     } catch (error) {
         handleErrorResponse(error);
@@ -193,7 +154,6 @@ onMounted(() => {
 });
 onBeforeUnmount(() => {
     stopSummaryRefresh();
-    clearSecondaryExpiryTimer();
     window.removeEventListener('collaborator:summary', receiveSummary);
     window.removeEventListener('collaborator:refresh', loadSummary);
     window.removeEventListener('game-service-secondary-auth:locked', lockSecondarySession);
@@ -299,6 +259,13 @@ onBeforeUnmount(() => {
                     @click="closeSidebar"
                     ><WalletCards class="size-5" /> Rút tiền</RouterLink
                 >
+                <RouterLink
+                    to="/dashboard/lich-su-vi"
+                    class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
+                    :class="routeName === 'collaborator.wallet-history' ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-50'"
+                    @click="closeSidebar"
+                    ><History class="size-5" /> Lịch sử ví</RouterLink
+                >
                 <a href="/" class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold text-slate-600 hover:bg-slate-50"
                     ><Home class="size-5" /> Về trang chính</a
                 >
@@ -322,17 +289,14 @@ onBeforeUnmount(() => {
                     <p class="text-xs text-slate-500">{{ pageDescription }}</p>
                 </div>
             </header>
-            <div v-if="secondaryChecking" class="grid min-h-[calc(100dvh-4rem)] place-items-center">
-                <LoaderCircle class="size-9 animate-spin text-emerald-600" />
-            </div>
-            <RouterView v-else-if="secondaryUnlocked" />
+            <RouterView />
         </section>
         <SecondaryPasswordDialog
-            :open="!secondaryChecking && !secondaryUnlocked"
+            :open="secondaryDialogOpen"
             :configured="secondaryConfigured"
             :loading="secondaryUnlocking"
             :personal="userStore.user?.role === 'ctv'"
-            blocking
+            @close="secondaryDialogOpen = false"
             @submit="unlockSecondaryPassword"
         />
     </div>

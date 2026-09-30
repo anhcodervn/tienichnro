@@ -27,18 +27,26 @@ Route::middleware(['auth:sanctum', 'throttle:60,1'])->prefix('client/affiliate')
         Route::post('/game-service-announcements/{affiliateAnnouncement}/read', [CollaboratorDashboardController::class, 'readAnnouncement'])
             ->name('game-service-announcements.read');
         Route::get('/game-service-finance', [CollaboratorDashboardController::class, 'finance'])->name('game-service-finance.index');
+        Route::get('/game-service-wallet-history', [CollaboratorDashboardController::class, 'walletHistory'])->name('game-service-wallet-history.index');
+        Route::get('/game-service-order-chats', [GameServiceOrderChatController::class, 'chats'])->name('game-service-order-chats.index');
+        Route::get('/game-service-orders/{gameServiceOrder}/preview', [CollaboratorDashboardController::class, 'preview'])
+            ->name('game-service-orders.preview');
+        Route::get('/game-service-orders/{gameServiceOrder}/messages', [GameServiceOrderChatController::class, 'show'])->name('game-service-orders.messages.index');
+        Route::post('/game-service-orders/{gameServiceOrder}/messages', [GameServiceOrderChatController::class, 'store'])
+            ->middleware('throttle:game-service-chat-message')->name('game-service-orders.messages.store');
+        Route::get('/game-service-orders/{gameServiceOrder}/progress', [CollaboratorDashboardController::class, 'progress'])
+            ->name('game-service-orders.progress.index');
+        Route::post('/game-service-orders/{gameServiceOrder}/progress', [CollaboratorDashboardController::class, 'storeProgress'])
+            ->middleware('throttle:30,1')->name('game-service-orders.progress.store');
+        Route::post('/game-service-orders/{gameServiceOrder}/start', [CollaboratorDashboardController::class, 'start'])->name('game-service-orders.start');
+        Route::post('/game-service-orders/{gameServiceOrder}/submit', [CollaboratorDashboardController::class, 'submit'])
+            ->name('game-service-orders.submit');
         Route::middleware('game-service.secondary')->group(function (): void {
-            Route::get('/game-service-order-chats', [GameServiceOrderChatController::class, 'chats'])->name('game-service-order-chats.index');
             Route::get('/game-service-orders/{gameServiceOrder}/payload', [GameServiceOrderChatController::class, 'payload'])
                 ->name('game-service-orders.payload');
-            Route::get('/game-service-orders/{gameServiceOrder}/messages', [GameServiceOrderChatController::class, 'show'])->name('game-service-orders.messages.index');
-            Route::post('/game-service-orders/{gameServiceOrder}/messages', [GameServiceOrderChatController::class, 'store'])
-                ->middleware('throttle:game-service-chat-message')->name('game-service-orders.messages.store');
             Route::put('/game-service-payout-account', [CollaboratorDashboardController::class, 'updatePayout'])->name('game-service-payout.update');
             Route::post('/game-service-withdrawals', [CollaboratorDashboardController::class, 'withdraw'])
                 ->middleware('throttle:game-service-withdrawal')->name('game-service-withdrawals.store');
-            Route::post('/game-service-orders/{gameServiceOrder}/start', [CollaboratorDashboardController::class, 'start'])->name('game-service-orders.start');
-            Route::post('/game-service-orders/{gameServiceOrder}/submit', [CollaboratorDashboardController::class, 'submit'])->name('game-service-orders.submit');
         });
     });
 });

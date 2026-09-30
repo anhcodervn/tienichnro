@@ -3,12 +3,27 @@ import SecondaryPasswordDialog from '@/components/shared/SecondaryPasswordDialog
 import {
     adminGameServiceService,
     type GameServiceOrder,
+    type GameServiceOrderProgress,
     type GameServiceOrderSettlement,
     type GameServiceOrderStatus,
 } from '@/services/admin-game-service.service';
 import { gameServiceSecondaryAuthService } from '@/services/game-service-secondary-auth.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { Banknote, ClipboardList, Eye, HandCoins, LoaderCircle, LockKeyhole, ReceiptText, Save, Scale, Search, WalletCards, X } from 'lucide-vue-next';
+import {
+    Banknote,
+    ClipboardList,
+    Eye,
+    HandCoins,
+    LoaderCircle,
+    LockKeyhole,
+    ReceiptText,
+    Save,
+    Scale,
+    Search,
+    WalletCards,
+    X,
+} from 'lucide-vue-next';
+import Swal from 'sweetalert2';
 import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 const orders = ref<GameServiceOrder[]>([]);
@@ -22,6 +37,7 @@ const secondaryUnlocking = ref(false);
 const secondaryStatusChecking = ref(true);
 const payloadLoading = ref(false);
 const collaborators = ref<Array<{ id: number; name: string }>>([]);
+const progressUpdates = ref<GameServiceOrderProgress[]>([]);
 const settlement = ref<GameServiceOrderSettlement>({
     approved_orders: 0,
     settled_orders: 0,
@@ -48,6 +64,12 @@ const statusLabels: Record<GameServiceOrderStatus, string> = {
     failed: 'Thất bại',
     cancelled: 'Đã hủy',
 };
+const managementStatusLabels = Object.fromEntries(Object.entries(statusLabels).filter(([status]) => status !== 'review')) as Partial<
+    Record<GameServiceOrderStatus, string>
+>;
+const editableStatusLabels = Object.fromEntries(
+    Object.entries(statusLabels).filter(([status]) => !['review', 'failed', 'cancelled'].includes(status)),
+) as Partial<Record<GameServiceOrderStatus, string>>;
 const statusClasses: Record<GameServiceOrderStatus, string> = {
     pending: 'bg-amber-100 text-amber-700',
     processing: 'bg-sky-100 text-sky-700',
@@ -63,6 +85,7 @@ const load = async (): Promise<void> => {
         const response = await adminGameServiceService.orders({
             search: filters.search || undefined,
             status: filters.status || undefined,
+            exclude_status: 'review',
             per_page: 100,
         });
         orders.value = response.data.data.data;
@@ -76,12 +99,18 @@ const load = async (): Promise<void> => {
 
 const openOrder = async (order: GameServiceOrder): Promise<void> => {
     selectedOrder.value = order;
+    progressUpdates.value = [];
     editForm.status = order.status;
     editForm.collaborator_id = order.collaborator_id;
     editForm.admin_note = order.admin_note ?? '';
 
     try {
-        collaborators.value = (await adminGameServiceService.chatCollaborators(order.game_service_id, order.collaborator_id)).data.data;
+        const [collaboratorResponse, progress] = await Promise.all([
+            adminGameServiceService.chatCollaborators(order.game_service_id, order.collaborator_id),
+            adminGameServiceService.orderProgress(order.code),
+        ]);
+        collaborators.value = collaboratorResponse.data.data;
+        progressUpdates.value = progress;
     } catch (error) {
         handleErrorResponse(error);
     }
@@ -170,6 +199,40 @@ const saveOrder = async (): Promise<void> => {
     }
 };
 
+const refundOrder = async (status: 'cancelled' | 'failed'): Promise<void> => {
+    if (!selectedOrder.value) return;
+
+    const result = await Swal.fire({
+        title: status === 'cancelled' ? 'Hủy đơn và hoàn tiền?' : 'Đánh dấu thất bại và hoàn tiền?',
+        text: 'Khách được hoàn giao dịch ví và tiền công của CTV sẽ bị thu hồi.',
+        input: 'textarea',
+        inputLabel: 'Lý do hoàn tiền',
+        inputPlaceholder: 'Nhập lý do rõ ràng để lưu lịch sử...',
+        inputValidator: (value) => (!String(value ?? '').trim() ? 'Phải nhập lý do hoàn tiền.' : undefined),
+        showCancelButton: true,
+        confirmButtonText: 'Xác nhận hoàn tiền',
+        cancelButtonText: 'Đóng',
+        confirmButtonColor: status === 'failed' ? '#e11d48' : '#475569',
+    });
+
+    if (!result.isConfirmed || !String(result.value ?? '').trim()) return;
+
+    saving.value = true;
+    try {
+        const response = await adminGameServiceService.refundOrder(selectedOrder.value.code, {
+            status,
+            admin_note: String(result.value).trim(),
+        });
+        selectedOrder.value = response.data.data;
+        handleSuccessResponse({ data: { status: true, message: 'Đã hoàn tiền và cập nhật trạng thái đơn.' } });
+        await load();
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        saving.value = false;
+    }
+};
+
 onMounted(() => {
     window.addEventListener('game-service-secondary-auth:locked', lockSecondarySession);
     void Promise.all([load(), checkSecondaryAuth()]);
@@ -201,7 +264,7 @@ onBeforeUnmount(() => {
                 /></label>
                 <select v-model="filters.status" :class="inputClass">
                     <option value="">Mọi trạng thái</option>
-                    <option v-for="(label, status) in statusLabels" :key="status" :value="status">{{ label }}</option>
+                    <option v-for="(label, status) in managementStatusLabels" :key="status" :value="status">{{ label }}</option>
                 </select>
                 <button class="min-h-11 rounded-md bg-slate-950 px-4 text-sm font-bold text-white">Lọc</button>
             </form>
@@ -384,7 +447,9 @@ onBeforeUnmount(() => {
                                 v-if="selectedOrder.payload_locked"
                                 class="grid min-h-32 place-items-center gap-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-center"
                             >
-                                <span class="grid size-10 place-items-center rounded-md bg-slate-200 text-slate-600"><LockKeyhole class="size-5" /></span>
+                                <span class="grid size-10 place-items-center rounded-md bg-slate-200 text-slate-600"
+                                    ><LockKeyhole class="size-5"
+                                /></span>
                                 <div>
                                     <p class="text-sm font-black text-slate-900">Thông tin tài khoản đang được ẩn</p>
                                     <p class="mt-1 text-xs text-slate-500">Nhập mật khẩu C2 để xem payload khách gửi.</p>
@@ -408,6 +473,39 @@ onBeforeUnmount(() => {
                                 <p v-if="Object.keys(selectedOrder.payload).length === 0" class="text-slate-500">Đơn không có payload.</p>
                             </dl>
                         </div>
+                        <section>
+                            <h3 class="mb-2 text-sm font-black">Tiến trình và báo cáo hoàn thành</h3>
+                            <div class="grid gap-3">
+                                <article
+                                    v-for="update in progressUpdates"
+                                    :key="update.id"
+                                    class="rounded-md border p-3"
+                                    :class="update.type === 'completion' ? 'border-emerald-200 bg-emerald-50' : 'border-slate-200 bg-slate-50'"
+                                >
+                                    <div class="flex items-center justify-between gap-3">
+                                        <strong class="text-sm">{{
+                                            update.type === 'completion' ? 'Báo cáo hoàn thành' : 'Cập nhật tiến trình'
+                                        }}</strong>
+                                        <time class="text-xs text-slate-500">{{ dateTime(update.created_at) }}</time>
+                                    </div>
+                                    <p class="mt-1 text-xs font-bold text-slate-500">{{ update.author?.name || 'Tài khoản đã xóa' }}</p>
+                                    <p class="mt-2 whitespace-pre-wrap break-words text-sm leading-6 text-slate-800">{{ update.description }}</p>
+                                    <a v-if="update.image_url" :href="update.image_url" target="_blank" rel="noopener" class="mt-3 block w-fit">
+                                        <img
+                                            :src="update.image_url"
+                                            alt="Ảnh tiến trình đơn"
+                                            class="max-h-64 rounded-md border border-slate-200 object-contain"
+                                        />
+                                    </a>
+                                </article>
+                                <p
+                                    v-if="progressUpdates.length === 0"
+                                    class="rounded-md border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500"
+                                >
+                                    CTV chưa cập nhật tiến trình.
+                                </p>
+                            </div>
+                        </section>
                     </div>
                     <form class="grid content-start gap-4" @submit.prevent="saveOrder">
                         <label class="grid gap-1 text-sm font-bold"
@@ -420,7 +518,14 @@ onBeforeUnmount(() => {
                         >
                         <label class="grid gap-1 text-sm font-bold"
                             >Trạng thái<select v-model="editForm.status" :class="inputClass">
-                                <option v-for="(label, status) in statusLabels" :key="status" :value="status">{{ label }}</option>
+                                <option
+                                    v-for="(label, status) in editableStatusLabels"
+                                    :key="status"
+                                    :value="status"
+                                    :disabled="status === 'completed' && selectedOrder.status !== 'completed'"
+                                >
+                                    {{ label }}
+                                </option>
                             </select></label
                         ><label class="grid gap-1 text-sm font-bold"
                             >Ghi chú quản trị<textarea
@@ -439,6 +544,27 @@ onBeforeUnmount(() => {
                         >
                             <Save class="size-4" /> {{ saving ? 'Đang lưu...' : 'Cập nhật đơn' }}
                         </button>
+                        <div
+                            v-if="selectedOrder && ['pending', 'processing', 'review', 'completed'].includes(selectedOrder.status)"
+                            class="grid gap-2 border-t border-slate-200 pt-4 sm:grid-cols-2"
+                        >
+                            <button
+                                type="button"
+                                :disabled="saving"
+                                class="min-h-11 rounded-md border-2 border-slate-300 px-3 text-sm font-black text-slate-700 hover:bg-slate-50 disabled:opacity-50"
+                                @click="refundOrder('cancelled')"
+                            >
+                                Hủy đơn + hoàn tiền
+                            </button>
+                            <button
+                                type="button"
+                                :disabled="saving"
+                                class="min-h-11 rounded-md bg-rose-600 px-3 text-sm font-black text-white hover:bg-rose-700 disabled:opacity-50"
+                                @click="refundOrder('failed')"
+                            >
+                                Thất bại + hoàn tiền
+                            </button>
+                        </div>
                     </form>
                 </div>
             </section>

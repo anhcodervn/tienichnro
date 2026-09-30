@@ -112,7 +112,66 @@ export type AdminTopupReport = {
     criteria: string;
 };
 
+export type GameServiceReportBreakdown = {
+    name: string;
+    completed_orders: number;
+    revenue: number;
+    collaborator_cost: number;
+    after_collaborator: number;
+    estimated_tax: number;
+    net_profit: number;
+};
+
+export type AdminGameServiceReport = {
+    period: { from: string; to: string; days: number; timezone: string };
+    orders: {
+        total_orders: number;
+        pending_orders: number;
+        processing_orders: number;
+        review_orders: number;
+        reported_completion_orders: number;
+        completed_orders: number;
+        failed_orders: number;
+        cancelled_orders: number;
+        completion_rate: number;
+    };
+    funds: {
+        working_hold: number;
+        pending_settlement: number;
+        total_unsettled: number;
+        settled: number;
+        reversed: number;
+    };
+    financials: {
+        completed_orders: number;
+        revenue: number;
+        collaborator_cost: number;
+        after_collaborator: number;
+        estimated_tax: number;
+        net_profit: number;
+        net_margin_percent: number;
+        legacy_orders: number;
+    };
+    breakdowns: { games: GameServiceReportBreakdown[]; services: GameServiceReportBreakdown[] };
+    recent_completed_orders: Array<{
+        code: string;
+        game: string;
+        service: string;
+        package: string;
+        revenue: number;
+        collaborator_cost: number;
+        after_collaborator: number;
+        estimated_tax: number;
+        net_profit: number;
+        settled_at: string | null;
+        completed_at: string | null;
+    }>;
+    criteria: string;
+};
+
 export const adminReportingService = {
     topup: (params: { from?: string; to?: string }) =>
         axios.get<{ status: true; data: AdminTopupReport }>('/api/admin-api/reports/topup', { params }),
+    gameServices: (params: { from?: string; to?: string }) =>
+        axios.get<{ status: true; data: AdminGameServiceReport }>('/api/admin-api/reports/game-services', { params }),
 };

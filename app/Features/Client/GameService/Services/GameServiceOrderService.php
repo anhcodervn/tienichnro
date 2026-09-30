@@ -191,7 +191,7 @@ class GameServiceOrderService
         }, 3);
     }
 
-    private function refundWalletPayment(GameServiceOrder $order, User $user): int
+    public function refundWalletPayment(GameServiceOrder $order, User $user): int
     {
         $wallet = $this->walletService->getWallet($user);
         $debit = WalletTransaction::query()

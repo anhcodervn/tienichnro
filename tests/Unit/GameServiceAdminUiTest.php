@@ -3,7 +3,10 @@
 test('admin game service menu exposes all management pages', function (): void {
     $projectRoot = dirname(__DIR__, 2);
     $navigation = file_get_contents($projectRoot.'/resources/js/layouts/admin/sidebar/navigation.ts');
+    $sidebar = file_get_contents($projectRoot.'/resources/js/layouts/admin/sidebar/index.vue');
     $router = file_get_contents($projectRoot.'/resources/js/router/modules/admin/index.ts');
+    $chats = file_get_contents($projectRoot.'/resources/js/pages/admin/game-services/chats/index.vue');
+    $reviews = file_get_contents($projectRoot.'/resources/js/pages/admin/game-services/order-reviews/index.vue');
 
     expect($navigation)
         ->toContain("key: 'game-services'")
@@ -12,13 +15,39 @@ test('admin game service menu exposes all management pages', function (): void {
         ->toContain("{ label: 'Quản lý dịch vụ', href: '/admin/game-services/services' }")
         ->toContain("{ label: 'Gói dịch vụ', href: '/admin/game-services/packages' }")
         ->toContain("{ label: 'Quản lý đơn order', href: '/admin/game-services/orders' }")
+        ->toContain("{ label: 'Duyệt hoàn thành', href: '/admin/game-services/order-reviews', badge: 'game-service-reviews' }")
+        ->toContain("badge: 'game-service-reviews'")
         ->toContain("{ label: 'Quản lý chat', href: '/admin/game-services/chats' }")
         ->and($router)
         ->toContain("name: 'admin.game-services.games'")
         ->toContain("name: 'admin.game-services.services'")
         ->toContain("name: 'admin.game-services.packages'")
         ->toContain("name: 'admin.game-services.orders'")
-        ->toContain("name: 'admin.game-services.chats'");
+        ->toContain("name: 'admin.game-services.order-reviews'")
+        ->toContain("name: 'admin.game-services.chats'")
+        ->and($sidebar)
+        ->toContain('adminGameServiceService.reviewOrderCount()')
+        ->toContain('window.setInterval(() => void loadReviewOrderCount(), 30_000)')
+        ->toContain("group.badge === 'game-service-reviews'")
+        ->toContain("child.badge === 'game-service-reviews'")
+        ->toContain("reviewOrderCount > 99 ? '99+' : reviewOrderCount")
+        ->toContain('bg-red-600')
+        ->and($chats)
+        ->toContain('message.progress.image_url')
+        ->and($reviews)
+        ->toContain("status: 'review'")
+        ->toContain('1. Thông tin đơn')
+        ->toContain('2. Tiến trình')
+        ->toContain('3. Báo cáo hoàn thành')
+        ->toContain("update.type === 'progress'")
+        ->toContain("update.type === 'completion'")
+        ->toContain('data-progress-readonly')
+        ->toContain('saveReviewStatus')
+        ->toContain("processing: 'Trả lại CTV xử lý'")
+        ->not->toContain("failed: 'Không đạt yêu cầu'")
+        ->toContain('adminGameServiceService.approveOrderCompletion')
+        ->toContain("new CustomEvent('game-service-order-review-count'")
+        ->toContain('Xác nhận hoàn thành');
 });
 
 test('admin game service pages connect catalog payload prices servers and orders', function (): void {
@@ -86,13 +115,23 @@ test('admin game service pages connect catalog payload prices servers and orders
         ->toContain('order.gross_profit')
         ->toContain('order.estimated_tax')
         ->toContain('order.net_profit')
+        ->toContain('adminGameServiceService.orderProgress(order.code)')
+        ->toContain("exclude_status: 'review'")
+        ->toContain('Tiến trình và báo cáo hoàn thành')
+        ->toContain("refundOrder('cancelled')")
+        ->toContain("refundOrder('failed')")
+        ->toContain('Hủy đơn + hoàn tiền')
+        ->toContain('Thất bại + hoàn tiền')
         ->toContain("order.net_profit < 0 ? 'text-rose-700' : 'text-emerald-700'")
-        ->not->toContain('text-violet-700')
         ->and($service)
         ->toContain("'/api/admin-api/game-service-games'")
         ->toContain("'/api/admin-api/game-services'")
         ->toContain("'/api/admin-api/game-service-packages'")
         ->toContain("'/api/admin-api/game-service-orders'")
+        ->toContain('`/api/admin-api/game-service-orders/${code}/progress`')
+        ->toContain('`/api/admin-api/game-service-orders/${code}/approve-completion`')
+        ->toContain('`/api/admin-api/game-service-orders/${code}/refund`')
+        ->toContain("'/api/admin-api/game-service-orders/review-count'")
         ->toContain('background_image: string | null')
         ->toContain("type: 'text' | 'number' | 'password' | 'select'");
 });

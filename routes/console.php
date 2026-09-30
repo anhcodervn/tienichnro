@@ -26,6 +26,11 @@ Schedule::command('affiliate:release-commissions')
     ->withoutOverlapping()
     ->onOneServer();
 
+Schedule::command('game-service-orders:release-collaborator-funds')
+    ->everyFiveMinutes()
+    ->withoutOverlapping()
+    ->onOneServer();
+
 Schedule::command('orders:expire-unpaid')
     ->everyTenMinutes()
     ->withoutOverlapping()

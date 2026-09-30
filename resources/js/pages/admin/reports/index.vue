@@ -211,7 +211,7 @@ onMounted(loadReport);
                     >
                         <ChartNoAxesCombined class="h-4 w-4" /> Trung tâm báo cáo
                     </div>
-                    <h1 class="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Tăng trưởng và doanh thu topup</h1>
+                    <h1 class="mt-4 text-3xl font-black tracking-tight sm:text-4xl">Doanh thu nạp game</h1>
                     <p class="mt-3 text-sm leading-6 text-slate-300">
                         Doanh thu chỉ ghi nhận khi đơn đã thanh toán và hoàn thành thành công. Các đơn chờ, lỗi hoặc hoàn tiền không được cộng vào
                         KPI.
@@ -280,6 +280,22 @@ onMounted(loadReport);
         </div>
 
         <template v-else-if="report">
+            <section class="grid gap-4 sm:grid-cols-3">
+                <article class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                    <p class="text-sm font-bold text-slate-500">Tổng đơn được tạo</p>
+                    <p class="mt-2 text-3xl font-black text-slate-950">{{ number(report.status_overview.created_orders) }}</p>
+                </article>
+                <article class="rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
+                    <p class="text-sm font-bold text-emerald-700">Đơn thành công</p>
+                    <p class="mt-2 text-3xl font-black text-emerald-950">{{ number(report.summary.successful_orders) }}</p>
+                    <p class="mt-1 text-xs text-emerald-700">Chỉ đơn đã thanh toán và hoàn thành</p>
+                </article>
+                <article class="rounded-2xl border border-rose-200 bg-rose-50 p-5 shadow-sm">
+                    <p class="text-sm font-bold text-rose-700">Đơn thất bại</p>
+                    <p class="mt-2 text-3xl font-black text-rose-950">{{ number(report.status_overview.failed_orders) }}</p>
+                </article>
+            </section>
+
             <section class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 <article v-for="metric in metricCards" :key="metric.label" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                     <div class="flex items-start justify-between gap-3">

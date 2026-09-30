@@ -118,8 +118,17 @@ test('collaborator only sees and claims pending orders from allowed services', f
             'include_user_id' => $collaborator->id,
         ]))
         ->assertSuccessful()
+        ->assertJsonFragment(['id' => $admin->id])
         ->assertJsonFragment(['id' => $collaborator->id])
         ->assertJsonMissing(['id' => $otherCollaborator->id]);
+
+    $this->actingAs($admin)
+        ->patchJson("/api/admin-api/game-service-orders/{$forbiddenOrder->code}", [
+            'status' => 'pending',
+            'collaborator_id' => $admin->id,
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('data.collaborator_id', $admin->id);
 
     $this->actingAs($admin)
         ->patchJson("/api/admin-api/game-service-orders/{$forbiddenOrder->code}", [

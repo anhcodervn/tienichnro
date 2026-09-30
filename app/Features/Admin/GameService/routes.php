@@ -25,8 +25,16 @@ Route::middleware(['auth:sanctum', 'admin', 'platform.admin'])
         Route::get('game-service-order-chats/{gameServiceOrder}', [GameServiceOrderChatController::class, 'show'])->name('chats.show');
         Route::post('game-service-order-chats/{gameServiceOrder}/messages', [GameServiceOrderChatController::class, 'store'])
             ->middleware('throttle:30,1')->name('chats.messages.store');
+        Route::get('game-service-orders/review-count', [GameServiceOrderController::class, 'reviewCount'])
+            ->name('orders.review-count');
         Route::get('game-service-orders/{gameServiceOrder}/payload', [GameServiceOrderController::class, 'payload'])
             ->middleware('game-service.secondary')->name('orders.payload');
+        Route::get('game-service-orders/{gameServiceOrder}/progress', [GameServiceOrderController::class, 'progress'])
+            ->name('orders.progress.index');
+        Route::patch('game-service-orders/{gameServiceOrder}/approve-completion', [GameServiceOrderController::class, 'approveCompletion'])
+            ->name('orders.approve-completion');
+        Route::patch('game-service-orders/{gameServiceOrder}/refund', [GameServiceOrderController::class, 'refund'])
+            ->name('orders.refund');
         Route::apiResource('game-service-orders', GameServiceOrderController::class)
             ->only(['index', 'show', 'update'])
             ->parameters(['game-service-orders' => 'gameServiceOrder']);

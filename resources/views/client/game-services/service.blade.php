@@ -11,13 +11,6 @@
 @section('content')
     @php
         $selectedPackageId = (int) old('package_id', $gameService->packages->first()?->id);
-        $statusLabels = [
-            'pending' => ['label' => 'Chờ tiếp nhận', 'class' => 'bg-amber-50 text-amber-700'],
-            'processing' => ['label' => 'Đang xử lý', 'class' => 'bg-sky-50 text-sky-700'],
-            'completed' => ['label' => 'Hoàn thành', 'class' => 'bg-emerald-50 text-emerald-700'],
-            'failed' => ['label' => 'Thất bại', 'class' => 'bg-rose-50 text-rose-700'],
-            'cancelled' => ['label' => 'Đã hủy', 'class' => 'bg-slate-100 text-slate-600'],
-        ];
     @endphp
 
     <div class="client-container grid gap-8 py-6 sm:gap-10 sm:py-10">
@@ -202,16 +195,13 @@
             </header>
             <div>
                 @forelse ($recentOrders as $order)
-                    @php
-                        $status = $statusLabels[$order->status] ?? ['label' => 'Đang cập nhật', 'class' => 'bg-slate-100 text-slate-600'];
-                    @endphp
                     <div class="grid gap-2 border-b border-slate-200 px-5 py-4 last:border-b-0 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:items-center sm:gap-5 sm:px-6">
                         <div class="min-w-0">
                             <p class="truncate font-bold text-slate-900">{{ $order->package_name }}</p>
                             <p class="mt-1 truncate text-xs text-slate-500">{{ $order->server_name }} · Số lượng {{ $order->quantity }}</p>
                         </div>
                         <time class="text-xs font-semibold text-slate-500" datetime="{{ $order->created_at?->toISOString() }}">{{ $order->created_at?->diffForHumans() }}</time>
-                        <span class="w-fit rounded-[5px] px-2.5 py-1 text-xs font-bold {{ $status['class'] }}">{{ $status['label'] }}</span>
+                        <x-client.game-service-order-status :status="$order->status" />
                     </div>
                 @empty
                     <p class="p-6 text-center text-sm font-semibold text-slate-500">Chưa có đơn dịch vụ nào.</p>

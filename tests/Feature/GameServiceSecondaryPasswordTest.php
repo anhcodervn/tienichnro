@@ -7,17 +7,13 @@ use App\Models\Tenant;
 use App\Models\User;
 use App\Support\GameServicePayloadCipher;
 use App\Support\GameServiceSecondaryAuth;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Hash;
 
 beforeEach(function (): void {
     Event::fake([AffiliateDashboardUpdated::class]);
-    config()->set('cache.default', 'array');
     config()->set('services.game_service_secondary_auth.password', 'shared-secondary-secret');
-    config()->set('services.game_service_secondary_auth.ttl_minutes', 30);
-    Cache::flush();
 });
 
 test('admin unlocks customer order payload with the shared secondary password', function (): void {
@@ -59,9 +55,13 @@ test('admin unlocks customer order payload with the shared secondary password', 
     $unlock = $this->actingAs($admin)
         ->postJson('/api/client/affiliate/game-service-secondary-auth', ['password' => 'shared-secondary-secret'])
         ->assertSuccessful()
-        ->assertJsonStructure(['data' => ['token', 'expires_at', 'expires_in_minutes']]);
+        ->assertJsonStructure(['data' => ['token']])
+        ->assertJsonMissingPath('data.expires_at')
+        ->assertJsonMissingPath('data.expires_in_minutes');
 
     $headers = [GameServiceSecondaryAuth::HEADER_NAME => $unlock->json('data.token')];
+
+    $this->travel(31)->minutes();
 
     $this->actingAs($admin)
         ->getJson('/api/client/affiliate/game-service-secondary-auth', $headers)
@@ -74,6 +74,12 @@ test('admin unlocks customer order payload with the shared secondary password', 
         ->assertJsonPath('data.payload.account', 'customer-account')
         ->assertJsonPath('data.payload.password', 'customer-password')
         ->assertHeader('Cache-Control', 'no-store, private');
+
+    $this->actingAs($admin)
+        ->getJson("/api/admin-api/game-service-orders/{$order->code}/payload", [
+            GameServiceSecondaryAuth::HEADER_NAME => $unlock->json('data.token').'tampered',
+        ])
+        ->assertStatus(423);
 
     config()->set('services.game_service_secondary_auth.password', 'rotated-secondary-secret');
 
@@ -105,7 +111,7 @@ test('existing plaintext payloads are encrypted by the data migration', function
         ]);
 });
 
-test('collaborator must unlock before viewing assigned payload or performing protected work', function (): void {
+test('collaborator only unlocks before viewing assigned payload or performing financial work', function (): void {
     $tenant = Tenant::query()->where('is_main', true)->firstOrFail();
     $collaborator = User::factory()->create([
         'tenant_id' => $tenant->id,
@@ -139,7 +145,10 @@ test('collaborator must unlock before viewing assigned payload or performing pro
 
     $this->actingAs($collaborator)
         ->postJson("/api/client/affiliate/game-service-orders/{$order->code}/start")
-        ->assertStatus(423);
+        ->assertSuccessful()
+        ->assertJsonPath('data.status', 'processing')
+        ->assertJsonPath('data.payload', [])
+        ->assertJsonPath('data.payload_locked', true);
 
     $this->actingAs($collaborator)
         ->postJson('/api/client/affiliate/game-service-withdrawals', [])
@@ -158,18 +167,22 @@ test('collaborator must unlock before viewing assigned payload or performing pro
     $this->actingAs($collaborator)
         ->getJson("/api/client/affiliate/game-service-orders/{$order->code}/payload", $headers)
         ->assertSuccessful()
-        ->assertJsonPath('data.payload.account', 'assigned-account')
-        ->assertJsonPath('data.payload.password', 'assigned-password');
+        ->assertJsonPath('data.payload.account', 'assigned-account');
+
+    $this->actingAs($collaborator)
+        ->getJson("/api/client/affiliate/game-service-orders/{$order->code}/preview", $headers)
+        ->assertSuccessful()
+        ->assertJsonMissingPath('data.payload');
 
     $this->actingAs($collaborator)
         ->getJson("/api/client/affiliate/game-service-orders/{$foreignOrder->code}/payload", $headers)
         ->assertForbidden();
 
     $this->actingAs($collaborator)
-        ->postJson("/api/client/affiliate/game-service-orders/{$order->code}/start", [], $headers)
+        ->getJson("/api/client/affiliate/game-service-orders/{$order->code}/payload", $headers)
         ->assertSuccessful()
-        ->assertJsonPath('data.payload', [])
-        ->assertJsonPath('data.payload_locked', true);
+        ->assertJsonPath('data.payload.account', 'assigned-account')
+        ->assertJsonPath('data.payload.password', 'assigned-password');
 
     $this->actingAs($collaborator)
         ->postJson('/api/client/affiliate/game-service-withdrawals', [], $headers)
@@ -183,6 +196,7 @@ test('admin sets a private secondary password for each collaborator and rotating
     $regularUser = User::factory()->create(['role' => User::ROLE_USER]);
     $order = GameServiceOrder::factory()->create([
         'collaborator_id' => $collaborator->id,
+        'status' => 'processing',
         'payload' => ['account' => 'private-account'],
     ]);
 

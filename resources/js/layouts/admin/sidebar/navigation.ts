@@ -22,6 +22,7 @@ import {
 export type AdminMenuChild = {
     label: string;
     href: string;
+    badge?: 'game-service-reviews';
     platformOnly?: boolean;
     childOnly?: boolean;
     tenancyOnly?: boolean;
@@ -33,7 +34,7 @@ export type AdminMenuGroup = {
     icon: LucideIcon;
     href?: string;
     children?: AdminMenuChild[];
-    badge?: 'support';
+    badge?: 'support' | 'game-service-reviews';
     platformOnly?: boolean;
     childOnly?: boolean;
     tenancyOnly?: boolean;
@@ -50,7 +51,10 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         key: 'reports',
         label: 'Báo cáo doanh thu',
         icon: ChartNoAxesCombined,
-        href: '/admin/reports',
+        children: [
+            { label: 'Doanh thu nạp game', href: '/admin/reports/topup' },
+            { label: 'Doanh thu dịch vụ', href: '/admin/reports/game-services', platformOnly: true },
+        ],
     },
     {
         key: 'audit-logs',
@@ -96,11 +100,13 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         key: 'game-services',
         label: 'Dịch vụ game',
         icon: Layers3,
+        badge: 'game-service-reviews',
         children: [
             { label: 'Quản lý game', href: '/admin/game-services/games' },
             { label: 'Quản lý dịch vụ', href: '/admin/game-services/services' },
             { label: 'Gói dịch vụ', href: '/admin/game-services/packages' },
             { label: 'Quản lý đơn order', href: '/admin/game-services/orders' },
+            { label: 'Duyệt hoàn thành', href: '/admin/game-services/order-reviews', badge: 'game-service-reviews' },
             { label: 'Quản lý chat', href: '/admin/game-services/chats' },
             { label: 'Thông báo Dashboard CTV', href: '/admin/game-services/announcements' },
         ],

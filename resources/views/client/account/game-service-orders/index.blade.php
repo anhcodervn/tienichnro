@@ -4,25 +4,6 @@
 @section('robots', 'noindex,nofollow')
 
 @section('content')
-@php
-    $statusLabels = [
-        'pending' => 'Chờ tiếp nhận',
-        'processing' => 'Đang xử lý',
-        'review' => 'Chờ duyệt',
-        'completed' => 'Hoàn thành',
-        'failed' => 'Thất bại',
-        'cancelled' => 'Đã hủy',
-    ];
-    $statusClasses = [
-        'pending' => 'border-amber-200 bg-amber-50 text-amber-700',
-        'processing' => 'border-blue-200 bg-blue-50 text-blue-700',
-        'review' => 'border-violet-200 bg-violet-50 text-violet-700',
-        'completed' => 'border-emerald-200 bg-emerald-50 text-emerald-700',
-        'failed' => 'border-rose-200 bg-rose-50 text-rose-700',
-        'cancelled' => 'border-slate-200 bg-slate-100 text-slate-600',
-    ];
-@endphp
-
 <section class="client-container py-8 sm:py-10">
     <header class="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div class="min-w-0">
@@ -49,6 +30,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($orders as $order)
+                        @php($needsSupport = in_array($order->status, ['failed', 'cancelled'], true))
                         <tr class="transition hover:bg-slate-50/80">
                             <td class="px-4 py-4 text-center align-top font-semibold text-slate-500">{{ ($orders->firstItem() ?? 1) + $loop->index }}</td>
                             <td class="px-4 py-4 align-top">
@@ -64,17 +46,21 @@
                                 <p class="mt-1 text-xs text-slate-500">{{ $order->server_name ?: 'Không xác định' }} · SL {{ number_format($order->quantity) }}</p>
                             </td>
                             <td class="whitespace-nowrap px-4 py-4 text-right align-top font-extrabold text-slate-950">{{ number_format($order->total_amount, 0, ',', '.') }}đ</td>
-                            <td class="px-4 py-4 align-top"><span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $statusClasses[$order->status] ?? 'border-slate-200 bg-slate-50 text-slate-600' }}">{{ $statusLabels[$order->status] ?? $order->status }}</span></td>
+                            <td class="px-4 py-4 align-top"><x-client.game-service-order-status :status="$order->status" /></td>
                             <td class="px-4 py-4 align-top">
                                 <div class="flex items-center justify-end gap-2">
                                     <a
-                                        class="inline-grid size-9 place-items-center rounded-[5px] bg-emerald-600 text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                                        @class([
+                                            'min-h-9 items-center justify-center rounded-[5px] text-white transition focus:outline-none focus:ring-2 focus:ring-offset-2',
+                                            'inline-flex gap-1.5 bg-rose-600 px-3 text-xs font-extrabold hover:bg-rose-700 focus:ring-rose-500' => $needsSupport,
+                                            'inline-grid size-9 bg-emerald-600 hover:bg-emerald-700 focus:ring-emerald-500' => !$needsSupport,
+                                        ])
                                         href="{{ route('account.game-service-orders.chat', $order) }}"
                                         aria-label="Chat đơn {{ $order->code }}"
-                                        title="Chat"
+                                        title="{{ $needsSupport ? 'Chat để xem vấn đề' : 'Chat' }}"
                                     >
                                         <i class="bx bx-message-circle-dots text-lg" aria-hidden="true"></i>
-                                        <span class="sr-only">Chat đơn {{ $order->code }}</span>
+                                        <span @class(['sr-only' => !$needsSupport])>{{ $needsSupport ? 'Chat xem vấn đề' : 'Chat đơn '.$order->code }}</span>
                                     </a>
                                     @if ($order->status === 'pending')
                                         <form

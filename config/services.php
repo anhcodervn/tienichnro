@@ -82,7 +82,6 @@ return [
 
     'game_service_secondary_auth' => [
         'password' => env('GAME_SERVICE_SECONDARY_PASSWORD'),
-        'ttl_minutes' => (int) env('GAME_SERVICE_SECONDARY_PASSWORD_TTL', 30),
     ],
 
 ];

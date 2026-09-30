@@ -23,6 +23,8 @@ class GameServiceOrder extends Model
         'email', 'game_name', 'service_name', 'package_name', 'price_label', 'server_name', 'payload', 'quantity', 'unit_price',
         'total_amount', 'collaborator_unit_cost', 'collaborator_total_cost', 'gross_profit', 'tax_enabled',
         'collaborator_settlement_amount', 'collaborator_wallet_transaction_id', 'collaborator_settled_at',
+        'collaborator_hold_transaction_id', 'collaborator_refund_transaction_id', 'collaborator_held_at',
+        'collaborator_available_at', 'collaborator_refunded_at',
         'tax_calculation_type', 'vat_rate', 'pit_rate', 'estimated_vat', 'estimated_pit', 'estimated_tax', 'net_profit',
         'profit_margin', 'status', 'admin_note', 'processing_at', 'completed_at',
     ];
@@ -41,6 +43,7 @@ class GameServiceOrder extends Model
             'estimated_tax' => 'integer', 'net_profit' => 'integer', 'profit_margin' => 'decimal:4',
             'processing_at' => 'datetime', 'completed_at' => 'datetime',
             'collaborator_settled_at' => 'datetime',
+            'collaborator_held_at' => 'datetime', 'collaborator_available_at' => 'datetime', 'collaborator_refunded_at' => 'datetime',
         ];
     }
 
@@ -78,6 +81,11 @@ class GameServiceOrder extends Model
     public function messages(): HasMany
     {
         return $this->hasMany(GameServiceOrderMessage::class);
+    }
+
+    public function progressUpdates(): HasMany
+    {
+        return $this->hasMany(GameServiceOrderProgress::class);
     }
 
     public function latestMessage(): HasOne

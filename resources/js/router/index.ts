@@ -8,7 +8,8 @@ const routes: RouteRecordRaw[] = [adminRouter, affiliateRouter, collaboratorRout
 
 const routeTitles: Record<string, string> = {
     'admin.dashboard': 'Tổng quan quản trị',
-    'admin.reports.index': 'Báo cáo tăng trưởng và doanh thu',
+    'admin.reports.topup': 'Doanh thu nạp game',
+    'admin.reports.game-services': 'Doanh thu dịch vụ game',
     'admin.affiliate.index': 'Quản lý Affiliate',
     'admin.affiliate.announcements': 'Thông báo Affiliate',
     'admin.support.index': 'Tin nhắn hỗ trợ',

@@ -1,15 +1,22 @@
 <?php
 
+use App\Features\Affiliate\Services\AffiliateWalletService;
+use App\Features\Client\Wallet\Services\WalletService;
 use App\Models\Game;
 use App\Models\GameServer;
 use App\Models\GameService;
 use App\Models\GameServiceOrder;
 use App\Models\GameServiceOrderMessage;
+use App\Models\GameServiceOrderProgress;
 use App\Models\GameServicePackage;
 use App\Models\GameServicePackagePrice;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Models\Wallet;
 use App\Support\SettingStore;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 
 function validGameServicePayload(Game $game, GameServer $server): array
 {
@@ -82,6 +89,18 @@ test('game service admin endpoints require a platform admin', function (): void 
     $this->actingAs(User::factory()->create())
         ->getJson('/api/admin-api/game-service-games')
         ->assertForbidden();
+});
+
+test('admin review count only includes orders waiting for completion approval', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    GameServiceOrder::factory()->count(3)->create(['status' => 'review']);
+    GameServiceOrder::factory()->create(['status' => 'processing']);
+    GameServiceOrder::factory()->create(['status' => 'completed']);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/game-service-orders/review-count')
+        ->assertSuccessful()
+        ->assertJsonPath('data.count', 3);
 });
 
 test('admin enables an existing catalog game for services without duplicating game identity', function (): void {
@@ -214,13 +233,16 @@ test('package status controls its single price status without exposing price con
 });
 
 test('admin filters and updates game service orders while preserving snapshots', function (): void {
+    Storage::fake('local');
     $admin = User::factory()->create(['role' => 'admin']);
+    $collaborator = User::factory()->create(['role' => User::ROLE_COLLABORATOR]);
     $game = Game::factory()->create();
     $server = GameServer::factory()->for($game)->create();
     $service = GameService::factory()->for($game)->create();
     $package = GameServicePackage::factory()->for($service, 'service')->create();
     $price = GameServicePackagePrice::factory()->for($package, 'package')->create(['price' => 50000]);
     $order = GameServiceOrder::factory()->create([
+        'collaborator_id' => $collaborator->id,
         'game_id' => $game->id,
         'game_service_id' => $service->id,
         'game_service_package_id' => $package->id,
@@ -246,12 +268,122 @@ test('admin filters and updates game service orders while preserving snapshots',
             'status' => 'completed',
             'admin_note' => 'Đã bàn giao dịch vụ.',
         ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('status');
+
+    $order->forceFill(['status' => 'review'])->save();
+    $proofPath = "game-service-orders/{$order->code}/completion/proof.webp";
+    Storage::disk('local')->put($proofPath, 'proof');
+    GameServiceOrderProgress::factory()->create([
+        'game_service_order_id' => $order->id,
+        'user_id' => $collaborator->id,
+        'type' => GameServiceOrderProgress::TYPE_COMPLETION,
+        'image_path' => $proofPath,
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson('/api/admin-api/game-service-orders?exclude_status=review&search='.$order->code)
+        ->assertSuccessful()
+        ->assertJsonCount(0, 'data.data');
+
+    $this->actingAs($admin)
+        ->patchJson("/api/admin-api/game-service-orders/{$order->code}/approve-completion", [
+            'admin_note' => 'Đã kiểm tra báo cáo hoàn thành.',
+        ])
         ->assertSuccessful()
         ->assertJsonPath('data.status', 'completed')
-        ->assertJsonPath('data.admin_note', 'Đã bàn giao dịch vụ.');
+        ->assertJsonPath('data.admin_note', 'Đã kiểm tra báo cáo hoàn thành.');
 
     expect($order->refresh()->completed_at)->not->toBeNull()
         ->and($order->service_name)->toBe($service->name);
+});
+
+test('admin cannot approve an invalid completion report and can return the order to processing', function (): void {
+    Storage::fake('local');
+    $admin = User::factory()->create(['role' => 'admin']);
+    $collaborator = User::factory()->create(['role' => User::ROLE_COLLABORATOR]);
+    $order = GameServiceOrder::factory()->create([
+        'collaborator_id' => $collaborator->id,
+        'status' => 'review',
+    ]);
+
+    $this->actingAs($admin)
+        ->patchJson("/api/admin-api/game-service-orders/{$order->code}/approve-completion")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('completion_report');
+
+    $this->actingAs($admin)
+        ->patchJson("/api/admin-api/game-service-orders/{$order->code}", [
+            'status' => 'failed',
+            'admin_note' => 'Không được kết thúc đơn tại màn duyệt.',
+        ])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('status');
+
+    $this->actingAs($admin)
+        ->patchJson("/api/admin-api/game-service-orders/{$order->code}", [
+            'status' => 'processing',
+            'admin_note' => 'CTV cần bổ sung lại bằng chứng.',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('data.status', 'processing');
+
+    expect($order->refresh()->status)->toBe('processing')
+        ->and($order->completed_at)->toBeNull();
+});
+
+test('admin can fail an order with customer refund and collaborator hold reversal', function (): void {
+    $admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
+    $customer = User::factory()->create(['tenant_id' => $admin->tenant_id]);
+    $collaborator = User::factory()->create(['tenant_id' => $admin->tenant_id, 'role' => User::ROLE_COLLABORATOR]);
+    $customerWallet = Wallet::query()
+        ->where('user_id', $customer->id)
+        ->where('type', Wallet::TYPE_MAIN)
+        ->firstOrFail();
+    $customerWallet->forceFill(['balance' => 100000])->save();
+    $order = GameServiceOrder::factory()->for($customer)->create([
+        'collaborator_id' => $collaborator->id,
+        'status' => 'processing',
+        'total_amount' => 50000,
+        'collaborator_total_cost' => 32000,
+    ]);
+
+    DB::transaction(function () use ($customer, $order): void {
+        app(WalletService::class)->debit(
+            $customer,
+            50000,
+            GameServiceOrder::class,
+            $order->id,
+            'Thanh toán đơn '.$order->code,
+            idempotencyKey: (string) Str::uuid(),
+        );
+        app(AffiliateWalletService::class)->holdGameServiceOrder($order);
+    });
+
+    $this->actingAs($admin)
+        ->patchJson("/api/admin-api/game-service-orders/{$order->code}/refund", [
+            'status' => 'failed',
+            'admin_note' => 'Dịch vụ không thể hoàn thành, hoàn lại toàn bộ tiền.',
+        ])
+        ->assertSuccessful()
+        ->assertJsonPath('data.status', 'failed');
+
+    $collaboratorWallet = Wallet::query()->withoutGlobalScopes()
+        ->where('user_id', $collaborator->id)
+        ->where('type', Wallet::TYPE_COLLABORATOR)
+        ->firstOrFail();
+
+    expect((int) $customerWallet->refresh()->balance)->toBe(100000)
+        ->and((int) $collaboratorWallet->work_hold_balance)->toBe(0)
+        ->and($order->refresh()->collaborator_refunded_at)->not->toBeNull()
+        ->and($order->collaborator_refund_transaction_id)->not->toBeNull();
+
+    $this->actingAs($admin)
+        ->patchJson("/api/admin-api/game-service-orders/{$order->code}/refund", [
+            'status' => 'failed',
+            'admin_note' => 'Không được hoàn lần hai.',
+        ])
+        ->assertUnprocessable();
 });
 
 test('admin game service order summary only settles completed orders while each order keeps its settlement', function (): void {
@@ -382,15 +514,43 @@ test('order chat is private to its owner assigned collaborator and admins can in
     $collaborator = User::factory()->create(['role' => User::ROLE_COLLABORATOR]);
     $otherCollaborator = User::factory()->create(['role' => User::ROLE_COLLABORATOR]);
     $admin = User::factory()->create(['role' => 'admin']);
-    $order = GameServiceOrder::factory()->for($owner)->create(['collaborator_id' => $collaborator->id]);
-    $foreignOrder = GameServiceOrder::factory()->create(['collaborator_id' => $otherCollaborator->id]);
+    $game = Game::factory()->create([
+        'image' => '/storage/uploads/games/ngoc-rong-online.webp',
+    ]);
+    $order = GameServiceOrder::factory()->for($owner)->create([
+        'collaborator_id' => $collaborator->id,
+        'game_id' => $game->id,
+        'status' => 'processing',
+    ]);
+    $foreignOrder = GameServiceOrder::factory()->create([
+        'collaborator_id' => $otherCollaborator->id,
+        'status' => 'processing',
+    ]);
     $unassignedOrder = GameServiceOrder::factory()->create(['collaborator_id' => null]);
     $collaboratorHeaders = gameServiceSecondaryHeaders($collaborator);
 
     $this->actingAs($owner)
+        ->get(route('account.game-service-orders.chat', $order))
+        ->assertSuccessful()
+        ->assertSee('data-order-chat-heading', false)
+        ->assertSee('/storage/uploads/games/ngoc-rong-online.webp', false);
+
+    $fallbackOrder = GameServiceOrder::factory()->for($owner)->create([
+        'game_id' => null,
+        'game_name' => 'Ngọc Rồng Online',
+        'service_name' => 'Săn đệ tử',
+    ]);
+
+    $this->actingAs($owner)
+        ->get(route('account.game-service-orders.chat', $fallbackOrder))
+        ->assertSuccessful()
+        ->assertSee('NG');
+
+    $this->actingAs($owner)
         ->postJson("/api/client/game-service-orders/{$order->code}/messages", ['message' => 'Em cần hỏi tiến độ.'])
         ->assertCreated()
-        ->assertJsonPath('data.sender_role', GameServiceOrderMessage::ROLE_USER);
+        ->assertJsonPath('data.sender_role', GameServiceOrderMessage::ROLE_USER)
+        ->assertJsonPath('data.progress', null);
 
     $this->actingAs($collaborator)
         ->postJson(

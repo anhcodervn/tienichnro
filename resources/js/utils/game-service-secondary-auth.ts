@@ -2,7 +2,6 @@ const storageKey = 'napcarot.game-service-secondary-auth';
 
 export type GameServiceSecondaryGrant = {
     token: string;
-    expires_at: string;
 };
 
 export const getGameServiceSecondaryGrant = (): GameServiceSecondaryGrant | null => {
@@ -11,7 +10,7 @@ export const getGameServiceSecondaryGrant = (): GameServiceSecondaryGrant | null
         if (!rawGrant) return null;
 
         const grant = JSON.parse(rawGrant) as GameServiceSecondaryGrant;
-        if (!grant.token || !grant.expires_at || new Date(grant.expires_at).getTime() <= Date.now()) {
+        if (!grant.token) {
             window.sessionStorage.removeItem(storageKey);
             return null;
         }

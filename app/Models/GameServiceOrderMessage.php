@@ -18,7 +18,13 @@ class GameServiceOrderMessage extends Model
 
     public const ROLE_ADMIN = 'admin';
 
-    protected $fillable = ['game_service_order_id', 'sender_id', 'sender_role', 'message'];
+    protected $fillable = [
+        'game_service_order_id',
+        'sender_id',
+        'sender_role',
+        'game_service_order_progress_id',
+        'message',
+    ];
 
     public function order(): BelongsTo
     {
@@ -28,5 +34,10 @@ class GameServiceOrderMessage extends Model
     public function sender(): BelongsTo
     {
         return $this->belongsTo(User::class, 'sender_id');
+    }
+
+    public function progress(): BelongsTo
+    {
+        return $this->belongsTo(GameServiceOrderProgress::class, 'game_service_order_progress_id');
     }
 }

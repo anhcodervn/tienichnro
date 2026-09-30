@@ -19,8 +19,17 @@ export default {
         },
         {
             path: 'reports',
-            name: 'admin.reports.index',
+            redirect: { name: 'admin.reports.topup' },
+        },
+        {
+            path: 'reports/topup',
+            name: 'admin.reports.topup',
             component: () => import('@/pages/admin/reports/index.vue'),
+        },
+        {
+            path: 'reports/game-services',
+            name: 'admin.reports.game-services',
+            component: () => import('@/pages/admin/reports/game-services.vue'),
         },
         {
             path: 'audit-logs',
@@ -119,6 +128,11 @@ export default {
             path: 'game-services/orders',
             name: 'admin.game-services.orders',
             component: () => import('@/pages/admin/game-services/orders/index.vue'),
+        },
+        {
+            path: 'game-services/order-reviews',
+            name: 'admin.game-services.order-reviews',
+            component: () => import('@/pages/admin/game-services/order-reviews/index.vue'),
         },
         {
             path: 'game-services/chats',

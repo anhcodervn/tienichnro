@@ -33,6 +33,11 @@ export default {
             component: () => import('@/pages/affiliate/withdrawal/index.vue'),
         },
         {
+            path: 'lich-su-vi',
+            name: 'collaborator.wallet-history',
+            component: () => import('@/pages/affiliate/wallet-history/index.vue'),
+        },
+        {
             path: ':pathMatch(.*)*',
             redirect: { name: 'collaborator.dashboard' },
         },

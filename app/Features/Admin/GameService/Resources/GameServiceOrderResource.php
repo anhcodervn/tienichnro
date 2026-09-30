@@ -46,6 +46,10 @@ class GameServiceOrderResource extends JsonResource
             'admin_note' => $this->admin_note,
             'processing_at' => $this->processing_at?->toISOString(),
             'completed_at' => $this->completed_at?->toISOString(),
+            'collaborator_held_at' => $this->collaborator_held_at?->toISOString(),
+            'collaborator_available_at' => $this->collaborator_available_at?->toISOString(),
+            'collaborator_settled_at' => $this->collaborator_settled_at?->toISOString(),
+            'collaborator_refunded_at' => $this->collaborator_refunded_at?->toISOString(),
             'created_at' => $this->created_at?->toISOString(),
         ];
     }

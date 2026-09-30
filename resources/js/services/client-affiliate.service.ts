@@ -65,6 +65,7 @@ export type GameServiceChatMessage = {
     sender_role: 'user' | 'collaborator' | 'admin';
     sender_name: string;
     message: string;
+    progress: { id: number; type: 'progress' | 'completion'; image_url: string | null } | null;
     created_at: string;
 };
 
@@ -86,6 +87,15 @@ export type GameServiceChatThread = {
     messages: GameServiceChatMessage[];
 };
 
+export type GameServiceOrderProgress = {
+    id: number;
+    type: 'progress' | 'completion';
+    description: string;
+    image_url: string | null;
+    author: { id: number; name: string; role: string } | null;
+    created_at: string;
+};
+
 export type CollaboratorOrder = {
     code: string;
     game_id: number | null;
@@ -102,7 +112,13 @@ export type CollaboratorOrder = {
     can_claim: boolean;
     can_chat: boolean;
     settled_at: string | null;
+    available_at: string | null;
+    refunded_at: string | null;
     created_at: string;
+};
+
+export type CollaboratorOrderPreview = CollaboratorOrder & {
+    customer_note: string | null;
 };
 
 export type CollaboratorDashboardData = {
@@ -120,7 +136,7 @@ export type CollaboratorOrdersData = {
 
 export type CollaboratorFinanceData = {
     minimum_withdrawal: number;
-    wallet: { balance: number; hold_balance: number };
+    wallet: { balance: number; hold_balance: number; work_hold_balance: number };
     profile: {
         status: 'active' | 'suspended';
         bank_name: string | null;
@@ -129,6 +145,24 @@ export type CollaboratorFinanceData = {
         has_payout_account: boolean;
     };
     withdrawals: Array<{ id: number; amount: number; status: string; bank_name: string; account_number: string; created_at: string }>;
+};
+
+export type CollaboratorWalletHistoryData = {
+    wallet: { balance: number; hold_balance: number; work_hold_balance: number };
+    data: Array<{
+        id: number;
+        type: string;
+        event: string | null;
+        amount: number;
+        balance_before: number;
+        balance_after: number;
+        work_hold_before: number | null;
+        work_hold_after: number | null;
+        order_code: string | null;
+        description: string;
+        created_at: string;
+    }>;
+    meta: { current_page: number; last_page: number; total: number };
 };
 
 export const clientAffiliateService = {
@@ -144,6 +178,8 @@ export const clientAffiliateService = {
     readCollaboratorAnnouncement: async (id: number): Promise<number> =>
         (await api.post(`${root}/game-service-announcements/${id}/read`)).data.data.unread_count,
     collaboratorFinance: async (): Promise<CollaboratorFinanceData> => (await api.get(`${root}/game-service-finance`)).data.data,
+    collaboratorWalletHistory: async (page = 1): Promise<CollaboratorWalletHistoryData> =>
+        (await api.get(`${root}/game-service-wallet-history`, { params: { page } })).data.data,
     updateCollaboratorPayout: (payload: { bank_name: string; bank_account_name: string; bank_account_number: string }) =>
         api.put(`${root}/game-service-payout-account`, payload),
     withdrawCollaborator: (amount: number, idempotencyKey: string) =>
@@ -152,9 +188,14 @@ export const clientAffiliateService = {
         (await api.get(`${root}/game-service-orders`, { params })).data.data,
     gameServiceOrderPayload: async (code: string): Promise<Record<string, string | number | null>> =>
         (await api.get(`${root}/game-service-orders/${code}/payload`)).data.data.payload,
+    gameServiceOrderPreview: async (code: string): Promise<CollaboratorOrderPreview> =>
+        (await api.get(`${root}/game-service-orders/${code}/preview`)).data.data,
     gameServiceOrderChats: async (): Promise<GameServiceChatOrder[]> => (await api.get(`${root}/game-service-order-chats`)).data.data,
     startGameServiceOrder: (code: string) => api.post(`${root}/game-service-orders/${code}/start`),
-    submitGameServiceOrder: (code: string) => api.post(`${root}/game-service-orders/${code}/submit`),
+    gameServiceOrderProgress: async (code: string): Promise<GameServiceOrderProgress[]> =>
+        (await api.get(`${root}/game-service-orders/${code}/progress`)).data.data.progress,
+    storeGameServiceOrderProgress: (code: string, payload: FormData) => api.post(`${root}/game-service-orders/${code}/progress`, payload),
+    completeGameServiceOrder: (code: string, payload: FormData) => api.post(`${root}/game-service-orders/${code}/submit`, payload),
     gameServiceOrderThread: async (code: string): Promise<GameServiceChatThread> =>
         (await api.get(`${root}/game-service-orders/${code}/messages`)).data.data,
     sendGameServiceOrderMessage: async (code: string, message: string): Promise<GameServiceChatMessage> =>

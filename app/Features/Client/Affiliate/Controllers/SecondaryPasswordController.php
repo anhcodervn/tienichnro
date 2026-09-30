@@ -22,7 +22,6 @@ class SecondaryPasswordController extends Controller
             'data' => [
                 'configured' => $this->secondaryAuth->isConfigured($user),
                 'unlocked' => $this->secondaryAuth->isUnlocked($user, $request),
-                'expires_in_minutes' => $this->secondaryAuth->ttlMinutes(),
             ],
         ])->header('Cache-Control', 'no-store, private');
     }

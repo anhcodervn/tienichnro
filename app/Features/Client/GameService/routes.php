@@ -20,6 +20,10 @@ Route::middleware(['site.active', 'auth'])->group(function (): void {
         ->name('client.game-service-orders.messages.index');
     Route::post('/api/client/game-service-orders/{gameServiceOrder}/messages', [GameServiceOrderChatController::class, 'store'])
         ->middleware('throttle:30,1')->name('client.game-service-orders.messages.store');
+    Route::get('/api/client/game-service-orders/{gameServiceOrder}/progress', [GameServiceOrderChatController::class, 'progress'])
+        ->name('client.game-service-orders.progress.index');
+    Route::get('/tai-khoan/dich-vu-game/{gameServiceOrder}/tien-trinh/{gameServiceOrderProgress}/anh', [GameServiceOrderChatController::class, 'image'])
+        ->name('account.game-service-orders.progress.image');
 });
 
 Route::get('/dich-vu-game-{game:slug}/{gameService:slug}', GameServiceDetailController::class)

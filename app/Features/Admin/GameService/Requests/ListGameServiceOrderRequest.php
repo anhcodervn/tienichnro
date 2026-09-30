@@ -22,6 +22,7 @@ class ListGameServiceOrderRequest extends FormRequest
             'game_id' => ['nullable', 'integer', Rule::exists(Game::class, 'id')],
             'game_service_id' => ['nullable', 'integer', Rule::exists(GameService::class, 'id')],
             'status' => ['nullable', Rule::in(GameServiceOrder::STATUSES)],
+            'exclude_status' => ['nullable', Rule::in(GameServiceOrder::STATUSES)],
             'per_page' => ['nullable', 'integer', Rule::in([10, 20, 50, 100])],
             'page' => ['nullable', 'integer', 'min:1'],
         ];

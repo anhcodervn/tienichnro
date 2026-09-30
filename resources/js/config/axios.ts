@@ -1,5 +1,5 @@
-import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from "axios"
-import { clearGameServiceSecondaryGrant, getGameServiceSecondaryToken } from "@/utils/game-service-secondary-auth"
+import { clearGameServiceSecondaryGrant, getGameServiceSecondaryToken } from '@/utils/game-service-secondary-auth';
+import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 /**
  * =========================
@@ -7,13 +7,12 @@ import { clearGameServiceSecondaryGrant, getGameServiceSecondaryToken } from "@/
  * =========================
  */
 const api: AxiosInstance = axios.create({
-  baseURL: window.location.origin,
-  withCredentials: true,
-  headers: {
-    "X-Requested-With": "XMLHttpRequest",
-    "Content-Type": "application/json"
-  }
-})
+    baseURL: window.location.origin,
+    withCredentials: true,
+    headers: {
+        'X-Requested-With': 'XMLHttpRequest',
+    },
+});
 
 /**
  * =========================
@@ -21,22 +20,20 @@ const api: AxiosInstance = axios.create({
  * =========================
  */
 const getCsrfFromMeta = () => {
-  return document
-    .querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-    ?.content || ""
-}
+    return document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content || '';
+};
 
-api.defaults.headers.common["X-CSRF-TOKEN"] = getCsrfFromMeta()
+api.defaults.headers.common['X-CSRF-TOKEN'] = getCsrfFromMeta();
 
 api.interceptors.request.use((config) => {
-  const secondaryToken = getGameServiceSecondaryToken()
+    const secondaryToken = getGameServiceSecondaryToken();
 
-  if (secondaryToken) {
-    config.headers.set("X-Game-Service-Secondary-Token", secondaryToken)
-  }
+    if (secondaryToken) {
+        config.headers.set('X-Game-Service-Secondary-Token', secondaryToken);
+    }
 
-  return config
-})
+    return config;
+});
 
 /**
  * =========================
@@ -44,32 +41,32 @@ api.interceptors.request.use((config) => {
  * =========================
  */
 const refreshCsrf = async (): Promise<string> => {
-  const res = await fetch("/csrf-token", {
-    credentials: "include"
-  })
+    const res = await fetch('/csrf-token', {
+        credentials: 'include',
+    });
 
-  const data = await res.json()
+    const data = await res.json();
 
-  const newToken = data.csrf_token
+    const newToken = data.csrf_token;
 
-  // update global header
-  api.defaults.headers.common["X-CSRF-TOKEN"] = newToken
+    // update global header
+    api.defaults.headers.common['X-CSRF-TOKEN'] = newToken;
 
-  return newToken
-}
+    return newToken;
+};
 
 /**
  * =========================
  * QUEUE SYSTEM (tránh spam)
  * =========================
  */
-let isRefreshing = false
-let queue: Array<() => void> = []
+let isRefreshing = false;
+let queue: Array<() => void> = [];
 
 const processQueue = () => {
-  queue.forEach(cb => cb())
-  queue = []
-}
+    queue.forEach((cb) => cb());
+    queue = [];
+};
 
 /**
  * =========================
@@ -77,63 +74,63 @@ const processQueue = () => {
  * =========================
  */
 api.interceptors.response.use(
-  (response) => response,
+    (response) => response,
 
-  async (error: AxiosError) => {
-    const responseData = error.response?.data as { code?: string } | undefined
+    async (error: AxiosError) => {
+        const responseData = error.response?.data as { code?: string } | undefined;
 
-    if (error.response?.status === 423 && responseData?.code === "SECONDARY_PASSWORD_REQUIRED") {
-      clearGameServiceSecondaryGrant()
-      window.dispatchEvent(new Event("game-service-secondary-auth:locked"))
-    }
+        if (error.response?.status === 423 && responseData?.code === 'SECONDARY_PASSWORD_REQUIRED') {
+            clearGameServiceSecondaryGrant();
+            window.dispatchEvent(new Event('game-service-secondary-auth:locked'));
+        }
 
-    const originalRequest = error.config as InternalAxiosRequestConfig & {
-      _retry?: boolean
-    }
+        const originalRequest = error.config as InternalAxiosRequestConfig & {
+            _retry?: boolean;
+        };
 
-    // nếu không phải 419 → bỏ qua
-    if (error.response?.status !== 419) {
-      return Promise.reject(error)
-    }
+        // nếu không phải 419 → bỏ qua
+        if (error.response?.status !== 419) {
+            return Promise.reject(error);
+        }
 
-    // tránh loop vô hạn
-    if (originalRequest._retry) {
-      return Promise.reject(error)
-    }
+        // tránh loop vô hạn
+        if (originalRequest._retry) {
+            return Promise.reject(error);
+        }
 
-    originalRequest._retry = true
+        originalRequest._retry = true;
 
-    // nếu đang refresh → đợi
-    if (isRefreshing) {
-      return new Promise(resolve => {
-        queue.push(() => {
-          resolve(api(originalRequest))
-        })
-      })
-    }
+        // nếu đang refresh → đợi
+        if (isRefreshing) {
+            return new Promise((resolve) => {
+                queue.push(() => {
+                    resolve(api(originalRequest));
+                });
+            });
+        }
 
-    isRefreshing = true
+        isRefreshing = true;
 
-    try {
-      const newToken = await refreshCsrf()
+        try {
+            const newToken = await refreshCsrf();
 
-      // gắn lại token cho request cũ
-      originalRequest.headers["X-CSRF-TOKEN"] = newToken
+            // gắn lại token cho request cũ
+            originalRequest.headers['X-CSRF-TOKEN'] = newToken;
 
-      processQueue()
+            processQueue();
 
-      return api(originalRequest) // retry
-    } catch (err) {
-      console.error("Refresh CSRF thất bại")
+            return api(originalRequest); // retry
+        } catch (err) {
+            console.error('Refresh CSRF thất bại');
 
-      // session chết → reload
-      window.location.reload()
+            // session chết → reload
+            window.location.reload();
 
-      return Promise.reject(err)
-    } finally {
-      isRefreshing = false
-    }
-  }
-)
+            return Promise.reject(err);
+        } finally {
+            isRefreshing = false;
+        }
+    },
+);
 
-export default api
+export default api;

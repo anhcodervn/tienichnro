@@ -60,9 +60,6 @@ function gameServiceSecondaryHeaders(User $user): array
         config()->set('services.game_service_secondary_auth.password', 'test-secondary-password');
     }
 
-    config()->set('services.game_service_secondary_auth.ttl_minutes', 30);
-    config()->set('cache.default', 'array');
-
     $grant = app(GameServiceSecondaryAuth::class)->unlock($user, 'test-secondary-password');
 
     return [GameServiceSecondaryAuth::HEADER_NAME => $grant['token']];

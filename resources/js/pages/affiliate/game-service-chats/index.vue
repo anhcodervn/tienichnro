@@ -2,8 +2,10 @@
 import { clientAffiliateService, type GameServiceChatMessage, type GameServiceChatOrder } from '@/services/client-affiliate.service';
 import { handleErrorResponse } from '@/utils/response';
 import { ArrowLeft, LoaderCircle, MessageCircle, RefreshCw, Search, Send } from 'lucide-vue-next';
-import { computed, nextTick, onBeforeUnmount, onMounted, ref } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { useRoute } from 'vue-router';
 
+const route = useRoute();
 const threads = ref<GameServiceChatOrder[]>([]);
 const selected = ref<GameServiceChatOrder | null>(null);
 const messages = ref<GameServiceChatMessage[]>([]);
@@ -118,9 +120,19 @@ const refresh = async (): Promise<void> => {
 
 onMounted(async () => {
     await loadThreads();
-    if (threads.value[0]) await openThread(threads.value[0]);
+    const requestedOrder = typeof route.query.order === 'string' ? route.query.order : '';
+    const initialThread = threads.value.find((thread) => thread.code === requestedOrder) ?? threads.value[0];
+    if (initialThread) await openThread(initialThread);
     refreshTimer = window.setInterval(() => void refresh(), 5000);
 });
+watch(
+    () => route.query.order,
+    (orderCode) => {
+        if (typeof orderCode !== 'string' || selected.value?.code === orderCode) return;
+        const thread = threads.value.find((item) => item.code === orderCode);
+        if (thread) void openThread(thread);
+    },
+);
 onBeforeUnmount(() => {
     if (refreshTimer !== null) window.clearInterval(refreshTimer);
 });
@@ -219,7 +231,7 @@ onBeforeUnmount(() => {
                     >
                         <div class="max-w-[85%]">
                             <p class="mb-1 text-xs font-bold text-slate-500">{{ roleLabel(message.sender_role) }} · {{ message.sender_name }}</p>
-                            <p
+                            <div
                                 class="whitespace-pre-wrap break-words rounded-xl px-4 py-2.5 text-sm shadow-sm"
                                 :class="
                                     message.sender_role === 'collaborator'
@@ -229,8 +241,20 @@ onBeforeUnmount(() => {
                                           : 'border border-slate-200 bg-white text-slate-900'
                                 "
                             >
-                                {{ message.message }}
-                            </p>
+                                <p>{{ message.message }}</p>
+                                <div v-if="message.progress" class="border-current/20 mt-2 border-t pt-2">
+                                    <p class="mb-2 text-xs font-bold">Cập nhật tiến trình</p>
+                                    <a
+                                        v-if="message.progress.image_url"
+                                        :href="message.progress.image_url"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="border-current/20 block overflow-hidden rounded-lg border bg-white/90"
+                                    >
+                                        <img :src="message.progress.image_url" alt="Ảnh tiến trình đơn hàng" class="max-h-72 w-full object-contain" />
+                                    </a>
+                                </div>
+                            </div>
                             <time class="text-[10px] text-slate-400">{{ formatTime(message.created_at) }}</time>
                         </div>
                     </article>

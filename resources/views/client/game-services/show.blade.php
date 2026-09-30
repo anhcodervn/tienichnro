@@ -38,22 +38,20 @@
                 <h2 id="game-services-title" class="mt-1 text-2xl font-extrabold text-slate-950">Danh sách dịch vụ</h2>
             </div>
 
-            <div class="mt-5 grid gap-5 sm:grid-cols-2 xl:grid-cols-3" data-game-service-list>
+            <div class="mt-4 grid grid-cols-2 gap-3 sm:mt-5 sm:gap-5 xl:grid-cols-3" data-game-service-list>
                 @foreach ($game->gameServices as $service)
                     <a href="{{ route('game-services.service', ['game' => $game, 'gameService' => $service]) }}" class="client-card group overflow-hidden transition hover:border-emerald-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" data-game-service-card>
-                        <div class="aspect-[16/9] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200">
+                        <div class="relative aspect-[16/9] overflow-hidden bg-gradient-to-br from-slate-100 to-slate-200">
                             @if ($service->background_image)
                                 <img class="h-full w-full object-cover transition duration-300 group-hover:scale-105" src="{{ $service->background_image }}" alt="{{ $service->name }}" loading="lazy">
                             @else
-                                <span class="grid h-full place-items-center text-5xl text-slate-400"><i class="bx bx-game" aria-hidden="true"></i></span>
+                                <span class="grid h-full place-items-center text-3xl text-slate-400 sm:text-5xl"><i class="bx bx-game" aria-hidden="true"></i></span>
                             @endif
+                            <span class="absolute right-1.5 top-1.5 rounded-full border border-white/80 bg-white/90 px-2 py-0.5 text-[10px] font-extrabold text-emerald-700 shadow-sm backdrop-blur-sm sm:right-3 sm:top-3 sm:px-2.5 sm:py-1 sm:text-xs" data-game-service-package-count>{{ $service->active_packages_count }} gói</span>
                         </div>
-                        <div class="grid gap-3 p-5">
-                            <div class="flex items-start justify-between gap-3">
-                                <h3 class="min-w-0 break-words text-xl font-extrabold text-slate-950">{{ $service->name }}</h3>
-                                <span class="shrink-0 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">{{ $service->active_packages_count }} gói</span>
-                            </div>
-                            <p class="text-sm font-bold text-amber-700" data-game-service-price-range>
+                        <div class="grid gap-2 p-3 sm:gap-3 sm:p-5">
+                            <h3 class="line-clamp-2 min-h-10 break-words text-sm font-extrabold leading-5 text-slate-950 sm:min-h-0 sm:text-xl sm:leading-7" data-game-service-card-title>{{ $service->name }}</h3>
+                            <p class="text-[11px] font-bold leading-4 text-amber-700 sm:text-sm sm:leading-5" data-game-service-price-range>
                                 @if ($service->minimum_price === null)
                                     Giá: Liên hệ
                                 @elseif ($service->minimum_price === $service->maximum_price)
@@ -62,7 +60,7 @@
                                     Giá từ {{ number_format($service->minimum_price, 0, ',', '.') }}đ - {{ number_format($service->maximum_price, 0, ',', '.') }}đ
                                 @endif
                             </p>
-                            <span class="inline-flex items-center gap-1 text-sm font-bold text-emerald-700">Xem dịch vụ <i class="bx bx-right-arrow-alt text-lg" aria-hidden="true"></i></span>
+                            <span class="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 sm:text-sm"><span class="sm:hidden">Chi tiết</span><span class="hidden sm:inline">Xem dịch vụ</span><i class="bx bx-right-arrow-alt text-base sm:text-lg" aria-hidden="true"></i></span>
                         </div>
                     </a>
                 @endforeach

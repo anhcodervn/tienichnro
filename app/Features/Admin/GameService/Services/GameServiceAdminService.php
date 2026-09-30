@@ -3,10 +3,12 @@
 namespace App\Features\Admin\GameService\Services;
 
 use App\Features\Affiliate\Services\AffiliateWalletService;
+use App\Features\Client\GameService\Services\GameServiceOrderService;
 use App\Models\AdminAuditLog;
 use App\Models\Game;
 use App\Models\GameService;
 use App\Models\GameServiceOrder;
+use App\Models\GameServiceOrderProgress;
 use App\Models\GameServicePackage;
 use App\Models\GameServicePackagePrice;
 use App\Models\User;
@@ -16,11 +18,15 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class GameServiceAdminService
 {
-    public function __construct(private readonly AffiliateWalletService $affiliateWalletService) {}
+    public function __construct(
+        private readonly AffiliateWalletService $affiliateWalletService,
+        private readonly GameServiceOrderService $gameServiceOrderService,
+    ) {}
 
     /** @param array<string, mixed> $filters */
     public function games(array $filters): LengthAwarePaginator
@@ -182,6 +188,11 @@ class GameServiceAdminService
             ->paginate($this->perPage($filters));
     }
 
+    public function reviewOrderCount(): int
+    {
+        return GameServiceOrder::query()->where('status', 'review')->count();
+    }
+
     /**
      * @param  array<string, mixed>  $filters
      * @return array<string, int>
@@ -228,7 +239,8 @@ class GameServiceAdminService
                 ->orWhere('package_name', 'like', "%{$search}%")))
             ->when(filled($filters['game_id'] ?? null), fn (Builder $query) => $query->where('game_id', $filters['game_id']))
             ->when(filled($filters['game_service_id'] ?? null), fn (Builder $query) => $query->where('game_service_id', $filters['game_service_id']))
-            ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']));
+            ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
+            ->when(filled($filters['exclude_status'] ?? null), fn (Builder $query) => $query->where('status', '!=', $filters['exclude_status']));
     }
 
     /** @param array<string, mixed> $payload */
@@ -239,10 +251,36 @@ class GameServiceAdminService
             $old = Arr::only($locked->getAttributes(), ['status', 'collaborator_id', 'admin_note', 'processing_at', 'completed_at']);
             $status = (string) $payload['status'];
 
-            if ($locked->collaborator_settled_at !== null
+            if ($status !== $locked->status && in_array($status, ['review', 'completed'], true)) {
+                throw ValidationException::withMessages([
+                    'status' => 'Trạng thái chờ duyệt và hoàn thành phải được cập nhật qua đúng quy trình duyệt báo cáo.',
+                ]);
+            }
+
+            if ($status !== $locked->status && in_array($status, ['failed', 'cancelled'], true)) {
+                throw ValidationException::withMessages([
+                    'status' => 'Hãy dùng thao tác hoàn tiền riêng để hủy hoặc đánh dấu đơn thất bại.',
+                ]);
+            }
+
+            if ($locked->status === 'review' && ! in_array($status, ['review', 'processing'], true)) {
+                throw ValidationException::withMessages([
+                    'status' => 'Đơn chưa đạt yêu cầu chỉ có thể trả lại trạng thái đang xử lý để cộng tác viên tiếp tục thực hiện.',
+                ]);
+            }
+
+            if ($locked->collaborator_held_at !== null
                 && array_key_exists('collaborator_id', $payload)
                 && (int) $payload['collaborator_id'] !== (int) $locked->collaborator_id) {
                 throw ValidationException::withMessages(['collaborator_id' => 'Không thể đổi CTV sau khi đơn đã được kết toán.']);
+            }
+
+            if ($locked->status === 'review'
+                && array_key_exists('collaborator_id', $payload)
+                && (int) $payload['collaborator_id'] !== (int) $locked->collaborator_id) {
+                throw ValidationException::withMessages([
+                    'collaborator_id' => 'Không thể đổi cộng tác viên khi đơn đang chờ duyệt hoàn thành.',
+                ]);
             }
 
             if (array_key_exists('collaborator_id', $payload)
@@ -251,7 +289,11 @@ class GameServiceAdminService
                 && $locked->game_service_id !== null
                 && ! User::query()
                     ->whereKey((int) $payload['collaborator_id'])
-                    ->whereHas('allowedGameServices', fn (Builder $query) => $query->whereKey($locked->game_service_id))
+                    ->where(function (Builder $candidateQuery) use ($locked): void {
+                        $candidateQuery
+                            ->where('role', User::ROLE_ADMIN)
+                            ->orWhereHas('allowedGameServices', fn (Builder $query) => $query->whereKey($locked->game_service_id));
+                    })
                     ->exists()) {
                 throw ValidationException::withMessages([
                     'collaborator_id' => 'CTV chưa được cấp quyền nhận dịch vụ của đơn này.',
@@ -262,14 +304,105 @@ class GameServiceAdminService
             $payload['completed_at'] = $status === 'completed' ? ($locked->completed_at ?? now()) : null;
             $locked->fill($payload)->save();
 
-            if ($status === 'completed') {
-                $this->affiliateWalletService->settleGameServiceOrder($locked);
-            } elseif ($locked->collaborator_settled_at !== null) {
-                $this->affiliateWalletService->reverseGameServiceOrderSettlement($locked);
+            if ($status === 'processing' && $locked->collaborator_id !== null) {
+                $this->affiliateWalletService->holdGameServiceOrder($locked);
             }
             $this->audit($admin, 'game_service_order_updated', $locked, $old, Arr::only($locked->fresh()->getAttributes(), array_keys($old)), $request);
 
             return $locked->refresh();
+        }, 3);
+    }
+
+    /** @param array<string, mixed> $payload */
+    public function approveOrderCompletion(GameServiceOrder $order, array $payload, User $admin, Request $request): GameServiceOrder
+    {
+        return DB::transaction(function () use ($order, $payload, $admin, $request): GameServiceOrder {
+            $locked = GameServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
+
+            if ($locked->status !== 'review') {
+                throw ValidationException::withMessages([
+                    'status' => 'Chỉ có thể xác nhận đơn đang chờ duyệt hoàn thành.',
+                ]);
+            }
+
+            $completionReport = $locked->progressUpdates()
+                ->where('type', GameServiceOrderProgress::TYPE_COMPLETION)
+                ->latest('id')
+                ->first();
+
+            if (! $completionReport instanceof GameServiceOrderProgress
+                || blank($completionReport->image_path)
+                || ! Storage::disk('local')->exists($completionReport->image_path)
+                || $locked->collaborator_id === null
+                || $completionReport->user_id !== $locked->collaborator_id) {
+                throw ValidationException::withMessages([
+                    'completion_report' => 'Báo cáo hoàn thành hoặc ảnh xác minh của cộng tác viên chưa hợp lệ.',
+                ]);
+            }
+
+            $old = Arr::only($locked->getAttributes(), ['status', 'admin_note', 'completed_at']);
+            $locked->forceFill([
+                'status' => 'completed',
+                'admin_note' => array_key_exists('admin_note', $payload) ? $payload['admin_note'] : $locked->admin_note,
+                'completed_at' => $locked->completed_at ?? now(),
+            ])->save();
+            $this->affiliateWalletService->scheduleGameServiceOrderSettlement($locked);
+            $this->audit(
+                $admin,
+                'game_service_order_completion_approved',
+                $locked,
+                $old,
+                Arr::only($locked->fresh()->getAttributes(), array_keys($old)),
+                $request,
+            );
+
+            return $locked->refresh()->load('collaborator:id,username,full_name');
+        }, 3);
+    }
+
+    /** @param array{status: string, admin_note: string} $payload */
+    public function refundOrder(GameServiceOrder $order, array $payload, User $admin, Request $request): GameServiceOrder
+    {
+        return DB::transaction(function () use ($order, $payload, $admin, $request): GameServiceOrder {
+            $locked = GameServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
+
+            if ($locked->collaborator_refunded_at !== null) {
+                throw ValidationException::withMessages(['order' => 'Đơn này đã được hoàn tiền trước đó.']);
+            }
+
+            if (! in_array($locked->status, ['pending', 'processing', 'review', 'completed'], true)) {
+                throw ValidationException::withMessages(['order' => 'Trạng thái hiện tại không thể hoàn tiền.']);
+            }
+
+            $old = Arr::only($locked->getAttributes(), ['status', 'admin_note', 'collaborator_available_at', 'collaborator_refunded_at']);
+            $refundedAmount = 0;
+
+            if ($locked->user_id !== null) {
+                $customer = User::query()->withoutGlobalScopes()->find($locked->user_id);
+                if ($customer instanceof User) {
+                    $refundedAmount = $this->gameServiceOrderService->refundWalletPayment($locked, $customer);
+                }
+            }
+
+            $this->affiliateWalletService->refundGameServiceOrder($locked);
+            $locked->forceFill([
+                'status' => $payload['status'],
+                'admin_note' => $payload['admin_note'],
+                'collaborator_available_at' => null,
+            ])->save();
+            $this->audit(
+                $admin,
+                'game_service_order_refunded',
+                $locked,
+                $old,
+                [
+                    ...Arr::only($locked->fresh()->getAttributes(), array_keys($old)),
+                    'customer_refunded_amount' => $refundedAmount,
+                ],
+                $request,
+            );
+
+            return $locked->refresh()->load('collaborator:id,username,full_name');
         }, 3);
     }
 

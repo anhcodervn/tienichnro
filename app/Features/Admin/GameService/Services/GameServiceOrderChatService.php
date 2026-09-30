@@ -10,12 +10,19 @@ use Illuminate\Support\Facades\DB;
 
 class GameServiceOrderChatService
 {
+    public function __construct(private readonly GameServiceOrderProgressService $progressService) {}
+
     /** @param array<string, mixed> $filters */
     public function adminThreads(array $filters): array
     {
         $search = trim((string) ($filters['search'] ?? ''));
         $orders = GameServiceOrder::query()
-            ->with(['user:id,username,full_name,email,avatar', 'collaborator:id,username,full_name,avatar', 'latestMessage.sender:id,username,full_name'])
+            ->with([
+                'user:id,username,full_name,email,avatar',
+                'collaborator:id,username,full_name,avatar',
+                'latestMessage.sender:id,username,full_name',
+                'latestMessage.progress.order:id,code',
+            ])
             ->withCount('messages')
             ->when($search !== '', fn (Builder $query) => $query->where(fn (Builder $nested) => $nested
                 ->where('code', 'like', "%{$search}%")
@@ -41,7 +48,13 @@ class GameServiceOrderChatService
 
         return GameServiceOrder::query()
             ->whereBelongsTo($collaborator, 'collaborator')
-            ->with(['user:id,username,full_name,email,avatar', 'collaborator:id,username,full_name,avatar', 'latestMessage.sender:id,username,full_name'])
+            ->where('status', '!=', 'pending')
+            ->with([
+                'user:id,username,full_name,email,avatar',
+                'collaborator:id,username,full_name,avatar',
+                'latestMessage.sender:id,username,full_name',
+                'latestMessage.progress.order:id,code',
+            ])
             ->withCount('messages')
             ->latest('id')
             ->limit(100)
@@ -54,13 +67,15 @@ class GameServiceOrderChatService
     public function collaborators(?int $gameServiceId = null, ?int $includeUserId = null): array
     {
         return User::query()
-            ->where('role', User::ROLE_COLLABORATOR)
+            ->whereIn('role', [User::ROLE_ADMIN, User::ROLE_COLLABORATOR])
             ->where('status', 'active')
             ->when($gameServiceId !== null, fn (Builder $query) => $query->where(function (Builder $permissionQuery) use ($gameServiceId, $includeUserId): void {
-                $permissionQuery->whereHas(
-                    'allowedGameServices',
-                    fn (Builder $serviceQuery) => $serviceQuery->whereKey($gameServiceId),
-                );
+                $permissionQuery
+                    ->where('role', User::ROLE_ADMIN)
+                    ->orWhereHas(
+                        'allowedGameServices',
+                        fn (Builder $serviceQuery) => $serviceQuery->whereKey($gameServiceId),
+                    );
 
                 if ($includeUserId !== null) {
                     $permissionQuery->orWhere(
@@ -83,12 +98,17 @@ class GameServiceOrderChatService
     public function thread(GameServiceOrder $order, User $actor): array
     {
         $this->authorize($order, $actor);
-        $order->loadMissing(['user:id,username,full_name,email,avatar', 'collaborator:id,username,full_name,avatar']);
+        $order->loadMissing([
+            'user:id,username,full_name,email,avatar',
+            'collaborator:id,username,full_name,avatar',
+            'latestMessage.sender:id,username,full_name',
+            'latestMessage.progress.order:id,code',
+        ]);
 
         return [
             'order' => $this->orderPayload($order),
             'messages' => $order->messages()
-                ->with('sender:id,username,full_name,avatar')
+                ->with(['sender:id,username,full_name,avatar', 'progress.order:id,code'])
                 ->latest('id')
                 ->limit(200)
                 ->get()
@@ -121,6 +141,7 @@ class GameServiceOrderChatService
     private function authorize(GameServiceOrder $order, User $actor): void
     {
         $isActiveCollaborator = $order->collaborator_id === $actor->id
+            && $order->status !== 'pending'
             && $actor->canAccessCollaboratorDashboard();
 
         abort_unless(
@@ -168,6 +189,11 @@ class GameServiceOrderChatService
             'sender_role' => (string) $message->sender_role,
             'sender_name' => $message->sender?->name ?? 'Tài khoản đã xóa',
             'message' => (string) $message->message,
+            'progress' => $message->progress ? [
+                'id' => (int) $message->progress->id,
+                'type' => (string) $message->progress->type,
+                'image_url' => $this->progressService->imageUrl($message->progress),
+            ] : null,
             'created_at' => $message->created_at?->toISOString(),
         ];
     }

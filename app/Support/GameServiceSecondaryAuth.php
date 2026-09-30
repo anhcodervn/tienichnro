@@ -3,8 +3,9 @@
 namespace App\Support;
 
 use App\Models\User;
+use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
@@ -18,12 +19,7 @@ class GameServiceSecondaryAuth
         return $this->credentialFingerprintSource($user) !== '';
     }
 
-    public function ttlMinutes(): int
-    {
-        return min(max((int) config('services.game_service_secondary_auth.ttl_minutes', 30), 5), 1440);
-    }
-
-    /** @return array{token: string, expires_at: string, expires_in_minutes: int} */
+    /** @return array{token: string} */
     public function unlock(User $user, string $password): array
     {
         abort_unless(
@@ -40,14 +36,15 @@ class GameServiceSecondaryAuth
             ]);
         }
 
-        $token = Str::random(80);
-        $expiresAt = now()->addMinutes($this->ttlMinutes());
-        Cache::put($this->cacheKey($user, $token), true, $expiresAt);
+        $token = Crypt::encryptString(json_encode([
+            'user_id' => (string) $user->getKey(),
+            'role' => $user->role,
+            'credential' => $this->credentialFingerprint($user),
+            'nonce' => Str::random(40),
+        ], JSON_THROW_ON_ERROR));
 
         return [
             'token' => $token,
-            'expires_at' => $expiresAt->toISOString(),
-            'expires_in_minutes' => $this->ttlMinutes(),
         ];
     }
 
@@ -63,7 +60,19 @@ class GameServiceSecondaryAuth
             return false;
         }
 
-        return Cache::get($this->cacheKey($user, $token)) === true;
+        try {
+            $grant = json_decode(Crypt::decryptString($token), true, 512, JSON_THROW_ON_ERROR);
+        } catch (DecryptException|\JsonException) {
+            return false;
+        }
+
+        if (! is_array($grant)) {
+            return false;
+        }
+
+        return hash_equals((string) ($grant['user_id'] ?? ''), (string) $user->getKey())
+            && hash_equals((string) ($grant['role'] ?? ''), (string) $user->role)
+            && hash_equals((string) ($grant['credential'] ?? ''), $this->credentialFingerprint($user));
     }
 
     private function configuredPassword(): string
@@ -103,12 +112,8 @@ class GameServiceSecondaryAuth
         };
     }
 
-    private function cacheKey(User $user, string $token): string
+    private function credentialFingerprint(User $user): string
     {
-        return 'game-service-secondary-auth:'
-            .$user->getKey().':'
-            .$user->role.':'
-            .hash('sha256', $this->credentialFingerprintSource($user)).':'
-            .hash('sha256', $token);
+        return hash('sha256', $this->credentialFingerprintSource($user));
     }
 }

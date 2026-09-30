@@ -135,10 +135,14 @@ test('user cannot cancel another customer order or a non pending order', functio
         ->and($processingOrder->refresh()->status)->toBe('processing');
 });
 
-test('history only renders the cancel icon for pending orders', function (): void {
+test('history presents four customer statuses and only allows pending cancellation', function (): void {
     $user = User::factory()->create();
     GameServiceOrder::factory()->create(['user_id' => $user->id, 'status' => 'pending']);
     GameServiceOrder::factory()->create(['user_id' => $user->id, 'status' => 'processing']);
+    GameServiceOrder::factory()->create(['user_id' => $user->id, 'status' => 'review']);
+    GameServiceOrder::factory()->create(['user_id' => $user->id, 'status' => 'completed']);
+    GameServiceOrder::factory()->create(['user_id' => $user->id, 'status' => 'failed']);
+    GameServiceOrder::factory()->create(['user_id' => $user->id, 'status' => 'cancelled']);
 
     $response = $this->actingAs($user)
         ->get(route('account.game-service-orders.index'))
@@ -147,4 +151,24 @@ test('history only renders the cancel icon for pending orders', function (): voi
         ->assertSee('bx bx-x-circle text-lg', false);
 
     expect(substr_count($response->getContent(), 'data-game-service-order-cancel-form'))->toBe(1);
+    expect(substr_count($response->getContent(), 'Chờ duyệt'))->toBe(1)
+        ->and(substr_count($response->getContent(), 'Đang thực hiện'))->toBe(2)
+        ->and(substr_count($response->getContent(), 'Hoàn thành'))->toBe(1)
+        ->and(substr_count($response->getContent(), 'Trả về/hoàn tiền'))->toBe(2)
+        ->and(substr_count($response->getContent(), 'Chat xem vấn đề'))->toBe(2);
+});
+
+test('returned order keeps chat available so the customer can understand the issue', function (): void {
+    $user = User::factory()->create();
+    $order = GameServiceOrder::factory()->create([
+        'user_id' => $user->id,
+        'status' => 'failed',
+    ]);
+
+    $this->actingAs($user)
+        ->get(route('account.game-service-orders.chat', $order))
+        ->assertSuccessful()
+        ->assertSee('Trả về/hoàn tiền')
+        ->assertSee('data-game-service-order-chat-support', false)
+        ->assertSee('data-order-chat-form', false);
 });

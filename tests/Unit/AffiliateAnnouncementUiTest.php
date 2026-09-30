@@ -14,7 +14,10 @@ test('affiliate navigation separates overview announcements and partner home', f
     $collaboratorDashboard = file_get_contents($projectRoot.'/resources/js/pages/affiliate/collaborator-dashboard/index.vue');
     $collaboratorOrders = file_get_contents($projectRoot.'/resources/js/pages/affiliate/game-service-orders/index.vue');
     $collaboratorChats = file_get_contents($projectRoot.'/resources/js/pages/affiliate/game-service-chats/index.vue');
+    $walletHistory = file_get_contents($projectRoot.'/resources/js/pages/affiliate/wallet-history/index.vue');
+    $clientOrderChat = file_get_contents($projectRoot.'/resources/views/client/account/game-service-orders/chat.blade.php');
     $clientAffiliateService = file_get_contents($projectRoot.'/resources/js/services/client-affiliate.service.ts');
+    $axios = file_get_contents($projectRoot.'/resources/js/config/axios.ts');
     $editor = file_get_contents($projectRoot.'/resources/js/components/shared/Editor/index.vue');
 
     expect($adminRouter)
@@ -46,6 +49,7 @@ test('affiliate navigation separates overview announcements and partner home', f
         ->toContain('@/pages/affiliate/collaborator-notifications/index.vue')
         ->toContain("name: 'collaborator.revenue'")
         ->toContain("name: 'collaborator.withdrawal'")
+        ->toContain("name: 'collaborator.wallet-history'")
         ->and($affiliateLayout)
         ->toContain('Quản lý đơn')
         ->toContain('Đơn đang chờ')
@@ -57,6 +61,7 @@ test('affiliate navigation separates overview announcements and partner home', f
         ->toContain('query: { status: item.status }')
         ->toContain('Chat đơn đã nhận')
         ->toContain('Quản lý doanh thu')
+        ->toContain('Lịch sử ví')
         ->toContain('summary.orders.pending')
         ->toContain('summary.unread_announcements')
         ->not->toContain('Dashboard hoa hồng')
@@ -86,16 +91,66 @@ test('affiliate navigation separates overview announcements and partner home', f
         ->toContain('order.can_claim')
         ->toContain('order.can_chat')
         ->toContain('Đơn chờ nhận và đơn được giao')
+        ->toContain('openOrderPreview(order)')
+        ->toContain('Xem đơn')
+        ->toContain('orderPreview.customer_note')
+        ->toContain('Xác nhận nhận đơn')
+        ->toContain('@click="startOrder(orderPreview)"')
+        ->not->toContain('@click="startOrder(order)"')
         ->toContain('openChat(order)')
+        ->toContain("router.push({ name: 'collaborator.chats', query: { order: order.code } })")
+        ->toContain('1. Thông tin')
+        ->toContain('2. Tiến trình')
+        ->toContain('3. Báo cáo hoàn thành')
+        ->toContain('Ảnh xác minh hoàn thành *')
+        ->toContain('clientAffiliateService.storeGameServiceOrderProgress')
+        ->toContain('clientAffiliateService.completeGameServiceOrder')
+        ->not->toContain('Gửi duyệt')
         ->and($collaboratorChats)
         ->toContain('Chat đơn đã nhận')
         ->toContain('clientAffiliateService.gameServiceOrderChats()')
         ->toContain('clientAffiliateService.gameServiceOrderThread(order.code)')
         ->toContain('clientAffiliateService.sendGameServiceOrderMessage')
+        ->toContain('route.query.order')
         ->toContain("document.visibilityState === 'hidden'")
+        ->toContain('message.progress.image_url')
+        ->and($walletHistory)
+        ->toContain('Lịch sử ví công việc')
+        ->toContain('Tiền công đang treo')
+        ->toContain('game_service_order_refunded')
+        ->toContain('transaction.order_code')
+        ->and($clientOrderChat)
+        ->toContain('data-progress-url=')
+        ->toContain('data-order-progress-open')
+        ->toContain('aria-controls="order-progress-modal"')
+        ->toContain('aria-haspopup="dialog"')
+        ->toContain('data-order-progress-modal')
+        ->toContain('role="dialog"')
+        ->toContain('data-order-chat-heading')
+        ->toContain('data-order-chat-back')
+        ->toContain('from-emerald-100 via-emerald-50 to-cyan-100')
+        ->toContain('{{ $gameIcon }}')
+        ->toContain('Icon {{ $order->game_name }}')
+        ->toContain('Xem tiến trình')
+        ->toContain('Tiến trình thực hiện')
+        ->toContain('loadProgress')
+        ->toContain("progressOpen.setAttribute('aria-expanded', 'true')")
+        ->toContain('if (!progressModal.hidden) void loadProgress()')
+        ->toContain('update.image_url')
+        ->toContain('message.progress.image_url')
         ->and($clientAffiliateService)
         ->toContain('`${root}/game-service-order-chats`')
+        ->toContain('`${root}/game-service-orders/${code}/preview`')
+        ->toContain("progress: { id: number; type: 'progress' | 'completion'; image_url: string | null } | null")
+        ->toContain('payload: FormData')
+        ->and($axios)
+        ->not->toContain('"Content-Type": "application/json"')
         ->and($editor)
         ->toContain('images_upload_handler: handleImageUpload')
         ->toContain("'alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | link image emoticons");
+
+    expect(strpos($clientOrderChat, 'data-order-chat-messages'))
+        ->toBeLessThan(strpos($clientOrderChat, 'data-order-progress-modal'));
+    expect(strpos($clientOrderChat, 'data-order-chat-back'))
+        ->toBeLessThan(strpos($clientOrderChat, '{{ $gameIcon }}'));
 });

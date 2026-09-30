@@ -24,6 +24,7 @@ class Wallet extends Model
         'type',
         'balance',
         'hold_balance',
+        'work_hold_balance',
         'total_recharge',
         'total_spent',
     ];
@@ -37,6 +38,7 @@ class Wallet extends Model
         return [
             'balance' => 'decimal:2',
             'hold_balance' => 'decimal:2',
+            'work_hold_balance' => 'decimal:2',
             'total_recharge' => 'decimal:2',
             'total_spent' => 'decimal:2',
         ];

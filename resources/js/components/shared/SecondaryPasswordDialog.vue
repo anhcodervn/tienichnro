@@ -38,7 +38,11 @@ const submit = (): void => {
 </script>
 
 <template>
-    <div v-if="open" class="fixed inset-0 z-[150] grid place-items-center bg-slate-950/65 p-4 backdrop-blur-sm" @click.self="!blocking && emit('close')">
+    <div
+        v-if="open"
+        class="fixed inset-0 z-[150] grid place-items-center bg-slate-950/65 p-4 backdrop-blur-sm"
+        @click.self="!blocking && emit('close')"
+    >
         <section class="w-full max-w-md overflow-hidden rounded-[11px] border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true">
             <header class="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4">
                 <div class="flex items-center gap-3">
@@ -84,7 +88,7 @@ const submit = (): void => {
                     <KeyRound v-else class="size-4" />
                     {{ loading ? 'Đang xác thực...' : 'Mở khóa phiên làm việc' }}
                 </button>
-                <p class="text-center text-xs leading-5 text-slate-500">Phiên mở khóa có thời hạn và sẽ tự khóa lại khi hết hạn.</p>
+                <p class="text-center text-xs leading-5 text-slate-500">Phiên mở khóa được giữ đến khi bạn đóng tab trình duyệt.</p>
             </form>
 
             <div v-else class="grid gap-4 p-5">
@@ -92,7 +96,11 @@ const submit = (): void => {
                     <template v-if="personal">Tài khoản CTV chưa được quản trị viên cấu hình mật khẩu C2 riêng.</template>
                     <template v-else>Hệ thống chưa cấu hình mật khẩu C2 global dành cho admin. Vui lòng kiểm tra cấu hình máy chủ.</template>
                 </div>
-                <a v-if="blocking" href="/" class="inline-flex min-h-11 items-center justify-center rounded-[9px] bg-slate-950 px-4 font-bold text-white">
+                <a
+                    v-if="blocking"
+                    href="/"
+                    class="inline-flex min-h-11 items-center justify-center rounded-[9px] bg-slate-950 px-4 font-bold text-white"
+                >
                     Về trang chính
                 </a>
             </div>

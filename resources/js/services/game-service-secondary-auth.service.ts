@@ -4,13 +4,10 @@ import { storeGameServiceSecondaryGrant } from '@/utils/game-service-secondary-a
 export type GameServiceSecondaryAuthStatus = {
     configured: boolean;
     unlocked: boolean;
-    expires_in_minutes: number;
 };
 
 export type GameServiceSecondaryAuthGrant = {
     token: string;
-    expires_at: string;
-    expires_in_minutes: number;
 };
 
 const endpoint = '/api/client/affiliate/game-service-secondary-auth';

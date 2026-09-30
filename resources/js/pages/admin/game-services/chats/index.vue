@@ -4,7 +4,14 @@ import { handleErrorResponse } from '@/utils/response';
 import { MessageCircle, RefreshCw, Search, Send } from 'lucide-vue-next';
 import { onBeforeUnmount, onMounted, ref } from 'vue';
 
-type ChatMessage = { id: number; sender_role: 'user' | 'collaborator' | 'admin'; sender_name: string; message: string; created_at: string };
+type ChatMessage = {
+    id: number;
+    sender_role: 'user' | 'collaborator' | 'admin';
+    sender_name: string;
+    message: string;
+    progress: { id: number; type: 'progress' | 'completion'; image_url: string | null } | null;
+    created_at: string;
+};
 type ChatOrder = {
     code: string;
     service_name: string;
@@ -138,7 +145,7 @@ onBeforeUnmount(() => {
                     >
                         <div class="max-w-[80%]">
                             <p class="mb-1 text-xs font-bold text-slate-500">{{ roleLabel(message.sender_role) }} · {{ message.sender_name }}</p>
-                            <p
+                            <div
                                 class="rounded-lg px-4 py-2.5 text-sm shadow-sm"
                                 :class="
                                     message.sender_role === 'admin'
@@ -148,8 +155,20 @@ onBeforeUnmount(() => {
                                           : 'border border-slate-200 bg-white'
                                 "
                             >
-                                {{ message.message }}
-                            </p>
+                                <p class="whitespace-pre-wrap break-words">{{ message.message }}</p>
+                                <div v-if="message.progress" class="border-current/20 mt-2 border-t pt-2">
+                                    <p class="mb-2 text-xs font-bold">Cập nhật tiến trình</p>
+                                    <a
+                                        v-if="message.progress.image_url"
+                                        :href="message.progress.image_url"
+                                        target="_blank"
+                                        rel="noopener"
+                                        class="border-current/20 block overflow-hidden rounded-md border bg-white/90"
+                                    >
+                                        <img :src="message.progress.image_url" alt="Ảnh tiến trình đơn hàng" class="max-h-72 w-full object-contain" />
+                                    </a>
+                                </div>
+                            </div>
                             <time class="text-[10px] text-slate-400">{{ formatTime(message.created_at) }}</time>
                         </div>
                     </article>

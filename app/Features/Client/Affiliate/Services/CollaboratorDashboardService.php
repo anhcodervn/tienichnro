@@ -10,9 +10,11 @@ use App\Models\AffiliateWithdrawal;
 use App\Models\GameServiceOrder;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Models\WalletTransaction;
 use App\Support\EditorContentRenderer;
 use App\Support\GameServicePayloadCipher;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 
 class CollaboratorDashboardService
@@ -20,6 +22,7 @@ class CollaboratorDashboardService
     public function __construct(
         private readonly EditorContentRenderer $contentRenderer,
         private readonly GameServicePayloadCipher $payloadCipher,
+        private readonly AffiliateWalletService $affiliateWalletService,
     ) {}
 
     /** @return array<string, mixed> */
@@ -30,7 +33,7 @@ class CollaboratorDashboardService
         $assignedOrders = GameServiceOrder::query()->whereBelongsTo($user, 'collaborator');
         $wallet = Wallet::query()->firstOrCreate(
             ['user_id' => $user->id, 'type' => Wallet::TYPE_COLLABORATOR],
-            ['tenant_id' => $user->tenant_id, 'balance' => 0, 'hold_balance' => 0, 'total_recharge' => 0, 'total_spent' => 0],
+            ['tenant_id' => $user->tenant_id, 'balance' => 0, 'hold_balance' => 0, 'work_hold_balance' => 0, 'total_recharge' => 0, 'total_spent' => 0],
         );
 
         return [
@@ -43,7 +46,7 @@ class CollaboratorDashboardService
             ],
             'revenue' => [
                 'order_revenue' => (int) (clone $assignedOrders)->sum('collaborator_total_cost'),
-                'held' => (int) (clone $assignedOrders)->whereIn('status', ['pending', 'processing', 'review'])->sum('collaborator_total_cost'),
+                'held' => (int) $wallet->work_hold_balance,
                 'settled' => (int) (clone $assignedOrders)->sum('collaborator_settlement_amount'),
                 'available' => (int) $wallet->balance,
                 'withdrawal_hold' => (int) $wallet->hold_balance,
@@ -61,7 +64,7 @@ class CollaboratorDashboardService
         $profile = $this->profile($user);
         $wallet = Wallet::query()->firstOrCreate(
             ['user_id' => $user->id, 'type' => Wallet::TYPE_COLLABORATOR],
-            ['tenant_id' => $user->tenant_id, 'balance' => 0, 'hold_balance' => 0, 'total_recharge' => 0, 'total_spent' => 0],
+            ['tenant_id' => $user->tenant_id, 'balance' => 0, 'hold_balance' => 0, 'work_hold_balance' => 0, 'total_recharge' => 0, 'total_spent' => 0],
         );
         $withdrawals = AffiliateWithdrawal::query()
             ->where('user_id', $user->id)
@@ -70,7 +73,11 @@ class CollaboratorDashboardService
 
         return [
             'minimum_withdrawal' => AffiliateWalletService::MINIMUM_COLLABORATOR_WITHDRAWAL,
-            'wallet' => ['balance' => (int) $wallet->balance, 'hold_balance' => (int) $wallet->hold_balance],
+            'wallet' => [
+                'balance' => (int) $wallet->balance,
+                'hold_balance' => (int) $wallet->hold_balance,
+                'work_hold_balance' => (int) $wallet->work_hold_balance,
+            ],
             'profile' => [
                 'status' => $profile->status,
                 'bank_name' => $profile->bank_name,
@@ -110,6 +117,47 @@ class CollaboratorDashboardService
         return [
             'announcements' => $announcements,
             'unread_count' => collect($announcements)->where('is_read', false)->count(),
+        ];
+    }
+
+    /** @return array<string, mixed> */
+    public function walletHistory(User $user): array
+    {
+        $this->assertActive($user);
+        $wallet = $this->affiliateWalletService->wallet($user, Wallet::TYPE_COLLABORATOR);
+        $paginator = WalletTransaction::query()
+            ->where('wallet_id', $wallet->id)
+            ->latest('id')
+            ->paginate(30);
+
+        return [
+            'wallet' => [
+                'balance' => (int) $wallet->balance,
+                'hold_balance' => (int) $wallet->hold_balance,
+                'work_hold_balance' => (int) $wallet->work_hold_balance,
+            ],
+            'data' => $paginator->getCollection()->map(function (WalletTransaction $transaction): array {
+                $metadata = $transaction->metadata ?? [];
+
+                return [
+                    'id' => $transaction->id,
+                    'type' => $transaction->type,
+                    'event' => $metadata['event'] ?? null,
+                    'amount' => (int) $transaction->amount,
+                    'balance_before' => (int) $transaction->balance_before,
+                    'balance_after' => (int) $transaction->balance_after,
+                    'work_hold_before' => isset($metadata['work_hold_before']) ? (int) $metadata['work_hold_before'] : null,
+                    'work_hold_after' => isset($metadata['work_hold_after']) ? (int) $metadata['work_hold_after'] : null,
+                    'order_code' => $metadata['order_code'] ?? null,
+                    'description' => $transaction->description,
+                    'created_at' => $transaction->created_at?->toISOString(),
+                ];
+            })->all(),
+            'meta' => [
+                'current_page' => $paginator->currentPage(),
+                'last_page' => $paginator->lastPage(),
+                'total' => $paginator->total(),
+            ],
         ];
     }
 
@@ -187,20 +235,7 @@ class CollaboratorDashboardService
                 'status' => 'processing',
                 'processing_at' => now(),
             ])->save();
-
-            return $locked->refresh();
-        }, 3);
-    }
-
-    public function submitOrder(User $user, GameServiceOrder $order): GameServiceOrder
-    {
-        $this->assertActive($user);
-
-        return DB::transaction(function () use ($user, $order): GameServiceOrder {
-            $locked = GameServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
-            abort_unless($locked->collaborator_id === $user->id, 403);
-            abort_unless($locked->status === 'processing', 422, 'Chỉ có thể gửi duyệt đơn đang xử lý.');
-            $locked->forceFill(['status' => 'review'])->save();
+            $this->affiliateWalletService->holdGameServiceOrder($locked);
 
             return $locked->refresh();
         }, 3);
@@ -213,15 +248,35 @@ class CollaboratorDashboardService
     }
 
     /** @return array<string, mixed> */
+    public function orderPreview(User $user, GameServiceOrder $order): array
+    {
+        $this->assertActive($user);
+        abort_unless($this->visibleOrders($user)->whereKey($order->getKey())->exists(), 403);
+        abort_unless(in_array($order->status, ['pending', 'processing'], true), 422, 'Chỉ có thể xem đơn đang chờ hoặc đang làm.');
+
+        $payload = $this->payloadCipher->decrypt((string) $order->getRawOriginal('payload'));
+        $note = trim((string) ($payload['note'] ?? ''));
+
+        return [
+            ...Arr::except($this->orderPayload($order, $user), ['payload', 'payload_locked']),
+            'customer_note' => $note !== '' ? $note : null,
+        ];
+    }
+
+    /** @return array<string, mixed> */
     public function payload(User $user, GameServiceOrder $order): array
     {
         $this->assertActive($user);
         abort_unless(
-            $user->role === User::ROLE_ADMIN || $order->collaborator_id === $user->id,
+            $user->role === User::ROLE_ADMIN
+                || ($order->collaborator_id === $user->id && $order->status !== 'pending'),
             403,
         );
 
-        return $this->payloadCipher->decrypt((string) $order->getRawOriginal('payload'));
+        return Arr::except(
+            $this->payloadCipher->decrypt((string) $order->getRawOriginal('payload')),
+            ['note'],
+        );
     }
 
     private function unreadAnnouncements(User $user): int
@@ -292,8 +347,10 @@ class CollaboratorDashboardService
             'payload' => [], 'payload_locked' => $isAssignedToViewer, 'quantity' => $order->quantity, 'status' => $order->status,
             'collaborator_id' => $order->collaborator_id,
             'collaborator_amount' => $order->collaborator_total_cost, 'can_claim' => $order->status === 'pending' && ($order->collaborator_id === null || $isAssignedToViewer),
-            'can_chat' => $isAssignedToViewer,
+            'can_chat' => $isAssignedToViewer && $order->status !== 'pending',
             'settled_at' => $order->collaborator_settled_at?->toISOString(), 'created_at' => $order->created_at?->toISOString(),
+            'available_at' => $order->collaborator_available_at?->toISOString(),
+            'refunded_at' => $order->collaborator_refunded_at?->toISOString(),
         ];
     }
 }

@@ -40,7 +40,7 @@ onMounted(load);
                     <Clock3 class="size-6 text-amber-700" />
                     <p class="mt-3 text-sm font-bold text-amber-800">Tiền treo</p>
                     <p class="text-3xl font-black text-amber-950">{{ money(data.revenue.held) }}</p>
-                    <p class="mt-1 text-xs text-amber-700">Đơn đang chờ, đang làm hoặc chờ duyệt</p>
+                    <p class="mt-1 text-xs text-amber-700">Đã giữ khi nhận đơn; mở khóa sau 3 ngày kể từ lúc hoàn thành</p>
                 </article>
                 <article class="rounded-2xl border border-violet-200 bg-violet-50 p-5">
                     <Banknote class="size-6 text-violet-700" />
@@ -60,7 +60,7 @@ onMounted(load);
                 <header class="flex flex-col justify-between gap-3 border-b border-slate-200 p-5 sm:flex-row sm:items-center">
                     <div>
                         <h2 class="font-black">Thu nhập theo đơn gần đây</h2>
-                        <p class="text-sm text-slate-500">Đơn hoàn thành chỉ được kết toán sau khi admin duyệt.</p>
+                        <p class="text-sm text-slate-500">Đơn hoàn thành được mở khóa sau 3 ngày nếu không bị hoàn tiền.</p>
                     </div>
                     <RouterLink
                         to="/dashboard/rut-tien"

@@ -22,6 +22,8 @@ class AffiliateWalletService
 
     public const MINIMUM_COLLABORATOR_WITHDRAWAL = 100000;
 
+    public const COLLABORATOR_SETTLEMENT_HOLD_DAYS = 3;
+
     public function wallet(User $user, string $type): Wallet
     {
         return $this->ensureWallet($user, $type, (int) $user->tenant_id);
@@ -38,9 +40,64 @@ class AffiliateWalletService
         return $wallet;
     }
 
-    public function settleGameServiceOrder(GameServiceOrder $order): ?WalletTransaction
+    public function holdGameServiceOrder(GameServiceOrder $order): ?WalletTransaction
     {
-        if ($order->collaborator_id === null || $order->collaborator_total_cost === null || $order->collaborator_settled_at !== null) {
+        if ($order->collaborator_id === null
+            || (int) $order->collaborator_total_cost <= 0
+            || $order->collaborator_held_at !== null
+            || $order->collaborator_refunded_at !== null) {
+            return null;
+        }
+
+        $collaborator = User::query()->withoutGlobalScope(TenantScope::class)->findOrFail($order->collaborator_id);
+        $wallet = $this->lockedWallet($collaborator, Wallet::TYPE_COLLABORATOR, (int) $collaborator->tenant_id);
+        $amount = (int) $order->collaborator_total_cost;
+        $workHoldBefore = (int) $wallet->work_hold_balance;
+        $wallet->forceFill(['work_hold_balance' => $workHoldBefore + $amount])->save();
+        $transaction = $this->record(
+            $wallet,
+            'hold',
+            $amount,
+            (int) $wallet->balance,
+            (int) $wallet->balance,
+            $order,
+            'Tạm giữ tiền công đơn dịch vụ '.$order->code,
+            [
+                'event' => 'game_service_order_claimed',
+                'order_code' => $order->code,
+                'work_hold_before' => $workHoldBefore,
+                'work_hold_after' => $workHoldBefore + $amount,
+            ],
+        );
+        $order->forceFill([
+            'collaborator_hold_transaction_id' => $transaction->id,
+            'collaborator_held_at' => now(),
+        ])->save();
+
+        return $transaction;
+    }
+
+    public function scheduleGameServiceOrderSettlement(GameServiceOrder $order): void
+    {
+        if ($order->collaborator_id === null || (int) $order->collaborator_total_cost <= 0 || $order->collaborator_refunded_at !== null) {
+            return;
+        }
+
+        $this->holdGameServiceOrder($order);
+        $order->forceFill([
+            'collaborator_available_at' => ($order->completed_at ?? now())->copy()->addDays(self::COLLABORATOR_SETTLEMENT_HOLD_DAYS),
+        ])->save();
+    }
+
+    public function releaseMaturedGameServiceOrder(GameServiceOrder $order): ?WalletTransaction
+    {
+        if ($order->status !== 'completed'
+            || $order->collaborator_id === null
+            || $order->collaborator_held_at === null
+            || $order->collaborator_available_at === null
+            || $order->collaborator_available_at->isFuture()
+            || $order->collaborator_settled_at !== null
+            || $order->collaborator_refunded_at !== null) {
             return null;
         }
 
@@ -48,8 +105,31 @@ class AffiliateWalletService
         $wallet = $this->lockedWallet($collaborator, Wallet::TYPE_COLLABORATOR, (int) $collaborator->tenant_id);
         $amount = (int) $order->collaborator_total_cost;
         $before = (int) $wallet->balance;
-        $wallet->forceFill(['balance' => $before + $amount])->save();
-        $transaction = $this->record($wallet, 'credit', $amount, $before, $before + $amount, $order, 'Kết toán đơn dịch vụ '.$order->code);
+        $workHoldBefore = (int) $wallet->work_hold_balance;
+
+        if ($workHoldBefore < $amount) {
+            throw new ApiException('Số dư tiền công đang treo không khớp với đơn dịch vụ.', 409);
+        }
+
+        $wallet->forceFill([
+            'balance' => $before + $amount,
+            'work_hold_balance' => $workHoldBefore - $amount,
+        ])->save();
+        $transaction = $this->record(
+            $wallet,
+            'credit',
+            $amount,
+            $before,
+            $before + $amount,
+            $order,
+            'Giải ngân tiền công đơn dịch vụ '.$order->code,
+            [
+                'event' => 'game_service_order_released',
+                'order_code' => $order->code,
+                'work_hold_before' => $workHoldBefore,
+                'work_hold_after' => $workHoldBefore - $amount,
+            ],
+        );
         $order->forceFill([
             'collaborator_settlement_amount' => $amount,
             'collaborator_wallet_transaction_id' => $transaction->id,
@@ -59,27 +139,59 @@ class AffiliateWalletService
         return $transaction;
     }
 
-    public function reverseGameServiceOrderSettlement(GameServiceOrder $order): ?WalletTransaction
+    public function refundGameServiceOrder(GameServiceOrder $order): ?WalletTransaction
     {
-        if ($order->collaborator_id === null || $order->collaborator_settled_at === null) {
+        if ($order->collaborator_id === null
+            || $order->collaborator_refunded_at !== null
+            || ($order->collaborator_held_at === null && $order->collaborator_settled_at === null)) {
             return null;
         }
 
         $collaborator = User::query()->withoutGlobalScope(TenantScope::class)->findOrFail($order->collaborator_id);
         $wallet = $this->lockedWallet($collaborator, Wallet::TYPE_COLLABORATOR, (int) $collaborator->tenant_id);
-        $amount = (int) $order->collaborator_settlement_amount;
+        $amount = (int) ($order->collaborator_settlement_amount ?? $order->collaborator_total_cost);
         $before = (int) $wallet->balance;
+        $workHoldBefore = (int) $wallet->work_hold_balance;
 
-        if ($before < $amount) {
-            throw new ApiException('Không thể thu hồi kết toán vì số dư khả dụng của CTV không đủ.', 422);
+        if ($order->collaborator_settled_at === null) {
+            if ($workHoldBefore < $amount) {
+                throw new ApiException('Số dư tiền công đang treo không khớp với đơn dịch vụ.', 409);
+            }
+
+            $wallet->forceFill(['work_hold_balance' => $workHoldBefore - $amount])->save();
+            $transaction = $this->record(
+                $wallet,
+                'release',
+                $amount,
+                $before,
+                $before,
+                $order,
+                'Thu hồi tiền công đang treo do hoàn tiền đơn '.$order->code,
+                [
+                    'event' => 'game_service_order_refunded',
+                    'order_code' => $order->code,
+                    'work_hold_before' => $workHoldBefore,
+                    'work_hold_after' => $workHoldBefore - $amount,
+                ],
+            );
+        } else {
+            $wallet->forceFill(['balance' => $before - $amount])->save();
+            $transaction = $this->record(
+                $wallet,
+                'debit',
+                $amount,
+                $before,
+                $before - $amount,
+                $order,
+                'Thu hồi tiền công do hoàn tiền đơn '.$order->code,
+                ['event' => 'game_service_order_refunded', 'order_code' => $order->code],
+            );
         }
 
-        $wallet->forceFill(['balance' => $before - $amount])->save();
-        $transaction = $this->record($wallet, 'debit', $amount, $before, $before - $amount, $order, 'Thu hồi kết toán đơn dịch vụ '.$order->code);
         $order->forceFill([
-            'collaborator_settlement_amount' => null,
-            'collaborator_wallet_transaction_id' => null,
-            'collaborator_settled_at' => null,
+            'collaborator_refund_transaction_id' => $transaction->id,
+            'collaborator_refunded_at' => now(),
+            'collaborator_available_at' => null,
         ])->save();
 
         return $transaction;
@@ -270,7 +382,7 @@ class AffiliateWalletService
     {
         return Wallet::query()->withoutGlobalScope(TenantScope::class)->firstOrCreate(
             ['user_id' => $user->id, 'type' => $type],
-            ['tenant_id' => $tenantId, 'balance' => 0, 'hold_balance' => 0, 'total_recharge' => 0, 'total_spent' => 0],
+            ['tenant_id' => $tenantId, 'balance' => 0, 'hold_balance' => 0, 'work_hold_balance' => 0, 'total_recharge' => 0, 'total_spent' => 0],
         );
     }
 

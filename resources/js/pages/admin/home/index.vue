@@ -121,7 +121,7 @@ onBeforeUnmount(() => {
                 ><RouterLink class="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700" to="/admin/topup/games"
                     >Quản lý catalog</RouterLink
                 >
-                <RouterLink class="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700" to="/admin/reports"
+                <RouterLink class="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-700" to="/admin/reports/topup"
                     >Xem báo cáo doanh thu</RouterLink
                 >
                 <span
