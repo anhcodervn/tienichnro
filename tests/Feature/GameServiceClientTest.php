@@ -6,6 +6,9 @@ use App\Models\GameService;
 use App\Models\GameServiceOrder;
 use App\Models\GameServicePackage;
 use App\Models\GameServicePackagePrice;
+use App\Models\User;
+use App\Models\WalletTransaction;
+use App\Support\GameServicePayloadCipher;
 use App\Support\SettingStore;
 
 test('client game service item opens a game picker without submenu links', function (): void {
@@ -26,11 +29,13 @@ test('client game service item opens a game picker without submenu links', funct
 
     $response = $this->get(route('home'))->assertSuccessful();
 
-    expect(substr_count($response->getContent(), 'data-game-service-picker-open'))->toBe(2);
+    expect(substr_count($response->getContent(), 'data-game-service-picker-open'))->toBe(3);
 
     $response
         ->assertSee('data-game-service-picker-modal', false)
         ->assertSee('data-game-service-picker-link', false)
+        ->assertSee('data-game-service-picker-trigger="mobile-bottom"', false)
+        ->assertSee('data-mobile-nav-item="service"', false)
         ->assertSee('Dịch vụ game')
         ->assertSee('Ngọc Rồng Online')
         ->assertSee('href="'.route('game-services.show', ['game' => $game]).'"', false)
@@ -218,7 +223,7 @@ test('guest can create a game service order from the service form', function ():
     ]);
     $order = GameServiceOrder::query()->firstOrFail();
 
-    expect($order->payload)->toBe([
+    expect(app(GameServicePayloadCipher::class)->decrypt((string) $order->getRawOriginal('payload')))->toBe([
         'account' => 'player01',
         'password' => 'secret123',
         'note' => 'Làm giúp sau 20 giờ.',
@@ -227,6 +232,97 @@ test('guest can create a game service order from the service form', function ():
         ->and($order->gross_profit)->toBe(30000)
         ->and($order->estimated_tax)->toBe(1350)
         ->and($order->net_profit)->toBe(28650);
+});
+
+test('authenticated customer pays a game service order from the NapCarot wallet', function (): void {
+    $user = User::factory()->create(['email' => 'wallet-player@example.com']);
+    $wallet = $user->wallet()->firstOrFail();
+    $wallet->forceFill(['balance' => 100000, 'total_spent' => 0])->save();
+    $game = Game::factory()->create(['game_services_enabled' => true, 'status' => 'active']);
+    $service = GameService::factory()->for($game)->create([
+        'payload_fields' => [[
+            'key' => 'account',
+            'label' => 'Tài khoản',
+            'placeholder' => '',
+            'required' => true,
+            'regex' => '',
+            'type' => 'text',
+            'options' => [],
+            'min' => null,
+            'max' => null,
+            'step' => null,
+        ]],
+        'status' => 'active',
+    ]);
+    $server = GameServer::factory()->for($game)->create();
+    $service->servers()->attach($server);
+    $package = GameServicePackage::factory()->for($service, 'service')->create(['status' => 'active']);
+    GameServicePackagePrice::factory()->for($package, 'package')->create([
+        'price' => 30000,
+        'quantity_enabled' => false,
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($user)
+        ->post(route('game-services.orders.store', ['game' => $game, 'gameService' => $service]), [
+            'package_id' => $package->id,
+            'server_id' => $server->id,
+            'quantity' => 1,
+            'payload' => ['account' => 'player01'],
+        ])
+        ->assertRedirect(route('game-services.service', ['game' => $game, 'gameService' => $service]))
+        ->assertSessionHas('success');
+
+    $order = GameServiceOrder::query()->whereBelongsTo($user)->firstOrFail();
+
+    expect($order->email)->toBe('wallet-player@example.com')
+        ->and($wallet->refresh()->balance)->toBe('70000.00')
+        ->and($wallet->total_spent)->toBe('30000.00')
+        ->and(WalletTransaction::query()
+            ->where('wallet_id', $wallet->id)
+            ->where('type', 'debit')
+            ->where('reference_type', GameServiceOrder::class)
+            ->where('reference_id', $order->id)
+            ->value('amount'))->toBe('30000.00');
+});
+
+test('authenticated game service order is not created when wallet balance is insufficient', function (): void {
+    $user = User::factory()->create();
+    $wallet = $user->wallet()->firstOrFail();
+    $wallet->forceFill(['balance' => 10000])->save();
+    $game = Game::factory()->create(['game_services_enabled' => true, 'status' => 'active']);
+    $service = GameService::factory()->for($game)->create([
+        'payload_fields' => [[
+            'key' => 'account',
+            'label' => 'Tài khoản',
+            'required' => true,
+            'type' => 'text',
+        ]],
+        'status' => 'active',
+    ]);
+    $server = GameServer::factory()->for($game)->create();
+    $service->servers()->attach($server);
+    $package = GameServicePackage::factory()->for($service, 'service')->create(['status' => 'active']);
+    GameServicePackagePrice::factory()->for($package, 'package')->create([
+        'price' => 30000,
+        'quantity_enabled' => false,
+        'status' => 'active',
+    ]);
+
+    $this->actingAs($user)
+        ->from(route('game-services.service', ['game' => $game, 'gameService' => $service]))
+        ->post(route('game-services.orders.store', ['game' => $game, 'gameService' => $service]), [
+            'package_id' => $package->id,
+            'server_id' => $server->id,
+            'quantity' => 1,
+            'payload' => ['account' => 'player01'],
+        ])
+        ->assertRedirect(route('game-services.service', ['game' => $game, 'gameService' => $service]))
+        ->assertSessionHasErrors('wallet');
+
+    expect(GameServiceOrder::query()->whereBelongsTo($user)->count())->toBe(0)
+        ->and($wallet->refresh()->balance)->toBe('10000.00')
+        ->and(WalletTransaction::query()->where('wallet_id', $wallet->id)->count())->toBe(0);
 });
 
 test('service page only displays the five latest orders', function (): void {

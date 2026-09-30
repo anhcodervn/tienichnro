@@ -63,7 +63,7 @@ onMounted(load);
                         <p class="text-sm text-slate-500">Đơn hoàn thành chỉ được kết toán sau khi admin duyệt.</p>
                     </div>
                     <RouterLink
-                        to="/cong-tac-vien/rut-tien"
+                        to="/dashboard/rut-tien"
                         class="inline-flex min-h-10 items-center justify-center rounded-xl bg-emerald-600 px-4 font-bold text-white"
                         >Rút tiền</RouterLink
                     >

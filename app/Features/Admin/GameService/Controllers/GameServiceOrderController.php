@@ -9,12 +9,16 @@ use App\Features\Admin\GameService\Services\GameServiceAdminService;
 use App\Http\Controllers\Controller;
 use App\Models\GameServiceOrder;
 use App\Models\User;
+use App\Support\GameServicePayloadCipher;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class GameServiceOrderController extends Controller
 {
-    public function __construct(private readonly GameServiceAdminService $service) {}
+    public function __construct(
+        private readonly GameServiceAdminService $service,
+        private readonly GameServicePayloadCipher $payloadCipher,
+    ) {}
 
     public function index(ListGameServiceOrderRequest $request): JsonResponse
     {
@@ -28,6 +32,14 @@ class GameServiceOrderController extends Controller
     public function show(GameServiceOrder $gameServiceOrder): GameServiceOrderResource
     {
         return GameServiceOrderResource::make($gameServiceOrder);
+    }
+
+    public function payload(GameServiceOrder $gameServiceOrder): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'data' => ['payload' => $this->payloadCipher->decrypt((string) $gameServiceOrder->getRawOriginal('payload'))],
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     public function update(UpdateGameServiceOrderRequest $request, GameServiceOrder $gameServiceOrder): GameServiceOrderResource

@@ -148,12 +148,55 @@ class WalletService
         string $type = Wallet::TYPE_MAIN,
         ?string $idempotencyKey = null,
     ): Wallet {
+        return $this->increaseBalance(
+            user: $user,
+            amount: $amount,
+            referenceType: $referenceType,
+            referenceId: $referenceId,
+            description: $description,
+            transactionType: 'credit',
+            walletType: $type,
+            idempotencyKey: $idempotencyKey,
+        );
+    }
+
+    public function refund(
+        User $user,
+        int|string $amount,
+        string $referenceType,
+        int $referenceId,
+        string $description,
+        string $type = Wallet::TYPE_MAIN,
+        ?string $idempotencyKey = null,
+    ): Wallet {
+        return $this->increaseBalance(
+            user: $user,
+            amount: $amount,
+            referenceType: $referenceType,
+            referenceId: $referenceId,
+            description: $description,
+            transactionType: 'refund',
+            walletType: $type,
+            idempotencyKey: $idempotencyKey,
+        );
+    }
+
+    private function increaseBalance(
+        User $user,
+        int|string $amount,
+        string $referenceType,
+        int $referenceId,
+        string $description,
+        string $transactionType,
+        string $walletType,
+        ?string $idempotencyKey,
+    ): Wallet {
         $amount = $this->monetaryInteger($amount);
 
         $idempotentWallet = $this->resolveIdempotentWallet(
             user: $user,
-            walletType: $type,
-            transactionType: 'credit',
+            walletType: $walletType,
+            transactionType: $transactionType,
             amount: $amount,
             referenceType: $referenceType,
             referenceId: $referenceId,
@@ -167,7 +210,7 @@ class WalletService
         $wallet = Wallet::query()
             ->withoutGlobalScope(TenantScope::class)
             ->where('user_id', $user->id)
-            ->where('type', $type)
+            ->where('type', $walletType)
             ->lockForUpdate()
             ->firstOrFail();
 
@@ -181,7 +224,7 @@ class WalletService
 
         $transactionAttributes = [
             'wallet_id' => $wallet->id,
-            'type' => 'credit',
+            'type' => $transactionType,
             'amount' => $amount,
             'balance_before' => $balanceBefore,
             'balance_after' => $balanceAfter,

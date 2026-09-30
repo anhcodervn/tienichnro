@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\GameServiceOrder;
+use App\Support\GameServicePayloadCipher;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
 /**
@@ -10,6 +11,17 @@ use Illuminate\Database\Eloquent\Factories\Factory;
  */
 class GameServiceOrderFactory extends Factory
 {
+    public function configure(): static
+    {
+        return $this->afterMaking(function (GameServiceOrder $order): void {
+            $payload = $order->getAttribute('payload');
+
+            if (is_array($payload)) {
+                $order->setAttribute('payload', (new GameServicePayloadCipher)->encrypt($payload));
+            }
+        });
+    }
+
     /**
      * Define the model's default state.
      *

@@ -13,8 +13,7 @@ class CollaboratorPageController extends Controller
     public function __invoke(Request $request, SettingStore $settingStore): View
     {
         $user = $request->user();
-        abort_unless($user instanceof User && $user->status === 'active'
-            && $user->affiliateProfile()->where('status', 'active')->exists(), 403);
+        abort_unless($user instanceof User && $user->canAccessCollaboratorDashboard(), 403);
 
         return view('app', ['systemSettings' => $settingStore->getMany([
             'site_name' => config('app.name', 'Nạp Carot'), 'meta_title' => '', 'meta_description' => '',

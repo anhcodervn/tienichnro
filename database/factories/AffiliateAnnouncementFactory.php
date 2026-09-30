@@ -21,6 +21,7 @@ class AffiliateAnnouncementFactory extends Factory
         return [
             'tenant_id' => Tenant::factory(),
             'admin_id' => null,
+            'audience' => AffiliateAnnouncement::AUDIENCE_AFFILIATE,
             'title' => fake()->sentence(6),
             'content' => [[
                 'type' => 'paragraph',
@@ -40,5 +41,12 @@ class AffiliateAnnouncementFactory extends Factory
     public function draft(): static
     {
         return $this->state(fn (): array => ['is_published' => false, 'published_at' => null]);
+    }
+
+    public function forCollaborators(): static
+    {
+        return $this->state(fn (): array => [
+            'audience' => AffiliateAnnouncement::AUDIENCE_COLLABORATOR,
+        ]);
     }
 }

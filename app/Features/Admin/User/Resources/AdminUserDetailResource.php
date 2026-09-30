@@ -23,6 +23,7 @@ class AdminUserDetailResource extends JsonResource
             'email_verified_at' => $user->email_verified_at?->toISOString(),
             'phone' => $user->phone,
             'role' => $user->role,
+            'has_game_service_secondary_password' => filled($user->game_service_secondary_password),
             'status' => $user->status === 'banned' ? 'blocked' : $user->status,
             'avatar' => $user->avatar,
             'created_at' => $user->created_at?->toISOString(),

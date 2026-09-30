@@ -27,12 +27,14 @@ class GameServiceOrder extends Model
         'profit_margin', 'status', 'admin_note', 'processing_at', 'completed_at',
     ];
 
+    protected $hidden = ['payload'];
+
     protected $attributes = ['status' => 'pending', 'quantity' => 1];
 
     protected function casts(): array
     {
         return [
-            'payload' => 'array', 'quantity' => 'integer', 'unit_price' => 'integer', 'total_amount' => 'integer',
+            'quantity' => 'integer', 'unit_price' => 'integer', 'total_amount' => 'integer',
             'collaborator_unit_cost' => 'integer', 'collaborator_total_cost' => 'integer', 'gross_profit' => 'integer',
             'tax_enabled' => 'boolean', 'tax_calculation_type' => TaxCalculationType::class,
             'vat_rate' => 'decimal:4', 'pit_rate' => 'decimal:4', 'estimated_vat' => 'integer', 'estimated_pit' => 'integer',

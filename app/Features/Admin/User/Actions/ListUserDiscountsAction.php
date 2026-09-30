@@ -92,7 +92,10 @@ class ListUserDiscountsAction
                 $search = trim((string) $filters['search']);
                 $query->where(function (Builder $searchQuery) use ($search): void {
                     if (is_numeric($search)) {
-                        $searchQuery->orWhereKey((int) $search);
+                        $searchQuery->orWhere(
+                            $searchQuery->getModel()->getQualifiedKeyName(),
+                            (int) $search,
+                        );
                     }
 
                     $searchQuery

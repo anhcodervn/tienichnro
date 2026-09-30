@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import DataTable from '@/components/shared/DataTable/index.vue';
 import {
     adminUserService,
     type AdminPaginationMeta,
     type AdminUserDetailResponse,
+    type AdminUserGameServicePermission,
+    type AdminUserGameServicePermissionResponse,
     type AdminUserGlobalPackagePreview,
     type AdminUserLog,
     type AdminUserPackagePrice,
@@ -22,13 +25,14 @@ import {
     Plus,
     RotateCcw,
     Save,
+    ShieldCheck,
     Sparkles,
     Wallet,
 } from 'lucide-vue-next';
-import { computed, onMounted, reactive, ref } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
 
-type TabKey = 'overview' | 'pricing' | 'transactions' | 'logs';
+type TabKey = 'overview' | 'services' | 'pricing' | 'transactions' | 'logs';
 
 type TabState<T> = {
     loading: boolean;
@@ -43,6 +47,11 @@ const userId = Number(route.params.user_id);
 const loading = ref(false);
 const adjustingWallet = ref(false);
 const resettingPassword = ref(false);
+const updatingRole = ref(false);
+const permissionsLoading = ref(false);
+const permissionsLoaded = ref(false);
+const permissionsSaving = ref(false);
+const secondaryPasswordSaving = ref(false);
 const pricesLoading = ref(false);
 const pricesLoaded = ref(false);
 const savingPriceId = ref<number | null>(null);
@@ -56,6 +65,14 @@ const priceRows = ref<AdminUserPackagePrice[]>([]);
 const globalPackageRows = ref<AdminUserGlobalPackagePreview[]>([]);
 const selectedPricingScope = ref('global');
 const activeTab = ref<TabKey>('overview');
+const roleForm = ref<'user' | 'ctv'>('user');
+const permissionRows = ref<AdminUserGameServicePermission[]>([]);
+const selectedGameServiceIds = ref<number[]>([]);
+const initialGameServiceIds = ref<number[]>([]);
+const permissionSearch = ref('');
+const permissionGameFilter = ref<number | ''>('');
+const permissionPage = ref(1);
+const permissionPageSize = 10;
 
 const quickSetForm = reactive({
     pricing_mode: 'discount' as 'discount' | 'profit',
@@ -74,6 +91,11 @@ const passwordForm = reactive({
     password_confirmation: '',
 });
 
+const secondaryPasswordForm = reactive({
+    password: '',
+    password_confirmation: '',
+});
+
 const transactionsState = reactive<TabState<AdminUserWalletTransaction>>({
     loading: false,
     loaded: false,
@@ -88,12 +110,58 @@ const logsState = reactive<TabState<AdminUserLog>>({
     meta: { current_page: 1, last_page: 1, per_page: 10, total: 0 },
 });
 
-const tabs = [
+const tabs = computed(() => [
     { key: 'overview' as const, label: 'Tổng quan' },
+    ...(detail.value?.role === 'ctv' ? [{ key: 'services' as const, label: 'Dịch vụ cho phép' }] : []),
     { key: 'pricing' as const, label: 'Chiết khấu' },
     { key: 'transactions' as const, label: 'Dòng tiền' },
     { key: 'logs' as const, label: 'Hoạt động' },
+]);
+
+const permissionGameOptions = computed(() => {
+    const games = new Map<number, string>();
+
+    permissionRows.value.forEach((service) => games.set(service.game_id, service.game_name));
+
+    return Array.from(games, ([id, name]) => ({ id, name })).sort((left, right) => left.name.localeCompare(right.name, 'vi'));
+});
+
+const filteredPermissionRows = computed(() => {
+    const keyword = permissionSearch.value.trim().toLocaleLowerCase('vi');
+
+    return permissionRows.value.filter((service) => {
+        const matchesGame = permissionGameFilter.value === '' || service.game_id === Number(permissionGameFilter.value);
+        const matchesSearch =
+            keyword === '' ||
+            `${service.game_name} ${service.name} ${service.code} ${service.slug}`.toLocaleLowerCase('vi').includes(keyword);
+
+        return matchesGame && matchesSearch;
+    });
+});
+
+const permissionTotalPages = computed(() => Math.max(1, Math.ceil(filteredPermissionRows.value.length / permissionPageSize)));
+const displayedPermissionRows = computed(() => {
+    const offset = (permissionPage.value - 1) * permissionPageSize;
+
+    return filteredPermissionRows.value.slice(offset, offset + permissionPageSize);
+});
+const permissionColumns = [
+    { id: 'allowed', accessorFn: (service: AdminUserGameServicePermission) => service.is_allowed, header: 'Cho phép' },
+    { id: 'service', accessorFn: (service: AdminUserGameServicePermission) => service.name, header: 'Dịch vụ' },
+    { id: 'code', accessorFn: (service: AdminUserGameServicePermission) => service.code, header: 'Mã dịch vụ' },
+    { id: 'status', accessorFn: (service: AdminUserGameServicePermission) => service.status, header: 'Trạng thái' },
 ];
+const permissionsDirty = computed(() => {
+    const current = [...selectedGameServiceIds.value].sort((left, right) => left - right);
+    const initial = [...initialGameServiceIds.value].sort((left, right) => left - right);
+
+    return current.join(',') !== initial.join(',');
+});
+const allFilteredPermissionsSelected = computed(
+    () =>
+        filteredPermissionRows.value.length > 0 &&
+        filteredPermissionRows.value.every((service) => selectedGameServiceIds.value.includes(service.id)),
+);
 
 const formatNumber = (value: number): string => new Intl.NumberFormat('vi-VN').format(value);
 
@@ -292,11 +360,129 @@ const loadDetail = async (): Promise<void> => {
     loading.value = true;
 
     try {
-        detail.value = await adminUserService.show(userId);
+        const response = await adminUserService.show(userId);
+        detail.value = response;
+        if (response.role !== 'admin') roleForm.value = response.role;
     } catch (error) {
         handleErrorResponse(error);
     } finally {
         loading.value = false;
+    }
+};
+
+const applyPermissionResponse = (response: AdminUserGameServicePermissionResponse): void => {
+    permissionRows.value = response.services;
+    selectedGameServiceIds.value = [...response.selected_ids];
+    initialGameServiceIds.value = [...response.selected_ids];
+    permissionsLoaded.value = true;
+
+    if (!permissionGameOptions.value.some((game) => game.id === permissionGameFilter.value)) {
+        permissionGameFilter.value = '';
+    }
+};
+
+const loadGameServicePermissions = async (): Promise<void> => {
+    if (detail.value?.role !== 'ctv') return;
+
+    permissionsLoading.value = true;
+
+    try {
+        applyPermissionResponse(await adminUserService.gameServices(userId));
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        permissionsLoading.value = false;
+    }
+};
+
+const saveGameServicePermissions = async (): Promise<void> => {
+    permissionsSaving.value = true;
+
+    try {
+        applyPermissionResponse(await adminUserService.syncGameServices(userId, selectedGameServiceIds.value));
+        handleSuccessResponse({ data: { status: true, message: 'Đã lưu danh sách dịch vụ CTV được phép nhận.' } });
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        permissionsSaving.value = false;
+    }
+};
+
+const submitGameServiceSecondaryPassword = async (): Promise<void> => {
+    if (!detail.value || detail.value.role !== 'ctv') return;
+
+    if (secondaryPasswordForm.password.trim() === '' || secondaryPasswordForm.password_confirmation.trim() === '') {
+        handleErrorResponse({
+            response: {
+                status: 422,
+                data: {
+                    errors: {
+                        password: ['Vui lòng nhập đầy đủ mật khẩu C2 mới và xác nhận mật khẩu.'],
+                    },
+                },
+            },
+        });
+        return;
+    }
+
+    secondaryPasswordSaving.value = true;
+
+    try {
+        const response = await adminUserService.updateGameServiceSecondaryPassword(userId, secondaryPasswordForm);
+        detail.value.has_game_service_secondary_password = response.has_game_service_secondary_password;
+        secondaryPasswordForm.password = '';
+        secondaryPasswordForm.password_confirmation = '';
+        handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật mật khẩu C2 riêng cho CTV.' } });
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        secondaryPasswordSaving.value = false;
+    }
+};
+
+const toggleFilteredPermissions = (): void => {
+    const selectedIds = new Set(selectedGameServiceIds.value);
+
+    filteredPermissionRows.value.forEach((service) => {
+        if (allFilteredPermissionsSelected.value) {
+            selectedIds.delete(service.id);
+        } else {
+            selectedIds.add(service.id);
+        }
+    });
+
+    selectedGameServiceIds.value = Array.from(selectedIds);
+};
+
+const changePermissionPage = async (page: number): Promise<void> => {
+    permissionPage.value = Math.min(Math.max(page, 1), permissionTotalPages.value);
+};
+
+const submitRole = async (): Promise<void> => {
+    if (!detail.value || detail.value.role === 'admin') return;
+
+    updatingRole.value = true;
+
+    try {
+        await adminUserService.updateRole(userId, roleForm.value);
+        detail.value.role = roleForm.value;
+
+        if (roleForm.value !== 'ctv') {
+            activeTab.value = 'overview';
+            permissionsLoaded.value = false;
+            permissionRows.value = [];
+            selectedGameServiceIds.value = [];
+            initialGameServiceIds.value = [];
+            detail.value.has_game_service_secondary_password = false;
+            secondaryPasswordForm.password = '';
+            secondaryPasswordForm.password_confirmation = '';
+        }
+
+        handleSuccessResponse({ data: { status: true, message: 'Đã cập nhật vai trò người dùng.' } });
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        updatingRole.value = false;
     }
 };
 
@@ -429,6 +615,10 @@ const openTab = async (tab: TabKey): Promise<void> => {
         await loadPrices();
     }
 
+    if (tab === 'services' && detail.value?.role === 'ctv' && !permissionsLoaded.value) {
+        await loadGameServicePermissions();
+    }
+
     if (tab === 'transactions' && !transactionsState.loaded) {
         await loadTransactions();
     }
@@ -541,9 +731,13 @@ onMounted(async () => {
     await loadDetail();
 
     const requestedTab = route.query.tab;
-    if (typeof requestedTab === 'string' && tabs.some((tab) => tab.key === requestedTab)) {
+    if (typeof requestedTab === 'string' && tabs.value.some((tab) => tab.key === requestedTab)) {
         await openTab(requestedTab as TabKey);
     }
+});
+
+watch([permissionSearch, permissionGameFilter], () => {
+    permissionPage.value = 1;
 });
 </script>
 
@@ -768,7 +962,26 @@ onMounted(async () => {
                                     </div>
                                     <div class="rounded-[8px] bg-slate-50 px-4 py-3">
                                         <p class="text-xs uppercase tracking-[0.18em] text-slate-400">Vai trò</p>
-                                        <p class="mt-2 text-sm font-semibold uppercase text-slate-900">{{ detail.role }}</p>
+                                        <p v-if="detail.role === 'admin'" class="mt-2 text-sm font-semibold uppercase text-slate-900">Admin</p>
+                                        <div v-else class="mt-2 grid gap-2">
+                                            <select
+                                                v-model="roleForm"
+                                                class="rounded-[8px] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 outline-none focus:border-[#465fff]"
+                                            >
+                                                <option value="user">User</option>
+                                                <option value="ctv">CTV dịch vụ</option>
+                                            </select>
+                                            <button
+                                                type="button"
+                                                class="inline-flex items-center justify-center gap-2 rounded-[8px] bg-[#465fff] px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                                                :disabled="updatingRole || roleForm === detail.role"
+                                                @click="submitRole"
+                                            >
+                                                <LoaderCircle v-if="updatingRole" class="h-4 w-4 animate-spin" />
+                                                <Save v-else class="h-4 w-4" />
+                                                Lưu vai trò
+                                            </button>
+                                        </div>
                                     </div>
                                     <div class="rounded-[8px] bg-slate-50 px-4 py-3">
                                         <p class="text-xs uppercase tracking-[0.18em] text-slate-400">Ngày tạo</p>
@@ -785,6 +998,177 @@ onMounted(async () => {
                                 </div>
                             </article>
                         </section>
+                    </div>
+
+                    <div v-else-if="activeTab === 'services'" class="space-y-4">
+                        <form class="rounded-[10px] border-2 border-slate-200 bg-white p-4" @submit.prevent="submitGameServiceSecondaryPassword">
+                            <div class="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div class="flex items-start gap-3">
+                                    <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-amber-50 text-amber-700">
+                                        <KeyRound class="h-5 w-5" />
+                                    </div>
+                                    <div>
+                                        <h3 class="font-bold text-slate-950">Mật khẩu C2 riêng của CTV</h3>
+                                        <p class="mt-1 text-sm leading-6 text-slate-600">
+                                            Mật khẩu được băm trong database và không thể xem lại. Đổi mật khẩu sẽ khóa ngay các phiên C2 cũ của CTV này.
+                                        </p>
+                                    </div>
+                                </div>
+                                <span
+                                    class="w-fit shrink-0 rounded-full px-3 py-1 text-xs font-bold"
+                                    :class="
+                                        detail.has_game_service_secondary_password
+                                            ? 'bg-emerald-50 text-emerald-700'
+                                            : 'bg-amber-50 text-amber-700'
+                                    "
+                                >
+                                    {{ detail.has_game_service_secondary_password ? 'Đã thiết lập' : 'Chưa thiết lập' }}
+                                </span>
+                            </div>
+
+                            <div class="mt-4 grid gap-3 lg:grid-cols-2">
+                                <label class="grid gap-1.5 text-sm font-semibold text-slate-700">
+                                    <span>Mật khẩu C2 mới</span>
+                                    <input
+                                        v-model="secondaryPasswordForm.password"
+                                        type="password"
+                                        autocomplete="new-password"
+                                        minlength="8"
+                                        required
+                                        class="min-h-11 rounded-[8px] border-2 border-slate-300 bg-white px-3 outline-none focus:border-[#465fff]"
+                                        placeholder="Tối thiểu 8 ký tự, có chữ và số"
+                                    />
+                                </label>
+                                <label class="grid gap-1.5 text-sm font-semibold text-slate-700">
+                                    <span>Xác nhận mật khẩu C2</span>
+                                    <input
+                                        v-model="secondaryPasswordForm.password_confirmation"
+                                        type="password"
+                                        autocomplete="new-password"
+                                        minlength="8"
+                                        required
+                                        class="min-h-11 rounded-[8px] border-2 border-slate-300 bg-white px-3 outline-none focus:border-[#465fff]"
+                                        placeholder="Nhập lại mật khẩu C2"
+                                    />
+                                </label>
+                            </div>
+
+                            <div class="mt-4 flex justify-end border-t border-slate-200 pt-4">
+                                <button
+                                    type="submit"
+                                    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-[8px] bg-slate-950 px-5 text-sm font-bold text-white disabled:cursor-not-allowed disabled:opacity-50"
+                                    :disabled="secondaryPasswordSaving"
+                                >
+                                    <LoaderCircle v-if="secondaryPasswordSaving" class="h-4 w-4 animate-spin" />
+                                    <KeyRound v-else class="h-4 w-4" />
+                                    {{ detail.has_game_service_secondary_password ? 'Đổi mật khẩu C2' : 'Thiết lập mật khẩu C2' }}
+                                </button>
+                            </div>
+                        </form>
+
+                        <div class="flex flex-col gap-4 rounded-[10px] border border-indigo-200 bg-indigo-50 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
+                            <div class="flex items-start gap-3">
+                                <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[8px] bg-white text-[#465fff] shadow-sm">
+                                    <ShieldCheck class="h-5 w-5" />
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-slate-950">Dịch vụ CTV được phép nhận</h3>
+                                    <p class="mt-1 text-sm leading-6 text-slate-600">
+                                        CTV chỉ nhìn thấy và nhận được đơn chờ thuộc các dịch vụ đã tích chọn. Đơn đã giao trước đó vẫn được giữ lại.
+                                    </p>
+                                </div>
+                            </div>
+                            <div class="shrink-0 rounded-[8px] border border-indigo-200 bg-white px-4 py-2 text-sm font-bold text-indigo-700">
+                                Đã chọn {{ selectedGameServiceIds.length }} / {{ permissionRows.length }} dịch vụ
+                            </div>
+                        </div>
+
+                        <div class="grid gap-3 lg:grid-cols-[minmax(12rem,0.7fr)_minmax(16rem,1fr)_auto] lg:items-end">
+                            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">
+                                <span>Lọc theo game</span>
+                                <select
+                                    v-model="permissionGameFilter"
+                                    class="min-h-11 rounded-[8px] border-2 border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#465fff]"
+                                >
+                                    <option value="">Tất cả game</option>
+                                    <option v-for="game in permissionGameOptions" :key="game.id" :value="game.id">{{ game.name }}</option>
+                                </select>
+                            </label>
+
+                            <label class="grid gap-1.5 text-sm font-semibold text-slate-700">
+                                <span>Tìm kiếm dịch vụ</span>
+                                <input
+                                    v-model.trim="permissionSearch"
+                                    type="search"
+                                    placeholder="Tên game, dịch vụ, mã hoặc slug..."
+                                    class="min-h-11 rounded-[8px] border-2 border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#465fff]"
+                                />
+                            </label>
+
+                            <button
+                                type="button"
+                                class="min-h-11 rounded-[8px] border-2 border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 transition hover:border-[#465fff] hover:text-[#465fff] disabled:cursor-not-allowed disabled:opacity-50"
+                                :disabled="filteredPermissionRows.length === 0"
+                                @click="toggleFilteredPermissions"
+                            >
+                                {{ allFilteredPermissionsSelected ? 'Bỏ chọn kết quả lọc' : 'Chọn tất cả kết quả lọc' }}
+                            </button>
+                        </div>
+
+                        <DataTable
+                            :data="displayedPermissionRows"
+                            :columns="permissionColumns"
+                            :loading="permissionsLoading"
+                            :current-page="permissionPage"
+                            :total-pages="permissionTotalPages"
+                            :go-to-page="changePermissionPage"
+                            class-custom="min-w-[760px]"
+                            empty-text="Không tìm thấy dịch vụ phù hợp."
+                        >
+                            <template #allowed="{ row }">
+                                <label class="inline-flex cursor-pointer items-center gap-2 font-semibold text-slate-700">
+                                    <input
+                                        v-model="selectedGameServiceIds"
+                                        type="checkbox"
+                                        :value="row.id"
+                                        class="h-5 w-5 rounded border-2 border-slate-400 text-[#465fff] focus:ring-[#465fff]"
+                                    />
+                                    Nhận đơn
+                                </label>
+                            </template>
+                            <template #service="{ row }">
+                                <div class="min-w-[240px]">
+                                    <p class="text-xs font-bold uppercase tracking-wide text-indigo-600">{{ row.game_name }}</p>
+                                    <p class="mt-1 font-bold text-slate-950">{{ row.name }}</p>
+                                    <p class="mt-0.5 text-xs text-slate-500">/{{ row.slug }}</p>
+                                </div>
+                            </template>
+                            <template #code="{ row }">
+                                <span class="rounded-[6px] bg-slate-100 px-2 py-1 font-mono text-xs font-bold text-slate-600">{{ row.code }}</span>
+                            </template>
+                            <template #status="{ row }">
+                                <span
+                                    class="whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-bold"
+                                    :class="row.status === 'active' ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'"
+                                >
+                                    {{ row.status === 'active' ? 'Hoạt động' : 'Tạm tắt' }}
+                                </span>
+                            </template>
+                        </DataTable>
+
+                        <div class="flex flex-col gap-3 border-t border-slate-200 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                            <p class="text-sm text-slate-500">Quyền chỉ có hiệu lực sau khi bấm lưu.</p>
+                            <button
+                                type="button"
+                                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-[8px] bg-[#465fff] px-5 text-sm font-bold text-white shadow-[0_10px_20px_rgba(70,95,255,0.2)] disabled:cursor-not-allowed disabled:opacity-50"
+                                :disabled="permissionsSaving || permissionsLoading || !permissionsDirty"
+                                @click="saveGameServicePermissions"
+                            >
+                                <LoaderCircle v-if="permissionsSaving" class="h-4 w-4 animate-spin" />
+                                <Save v-else class="h-4 w-4" />
+                                {{ permissionsSaving ? 'Đang lưu...' : 'Lưu dịch vụ cho phép' }}
+                            </button>
+                        </div>
                     </div>
 
                     <div v-else-if="activeTab === 'pricing'" class="space-y-4">

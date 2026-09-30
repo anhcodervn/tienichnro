@@ -2,6 +2,8 @@
 
 namespace App\Features\Client\GameService\Services;
 
+use App\Exceptions\ApiException;
+use App\Features\Client\Wallet\Services\WalletService;
 use App\Features\Topup\Services\OrderProfitCalculatorService;
 use App\Features\Topup\Services\TaxConfigurationService;
 use App\Models\Game;
@@ -10,7 +12,11 @@ use App\Models\GameService;
 use App\Models\GameServiceOrder;
 use App\Models\GameServicePackage;
 use App\Models\GameServicePackagePrice;
+use App\Models\Scopes\TenantScope;
 use App\Models\User;
+use App\Models\WalletTransaction;
+use App\Support\GameServicePayloadCipher;
+use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -21,6 +27,8 @@ class GameServiceOrderService
     public function __construct(
         private readonly TaxConfigurationService $taxConfigurationService,
         private readonly OrderProfitCalculatorService $orderProfitCalculator,
+        private readonly GameServicePayloadCipher $payloadCipher,
+        private readonly WalletService $walletService,
     ) {}
 
     /** @param array<string, mixed> $payload */
@@ -101,7 +109,7 @@ class GameServiceOrderService
                 calculationType: $taxConfiguration['calculation_type'],
             );
 
-            return GameServiceOrder::query()->create([
+            $order = GameServiceOrder::query()->create([
                 'user_id' => $user?->id,
                 'game_id' => $lockedGame->id,
                 'game_service_id' => $lockedService->id,
@@ -114,7 +122,7 @@ class GameServiceOrderService
                 'package_name' => $package->name,
                 'price_label' => $package->name,
                 'server_name' => $server->name,
-                'payload' => $recipientPayload,
+                'payload' => $this->payloadCipher->encrypt($recipientPayload),
                 'quantity' => $quantity,
                 'unit_price' => $price->price,
                 'total_amount' => $totalAmount,
@@ -132,6 +140,103 @@ class GameServiceOrderService
                 'profit_margin' => $profit['profit_margin'],
                 'status' => 'pending',
             ]);
+
+            if ($user instanceof User) {
+                try {
+                    $this->walletService->debit(
+                        user: $user,
+                        amount: $totalAmount,
+                        referenceType: GameServiceOrder::class,
+                        referenceId: $order->id,
+                        description: "Thanh toán đơn dịch vụ game {$order->code}",
+                        idempotencyKey: (string) Str::uuid(),
+                    );
+                } catch (ApiException $exception) {
+                    throw ValidationException::withMessages(['wallet' => $exception->getMessage()]);
+                }
+            }
+
+            return $order;
         }, 3);
+    }
+
+    /**
+     * @return array{order: GameServiceOrder, refunded_amount: int}
+     *
+     * @throws AuthorizationException
+     */
+    public function cancelPending(GameServiceOrder $order, User $user): array
+    {
+        return DB::transaction(function () use ($order, $user): array {
+            $lockedOrder = GameServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
+
+            if ($lockedOrder->user_id !== $user->id) {
+                throw new AuthorizationException;
+            }
+
+            if ($lockedOrder->status !== 'pending') {
+                throw ValidationException::withMessages([
+                    'order' => 'Chỉ có thể hủy đơn đang chờ tiếp nhận.',
+                ]);
+            }
+
+            $refundedAmount = $this->refundWalletPayment($lockedOrder, $user);
+
+            $lockedOrder->forceFill(['status' => 'cancelled'])->save();
+
+            return [
+                'order' => $lockedOrder->refresh(),
+                'refunded_amount' => $refundedAmount,
+            ];
+        }, 3);
+    }
+
+    private function refundWalletPayment(GameServiceOrder $order, User $user): int
+    {
+        $wallet = $this->walletService->getWallet($user);
+        $debit = WalletTransaction::query()
+            ->withoutGlobalScope(TenantScope::class)
+            ->where('wallet_id', $wallet->id)
+            ->where('type', 'debit')
+            ->where('status', 'success')
+            ->where('reference_type', GameServiceOrder::class)
+            ->where('reference_id', $order->id)
+            ->latest('id')
+            ->first();
+
+        if (! $debit instanceof WalletTransaction) {
+            return 0;
+        }
+
+        $debitedAmount = (int) $debit->amount;
+        if ($debitedAmount !== $order->total_amount) {
+            throw ValidationException::withMessages([
+                'order' => 'Giao dịch thanh toán của đơn không khớp. Vui lòng liên hệ quản trị viên.',
+            ]);
+        }
+
+        $existingRefund = WalletTransaction::query()
+            ->withoutGlobalScope(TenantScope::class)
+            ->where('wallet_id', $wallet->id)
+            ->where('type', 'refund')
+            ->where('status', 'success')
+            ->where('reference_type', GameServiceOrder::class)
+            ->where('reference_id', $order->id)
+            ->exists();
+
+        if ($existingRefund) {
+            return 0;
+        }
+
+        $this->walletService->refund(
+            user: $user,
+            amount: $debitedAmount,
+            referenceType: GameServiceOrder::class,
+            referenceId: $order->id,
+            description: "Hoàn tiền đơn dịch vụ game {$order->code}",
+            idempotencyKey: (string) Str::uuid(),
+        );
+
+        return $debitedAmount;
     }
 }

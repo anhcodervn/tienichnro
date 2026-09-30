@@ -110,6 +110,7 @@ export interface GameServiceOrder {
     price_label: string;
     server_name: string | null;
     payload: Record<string, unknown>;
+    payload_locked: boolean;
     quantity: number;
     unit_price: number;
     total_amount: number;
@@ -148,8 +149,16 @@ export const adminGameServiceService = {
     deletePackage: (id: number) => api.delete(`/api/admin-api/game-service-packages/${id}`),
     orders: (params: Record<string, unknown> = {}) => api.get('/api/admin-api/game-service-orders', { params }),
     order: (code: string) => api.get(`/api/admin-api/game-service-orders/${code}`),
+    orderPayload: async (code: string): Promise<Record<string, unknown>> =>
+        (await api.get(`/api/admin-api/game-service-orders/${code}/payload`)).data.data.payload,
     updateOrder: (code: string, payload: Record<string, unknown>) => api.patch(`/api/admin-api/game-service-orders/${code}`, payload),
-    chatCollaborators: () => api.get('/api/admin-api/game-service-order-chats/collaborators'),
+    chatCollaborators: (gameServiceId?: number | null, includeUserId?: number | null) =>
+        api.get('/api/admin-api/game-service-order-chats/collaborators', {
+            params: {
+                ...(gameServiceId ? { game_service_id: gameServiceId } : {}),
+                ...(includeUserId ? { include_user_id: includeUserId } : {}),
+            },
+        }),
     chatThreads: (params: Record<string, unknown> = {}) => api.get('/api/admin-api/game-service-order-chats', { params }),
     chatThread: (code: string) => api.get(`/api/admin-api/game-service-order-chats/${code}`),
     sendChatMessage: (code: string, message: string) => api.post(`/api/admin-api/game-service-order-chats/${code}/messages`, { message }),

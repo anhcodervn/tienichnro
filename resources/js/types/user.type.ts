@@ -8,7 +8,7 @@ export interface UserType {
     full_name: string | null;
     avatar: string | null;
     email_verified_at: string | null;
-    role: string;
+    role: 'user' | 'admin' | 'ctv';
     status: number;
     last_login_at: string | null;
     last_login_ip: string | null;

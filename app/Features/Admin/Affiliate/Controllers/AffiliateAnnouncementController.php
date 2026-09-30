@@ -6,6 +6,7 @@ use App\Features\Admin\Affiliate\Requests\AffiliateIndexRequest;
 use App\Features\Admin\Affiliate\Requests\SaveAffiliateAnnouncementRequest;
 use App\Features\Admin\Affiliate\Services\AdminAffiliateService;
 use App\Http\Controllers\Controller;
+use App\Models\AffiliateAnnouncement;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -16,28 +17,48 @@ class AffiliateAnnouncementController extends Controller
 
     public function index(AffiliateIndexRequest $request): JsonResponse
     {
-        return response()->json(['status' => true, 'data' => $this->service->announcements($request->validated())]);
+        return response()->json([
+            'status' => true,
+            'data' => $this->service->announcements($request->validated(), AffiliateAnnouncement::AUDIENCE_AFFILIATE),
+        ]);
     }
 
     public function store(SaveAffiliateAnnouncementRequest $request): JsonResponse
     {
-        $announcement = $this->service->saveAnnouncement(null, $request->validated(), $this->user($request), $request);
+        $announcement = $this->service->saveAnnouncement(
+            null,
+            $request->validated(),
+            $this->user($request),
+            $request,
+            AffiliateAnnouncement::AUDIENCE_AFFILIATE,
+        );
 
-        return response()->json(['status' => true, 'message' => 'Đã tạo thông báo cộng tác viên.', 'data' => $announcement], 201);
+        return response()->json(['status' => true, 'message' => 'Đã tạo thông báo Affiliate.', 'data' => $announcement], 201);
     }
 
     public function update(SaveAffiliateAnnouncementRequest $request, int $announcement): JsonResponse
     {
-        $savedAnnouncement = $this->service->saveAnnouncement($announcement, $request->validated(), $this->user($request), $request);
+        $savedAnnouncement = $this->service->saveAnnouncement(
+            $announcement,
+            $request->validated(),
+            $this->user($request),
+            $request,
+            AffiliateAnnouncement::AUDIENCE_AFFILIATE,
+        );
 
-        return response()->json(['status' => true, 'message' => 'Đã cập nhật thông báo cộng tác viên.', 'data' => $savedAnnouncement]);
+        return response()->json(['status' => true, 'message' => 'Đã cập nhật thông báo Affiliate.', 'data' => $savedAnnouncement]);
     }
 
     public function destroy(Request $request, int $announcement): JsonResponse
     {
-        $this->service->deleteAnnouncement($announcement, $this->user($request), $request);
+        $this->service->deleteAnnouncement(
+            $announcement,
+            $this->user($request),
+            $request,
+            AffiliateAnnouncement::AUDIENCE_AFFILIATE,
+        );
 
-        return response()->json(['status' => true, 'message' => 'Đã xóa thông báo cộng tác viên.']);
+        return response()->json(['status' => true, 'message' => 'Đã xóa thông báo Affiliate.']);
     }
 
     private function user(Request $request): User

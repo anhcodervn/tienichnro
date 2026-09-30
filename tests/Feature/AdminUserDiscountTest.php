@@ -56,6 +56,12 @@ test('admin lists each user with configured package or global discounts once', f
         ->assertSuccessful()
         ->assertJsonPath('data.meta.total', 1)
         ->assertJsonPath('data.data.0.id', $packageUser->id);
+
+    $numericSearchResponse = $this->actingAs($admin)
+        ->getJson('/api/admin-api/users/discounts?search='.$bothUser->id)
+        ->assertSuccessful();
+
+    expect(collect($numericSearchResponse->json('data.data'))->pluck('id'))->toContain($bothUser->id);
 });
 
 test('admin bulk sets discounts for selected users across custom and global packages', function (): void {

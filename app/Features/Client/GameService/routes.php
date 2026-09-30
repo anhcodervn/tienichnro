@@ -12,6 +12,8 @@ Route::get('/tai-khoan/dich-vu-game', AccountGameServiceOrderController::class)
     ->name('account.game-service-orders.index');
 
 Route::middleware(['site.active', 'auth'])->group(function (): void {
+    Route::delete('/tai-khoan/dich-vu-game/{gameServiceOrder}', [AccountGameServiceOrderController::class, 'destroy'])
+        ->name('account.game-service-orders.cancel');
     Route::get('/tai-khoan/dich-vu-game/{gameServiceOrder}/chat', [GameServiceOrderChatController::class, 'page'])
         ->name('account.game-service-orders.chat');
     Route::get('/api/client/game-service-orders/{gameServiceOrder}/messages', [GameServiceOrderChatController::class, 'show'])

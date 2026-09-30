@@ -31,6 +31,20 @@ class CollaboratorDashboardController extends Controller
         return response()->json(['status' => true, 'data' => $this->service->financialData($this->user($request))]);
     }
 
+    public function announcements(Request $request): JsonResponse
+    {
+        return response()->json(['status' => true, 'data' => $this->service->announcements($this->user($request))]);
+    }
+
+    public function readAnnouncement(AffiliateAnnouncement $affiliateAnnouncement, Request $request): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'message' => 'Đã đánh dấu thông báo công việc là đã đọc.',
+            'data' => ['unread_count' => $this->service->readAnnouncement($this->user($request), $affiliateAnnouncement)],
+        ]);
+    }
+
     public function updatePayout(UpdateAffiliatePayoutRequest $request): JsonResponse
     {
         $profile = $this->service->updatePayout($this->user($request), $request->validated());
@@ -57,17 +71,18 @@ class CollaboratorDashboardController extends Controller
 
     public function start(GameServiceOrder $gameServiceOrder, Request $request): JsonResponse
     {
-        return response()->json(['status' => true, 'message' => 'Đã nhận xử lý đơn.', 'data' => $this->service->startOrder($this->user($request), $gameServiceOrder)]);
+        $user = $this->user($request);
+        $order = $this->service->startOrder($user, $gameServiceOrder);
+
+        return response()->json(['status' => true, 'message' => 'Đã nhận xử lý đơn.', 'data' => $this->service->orderData($order, $user)]);
     }
 
     public function submit(GameServiceOrder $gameServiceOrder, Request $request): JsonResponse
     {
-        return response()->json(['status' => true, 'message' => 'Đã gửi đơn cho admin duyệt.', 'data' => $this->service->submitOrder($this->user($request), $gameServiceOrder)]);
-    }
+        $user = $this->user($request);
+        $order = $this->service->submitOrder($user, $gameServiceOrder);
 
-    public function readAnnouncement(AffiliateAnnouncement $affiliateAnnouncement, Request $request): JsonResponse
-    {
-        return response()->json(['status' => true, 'data' => ['unread_count' => $this->service->readAnnouncement($this->user($request), $affiliateAnnouncement)]]);
+        return response()->json(['status' => true, 'message' => 'Đã gửi đơn cho admin duyệt.', 'data' => $this->service->orderData($order, $user)]);
     }
 
     private function user(Request $request): User

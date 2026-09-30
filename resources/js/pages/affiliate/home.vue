@@ -3,15 +3,11 @@ import { clientAffiliateService, type ClientAffiliateHomeData } from '@/services
 import { handleErrorResponse } from '@/utils/response';
 import { sanitizeRichText } from '@/utils/rich-text';
 import { ArrowRight, BellRing, Eye, HandCoins, LoaderCircle, Pin } from 'lucide-vue-next';
-import { computed, onMounted, ref } from 'vue';
-import { useRoute } from 'vue-router';
+import { onMounted, ref } from 'vue';
 
 const data = ref<ClientAffiliateHomeData | null>(null);
 const loading = ref(true);
 const expandedAnnouncements = ref(new Set<number>());
-const route = useRoute();
-const dashboardTarget = computed(() => (String(route.name ?? '').startsWith('collaborator.') ? '/cong-tac-vien' : '/dashboard'));
-const dashboardLabel = computed(() => (String(route.name ?? '').startsWith('collaborator.') ? 'Xem công việc CTV' : 'Xem dashboard hoa hồng'));
 const dateTime = (value: string | null): string => (value ? new Date(value).toLocaleString('vi-VN') : '—');
 
 const load = async (): Promise<void> => {
@@ -33,7 +29,7 @@ const viewAnnouncement = async (id: number, isRead: boolean): Promise<void> => {
         data.value.unread_count = await clientAffiliateService.readAnnouncement(id);
         const announcement = data.value.announcements.find((item) => item.id === id);
         if (announcement) announcement.is_read = true;
-        window.dispatchEvent(new Event('collaborator:refresh'));
+        window.dispatchEvent(new Event('affiliate:refresh'));
     } catch (error) {
         handleErrorResponse(error);
     }
@@ -51,15 +47,13 @@ onMounted(load);
                         ><HandCoins class="size-4" /> Partner Center</span
                     >
                     <h1 class="mt-4 text-3xl font-black sm:text-4xl">Chào mừng bạn trở lại</h1>
-                    <p class="mt-3 leading-7 text-emerald-50">
-                        Theo dõi thông báo, chính sách và các thông tin quan trọng do quản trị viên gửi tới cộng tác viên.
-                    </p>
+                    <p class="mt-3 leading-7 text-emerald-50">Theo dõi chính sách, chương trình và thông tin dành riêng cho hoạt động Affiliate.</p>
                 </div>
                 <RouterLink
-                    :to="dashboardTarget"
+                    to="/cong-tac-vien"
                     class="inline-flex min-h-12 w-fit items-center justify-center gap-2 rounded-xl bg-white px-5 font-bold text-emerald-800 shadow-sm transition hover:bg-emerald-50"
                 >
-                    {{ dashboardLabel }} <ArrowRight class="size-5" />
+                    Xem dashboard hoa hồng <ArrowRight class="size-5" />
                 </RouterLink>
             </div>
         </section>
@@ -72,7 +66,7 @@ onMounted(load);
             <header class="flex items-center gap-3">
                 <span class="grid size-11 place-items-center rounded-xl bg-emerald-100 text-emerald-700"><BellRing class="size-5" /></span>
                 <div>
-                    <h2 id="affiliate-announcements-title" class="text-xl font-black text-slate-950">Thông báo từ quản trị viên</h2>
+                    <h2 id="affiliate-announcements-title" class="text-xl font-black text-slate-950">Thông báo Affiliate</h2>
                     <p class="text-sm text-slate-500">Thông báo được ghim luôn hiển thị ở đầu danh sách.</p>
                 </div>
             </header>

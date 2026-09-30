@@ -245,6 +245,19 @@ class GameServiceAdminService
                 throw ValidationException::withMessages(['collaborator_id' => 'Không thể đổi CTV sau khi đơn đã được kết toán.']);
             }
 
+            if (array_key_exists('collaborator_id', $payload)
+                && $payload['collaborator_id'] !== null
+                && (int) $payload['collaborator_id'] !== (int) $locked->collaborator_id
+                && $locked->game_service_id !== null
+                && ! User::query()
+                    ->whereKey((int) $payload['collaborator_id'])
+                    ->whereHas('allowedGameServices', fn (Builder $query) => $query->whereKey($locked->game_service_id))
+                    ->exists()) {
+                throw ValidationException::withMessages([
+                    'collaborator_id' => 'CTV chưa được cấp quyền nhận dịch vụ của đơn này.',
+                ]);
+            }
+
             $payload['processing_at'] = $status === 'processing' ? ($locked->processing_at ?? now()) : $locked->processing_at;
             $payload['completed_at'] = $status === 'completed' ? ($locked->completed_at ?? now()) : null;
             $locked->fill($payload)->save();

@@ -133,7 +133,10 @@
                 @endif
             </a>
             <nav class="hidden min-w-0 items-center gap-2 text-sm font-semibold text-slate-700 lg:flex xl:gap-4" aria-label="Điều hướng chính">
-                <button type="button" @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('topup.game'), 'hover:text-emerald-700' => ! request()->routeIs('topup.game')]) data-game-picker-open data-game-picker-trigger="desktop" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-game text-lg" aria-hidden="true"></i><span>Nạp game</span></button>
+                <button type="button" @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('topup.game'), 'hover:text-emerald-700' => ! request()->routeIs('topup.game')]) data-game-picker-open data-game-picker-trigger="desktop" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-bolt text-lg" aria-hidden="true"></i><span>Nạp game</span></button>
+                @if ($showGameServicePicker)
+                    <button type="button" @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('game-services.*'), 'hover:text-emerald-700' => ! request()->routeIs('game-services.*')]) data-game-service-picker-open data-game-service-picker-trigger="desktop" aria-controls="game-service-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-joystick text-lg" aria-hidden="true"></i><span>Dịch vụ game</span></button>
+                @endif
                 <a @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2', 'text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i><span>Nạp tiền</span></a>
                 <details class="group relative shrink-0" data-desktop-nav-menu data-order-history-menu>
                     <summary @class(['flex min-h-11 cursor-pointer list-none items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden', 'text-emerald-700' => $orderHistoryActive])>
@@ -146,9 +149,6 @@
                         </div>
                     </div>
                 </details>
-                @if ($showGameServicePicker)
-                    <button type="button" @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('game-services.*'), 'hover:text-emerald-700' => ! request()->routeIs('game-services.*')]) data-game-service-picker-open data-game-service-picker-trigger="desktop" aria-controls="game-service-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-joystick text-lg" aria-hidden="true"></i><span>Dịch vụ game</span></button>
-                @endif
                 <details class="group relative shrink-0" data-desktop-nav-menu>
                     <summary @class(['flex min-h-11 cursor-pointer list-none items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden', 'text-emerald-700' => $exploreActive])>
                         <i class="bx bx-compass text-lg" aria-hidden="true"></i>
@@ -178,13 +178,13 @@
                     <div class="relative" data-account-menu>
                         <button
                             type="button"
-                            class="flex min-h-12 w-[15.5rem] items-center gap-3 rounded-[5px] border border-slate-200 bg-white px-3 py-2 text-left shadow-sm transition duration-200 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                            class="flex min-h-10 w-[11rem] items-center gap-2 rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 text-left shadow-sm transition duration-200 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
                             data-account-menu-toggle
                             aria-controls="client-account-menu"
                             aria-expanded="false"
                             aria-haspopup="true"
                         >
-                            <span class="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-slate-950 text-sm font-extrabold text-white">
+                            <span class="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-slate-950 text-xs font-extrabold text-white">
                                 @if ($clientAccount['avatar'] !== '')
                                     <img class="h-full w-full object-cover" src="{{ $clientAccount['avatar'] }}" alt="Ảnh đại diện của {{ $clientAccount['name'] }}" referrerpolicy="no-referrer">
                                 @else
@@ -192,10 +192,10 @@
                                 @endif
                             </span>
                             <span class="min-w-0 flex-1">
-                                <span class="block truncate text-sm font-bold leading-5 text-slate-900">{{ $clientAccount['email'] }}</span>
-                                <span class="block truncate text-xs font-semibold tabular-nums text-emerald-700" data-header-wallet-balance>{{ number_format((float) $clientAccount['balance'], 0, ',', '.') }}đ</span>
+                                <span class="block truncate text-xs font-bold leading-4 text-slate-900" title="{{ $clientAccount['email'] }}">{{ $clientAccount['email'] }}</span>
+                                <span class="block truncate text-[11px] font-semibold leading-4 tabular-nums text-emerald-700" data-header-wallet-balance>{{ number_format((float) $clientAccount['balance'], 0, ',', '.') }}đ</span>
                             </span>
-                            <i class="bx bx-chevron-down shrink-0 text-xl text-slate-400 transition-transform duration-200" data-account-menu-chevron aria-hidden="true"></i>
+                            <i class="bx bx-chevron-down shrink-0 text-base text-slate-400 transition-transform duration-200" data-account-menu-chevron aria-hidden="true"></i>
                         </button>
 
                         <div id="client-account-menu" class="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-xl" data-account-menu-panel hidden>
@@ -323,7 +323,10 @@
 
             <nav class="min-h-0 flex-1 overscroll-contain overflow-y-auto px-3 py-4" aria-label="Điều hướng di động">
                 <div class="grid gap-1">
-                    <button type="button" data-menu-item data-game-picker-open data-game-picker-trigger="mobile-menu" class="flex items-center gap-3 rounded-[5px] bg-emerald-50 px-4 py-3 text-left text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-game text-xl" aria-hidden="true"></i><span>Nạp game</span><i class="bx bx-chevron-right ml-auto text-xl" aria-hidden="true"></i></button>
+                    <button type="button" data-menu-item data-game-picker-open data-game-picker-trigger="mobile-menu" class="flex items-center gap-3 rounded-[5px] bg-emerald-50 px-4 py-3 text-left text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-bolt text-xl" aria-hidden="true"></i><span>Nạp game</span><i class="bx bx-chevron-right ml-auto text-xl" aria-hidden="true"></i></button>
+                    @if ($showGameServicePicker)
+                        <button type="button" data-menu-item data-game-service-picker-open data-game-service-picker-trigger="mobile-menu" @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('game-services.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('game-services.*')]) aria-controls="game-service-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-joystick text-xl" aria-hidden="true"></i><span class="flex-1">Dịch vụ game</span><i class="bx bx-chevron-right ml-auto text-xl" aria-hidden="true"></i></button>
+                    @endif
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('home'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('home')]) href="{{ route('home') }}" @if (request()->routeIs('home')) aria-current="page" @endif><i class="bx bx-home-alt-2 text-xl" aria-hidden="true"></i><span>Trang chủ</span></a>
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-xl" aria-hidden="true"></i><span>Nạp tiền</span></a>
                     <details class="group" data-order-history-mobile-menu>
@@ -337,9 +340,6 @@
                         <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.affiliate.spa'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.affiliate.spa')]) href="{{ route('client.affiliate.spa') }}" @if (request()->routeIs('client.affiliate.spa')) aria-current="page" @endif><i class="bx bx-group text-xl" aria-hidden="true"></i><span>Cộng tác viên</span></a>
                     @endif
                     <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('seo.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('seo.*')]) href="{{ route('seo.index') }}" @if (request()->routeIs('seo.*')) aria-current="page" @endif><i class="bx bx-news text-xl" aria-hidden="true"></i><span>Bài viết</span></a>
-                    @if ($showGameServicePicker)
-                        <button type="button" data-menu-item data-game-service-picker-open data-game-service-picker-trigger="mobile-menu" @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('game-services.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('game-services.*')]) aria-controls="game-service-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-joystick text-xl" aria-hidden="true"></i><span class="flex-1">Dịch vụ game</span><i class="bx bx-chevron-right ml-auto text-xl" aria-hidden="true"></i></button>
-                    @endif
                 </div>
             </nav>
 
@@ -365,19 +365,25 @@
     </div>
 
     <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_18px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden" aria-label="Điều hướng nhanh trên di động" data-mobile-bottom-nav>
-        <div class="mx-auto grid h-16 max-w-lg grid-cols-4">
+        <div @class(['mx-auto grid h-16 max-w-lg', 'grid-cols-5' => $showGameServicePicker, 'grid-cols-4' => ! $showGameServicePicker])>
             <button type="button" @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs(['home', 'topup.*', 'pricing']), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs(['home', 'topup.*', 'pricing'])]) data-game-picker-open data-game-picker-trigger="mobile-bottom" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog" data-mobile-nav-item="topup">
-                <i class="bx bx-diamond text-xl" aria-hidden="true"></i>
+                <i class="bx bx-bolt text-xl" aria-hidden="true"></i>
                 <span class="truncate">Nạp game</span>
             </button>
+            @if ($showGameServicePicker)
+                <button type="button" @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('game-services.*'), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs('game-services.*')]) data-game-service-picker-open data-game-service-picker-trigger="mobile-bottom" aria-controls="game-service-picker-modal" aria-expanded="false" aria-haspopup="dialog" data-mobile-nav-item="service">
+                    <i class="bx bx-joystick text-xl" aria-hidden="true"></i>
+                    <span class="truncate">Dịch vụ</span>
+                </button>
+            @endif
             <a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition', 'text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif data-mobile-nav-item="wallet">
                 <i class="bx bx-wallet-alt text-xl" aria-hidden="true"></i>
                 <span class="truncate">Nạp tiền</span>
             </a>
-            <a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition', 'text-emerald-700' => $orderHistoryActive, 'text-slate-500 hover:text-emerald-700' => ! $orderHistoryActive]) href="{{ $orderHistoryUrl }}" @if ($orderHistoryActive) aria-current="page" @endif data-mobile-nav-item="history">
+            <button type="button" @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600', 'text-emerald-700' => $orderHistoryActive, 'text-slate-500 hover:text-emerald-700' => ! $orderHistoryActive]) data-order-history-picker-open aria-controls="order-history-picker-modal" aria-expanded="false" aria-haspopup="dialog" data-mobile-nav-item="history">
                 <i class="bx bx-history text-xl" aria-hidden="true"></i>
                 <span class="truncate">Lịch sử</span>
-            </a>
+            </button>
             <button
                 type="button"
                 class="flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold text-slate-500 transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600 aria-expanded:text-emerald-700"
@@ -400,8 +406,9 @@
 
     <x-client.game-picker-modal :games="$navigationGames ?? collect()" />
     <x-client.game-service-picker-modal :games="$gameServiceGames ?? collect()" />
+    <x-client.order-history-picker-modal :topup-url="$orderHistoryUrl" :service-url="route('account.game-service-orders.index')" />
 
-    <main id="main-content" class="min-w-0 focus:outline-none" tabindex="-1" data-page-enter>
+    <main id="main-content" class="client-page-scale min-w-0 focus:outline-none" tabindex="-1" data-page-enter>
         @include('client.partials.flash')
         @yield('content')
     </main>

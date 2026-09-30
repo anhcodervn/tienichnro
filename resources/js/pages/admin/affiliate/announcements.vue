@@ -6,7 +6,9 @@ import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { sanitizeRichText } from '@/utils/rich-text';
 import { BellRing, LoaderCircle, Pencil, Pin, PinOff, Plus, Save, Trash2, X } from 'lucide-vue-next';
 import Swal from 'sweetalert2';
-import { onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, reactive, ref, watch } from 'vue';
+
+const props = defineProps<{ announcementChannel: 'affiliate' | 'collaborator' }>();
 
 const data = ref<AffiliateAnnouncementData | null>(null);
 const selectedSiteId = ref<number | null>(null);
@@ -14,6 +16,9 @@ const editingId = ref<number | null>(null);
 const loading = ref(true);
 const saving = ref(false);
 const form = reactive({ title: '', content: [] as unknown[], is_pinned: false, is_published: true });
+const isCollaboratorChannel = computed(() => props.announcementChannel === 'collaborator');
+const pageLabel = computed(() => (isCollaboratorChannel.value ? 'Thông báo Dashboard CTV' : 'Thông báo Affiliate'));
+const centerLabel = computed(() => (isCollaboratorChannel.value ? 'Work Center' : 'Affiliate Center'));
 
 const dateTime = (value: string | null): string => (value ? new Date(value).toLocaleString('vi-VN') : 'Chưa đăng');
 
@@ -28,7 +33,9 @@ const resetForm = (): void => {
 const load = async (): Promise<void> => {
     loading.value = true;
     try {
-        data.value = await adminAffiliateService.announcements(selectedSiteId.value || undefined);
+        data.value = isCollaboratorChannel.value
+            ? await adminAffiliateService.collaboratorAnnouncements(selectedSiteId.value || undefined)
+            : await adminAffiliateService.announcements(selectedSiteId.value || undefined);
         selectedSiteId.value = data.value.selected_site_id;
     } catch (error) {
         handleErrorResponse(error);
@@ -54,9 +61,13 @@ const save = async (): Promise<void> => {
         form.content = await uploadEditorImages(form.content);
         const payload = { site_id: selectedSiteId.value, ...form };
         const response = editingId.value
-            ? await adminAffiliateService.updateAnnouncement(editingId.value, payload)
-            : await adminAffiliateService.createAnnouncement(payload);
-        handleSuccessResponse(response, editingId.value ? 'Đã cập nhật thông báo.' : 'Đã gửi thông báo tới cộng tác viên.');
+            ? isCollaboratorChannel.value
+                ? await adminAffiliateService.updateCollaboratorAnnouncement(editingId.value, payload)
+                : await adminAffiliateService.updateAnnouncement(editingId.value, payload)
+            : isCollaboratorChannel.value
+              ? await adminAffiliateService.createCollaboratorAnnouncement(payload)
+              : await adminAffiliateService.createAnnouncement(payload);
+        handleSuccessResponse(response, editingId.value ? 'Đã cập nhật thông báo.' : `Đã gửi thông báo tới ${centerLabel.value}.`);
         resetForm();
         await load();
     } catch (error) {
@@ -68,13 +79,16 @@ const save = async (): Promise<void> => {
 
 const togglePin = async (announcement: AffiliateAnnouncement): Promise<void> => {
     try {
-        const response = await adminAffiliateService.updateAnnouncement(announcement.id, {
+        const payload = {
             site_id: announcement.tenant_id,
             title: announcement.title,
             content: announcement.content,
             is_pinned: !announcement.is_pinned,
             is_published: announcement.is_published,
-        });
+        };
+        const response = isCollaboratorChannel.value
+            ? await adminAffiliateService.updateCollaboratorAnnouncement(announcement.id, payload)
+            : await adminAffiliateService.updateAnnouncement(announcement.id, payload);
         handleSuccessResponse(response, announcement.is_pinned ? 'Đã bỏ ghim thông báo.' : 'Đã ghim thông báo lên đầu.');
         await load();
     } catch (error) {
@@ -95,7 +109,9 @@ const remove = async (announcement: AffiliateAnnouncement): Promise<void> => {
     if (!result.isConfirmed) return;
 
     try {
-        const response = await adminAffiliateService.deleteAnnouncement(announcement.id);
+        const response = isCollaboratorChannel.value
+            ? await adminAffiliateService.deleteCollaboratorAnnouncement(announcement.id)
+            : await adminAffiliateService.deleteAnnouncement(announcement.id);
         handleSuccessResponse(response, 'Đã xóa thông báo.');
         if (editingId.value === announcement.id) resetForm();
         await load();
@@ -110,6 +126,15 @@ watch(selectedSiteId, (value, previousValue) => {
         void load();
     }
 });
+watch(
+    () => props.announcementChannel,
+    () => {
+        data.value = null;
+        selectedSiteId.value = null;
+        resetForm();
+        void load();
+    },
+);
 onMounted(load);
 </script>
 
@@ -117,9 +142,15 @@ onMounted(load);
     <main class="grid gap-5 p-4 sm:p-6">
         <header class="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:flex-row sm:items-end sm:justify-between">
             <div>
-                <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">Affiliate</p>
-                <h1 class="mt-1 text-2xl font-black text-slate-950">Thông báo cộng tác viên</h1>
-                <p class="mt-1 text-sm text-slate-500">Gửi thông tin tới Partner Center và ghim nội dung quan trọng lên đầu.</p>
+                <p class="text-xs font-bold uppercase tracking-[0.16em] text-blue-700">{{ centerLabel }}</p>
+                <h1 class="mt-1 text-2xl font-black text-slate-950">{{ pageLabel }}</h1>
+                <p class="mt-1 text-sm text-slate-500">
+                    {{
+                        isCollaboratorChannel
+                            ? 'Gửi thông tin công việc riêng tới dashboard của cộng tác viên dịch vụ.'
+                            : 'Gửi chính sách và chương trình riêng tới dashboard Affiliate.'
+                    }}
+                </p>
             </div>
             <label v-if="data && data.sites.length > 1" class="grid gap-1.5 text-sm font-bold text-slate-700">
                 Website
@@ -157,7 +188,7 @@ onMounted(load);
                         required
                         maxlength="180"
                         class="min-h-11 rounded-xl border-2 border-slate-300 px-3 focus:border-blue-500 focus:ring-blue-100"
-                        placeholder="Nội dung cần cộng tác viên chú ý"
+                        :placeholder="isCollaboratorChannel ? 'Nội dung công việc cần CTV chú ý' : 'Chính sách hoặc chương trình Affiliate'"
                     />
                 </label>
                 <div class="grid gap-2 text-sm font-bold text-slate-700">
@@ -191,7 +222,7 @@ onMounted(load);
             <div v-if="loading" class="grid min-h-72 place-items-center rounded-2xl border border-slate-200 bg-white">
                 <LoaderCircle class="size-8 animate-spin text-blue-600" />
             </div>
-            <section v-else class="grid gap-3" aria-label="Danh sách thông báo cộng tác viên">
+            <section v-else class="grid gap-3" :aria-label="`Danh sách ${pageLabel}`">
                 <article
                     v-for="announcement in data?.announcements"
                     :key="announcement.id"
@@ -254,7 +285,7 @@ onMounted(load);
                     <div>
                         <BellRing class="mx-auto size-9 text-slate-400" />
                         <p class="mt-3 font-bold text-slate-700">Chưa có thông báo</p>
-                        <p class="mt-1 text-sm text-slate-500">Tạo thông báo đầu tiên để gửi tới cộng tác viên.</p>
+                        <p class="mt-1 text-sm text-slate-500">Tạo thông báo đầu tiên để gửi tới {{ centerLabel }}.</p>
                     </div>
                 </div>
             </section>

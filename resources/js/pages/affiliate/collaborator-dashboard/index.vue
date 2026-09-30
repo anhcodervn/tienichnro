@@ -26,7 +26,7 @@ onMounted(load);
         <section class="rounded-2xl bg-gradient-to-br from-emerald-600 via-emerald-700 to-slate-900 p-6 text-white shadow-lg sm:p-8">
             <p class="text-xs font-black uppercase tracking-[0.18em] text-emerald-100">CTV dịch vụ game</p>
             <h1 class="mt-2 text-3xl font-black">Dashboard tổng quan</h1>
-            <p class="mt-2 max-w-2xl text-emerald-50">Theo dõi đơn được giao, tiến độ xử lý và thu nhập được admin kết toán.</p>
+            <p class="mt-2 max-w-2xl text-emerald-50">Theo dõi đơn chờ nhận, tiến độ xử lý và thu nhập được admin kết toán.</p>
         </section>
         <div v-if="loading" class="grid min-h-72 place-items-center rounded-2xl border border-slate-200 bg-white">
             <LoaderCircle class="size-9 animate-spin text-emerald-600" />
@@ -75,9 +75,9 @@ onMounted(load);
                 <header class="flex items-center justify-between border-b border-slate-200 p-5">
                     <div>
                         <h2 class="font-black">Đơn gần đây</h2>
-                        <p class="text-xs text-slate-500">5 đơn mới nhất được giao cho bạn.</p>
+                        <p class="text-xs text-slate-500">5 đơn chờ nhận hoặc đã được giao gần nhất.</p>
                     </div>
-                    <RouterLink to="/cong-tac-vien/don-dich-vu" class="font-bold text-emerald-700">Xem tất cả</RouterLink>
+                    <RouterLink to="/dashboard/don-dich-vu" class="font-bold text-emerald-700">Xem tất cả</RouterLink>
                 </header>
                 <div class="divide-y divide-slate-100">
                     <div

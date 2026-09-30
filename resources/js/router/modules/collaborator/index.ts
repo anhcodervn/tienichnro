@@ -1,5 +1,5 @@
 export default {
-    path: '/cong-tac-vien',
+    path: '/dashboard',
     component: () => import('@/layouts/AffiliateLayout.vue'),
     children: [
         {
@@ -13,9 +13,14 @@ export default {
             component: () => import('@/pages/affiliate/game-service-orders/index.vue'),
         },
         {
+            path: 'chat-don',
+            name: 'collaborator.chats',
+            component: () => import('@/pages/affiliate/game-service-chats/index.vue'),
+        },
+        {
             path: 'thong-bao',
             name: 'collaborator.notifications',
-            component: () => import('@/pages/affiliate/home.vue'),
+            component: () => import('@/pages/affiliate/collaborator-notifications/index.vue'),
         },
         {
             path: 'doanh-thu',

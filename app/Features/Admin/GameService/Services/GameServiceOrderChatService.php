@@ -37,7 +37,7 @@ class GameServiceOrderChatService
     /** @return array<int, array<string, mixed>> */
     public function collaboratorOrders(User $collaborator): array
     {
-        abort_unless($collaborator->affiliateProfile()->where('status', 'active')->exists(), 403);
+        abort_unless($collaborator->canAccessCollaboratorDashboard(), 403);
 
         return GameServiceOrder::query()
             ->whereBelongsTo($collaborator, 'collaborator')
@@ -51,12 +51,24 @@ class GameServiceOrderChatService
     }
 
     /** @return array<int, array<string, mixed>> */
-    public function collaborators(): array
+    public function collaborators(?int $gameServiceId = null, ?int $includeUserId = null): array
     {
         return User::query()
-            ->where('role', 'user')
+            ->where('role', User::ROLE_COLLABORATOR)
             ->where('status', 'active')
-            ->whereHas('affiliateProfile', fn (Builder $query) => $query->where('status', 'active'))
+            ->when($gameServiceId !== null, fn (Builder $query) => $query->where(function (Builder $permissionQuery) use ($gameServiceId, $includeUserId): void {
+                $permissionQuery->whereHas(
+                    'allowedGameServices',
+                    fn (Builder $serviceQuery) => $serviceQuery->whereKey($gameServiceId),
+                );
+
+                if ($includeUserId !== null) {
+                    $permissionQuery->orWhere(
+                        $permissionQuery->getModel()->getQualifiedKeyName(),
+                        $includeUserId,
+                    );
+                }
+            }))
             ->orderBy('username')
             ->get(['id', 'username', 'full_name', 'avatar'])
             ->map(fn (User $user): array => [
@@ -109,8 +121,7 @@ class GameServiceOrderChatService
     private function authorize(GameServiceOrder $order, User $actor): void
     {
         $isActiveCollaborator = $order->collaborator_id === $actor->id
-            && $actor->status === 'active'
-            && $actor->affiliateProfile()->where('status', 'active')->exists();
+            && $actor->canAccessCollaboratorDashboard();
 
         abort_unless(
             $actor->role === 'admin'

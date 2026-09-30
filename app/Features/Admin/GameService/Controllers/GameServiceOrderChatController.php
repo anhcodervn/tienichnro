@@ -33,9 +33,18 @@ class GameServiceOrderChatController extends Controller
         )], 201);
     }
 
-    public function collaborators(): JsonResponse
+    public function collaborators(Request $request): JsonResponse
     {
-        return response()->json(['status' => true, 'data' => $this->chatService->collaborators()]);
+        $gameServiceId = $request->integer('game_service_id');
+        $includeUserId = $request->integer('include_user_id');
+
+        return response()->json([
+            'status' => true,
+            'data' => $this->chatService->collaborators(
+                $gameServiceId > 0 ? $gameServiceId : null,
+                $includeUserId > 0 ? $includeUserId : null,
+            ),
+        ]);
     }
 
     private function user(Request $request): User

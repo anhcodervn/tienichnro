@@ -32,6 +32,7 @@ test('admin manages affiliate announcements and changes are audited', function (
         'is_pinned' => true,
         'is_published' => true,
     ])->assertCreated()
+        ->assertJsonPath('data.audience', AffiliateAnnouncement::AUDIENCE_AFFILIATE)
         ->assertJsonPath('data.title', 'Chính sách hoa hồng mới')
         ->assertJsonPath('data.content.0.children.0.href', 'https://napcarot.com/chinh-sach')
         ->assertJsonPath('data.is_pinned', true)
@@ -68,6 +69,54 @@ test('admin manages affiliate announcements and changes are audited', function (
         'affiliate_announcement_updated',
         'affiliate_announcement_deleted',
     ])->count())->toBe(3);
+});
+
+test('admin manages affiliate and collaborator announcements in separate channels', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $admin = User::factory()->create(['tenant_id' => $main->id, 'role' => User::ROLE_ADMIN]);
+    $payload = [
+        'site_id' => $main->id,
+        'title' => 'Thông báo công việc',
+        'content' => [['type' => 'paragraph', 'children' => [['text' => 'Ưu tiên xử lý đơn đang chờ.']]]],
+        'is_pinned' => true,
+        'is_published' => true,
+    ];
+
+    $createResponse = $this->actingAs($admin)
+        ->postJson('http://napcarot.com/api/admin-api/game-service-announcements', $payload)
+        ->assertCreated()
+        ->assertJsonPath('data.audience', AffiliateAnnouncement::AUDIENCE_COLLABORATOR);
+
+    $workAnnouncementId = (int) $createResponse->json('data.id');
+    $affiliateAnnouncement = AffiliateAnnouncement::factory()->create([
+        'tenant_id' => $main->id,
+        'title' => 'Thông báo Affiliate',
+    ]);
+
+    $this->actingAs($admin)
+        ->getJson('http://napcarot.com/api/admin-api/game-service-announcements')
+        ->assertOk()
+        ->assertJsonCount(1, 'data.announcements')
+        ->assertJsonPath('data.announcements.0.id', $workAnnouncementId)
+        ->assertJsonMissing(['title' => $affiliateAnnouncement->title]);
+
+    $this->actingAs($admin)
+        ->getJson('http://napcarot.com/api/admin-api/affiliate/announcements')
+        ->assertOk()
+        ->assertJsonCount(1, 'data.announcements')
+        ->assertJsonPath('data.announcements.0.id', $affiliateAnnouncement->id)
+        ->assertJsonMissing(['title' => 'Thông báo công việc']);
+
+    $this->actingAs($admin)
+        ->putJson("http://napcarot.com/api/admin-api/affiliate/announcements/{$workAnnouncementId}", $payload)
+        ->assertNotFound();
+
+    $this->actingAs($admin)
+        ->deleteJson("http://napcarot.com/api/admin-api/game-service-announcements/{$affiliateAnnouncement->id}")
+        ->assertNotFound();
+
+    expect(AdminAuditLog::query()->withoutGlobalScopes()
+        ->where('action', 'collaborator_announcement_created')->count())->toBe(1);
 });
 
 test('affiliate announcement rejects unsafe editor content', function (array $content): void {
@@ -108,6 +157,7 @@ test('affiliate home shows pinned published announcements first and only for the
     ]);
     AffiliateAnnouncement::factory()->draft()->create(['tenant_id' => $main->id, 'title' => 'Bản nháp']);
     AffiliateAnnouncement::factory()->pinned()->create(['tenant_id' => $otherSite->id, 'title' => 'Thông báo website khác']);
+    AffiliateAnnouncement::factory()->forCollaborators()->create(['tenant_id' => $main->id, 'title' => 'Thông báo công việc']);
 
     $this->actingAs($user)
         ->getJson('http://napcarot.com/api/client/affiliate/home')
@@ -118,6 +168,7 @@ test('affiliate home shows pinned published announcements first and only for the
         ->assertJsonPath('data.announcements.0.content_html', app(EditorContentRenderer::class)->renderNodes($olderPinned->content)->toHtml())
         ->assertJsonPath('data.announcements.1.id', $newerRegular->id)
         ->assertJsonMissing(['title' => 'Bản nháp'])
+        ->assertJsonMissing(['title' => 'Thông báo công việc'])
         ->assertJsonMissing(['title' => 'Thông báo website khác']);
 });
 

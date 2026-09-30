@@ -171,11 +171,15 @@ class AffiliateWalletService
                 return $existing;
             }
 
-            $profile = AffiliateProfile::query()->withoutGlobalScope(TenantScope::class)
+            $profileQuery = AffiliateProfile::query()->withoutGlobalScope(TenantScope::class)
                 ->where('tenant_id', $user->tenant_id)
-                ->where('user_id', $user->id)
-                ->where('status', 'active')
-                ->first();
+                ->where('user_id', $user->id);
+
+            if ($walletType === Wallet::TYPE_AFFILIATE) {
+                $profileQuery->where('status', 'active');
+            }
+
+            $profile = $profileQuery->first();
 
             if ($amount < $minimumWithdrawal) {
                 throw new ApiException('Số tiền chưa đạt mức rút tối thiểu của website.', 422);
@@ -295,13 +299,7 @@ class AffiliateWalletService
 
     private function assertActiveCollaborator(User $user): int
     {
-        $isActive = $user->status === 'active' && AffiliateProfile::query()->withoutGlobalScope(TenantScope::class)
-            ->where('tenant_id', $user->tenant_id)
-            ->where('user_id', $user->id)
-            ->where('status', 'active')
-            ->exists();
-
-        if (! $isActive) {
+        if (! $user->canAccessCollaboratorDashboard()) {
             throw new ApiException('Tài khoản cộng tác viên chưa hoạt động hoặc đang bị tạm khóa.', 403);
         }
 

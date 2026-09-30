@@ -2,11 +2,13 @@
 
 use App\Http\Middleware\CaptureAffiliateReferral;
 use App\Http\Middleware\EnsureAdminUser;
+use App\Http\Middleware\EnsureGameServiceSecondaryAuth;
 use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsureSiteIsActive;
 use App\Http\Middleware\EnsureTenancyIsActive;
 use App\Http\Middleware\EnsureTenantSession;
 use App\Http\Middleware\EnsureTopupIsAvailable;
+use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\RecordAdminActivity;
 use App\Http\Middleware\ResolveTenant;
 use App\Support\SettingStore;
@@ -49,6 +51,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenancy.active' => EnsureTenancyIsActive::class,
             'site.active' => EnsureSiteIsActive::class,
             'topup.available' => EnsureTopupIsAvailable::class,
+            'role' => EnsureUserHasRole::class,
+            'game-service.secondary' => EnsureGameServiceSecondaryAuth::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

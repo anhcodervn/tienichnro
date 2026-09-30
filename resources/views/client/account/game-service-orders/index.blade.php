@@ -44,7 +44,7 @@
                         <th class="px-4 py-3">Gói · Máy chủ</th>
                         <th class="px-4 py-3 text-right">Tổng tiền</th>
                         <th class="px-4 py-3">Trạng thái</th>
-                        <th class="px-4 py-3 text-right">Trao đổi</th>
+                        <th class="px-4 py-3 text-right">Thao tác</th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
@@ -65,7 +65,39 @@
                             </td>
                             <td class="whitespace-nowrap px-4 py-4 text-right align-top font-extrabold text-slate-950">{{ number_format($order->total_amount, 0, ',', '.') }}đ</td>
                             <td class="px-4 py-4 align-top"><span class="inline-flex rounded-[5px] border px-2.5 py-1 text-xs font-bold {{ $statusClasses[$order->status] ?? 'border-slate-200 bg-slate-50 text-slate-600' }}">{{ $statusLabels[$order->status] ?? $order->status }}</span></td>
-                            <td class="px-4 py-4 text-right align-top"><a class="inline-flex min-h-9 items-center gap-2 rounded-[5px] bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-700" href="{{ route('account.game-service-orders.chat', $order) }}"><i class="bx bx-message-rounded-dots text-base" aria-hidden="true"></i>Chat</a></td>
+                            <td class="px-4 py-4 align-top">
+                                <div class="flex items-center justify-end gap-2">
+                                    <a
+                                        class="inline-grid size-9 place-items-center rounded-[5px] bg-emerald-600 text-white transition hover:bg-emerald-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2"
+                                        href="{{ route('account.game-service-orders.chat', $order) }}"
+                                        aria-label="Chat đơn {{ $order->code }}"
+                                        title="Chat"
+                                    >
+                                        <i class="bx bx-message-circle-dots text-lg" aria-hidden="true"></i>
+                                        <span class="sr-only">Chat đơn {{ $order->code }}</span>
+                                    </a>
+                                    @if ($order->status === 'pending')
+                                        <form
+                                            method="POST"
+                                            action="{{ route('account.game-service-orders.cancel', $order) }}"
+                                            data-game-service-order-cancel-form
+                                            data-order-code="{{ $order->code }}"
+                                        >
+                                            @csrf
+                                            @method('DELETE')
+                                            <button
+                                                type="submit"
+                                                class="inline-grid size-9 place-items-center rounded-[5px] bg-rose-600 text-white transition hover:bg-rose-700 focus:outline-none focus:ring-2 focus:ring-rose-500 focus:ring-offset-2"
+                                                aria-label="Hủy đơn {{ $order->code }}"
+                                                title="Hủy đơn"
+                                            >
+                                                <i class="bx bx-x-circle text-lg" aria-hidden="true"></i>
+                                                <span class="sr-only">Hủy đơn {{ $order->code }}</span>
+                                            </button>
+                                        </form>
+                                    @endif
+                                </div>
+                            </td>
                         </tr>
                     @empty
                         <tr><td class="px-6 py-12 text-center text-slate-500" colspan="7">Bạn chưa có đơn dịch vụ nào.</td></tr>

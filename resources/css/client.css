@@ -821,6 +821,22 @@
     }
 }
 
+.client-page-scale {
+    width: 111.111111111%;
+    zoom: 0.9;
+}
+
+@media (min-width: 1024px) {
+    .client-page-scale {
+        width: 117.647058824%;
+        zoom: 0.85;
+    }
+
+    .client-page-scale .client-container {
+        max-width: 84.705882353rem;
+    }
+}
+
 @media (min-width: 992px) {
     .home-checkout-layout {
         grid-template-columns: minmax(0, 65fr) minmax(20rem, 35fr);

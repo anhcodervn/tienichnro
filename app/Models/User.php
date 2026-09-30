@@ -13,6 +13,7 @@ use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -25,6 +26,12 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 class User extends Authenticatable implements CanResetPassword, JWTSubject, MustVerifyEmailContract
 {
     use BelongsToTenant, CanResetPasswordTrait, HasApiTokens, HasFactory, MustVerifyEmail, Notifiable, SoftDeletes;
+
+    public const ROLE_USER = 'user';
+
+    public const ROLE_ADMIN = 'admin';
+
+    public const ROLE_COLLABORATOR = 'ctv';
 
     protected $fillable = [
         'tenant_id',
@@ -47,6 +54,7 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
 
     protected $hidden = [
         'password',
+        'game_service_secondary_password',
         'remember_token',
     ];
 
@@ -60,6 +68,7 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
+            'game_service_secondary_password' => 'hashed',
             'deleted_at' => 'datetime',
         ];
     }
@@ -204,9 +213,21 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         return $this->hasMany(GameServiceOrder::class, 'collaborator_id');
     }
 
+    public function allowedGameServices(): BelongsToMany
+    {
+        return $this->belongsToMany(GameService::class, 'collaborator_game_service_permissions')
+            ->withTimestamps();
+    }
+
     public function gameServiceOrderMessages(): HasMany
     {
         return $this->hasMany(GameServiceOrderMessage::class, 'sender_id');
+    }
+
+    public function canAccessCollaboratorDashboard(): bool
+    {
+        return $this->status === 'active'
+            && in_array($this->role, [self::ROLE_ADMIN, self::ROLE_COLLABORATOR], true);
     }
 
     public function notificationReads(): HasMany

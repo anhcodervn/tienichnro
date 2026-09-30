@@ -14,11 +14,21 @@ class AffiliateAnnouncement extends Model
     /** @use HasFactory<AffiliateAnnouncementFactory> */
     use BelongsToTenant, HasFactory;
 
+    public const AUDIENCE_AFFILIATE = 'affiliate';
+
+    public const AUDIENCE_COLLABORATOR = 'collaborator';
+
+    public const AUDIENCES = [self::AUDIENCE_AFFILIATE, self::AUDIENCE_COLLABORATOR];
+
     protected $fillable = [
-        'tenant_id', 'admin_id', 'title', 'content', 'is_pinned', 'is_published', 'published_at',
+        'tenant_id', 'admin_id', 'audience', 'title', 'content', 'is_pinned', 'is_published', 'published_at',
     ];
 
-    protected $attributes = ['is_pinned' => false, 'is_published' => true];
+    protected $attributes = [
+        'audience' => self::AUDIENCE_AFFILIATE,
+        'is_pinned' => false,
+        'is_published' => true,
+    ];
 
     protected function casts(): array
     {

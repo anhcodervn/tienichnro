@@ -384,6 +384,7 @@ onMounted(async () => {
                 >
                     <option value="">Vai trò</option>
                     <option value="admin">Admin</option>
+                    <option value="ctv">CTV dịch vụ</option>
                     <option value="user">User</option>
                 </select>
 

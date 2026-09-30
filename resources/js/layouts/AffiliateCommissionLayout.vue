@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { clientAffiliateService } from '@/services/client-affiliate.service';
 import { useUserStore } from '@/stores/user.store';
-import { BadgePercent, BellRing, BriefcaseBusiness, HandCoins, Home, LayoutDashboard, LogOut, Menu, X } from 'lucide-vue-next';
+import { BadgePercent, BellRing, HandCoins, Home, LayoutDashboard, LogOut, Menu, X } from 'lucide-vue-next';
 import { computed, onBeforeUnmount, onMounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 
@@ -50,11 +50,11 @@ const logout = async (): Promise<void> => {
 onMounted(() => {
     void loadUnreadAnnouncements();
     refreshTimer = window.setInterval(loadUnreadAnnouncements, 30000);
-    window.addEventListener('collaborator:refresh', loadUnreadAnnouncements);
+    window.addEventListener('affiliate:refresh', loadUnreadAnnouncements);
 });
 onBeforeUnmount(() => {
     if (refreshTimer !== null) window.clearInterval(refreshTimer);
-    window.removeEventListener('collaborator:refresh', loadUnreadAnnouncements);
+    window.removeEventListener('affiliate:refresh', loadUnreadAnnouncements);
 });
 </script>
 
@@ -66,7 +66,7 @@ onBeforeUnmount(() => {
             :class="sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
         >
             <header class="flex min-h-20 items-center justify-between border-b border-slate-200 px-5">
-                <RouterLink to="/dashboard" class="flex items-center gap-3"
+                <RouterLink to="/cong-tac-vien" class="flex items-center gap-3"
                     ><span class="grid size-11 place-items-center rounded-2xl bg-violet-600 text-white"><HandCoins class="size-6" /></span>
                     <div>
                         <p class="text-xs font-bold uppercase tracking-widest text-violet-700">Affiliate</p>
@@ -77,14 +77,14 @@ onBeforeUnmount(() => {
             </header>
             <nav class="grid flex-1 content-start gap-2 p-4">
                 <RouterLink
-                    to="/dashboard"
+                    to="/cong-tac-vien"
                     class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
                     :class="routeName === 'affiliate.dashboard' ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50'"
                     @click="closeSidebar"
                     ><LayoutDashboard class="size-5" /> Tổng quan hoa hồng</RouterLink
                 >
                 <RouterLink
-                    to="/dashboard/thong-bao"
+                    to="/cong-tac-vien/thong-bao"
                     class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
                     :class="routeName === 'affiliate.notifications' ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50'"
                     @click="closeSidebar"
@@ -96,16 +96,11 @@ onBeforeUnmount(() => {
                     ></RouterLink
                 >
                 <RouterLink
-                    to="/dashboard/bang-gia-chiet-khau"
+                    to="/cong-tac-vien/bang-gia-chiet-khau"
                     class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold transition"
                     :class="routeName === 'affiliate.rates' ? 'bg-violet-50 text-violet-700' : 'text-slate-600 hover:bg-slate-50'"
                     @click="closeSidebar"
                     ><BadgePercent class="size-5" /> Bảng giá chiết khấu</RouterLink
-                >
-                <a
-                    href="/cong-tac-vien"
-                    class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold text-slate-600 hover:bg-emerald-50 hover:text-emerald-700"
-                    ><BriefcaseBusiness class="size-5" /> Công việc CTV</a
                 >
                 <a href="/" class="flex items-center gap-3 rounded-xl px-4 py-3 font-bold text-slate-600 hover:bg-slate-50"
                     ><Home class="size-5" /> Về trang chính</a

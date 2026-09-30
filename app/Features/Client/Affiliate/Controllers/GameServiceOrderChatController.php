@@ -24,9 +24,22 @@ class GameServiceOrderChatController extends Controller
         return response()->json(['status' => true, 'data' => $this->dashboardService->orders($this->user($request), $request->validated())]);
     }
 
+    public function chats(Request $request): JsonResponse
+    {
+        return response()->json(['status' => true, 'data' => $this->chatService->collaboratorOrders($this->user($request))]);
+    }
+
     public function show(GameServiceOrder $gameServiceOrder, Request $request): JsonResponse
     {
         return response()->json(['status' => true, 'data' => $this->chatService->thread($gameServiceOrder, $this->user($request))]);
+    }
+
+    public function payload(GameServiceOrder $gameServiceOrder, Request $request): JsonResponse
+    {
+        return response()->json([
+            'status' => true,
+            'data' => ['payload' => $this->dashboardService->payload($this->user($request), $gameServiceOrder)],
+        ])->header('Cache-Control', 'no-store, private');
     }
 
     public function store(GameServiceOrder $gameServiceOrder, SendGameServiceOrderMessageRequest $request): JsonResponse

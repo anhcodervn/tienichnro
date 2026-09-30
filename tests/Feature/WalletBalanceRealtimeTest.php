@@ -41,6 +41,38 @@ it('broadcasts the committed wallet balance after a paid client operation', func
         && $event->broadcastAs() === 'wallet.balance.changed');
 });
 
+it('records refunds with refund semantics and broadcasts the restored balance', function (): void {
+    $user = User::factory()->create();
+    $wallet = $user->wallet()->firstOrFail();
+    $wallet->forceFill([
+        'balance' => 15000,
+        'total_spent' => 5000,
+    ])->save();
+
+    Event::fake([WalletBalanceChanged::class]);
+
+    app(WalletService::class)->refund(
+        user: $user,
+        amount: 5000,
+        referenceType: 'game_service_order',
+        referenceId: 99,
+        description: 'Hoàn tiền đơn dịch vụ game',
+    );
+
+    $transaction = $wallet->transactions()->latest('id')->firstOrFail();
+
+    expect($wallet->refresh()->balance)->toBe('20000.00')
+        ->and($wallet->total_spent)->toBe('0.00')
+        ->and($transaction->type)->toBe('refund');
+
+    Event::assertDispatched(WalletBalanceChanged::class, fn (WalletBalanceChanged $event): bool => $event->userId === $user->id
+        && $event->walletType === Wallet::TYPE_MAIN
+        && $event->balance === '20000.00'
+        && $event->totalSpent === '0.00'
+        && $event->changeType === 'refund'
+        && $event->amount === '5000.00');
+});
+
 it('notifies the user and broadcasts the balance when an admin adjusts the wallet', function () {
     $user = User::factory()->create();
     $admin = User::factory()->create(['role' => 'admin']);

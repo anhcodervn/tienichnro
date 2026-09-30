@@ -6,6 +6,7 @@ use App\Models\AffiliateProfile;
 use App\Models\AffiliateProgram;
 use App\Models\AffiliateWithdrawal;
 use App\Models\Game;
+use App\Models\GameService;
 use App\Models\GameServiceOrder;
 use App\Models\Tenant;
 use App\Models\User;
@@ -17,7 +18,10 @@ function activeCollaborator(): User
 {
     Event::fake([AffiliateDashboardUpdated::class]);
     $tenant = Tenant::query()->where('is_main', true)->firstOrFail();
-    $collaborator = User::factory()->create(['tenant_id' => $tenant->id]);
+    $collaborator = User::factory()->create([
+        'tenant_id' => $tenant->id,
+        'role' => User::ROLE_COLLABORATOR,
+    ]);
     AffiliateProfile::factory()->create([
         'tenant_id' => $tenant->id,
         'user_id' => $collaborator->id,
@@ -27,10 +31,12 @@ function activeCollaborator(): User
     return $collaborator;
 }
 
-test('collaborator dashboard summarizes only assigned orders and filters pending orders', function (): void {
+test('collaborator dashboard includes available pending orders without counting them as personal revenue', function (): void {
     $collaborator = activeCollaborator();
     $otherCollaborator = activeCollaborator();
     $game = Game::factory()->create(['name' => 'Ngọc Rồng Online']);
+    $service = GameService::factory()->for($game)->create();
+    $collaborator->allowedGameServices()->attach($service->id);
     $pending = GameServiceOrder::factory()->create([
         'collaborator_id' => $collaborator->id,
         'game_id' => $game->id,
@@ -52,13 +58,22 @@ test('collaborator dashboard summarizes only assigned orders and filters pending
         'status' => 'pending',
         'collaborator_total_cost' => 999000,
     ]);
+    $availablePending = GameServiceOrder::factory()->create([
+        'collaborator_id' => null,
+        'game_id' => $game->id,
+        'game_service_id' => $service->id,
+        'game_name' => $game->name,
+        'status' => 'pending',
+        'collaborator_total_cost' => 25000,
+        'payload' => ['character_name' => 'BiMatTruocKhiNhan', 'password' => 'secret'],
+    ]);
 
     $this->actingAs($collaborator)
         ->getJson('/api/client/affiliate/game-service-dashboard')
         ->assertSuccessful()
-        ->assertJsonPath('data.orders.pending', 1)
+        ->assertJsonPath('data.orders.pending', 2)
         ->assertJsonPath('data.orders.processing', 1)
-        ->assertJsonPath('data.orders.total', 2)
+        ->assertJsonPath('data.orders.total', 3)
         ->assertJsonPath('data.revenue.order_revenue', 75000)
         ->assertJsonPath('data.revenue.held', 75000);
 
@@ -68,12 +83,26 @@ test('collaborator dashboard summarizes only assigned orders and filters pending
         ->assertJsonCount(1, 'data.data')
         ->assertJsonPath('data.data.0.code', $pending->code)
         ->assertJsonPath('data.data.0.status', 'pending')
-        ->assertJsonPath('data.data.0.payload.character_name', $pending->payload['character_name']);
+        ->assertJsonPath('data.data.0.payload', [])
+        ->assertJsonPath('data.data.0.payload_locked', true)
+        ->assertJsonPath('data.data.0.can_claim', true)
+        ->assertJsonPath('data.data.0.can_chat', true);
+
+    $this->actingAs($collaborator)
+        ->getJson('/api/client/affiliate/game-service-orders?status=pending&search='.$availablePending->code)
+        ->assertSuccessful()
+        ->assertJsonCount(1, 'data.data')
+        ->assertJsonPath('data.data.0.code', $availablePending->code)
+        ->assertJsonPath('data.data.0.payload', [])
+        ->assertJsonPath('data.data.0.can_claim', true)
+        ->assertJsonPath('data.data.0.can_chat', false);
 });
 
 test('collaborator can process assigned orders but cannot process another collaborators order', function (): void {
     $collaborator = activeCollaborator();
     $otherCollaborator = activeCollaborator();
+    $service = GameService::factory()->create();
+    $collaborator->allowedGameServices()->attach($service->id);
     $order = GameServiceOrder::factory()->create([
         'collaborator_id' => $collaborator->id,
         'status' => 'pending',
@@ -84,54 +113,112 @@ test('collaborator can process assigned orders but cannot process another collab
         'status' => 'pending',
         'collaborator_total_cost' => 35000,
     ]);
+    $availableOrder = GameServiceOrder::factory()->create([
+        'collaborator_id' => null,
+        'game_service_id' => $service->id,
+        'status' => 'pending',
+        'collaborator_total_cost' => 28000,
+        'payload' => ['character_name' => 'NhanSauKhiClaim', 'password' => 'secret'],
+    ]);
+    $collaboratorHeaders = gameServiceSecondaryHeaders($collaborator);
+    $otherCollaboratorHeaders = gameServiceSecondaryHeaders($otherCollaborator);
 
     $this->actingAs($collaborator)
-        ->postJson("/api/client/affiliate/game-service-orders/{$order->code}/start")
+        ->getJson("/api/client/affiliate/game-service-orders/{$availableOrder->code}/messages", $collaboratorHeaders)
+        ->assertForbidden();
+
+    $this->actingAs($collaborator)
+        ->postJson("/api/client/affiliate/game-service-orders/{$availableOrder->code}/start", [], $collaboratorHeaders)
+        ->assertSuccessful()
+        ->assertJsonPath('data.status', 'processing')
+        ->assertJsonPath('data.collaborator_id', $collaborator->id);
+
+    $this->actingAs($otherCollaborator)
+        ->postJson("/api/client/affiliate/game-service-orders/{$availableOrder->code}/start", [], $otherCollaboratorHeaders)
+        ->assertForbidden();
+
+    $this->actingAs($collaborator)
+        ->getJson("/api/client/affiliate/game-service-orders/{$availableOrder->code}/messages", $collaboratorHeaders)
+        ->assertSuccessful();
+
+    $this->actingAs($collaborator)
+        ->getJson('/api/client/affiliate/game-service-orders?status=processing&search='.$availableOrder->code)
+        ->assertSuccessful()
+        ->assertJsonPath('data.data.0.payload', [])
+        ->assertJsonPath('data.data.0.payload_locked', true)
+        ->assertJsonPath('data.data.0.can_claim', false)
+        ->assertJsonPath('data.data.0.can_chat', true);
+
+    $this->actingAs($collaborator)
+        ->postJson("/api/client/affiliate/game-service-orders/{$order->code}/start", [], $collaboratorHeaders)
         ->assertSuccessful()
         ->assertJsonPath('data.status', 'processing');
 
     $this->actingAs($collaborator)
-        ->postJson("/api/client/affiliate/game-service-orders/{$order->code}/submit")
+        ->postJson("/api/client/affiliate/game-service-orders/{$order->code}/submit", [], $collaboratorHeaders)
         ->assertSuccessful()
         ->assertJsonPath('data.status', 'review');
 
     $this->actingAs($collaborator)
-        ->postJson("/api/client/affiliate/game-service-orders/{$foreignOrder->code}/start")
+        ->postJson("/api/client/affiliate/game-service-orders/{$foreignOrder->code}/start", [], $collaboratorHeaders)
         ->assertForbidden();
 
     expect($order->refresh()->status)->toBe('review')
         ->and($order->processing_at)->not->toBeNull()
+        ->and($availableOrder->refresh()->collaborator_id)->toBe($collaborator->id)
+        ->and($availableOrder->status)->toBe('processing')
         ->and($foreignOrder->refresh()->status)->toBe('pending');
 });
 
-test('opening an admin announcement clears its unread marker only for that collaborator', function (): void {
+test('work announcements and affiliate announcements keep separate feeds and read markers', function (): void {
     $tenant = Tenant::query()->where('is_main', true)->firstOrFail();
     AffiliateProgram::factory()->create(['tenant_id' => $tenant->id, 'is_enabled' => true]);
     $collaborator = activeCollaborator();
     $otherCollaborator = activeCollaborator();
-    $announcement = AffiliateAnnouncement::factory()->create([
+    $workAnnouncement = AffiliateAnnouncement::factory()->forCollaborators()->create([
         'tenant_id' => $tenant->id,
-        'title' => 'Thông báo mới',
+        'title' => 'Thông báo công việc',
     ]);
+    $affiliateAnnouncement = AffiliateAnnouncement::factory()->create([
+        'tenant_id' => $tenant->id,
+        'title' => 'Thông báo Affiliate',
+    ]);
+
+    $this->actingAs($collaborator)
+        ->getJson('/api/client/affiliate/game-service-announcements')
+        ->assertSuccessful()
+        ->assertJsonPath('data.unread_count', 1)
+        ->assertJsonPath('data.announcements.0.id', $workAnnouncement->id)
+        ->assertJsonPath('data.announcements.0.is_read', false);
 
     $this->actingAs($collaborator)
         ->getJson('/api/client/affiliate/home')
         ->assertSuccessful()
         ->assertJsonPath('data.unread_count', 1)
-        ->assertJsonPath('data.announcements.0.is_read', false);
+        ->assertJsonPath('data.announcements.0.id', $affiliateAnnouncement->id);
 
     $this->actingAs($collaborator)
-        ->postJson("/api/client/affiliate/announcements/{$announcement->id}/read")
+        ->postJson("/api/client/affiliate/game-service-announcements/{$workAnnouncement->id}/read")
         ->assertSuccessful()
         ->assertJsonPath('data.unread_count', 0);
 
     $this->actingAs($collaborator)
+        ->getJson('/api/client/affiliate/game-service-announcements')
+        ->assertJsonPath('data.announcements.0.is_read', true)
+        ->assertJsonPath('data.unread_count', 0);
+
+    $this->actingAs($collaborator)
         ->getJson('/api/client/affiliate/home')
-        ->assertJsonPath('data.announcements.0.is_read', true);
+        ->assertJsonPath('data.announcements.0.is_read', false)
+        ->assertJsonPath('data.unread_count', 1);
 
     $this->actingAs($otherCollaborator)
-        ->getJson('/api/client/affiliate/home')
+        ->getJson('/api/client/affiliate/game-service-announcements')
         ->assertJsonPath('data.unread_count', 1);
+
+    $this->actingAs($collaborator)
+        ->postJson("/api/client/affiliate/announcements/{$workAnnouncement->id}/read")
+        ->assertNotFound();
 });
 
 test('admin completion settles collaborator income once', function (): void {
@@ -197,7 +284,7 @@ test('collaborator finance and withdrawals use a separate wallet from affiliate 
         ->postJson('/api/client/affiliate/game-service-withdrawals', [
             'amount' => 100000,
             'idempotency_key' => (string) Str::uuid(),
-        ])
+        ], gameServiceSecondaryHeaders($collaborator))
         ->assertCreated();
 
     $this->actingAs($collaborator)

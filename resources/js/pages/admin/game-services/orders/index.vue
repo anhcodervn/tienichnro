@@ -1,18 +1,26 @@
 <script setup lang="ts">
+import SecondaryPasswordDialog from '@/components/shared/SecondaryPasswordDialog.vue';
 import {
     adminGameServiceService,
     type GameServiceOrder,
     type GameServiceOrderSettlement,
     type GameServiceOrderStatus,
 } from '@/services/admin-game-service.service';
+import { gameServiceSecondaryAuthService } from '@/services/game-service-secondary-auth.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { Banknote, ClipboardList, Eye, HandCoins, LoaderCircle, ReceiptText, Save, Scale, Search, WalletCards, X } from 'lucide-vue-next';
-import { onMounted, reactive, ref } from 'vue';
+import { Banknote, ClipboardList, Eye, HandCoins, LoaderCircle, LockKeyhole, ReceiptText, Save, Scale, Search, WalletCards, X } from 'lucide-vue-next';
+import { onBeforeUnmount, onMounted, reactive, ref } from 'vue';
 
 const orders = ref<GameServiceOrder[]>([]);
 const loading = ref(false);
 const saving = ref(false);
 const selectedOrder = ref<GameServiceOrder | null>(null);
+const secondaryDialogOpen = ref(false);
+const secondaryConfigured = ref(false);
+const secondaryUnlocked = ref(false);
+const secondaryUnlocking = ref(false);
+const secondaryStatusChecking = ref(true);
+const payloadLoading = ref(false);
 const collaborators = ref<Array<{ id: number; name: string }>>([]);
 const settlement = ref<GameServiceOrderSettlement>({
     approved_orders: 0,
@@ -59,9 +67,6 @@ const load = async (): Promise<void> => {
         });
         orders.value = response.data.data.data;
         settlement.value = response.data.data.summary;
-        if (collaborators.value.length === 0) {
-            collaborators.value = (await adminGameServiceService.chatCollaborators()).data.data;
-        }
     } catch (error) {
         handleErrorResponse(error);
     } finally {
@@ -69,11 +74,81 @@ const load = async (): Promise<void> => {
     }
 };
 
-const openOrder = (order: GameServiceOrder): void => {
+const openOrder = async (order: GameServiceOrder): Promise<void> => {
     selectedOrder.value = order;
     editForm.status = order.status;
     editForm.collaborator_id = order.collaborator_id;
     editForm.admin_note = order.admin_note ?? '';
+
+    try {
+        collaborators.value = (await adminGameServiceService.chatCollaborators(order.game_service_id, order.collaborator_id)).data.data;
+    } catch (error) {
+        handleErrorResponse(error);
+    }
+};
+
+const checkSecondaryAuth = async (): Promise<void> => {
+    secondaryStatusChecking.value = true;
+
+    try {
+        const status = await gameServiceSecondaryAuthService.status();
+        secondaryConfigured.value = status.configured;
+        secondaryUnlocked.value = status.unlocked;
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        secondaryStatusChecking.value = false;
+    }
+};
+
+const loadSelectedPayload = async (): Promise<void> => {
+    if (!selectedOrder.value) return;
+
+    payloadLoading.value = true;
+    const selectedCode = selectedOrder.value.code;
+
+    try {
+        const payload = await adminGameServiceService.orderPayload(selectedCode);
+        if (selectedOrder.value?.code === selectedCode) {
+            selectedOrder.value = { ...selectedOrder.value, payload, payload_locked: false };
+        }
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        payloadLoading.value = false;
+    }
+};
+
+const requestPayload = (): void => {
+    if (secondaryUnlocked.value) {
+        void loadSelectedPayload();
+        return;
+    }
+
+    secondaryDialogOpen.value = true;
+};
+
+const unlockSecondaryPassword = async (password: string): Promise<void> => {
+    secondaryUnlocking.value = true;
+
+    try {
+        await gameServiceSecondaryAuthService.unlock(password);
+        secondaryConfigured.value = true;
+        secondaryUnlocked.value = true;
+        secondaryDialogOpen.value = false;
+        await loadSelectedPayload();
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        secondaryUnlocking.value = false;
+    }
+};
+
+const lockSecondarySession = (): void => {
+    secondaryUnlocked.value = false;
+    if (selectedOrder.value) {
+        selectedOrder.value = { ...selectedOrder.value, payload: {}, payload_locked: true };
+    }
 };
 
 const saveOrder = async (): Promise<void> => {
@@ -95,7 +170,13 @@ const saveOrder = async (): Promise<void> => {
     }
 };
 
-onMounted(load);
+onMounted(() => {
+    window.addEventListener('game-service-secondary-auth:locked', lockSecondarySession);
+    void Promise.all([load(), checkSecondaryAuth()]);
+});
+onBeforeUnmount(() => {
+    window.removeEventListener('game-service-secondary-auth:locked', lockSecondarySession);
+});
 </script>
 
 <template>
@@ -299,11 +380,32 @@ onMounted(load);
                         </dl>
                         <div>
                             <h3 class="mb-2 text-sm font-black">Payload khách gửi</h3>
-                            <dl class="grid gap-2 rounded-md border border-slate-200 p-4 text-sm">
+                            <div
+                                v-if="selectedOrder.payload_locked"
+                                class="grid min-h-32 place-items-center gap-3 rounded-md border border-dashed border-slate-300 bg-slate-50 p-4 text-center"
+                            >
+                                <span class="grid size-10 place-items-center rounded-md bg-slate-200 text-slate-600"><LockKeyhole class="size-5" /></span>
+                                <div>
+                                    <p class="text-sm font-black text-slate-900">Thông tin tài khoản đang được ẩn</p>
+                                    <p class="mt-1 text-xs text-slate-500">Nhập mật khẩu C2 để xem payload khách gửi.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    :disabled="payloadLoading || secondaryStatusChecking"
+                                    class="inline-flex min-h-10 items-center justify-center gap-2 rounded-md bg-indigo-600 px-4 text-sm font-bold text-white disabled:opacity-50"
+                                    @click="requestPayload"
+                                >
+                                    <LoaderCircle v-if="payloadLoading" class="size-4 animate-spin" />
+                                    <LockKeyhole v-else class="size-4" />
+                                    {{ payloadLoading ? 'Đang tải...' : 'Mở khóa và xem payload' }}
+                                </button>
+                            </div>
+                            <dl v-else class="grid gap-2 rounded-md border border-slate-200 p-4 text-sm">
                                 <div v-for="(value, key) in selectedOrder.payload" :key="key" class="grid grid-cols-[9rem_minmax(0,1fr)] gap-3">
                                     <dt class="break-words font-mono text-xs text-slate-500">{{ key }}</dt>
                                     <dd class="break-words font-bold text-slate-900">{{ value }}</dd>
                                 </div>
+                                <p v-if="Object.keys(selectedOrder.payload).length === 0" class="text-slate-500">Đơn không có payload.</p>
                             </dl>
                         </div>
                     </div>
@@ -341,5 +443,12 @@ onMounted(load);
                 </div>
             </section>
         </div>
+        <SecondaryPasswordDialog
+            :open="secondaryDialogOpen"
+            :configured="secondaryConfigured"
+            :loading="secondaryUnlocking"
+            @close="secondaryDialogOpen = false"
+            @submit="unlockSecondaryPassword"
+        />
     </main>
 </template>

@@ -68,6 +68,24 @@ export type GameServiceChatMessage = {
     created_at: string;
 };
 
+export type GameServiceChatOrder = {
+    id: number;
+    code: string;
+    service_name: string;
+    package_name: string;
+    status: CollaboratorOrder['status'];
+    user: { id: number; name: string; email: string } | null;
+    collaborator: { id: number; name: string } | null;
+    messages_count: number;
+    last_message: GameServiceChatMessage | null;
+    created_at: string;
+};
+
+export type GameServiceChatThread = {
+    order: GameServiceChatOrder;
+    messages: GameServiceChatMessage[];
+};
+
 export type CollaboratorOrder = {
     code: string;
     game_id: number | null;
@@ -76,9 +94,13 @@ export type CollaboratorOrder = {
     package_name: string;
     server_name: string | null;
     payload: Record<string, string | number | null>;
+    payload_locked: boolean;
     quantity: number;
     status: 'pending' | 'processing' | 'review' | 'completed' | 'failed' | 'cancelled';
+    collaborator_id: number | null;
     collaborator_amount: number | null;
+    can_claim: boolean;
+    can_chat: boolean;
     settled_at: string | null;
     created_at: string;
 };
@@ -118,6 +140,9 @@ export const clientAffiliateService = {
     convert: (amount: number, idempotencyKey: string) => api.post(`${root}/convert`, { amount, idempotency_key: idempotencyKey }),
     withdraw: (amount: number, idempotencyKey: string) => api.post(`${root}/withdrawals`, { amount, idempotency_key: idempotencyKey }),
     collaboratorDashboard: async (): Promise<CollaboratorDashboardData> => (await api.get(`${root}/game-service-dashboard`)).data.data,
+    collaboratorAnnouncements: async (): Promise<ClientAffiliateHomeData> => (await api.get(`${root}/game-service-announcements`)).data.data,
+    readCollaboratorAnnouncement: async (id: number): Promise<number> =>
+        (await api.post(`${root}/game-service-announcements/${id}/read`)).data.data.unread_count,
     collaboratorFinance: async (): Promise<CollaboratorFinanceData> => (await api.get(`${root}/game-service-finance`)).data.data,
     updateCollaboratorPayout: (payload: { bank_name: string; bank_account_name: string; bank_account_number: string }) =>
         api.put(`${root}/game-service-payout-account`, payload),
@@ -125,9 +150,13 @@ export const clientAffiliateService = {
         api.post(`${root}/game-service-withdrawals`, { amount, idempotency_key: idempotencyKey }),
     gameServiceOrders: async (params: Record<string, unknown> = {}): Promise<CollaboratorOrdersData> =>
         (await api.get(`${root}/game-service-orders`, { params })).data.data,
+    gameServiceOrderPayload: async (code: string): Promise<Record<string, string | number | null>> =>
+        (await api.get(`${root}/game-service-orders/${code}/payload`)).data.data.payload,
+    gameServiceOrderChats: async (): Promise<GameServiceChatOrder[]> => (await api.get(`${root}/game-service-order-chats`)).data.data,
     startGameServiceOrder: (code: string) => api.post(`${root}/game-service-orders/${code}/start`),
     submitGameServiceOrder: (code: string) => api.post(`${root}/game-service-orders/${code}/submit`),
-    gameServiceOrderThread: async (code: string) => (await api.get(`${root}/game-service-orders/${code}/messages`)).data.data,
+    gameServiceOrderThread: async (code: string): Promise<GameServiceChatThread> =>
+        (await api.get(`${root}/game-service-orders/${code}/messages`)).data.data,
     sendGameServiceOrderMessage: async (code: string, message: string): Promise<GameServiceChatMessage> =>
         (await api.post(`${root}/game-service-orders/${code}/messages`, { message })).data.data,
     readAnnouncement: async (id: number): Promise<number> => (await api.post(`${root}/announcements/${id}/read`)).data.data.unread_count,

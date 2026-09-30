@@ -105,6 +105,7 @@ export type AffiliateWithdrawal = {
 export type AffiliateAnnouncement = {
     id: number;
     tenant_id: number;
+    audience: 'affiliate' | 'collaborator';
     title: string;
     content: unknown[];
     content_html: string;
@@ -122,6 +123,7 @@ export type AffiliateAnnouncementData = {
 };
 
 const root = '/api/admin-api/affiliate';
+const collaboratorAnnouncementRoot = '/api/admin-api/game-service-announcements';
 
 export const adminAffiliateService = {
     overview: async (params: Record<string, unknown> = {}): Promise<AffiliateOverview> => (await api.get(root, { params })).data.data,
@@ -147,4 +149,10 @@ export const adminAffiliateService = {
     createAnnouncement: (payload: Record<string, unknown>) => api.post(`${root}/announcements`, payload),
     updateAnnouncement: (announcementId: number, payload: Record<string, unknown>) => api.put(`${root}/announcements/${announcementId}`, payload),
     deleteAnnouncement: (announcementId: number) => api.delete(`${root}/announcements/${announcementId}`),
+    collaboratorAnnouncements: async (siteId?: number): Promise<AffiliateAnnouncementData> =>
+        (await api.get(collaboratorAnnouncementRoot, { params: siteId ? { site_id: siteId } : {} })).data.data,
+    createCollaboratorAnnouncement: (payload: Record<string, unknown>) => api.post(collaboratorAnnouncementRoot, payload),
+    updateCollaboratorAnnouncement: (announcementId: number, payload: Record<string, unknown>) =>
+        api.put(`${collaboratorAnnouncementRoot}/${announcementId}`, payload),
+    deleteCollaboratorAnnouncement: (announcementId: number) => api.delete(`${collaboratorAnnouncementRoot}/${announcementId}`),
 };

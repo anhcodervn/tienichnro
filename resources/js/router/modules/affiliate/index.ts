@@ -1,5 +1,5 @@
 export default {
-    path: '/dashboard',
+    path: '/cong-tac-vien',
     component: () => import('@/layouts/AffiliateCommissionLayout.vue'),
     children: [
         {

@@ -26,9 +26,8 @@ class UpdateGameServiceOrderRequest extends FormRequest
                 function (string $attribute, mixed $value, Closure $fail): void {
                     if ($value !== null && ! User::query()
                         ->whereKey((int) $value)
-                        ->where('role', 'user')
+                        ->where('role', User::ROLE_COLLABORATOR)
                         ->where('status', 'active')
-                        ->whereHas('affiliateProfile', fn ($query) => $query->where('status', 'active'))
                         ->exists()) {
                         $fail('CTV được chọn không hoạt động hoặc không hợp lệ.');
                     }

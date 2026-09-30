@@ -10,7 +10,7 @@ const routeTitles: Record<string, string> = {
     'admin.dashboard': 'Tổng quan quản trị',
     'admin.reports.index': 'Báo cáo tăng trưởng và doanh thu',
     'admin.affiliate.index': 'Quản lý Affiliate',
-    'admin.affiliate.announcements': 'Thông báo cộng tác viên',
+    'admin.affiliate.announcements': 'Thông báo Affiliate',
     'admin.support.index': 'Tin nhắn hỗ trợ',
     'admin.topup.catalog': 'Danh mục nạp game',
     'admin.topup.games': 'Danh sách game',
@@ -24,6 +24,7 @@ const routeTitles: Record<string, string> = {
     'admin.game-services.packages': 'Gói dịch vụ game',
     'admin.game-services.orders': 'Đơn dịch vụ game',
     'admin.game-services.chats': 'Chat đơn dịch vụ game',
+    'admin.game-services.announcements': 'Thông báo dashboard CTV',
     'admin.users.index': 'Quản lý người dùng',
     'admin.users.discounts': 'Quản lý user chiết khấu',
     'admin.users.show': 'Chi tiết người dùng',
@@ -51,7 +52,7 @@ const routeTitles: Record<string, string> = {
     'admin.recharge.config': 'Cấu hình nạp tiền',
     'admin.recharge.history': 'Lịch sử nạp tiền',
     'admin.error.404': 'Trang quản trị không tồn tại',
-    'affiliate.notifications': 'Thông báo cộng tác viên',
+    'affiliate.notifications': 'Thông báo Affiliate',
     'affiliate.dashboard': 'Tổng quan hoa hồng',
     'affiliate.rates': 'Bảng giá chiết khấu',
     'collaborator.dashboard': 'Dashboard công việc cộng tác viên',
@@ -59,6 +60,7 @@ const routeTitles: Record<string, string> = {
     'collaborator.revenue': 'Doanh thu công việc cộng tác viên',
     'collaborator.withdrawal': 'Rút tiền cộng tác viên',
     'collaborator.orders': 'Đơn dịch vụ được giao',
+    'collaborator.chats': 'Chat đơn dịch vụ đã nhận',
 };
 
 const router = createRouter({
@@ -86,6 +88,12 @@ router.beforeEach(async (to) => {
     }
 
     if (routeName.startsWith('admin.') && user.role !== 'admin') {
+        return {
+            path: '/',
+        };
+    }
+
+    if (routeName.startsWith('collaborator.') && !['admin', 'ctv'].includes(user.role)) {
         return {
             path: '/',
         };

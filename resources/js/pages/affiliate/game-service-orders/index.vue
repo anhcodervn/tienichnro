@@ -7,18 +7,10 @@ import {
 } from '@/services/client-affiliate.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { CheckCircle2, LoaderCircle, MessageCircle, Play, Search, Send, X } from 'lucide-vue-next';
-import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue';
+import { computed, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { useRoute, useRouter } from 'vue-router';
 
-const result = ref<CollaboratorOrdersData>({ data: [], games: [], meta: { current_page: 1, last_page: 1, total: 0 } });
-const filters = reactive({ search: '', game_id: '', status: 'pending', page: 1 });
-const loading = ref(true);
-const actionCode = ref<string | null>(null);
-const selected = ref<CollaboratorOrder | null>(null);
-const messages = ref<GameServiceChatMessage[]>([]);
-const draft = ref('');
-const sending = ref(false);
-let refreshTimer: number | null = null;
-const payloadEntries = computed(() => Object.entries(selected.value?.payload ?? {}));
+type OrderStatusFilter = CollaboratorOrder['status'] | '';
 
 const statusLabels: Record<CollaboratorOrder['status'], string> = {
     pending: 'Đang chờ',
@@ -36,6 +28,30 @@ const statusClasses: Record<CollaboratorOrder['status'], string> = {
     failed: 'bg-rose-100 text-rose-800',
     cancelled: 'bg-slate-100 text-slate-700',
 };
+const normalizeStatus = (value: unknown): OrderStatusFilter => {
+    if (value === 'all') return '';
+
+    return typeof value === 'string' && value in statusLabels ? (value as CollaboratorOrder['status']) : 'pending';
+};
+
+const route = useRoute();
+const router = useRouter();
+const result = ref<CollaboratorOrdersData>({ data: [], games: [], meta: { current_page: 1, last_page: 1, total: 0 } });
+const filters = reactive<{ search: string; game_id: string; status: OrderStatusFilter; page: number }>({
+    search: '',
+    game_id: '',
+    status: normalizeStatus(route.query.status),
+    page: 1,
+});
+const loading = ref(true);
+const actionCode = ref<string | null>(null);
+const selected = ref<CollaboratorOrder | null>(null);
+const messages = ref<GameServiceChatMessage[]>([]);
+const draft = ref('');
+const sending = ref(false);
+let refreshTimer: number | null = null;
+const payloadEntries = computed(() => Object.entries(selected.value?.payload ?? {}));
+
 const money = (value: number | null): string => `${new Intl.NumberFormat('vi-VN').format(value ?? 0)}đ`;
 const dateTime = (value: string): string => new Date(value).toLocaleString('vi-VN');
 const role = (value: GameServiceChatMessage['sender_role']): string => ({ user: 'Khách hàng', collaborator: 'Bạn', admin: 'Quản trị viên' })[value];
@@ -60,6 +76,14 @@ const loadOrders = async (showLoading = true): Promise<void> => {
 const applyFilters = (): void => {
     filters.page = 1;
     void loadOrders();
+};
+const applyStatusFilter = async (): Promise<void> => {
+    filters.page = 1;
+    await router.replace({
+        name: 'collaborator.orders',
+        query: { ...route.query, status: filters.status || 'all' },
+    });
+    await loadOrders();
 };
 const changePage = (page: number): void => {
     filters.page = page;
@@ -96,7 +120,12 @@ const submitOrder = async (order: CollaboratorOrder): Promise<void> => {
 const openChat = async (order: CollaboratorOrder): Promise<void> => {
     selected.value = order;
     try {
-        messages.value = (await clientAffiliateService.gameServiceOrderThread(order.code)).messages;
+        const [thread, payload] = await Promise.all([
+            clientAffiliateService.gameServiceOrderThread(order.code),
+            clientAffiliateService.gameServiceOrderPayload(order.code),
+        ]);
+        messages.value = thread.messages;
+        selected.value = { ...order, payload, payload_locked: false };
     } catch (error) {
         handleErrorResponse(error);
     }
@@ -118,6 +147,18 @@ const send = async (): Promise<void> => {
         sending.value = false;
     }
 };
+
+watch(
+    () => route.query.status,
+    (status) => {
+        const normalizedStatus = normalizeStatus(status);
+        if (filters.status === normalizedStatus) return;
+
+        filters.status = normalizedStatus;
+        filters.page = 1;
+        void loadOrders();
+    },
+);
 
 onMounted(async () => {
     await loadOrders();
@@ -147,7 +188,7 @@ onBeforeUnmount(() => {
                     <option value="">Tất cả game</option>
                     <option v-for="game in result.games" :key="game.id" :value="game.id">{{ game.name }}</option>
                 </select>
-                <select v-model="filters.status" class="min-h-12 rounded-xl border-2 border-slate-200 px-3" @change="applyFilters">
+                <select v-model="filters.status" class="min-h-12 rounded-xl border-2 border-slate-200 px-3" @change="applyStatusFilter">
                     <option value="">Tất cả trạng thái</option>
                     <option v-for="(label, value) in statusLabels" :key="value" :value="value">{{ label }}</option>
                 </select>
@@ -158,11 +199,11 @@ onBeforeUnmount(() => {
         <section class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
             <header class="flex items-center justify-between gap-4 border-b border-slate-200 p-5">
                 <div>
-                    <h1 class="font-black text-slate-950">Đơn dịch vụ được giao</h1>
+                    <h1 class="font-black text-slate-950">Đơn chờ nhận và đơn được giao</h1>
                     <p class="text-sm text-slate-500">{{ result.meta.total }} đơn phù hợp bộ lọc</p>
                 </div>
-                <span v-if="filters.status === 'pending'" class="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-800"
-                    >Mặc định: đơn đang chờ</span
+                <span v-if="filters.status" class="rounded-full px-3 py-1 text-xs font-black" :class="statusClasses[filters.status]"
+                    >Bộ lọc: {{ statusLabels[filters.status] }}</span
                 >
             </header>
             <div v-if="loading" class="grid min-h-72 place-items-center"><LoaderCircle class="size-9 animate-spin text-emerald-600" /></div>
@@ -201,6 +242,7 @@ onBeforeUnmount(() => {
                             <td class="px-5 py-4">
                                 <div class="flex justify-end gap-2">
                                     <button
+                                        v-if="order.can_chat"
                                         type="button"
                                         class="grid size-10 place-items-center rounded-xl border border-slate-200 hover:bg-slate-100"
                                         title="Trao đổi"
@@ -209,7 +251,7 @@ onBeforeUnmount(() => {
                                         <MessageCircle class="size-5" />
                                     </button>
                                     <button
-                                        v-if="order.status === 'pending'"
+                                        v-if="order.can_claim"
                                         type="button"
                                         :disabled="actionCode === order.code"
                                         class="inline-flex min-h-10 items-center gap-2 rounded-xl bg-sky-600 px-4 font-bold text-white disabled:opacity-50"

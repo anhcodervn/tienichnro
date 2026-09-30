@@ -8,7 +8,7 @@ export type AdminUserListItem = {
     username: string | null;
     email: string | null;
     phone: string | null;
-    role: string;
+    role: 'user' | 'admin' | 'ctv';
     status: AdminUserStatus;
     wallet_balance: number | null;
     created_at: string | null;
@@ -38,7 +38,8 @@ export type AdminUserDetailResponse = {
     username: string | null;
     email: string | null;
     phone: string | null;
-    role: string;
+    role: 'user' | 'admin' | 'ctv';
+    has_game_service_secondary_password: boolean;
     status: AdminUserStatus;
     avatar: string | null;
     created_at: string | null;
@@ -140,6 +141,22 @@ export type AdminUserPricingResponse = {
     global_packages: AdminUserGlobalPackagePreview[];
 };
 
+export type AdminUserGameServicePermission = {
+    id: number;
+    game_id: number;
+    game_name: string;
+    name: string;
+    slug: string;
+    code: string;
+    status: 'active' | 'inactive';
+    is_allowed: boolean;
+};
+
+export type AdminUserGameServicePermissionResponse = {
+    services: AdminUserGameServicePermission[];
+    selected_ids: number[];
+};
+
 export type QuickSetUserPricesPayload = {
     scope: 'packages' | 'global';
     package_ids: number[];
@@ -234,6 +251,29 @@ export const adminUserService = {
         return response.data.data as AdminUserPricingResponse;
     },
 
+    async gameServices(userId: number | string): Promise<AdminUserGameServicePermissionResponse> {
+        const response = await api.get(`/api/admin-api/users/${userId}/game-services`);
+
+        return response.data.data as AdminUserGameServicePermissionResponse;
+    },
+
+    async syncGameServices(userId: number | string, gameServiceIds: number[]): Promise<AdminUserGameServicePermissionResponse> {
+        const response = await api.put(`/api/admin-api/users/${userId}/game-services`, {
+            game_service_ids: gameServiceIds,
+        });
+
+        return response.data.data as AdminUserGameServicePermissionResponse;
+    },
+
+    async updateGameServiceSecondaryPassword(
+        userId: number | string,
+        payload: { password: string; password_confirmation: string },
+    ): Promise<{ has_game_service_secondary_password: boolean }> {
+        const response = await api.put(`/api/admin-api/users/${userId}/game-service-secondary-password`, payload);
+
+        return response.data.data;
+    },
+
     async quickSetPrices(userId: number | string, payload: QuickSetUserPricesPayload): Promise<AdminUserPricingResponse> {
         const response = await api.put(`/api/admin-api/users/${userId}/prices/quick-set`, payload);
 
@@ -281,6 +321,10 @@ export const adminUserService = {
 
     async updateStatus(userId: number | string, status: 'active' | 'blocked'): Promise<void> {
         await api.patch(`/api/admin-api/users/${userId}/status`, { status });
+    },
+
+    async updateRole(userId: number | string, role: 'user' | 'ctv'): Promise<void> {
+        await api.patch(`/api/admin-api/users/${userId}/role`, { role });
     },
 
     async resetPassword(

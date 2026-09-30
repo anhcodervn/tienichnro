@@ -50,4 +50,10 @@ class GameService extends Model
     {
         return $this->hasMany(GameServiceOrder::class);
     }
+
+    public function allowedCollaborators(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'collaborator_game_service_permissions')
+            ->withTimestamps();
+    }
 }

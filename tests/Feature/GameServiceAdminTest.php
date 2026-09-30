@@ -1,7 +1,5 @@
 <?php
 
-use App\Features\Affiliate\Events\AffiliateDashboardUpdated;
-use App\Models\AffiliateProfile;
 use App\Models\Game;
 use App\Models\GameServer;
 use App\Models\GameService;
@@ -12,7 +10,6 @@ use App\Models\GameServicePackagePrice;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\SettingStore;
-use Illuminate\Support\Facades\Event;
 
 function validGameServicePayload(Game $game, GameServer $server): array
 {
@@ -241,7 +238,8 @@ test('admin filters and updates game service orders while preserving snapshots',
         ->getJson('/api/admin-api/game-service-orders?status=pending&search='.$order->code)
         ->assertSuccessful()
         ->assertJsonPath('data.data.0.code', $order->code)
-        ->assertJsonPath('data.data.0.payload.character_name', 'Goku');
+        ->assertJsonPath('data.data.0.payload', [])
+        ->assertJsonPath('data.data.0.payload_locked', true);
 
     $this->actingAs($admin)
         ->patchJson("/api/admin-api/game-service-orders/{$order->code}", [
@@ -379,13 +377,15 @@ test('legacy game service order settlements can be backfilled without overwritin
 
 test('order chat is private to its owner assigned collaborator and admins can intervene', function (): void {
     config(['tenancy.enabled' => false]);
-    Event::fake([AffiliateDashboardUpdated::class]);
     $owner = User::factory()->create();
     $outsider = User::factory()->create();
-    $collaborator = User::factory()->create();
-    $collaboratorProfile = AffiliateProfile::factory()->for($collaborator)->create(['status' => 'active']);
+    $collaborator = User::factory()->create(['role' => User::ROLE_COLLABORATOR]);
+    $otherCollaborator = User::factory()->create(['role' => User::ROLE_COLLABORATOR]);
     $admin = User::factory()->create(['role' => 'admin']);
     $order = GameServiceOrder::factory()->for($owner)->create(['collaborator_id' => $collaborator->id]);
+    $foreignOrder = GameServiceOrder::factory()->create(['collaborator_id' => $otherCollaborator->id]);
+    $unassignedOrder = GameServiceOrder::factory()->create(['collaborator_id' => null]);
+    $collaboratorHeaders = gameServiceSecondaryHeaders($collaborator);
 
     $this->actingAs($owner)
         ->postJson("/api/client/game-service-orders/{$order->code}/messages", ['message' => 'Em cần hỏi tiến độ.'])
@@ -393,7 +393,11 @@ test('order chat is private to its owner assigned collaborator and admins can in
         ->assertJsonPath('data.sender_role', GameServiceOrderMessage::ROLE_USER);
 
     $this->actingAs($collaborator)
-        ->postJson("/api/client/affiliate/game-service-orders/{$order->code}/messages", ['message' => 'Mình đang xử lý nhé.'])
+        ->postJson(
+            "/api/client/affiliate/game-service-orders/{$order->code}/messages",
+            ['message' => 'Mình đang xử lý nhé.'],
+            $collaboratorHeaders,
+        )
         ->assertCreated()
         ->assertJsonPath('data.sender_role', GameServiceOrderMessage::ROLE_COLLABORATOR);
 
@@ -409,21 +413,44 @@ test('order chat is private to its owner assigned collaborator and admins can in
         ->assertJsonMissingPath('data.order.collaborator_total_cost')
         ->assertJsonMissingPath('data.order.payload');
 
+    $this->actingAs($collaborator)
+        ->getJson('/api/client/affiliate/game-service-order-chats', $collaboratorHeaders)
+        ->assertSuccessful()
+        ->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.code', $order->code)
+        ->assertJsonPath('data.0.messages_count', 3)
+        ->assertJsonPath('data.0.last_message.sender_role', GameServiceOrderMessage::ROLE_ADMIN)
+        ->assertJsonMissing(['code' => $foreignOrder->code])
+        ->assertJsonMissing(['code' => $unassignedOrder->code]);
+
     $this->actingAs($outsider)
         ->getJson("/api/client/game-service-orders/{$order->code}/messages")
         ->assertForbidden();
 
-    $collaboratorProfile->update(['status' => 'suspended']);
+    $collaborator->update(['role' => User::ROLE_USER]);
 
     $this->actingAs($collaborator)
         ->getJson("/api/client/affiliate/game-service-orders/{$order->code}/messages")
         ->assertForbidden();
 
-    $collaboratorProfile->update(['status' => 'active']);
+    $this->actingAs($collaborator)
+        ->getJson('/api/client/affiliate/game-service-order-chats')
+        ->assertForbidden();
+
+    $collaborator->update(['role' => User::ROLE_COLLABORATOR]);
 
     $order->update(['collaborator_id' => null]);
 
     $this->actingAs($collaborator)
-        ->postJson("/api/client/affiliate/game-service-orders/{$order->code}/messages", ['message' => 'Không còn quyền.'])
+        ->postJson(
+            "/api/client/affiliate/game-service-orders/{$order->code}/messages",
+            ['message' => 'Không còn quyền.'],
+            $collaboratorHeaders,
+        )
         ->assertForbidden();
+
+    $this->actingAs($collaborator)
+        ->getJson('/api/client/affiliate/game-service-order-chats', $collaboratorHeaders)
+        ->assertSuccessful()
+        ->assertJsonCount(0, 'data');
 });

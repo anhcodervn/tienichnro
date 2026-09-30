@@ -1,5 +1,10 @@
 <?php
 
+use App\Models\User;
+use App\Support\GameServiceSecondaryAuth;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Tests\TestCase;
+
 /*
 |--------------------------------------------------------------------------
 | Test Case
@@ -11,8 +16,8 @@
 |
 */
 
-pest()->extend(Tests\TestCase::class)
-    ->use(Illuminate\Foundation\Testing\RefreshDatabase::class)
+pest()->extend(TestCase::class)
+    ->use(RefreshDatabase::class)
     ->in('Feature');
 
 /*
@@ -44,4 +49,21 @@ expect()->extend('toBeOne', function () {
 function something()
 {
     // ..
+}
+
+/** @return array<string, string> */
+function gameServiceSecondaryHeaders(User $user): array
+{
+    if ($user->role === User::ROLE_COLLABORATOR) {
+        $user->forceFill(['game_service_secondary_password' => 'test-secondary-password'])->save();
+    } else {
+        config()->set('services.game_service_secondary_auth.password', 'test-secondary-password');
+    }
+
+    config()->set('services.game_service_secondary_auth.ttl_minutes', 30);
+    config()->set('cache.default', 'array');
+
+    $grant = app(GameServiceSecondaryAuth::class)->unlock($user, 'test-secondary-password');
+
+    return [GameServiceSecondaryAuth::HEADER_NAME => $grant['token']];
 }

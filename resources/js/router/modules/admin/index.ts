@@ -36,6 +36,7 @@ export default {
             path: 'affiliate/announcements',
             name: 'admin.affiliate.announcements',
             component: () => import('@/pages/admin/affiliate/announcements.vue'),
+            props: { announcementChannel: 'affiliate' },
         },
         {
             path: 'support',
@@ -89,6 +90,12 @@ export default {
             path: 'topup/orders',
             name: 'admin.topup.orders',
             component: () => import('@/pages/admin/topup/orders/index.vue'),
+        },
+        {
+            path: 'game-services/announcements',
+            name: 'admin.game-services.announcements',
+            component: () => import('@/pages/admin/affiliate/announcements.vue'),
+            props: { announcementChannel: 'collaborator' },
         },
         {
             path: 'game-services/games',

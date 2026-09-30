@@ -1019,6 +1019,98 @@ if (gameServicePickerModal) {
     window.addEventListener('pagehide', () => closePicker({ restoreFocus: false }));
 }
 
+const orderHistoryPickerModal = document.querySelector('[data-order-history-picker-modal]');
+
+if (orderHistoryPickerModal) {
+    const panel = orderHistoryPickerModal.querySelector('[data-order-history-picker-panel]');
+    const backdrop = orderHistoryPickerModal.querySelector('[data-order-history-picker-backdrop]');
+    const triggers = [...document.querySelectorAll('[data-order-history-picker-open]')];
+    let returnFocus = null;
+
+    const focusableElements = () =>
+        [
+            ...orderHistoryPickerModal.querySelectorAll(
+                'a[href]:not([tabindex="-1"]), button:not([disabled]):not([tabindex="-1"]), [tabindex]:not([tabindex="-1"])',
+            ),
+        ].filter((element) => !element.hidden && element.tabIndex >= 0);
+
+    const setExpanded = (expanded) => {
+        triggers.forEach((trigger) => trigger.setAttribute('aria-expanded', String(expanded)));
+    };
+
+    const closePicker = ({ restoreFocus = true } = {}) => {
+        if (orderHistoryPickerModal.hidden) return;
+
+        orderHistoryPickerModal.hidden = true;
+        orderHistoryPickerModal.setAttribute('aria-hidden', 'true');
+        document.body.classList.remove('client-game-picker-open');
+        setExpanded(false);
+
+        if (restoreFocus && returnFocus?.isConnected) {
+            returnFocus.focus({ preventScroll: true });
+        }
+    };
+
+    const openPicker = (trigger) => {
+        returnFocus = trigger;
+        orderHistoryPickerModal.hidden = false;
+        orderHistoryPickerModal.setAttribute('aria-hidden', 'false');
+        document.body.classList.add('client-game-picker-open');
+        setExpanded(true);
+
+        animateAndRelease(backdrop, [{ opacity: 0 }, { opacity: 1 }], { duration: 180 });
+        animateAndRelease(
+            panel,
+            [
+                { opacity: 0, transform: 'translateY(1rem) scale(0.98)' },
+                { opacity: 1, transform: 'translateY(0) scale(1)' },
+            ],
+            { duration: 220 },
+        );
+        window.requestAnimationFrame(() => focusableElements()[0]?.focus({ preventScroll: true }));
+    };
+
+    triggers.forEach((trigger) => {
+        trigger.addEventListener('click', () => openPicker(trigger));
+    });
+
+    orderHistoryPickerModal.querySelectorAll('[data-order-history-picker-close]').forEach((closeButton) => {
+        closeButton.addEventListener('click', () => closePicker());
+    });
+
+    orderHistoryPickerModal.querySelectorAll('[data-order-history-picker-link]').forEach((link) => {
+        link.addEventListener('click', () => closePicker({ restoreFocus: false }));
+    });
+
+    document.addEventListener('keydown', (event) => {
+        if (orderHistoryPickerModal.hidden) return;
+
+        if (event.key === 'Escape') {
+            event.preventDefault();
+            closePicker();
+            return;
+        }
+
+        if (event.key !== 'Tab') return;
+
+        const focusable = focusableElements();
+        const first = focusable[0];
+        const last = focusable.at(-1);
+
+        if (!first || !last) return;
+
+        if (event.shiftKey && document.activeElement === first) {
+            event.preventDefault();
+            last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+            event.preventDefault();
+            first.focus();
+        }
+    });
+
+    window.addEventListener('pagehide', () => closePicker({ restoreFocus: false }));
+}
+
 document.querySelectorAll('[data-account-menu]').forEach((accountMenu) => {
     const button = accountMenu.querySelector('[data-account-menu-toggle]');
     const panel = accountMenu.querySelector('[data-account-menu-panel]');
@@ -2624,6 +2716,34 @@ if (realtimeOrderContainers.length > 0) {
         });
     }
 }
+
+document.querySelectorAll('[data-game-service-order-cancel-form]').forEach((form) => {
+    if (!(form instanceof HTMLFormElement)) return;
+
+    let confirmed = false;
+
+    form.addEventListener('submit', async (event) => {
+        if (confirmed) return;
+
+        event.preventDefault();
+        const orderCode = form.dataset.orderCode || '';
+        const result = await Swal.fire({
+            icon: 'warning',
+            title: 'Hủy đơn dịch vụ?',
+            text: orderCode ? `Đơn ${orderCode} sẽ được hủy và hoàn tiền nếu đã trừ ví.` : 'Đơn sẽ được hủy và hoàn tiền nếu đã trừ ví.',
+            showCancelButton: true,
+            confirmButtonText: 'Hủy đơn',
+            cancelButtonText: 'Đóng',
+            confirmButtonColor: '#e11d48',
+            reverseButtons: true,
+        });
+
+        if (!result.isConfirmed) return;
+
+        confirmed = true;
+        form.requestSubmit();
+    });
+});
 
 document.querySelectorAll('[data-game-service-order-form]').forEach((form) => {
     const packageOptions = Array.from(form.querySelectorAll('[data-game-service-package-option]'));

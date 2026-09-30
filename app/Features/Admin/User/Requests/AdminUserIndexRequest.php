@@ -3,6 +3,7 @@
 namespace App\Features\Admin\User\Requests;
 
 use App\Exceptions\ApiException;
+use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
 
@@ -14,14 +15,14 @@ class AdminUserIndexRequest extends FormRequest
     }
 
     /**
-     * @return array<string, \Illuminate\Contracts\Validation\ValidationRule|array<mixed>|string>
+     * @return array<string, ValidationRule|array<mixed>|string>
      */
     public function rules(): array
     {
         return [
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'in:active,inactive,blocked'],
-            'role' => ['nullable', 'string', 'in:user,admin'],
+            'role' => ['nullable', 'string', 'in:user,admin,ctv'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],

@@ -80,13 +80,14 @@ class AdminAffiliateService
     }
 
     /** @param array<string, mixed> $filters @return array<string, mixed> */
-    public function announcements(array $filters): array
+    public function announcements(array $filters, string $audience = AffiliateAnnouncement::AUDIENCE_AFFILIATE): array
     {
         $tenantId = $this->resolveTenantId($filters['site_id'] ?? null);
 
         return [
             'announcements' => AffiliateAnnouncement::query()->withoutGlobalScope(TenantScope::class)
                 ->where('tenant_id', $tenantId)
+                ->where('audience', $audience)
                 ->with(['admin' => fn ($query) => $query->withoutGlobalScope(TenantScope::class)->select(['id', 'username', 'full_name'])])
                 ->orderByDesc('is_pinned')
                 ->latest('published_at')
@@ -101,15 +102,24 @@ class AdminAffiliateService
     }
 
     /** @param array<string, mixed> $payload */
-    public function saveAnnouncement(?int $announcementId, array $payload, User $admin, Request $request): AffiliateAnnouncement
-    {
-        return DB::transaction(function () use ($announcementId, $payload, $admin, $request): AffiliateAnnouncement {
+    public function saveAnnouncement(
+        ?int $announcementId,
+        array $payload,
+        User $admin,
+        Request $request,
+        string $audience = AffiliateAnnouncement::AUDIENCE_AFFILIATE,
+    ): AffiliateAnnouncement {
+        return DB::transaction(function () use ($announcementId, $payload, $admin, $request, $audience): AffiliateAnnouncement {
             $announcement = $announcementId === null
-                ? new AffiliateAnnouncement(['tenant_id' => $this->resolveTenantId($payload['site_id'] ?? null)])
+                ? new AffiliateAnnouncement([
+                    'tenant_id' => $this->resolveTenantId($payload['site_id'] ?? null),
+                    'audience' => $audience,
+                ])
                 : AffiliateAnnouncement::query()->withoutGlobalScope(TenantScope::class)->lockForUpdate()->findOrFail($announcementId);
 
             if ($announcement->exists) {
                 $this->assertAdminTenant($announcement->tenant_id);
+                abort_unless($announcement->audience === $audience, 404);
             }
 
             $old = $announcement->exists ? $announcement->getAttributes() : [];
@@ -126,7 +136,7 @@ class AdminAffiliateService
             $this->audit(
                 $announcement->tenant_id,
                 $admin,
-                $announcementId === null ? 'affiliate_announcement_created' : 'affiliate_announcement_updated',
+                $this->announcementAuditAction($audience, $announcementId === null ? 'created' : 'updated'),
                 $announcement,
                 $old,
                 $announcement->getAttributes(),
@@ -137,13 +147,26 @@ class AdminAffiliateService
         }, 3);
     }
 
-    public function deleteAnnouncement(int $announcementId, User $admin, Request $request): void
-    {
-        DB::transaction(function () use ($announcementId, $admin, $request): void {
+    public function deleteAnnouncement(
+        int $announcementId,
+        User $admin,
+        Request $request,
+        string $audience = AffiliateAnnouncement::AUDIENCE_AFFILIATE,
+    ): void {
+        DB::transaction(function () use ($announcementId, $admin, $request, $audience): void {
             $announcement = AffiliateAnnouncement::query()->withoutGlobalScope(TenantScope::class)->lockForUpdate()->findOrFail($announcementId);
             $this->assertAdminTenant($announcement->tenant_id);
+            abort_unless($announcement->audience === $audience, 404);
             $old = $announcement->getAttributes();
-            $this->audit($announcement->tenant_id, $admin, 'affiliate_announcement_deleted', $announcement, $old, [], $request);
+            $this->audit(
+                $announcement->tenant_id,
+                $admin,
+                $this->announcementAuditAction($audience, 'deleted'),
+                $announcement,
+                $old,
+                [],
+                $request,
+            );
             $announcement->delete();
         }, 3);
     }
@@ -811,6 +834,7 @@ class AdminAffiliateService
         return [
             'id' => $announcement->id,
             'tenant_id' => $announcement->tenant_id,
+            'audience' => $announcement->audience,
             'title' => $announcement->title,
             'content' => $announcement->content,
             'content_html' => $this->contentRenderer->renderNodes($announcement->content ?? [])->toHtml(),
@@ -820,6 +844,15 @@ class AdminAffiliateService
             'updated_at' => $announcement->updated_at?->toISOString(),
             'admin' => $announcement->admin?->only(['id', 'username', 'full_name']),
         ];
+    }
+
+    private function announcementAuditAction(string $audience, string $operation): string
+    {
+        $prefix = $audience === AffiliateAnnouncement::AUDIENCE_COLLABORATOR
+            ? 'collaborator_announcement'
+            : 'affiliate_announcement';
+
+        return "{$prefix}_{$operation}";
     }
 
     /** @param array<string, mixed> $old @param array<string, mixed> $new */

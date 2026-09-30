@@ -10,16 +10,24 @@ use App\Models\AffiliateWithdrawal;
 use App\Models\GameServiceOrder;
 use App\Models\User;
 use App\Models\Wallet;
+use App\Support\EditorContentRenderer;
+use App\Support\GameServicePayloadCipher;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 
 class CollaboratorDashboardService
 {
+    public function __construct(
+        private readonly EditorContentRenderer $contentRenderer,
+        private readonly GameServicePayloadCipher $payloadCipher,
+    ) {}
+
     /** @return array<string, mixed> */
     public function overview(User $user): array
     {
         $this->assertActive($user);
-        $orders = GameServiceOrder::query()->whereBelongsTo($user, 'collaborator');
+        $visibleOrders = $this->visibleOrders($user);
+        $assignedOrders = GameServiceOrder::query()->whereBelongsTo($user, 'collaborator');
         $wallet = Wallet::query()->firstOrCreate(
             ['user_id' => $user->id, 'type' => Wallet::TYPE_COLLABORATOR],
             ['tenant_id' => $user->tenant_id, 'balance' => 0, 'hold_balance' => 0, 'total_recharge' => 0, 'total_spent' => 0],
@@ -27,21 +35,22 @@ class CollaboratorDashboardService
 
         return [
             'orders' => [
-                'pending' => (clone $orders)->where('status', 'pending')->count(),
-                'processing' => (clone $orders)->where('status', 'processing')->count(),
-                'review' => (clone $orders)->where('status', 'review')->count(),
-                'completed' => (clone $orders)->where('status', 'completed')->count(),
-                'total' => (clone $orders)->count(),
+                'pending' => (clone $visibleOrders)->where('status', 'pending')->count(),
+                'processing' => (clone $visibleOrders)->where('status', 'processing')->count(),
+                'review' => (clone $visibleOrders)->where('status', 'review')->count(),
+                'completed' => (clone $visibleOrders)->where('status', 'completed')->count(),
+                'total' => (clone $visibleOrders)->count(),
             ],
             'revenue' => [
-                'order_revenue' => (int) (clone $orders)->sum('collaborator_total_cost'),
-                'held' => (int) (clone $orders)->whereIn('status', ['pending', 'processing', 'review'])->sum('collaborator_total_cost'),
-                'settled' => (int) (clone $orders)->sum('collaborator_settlement_amount'),
+                'order_revenue' => (int) (clone $assignedOrders)->sum('collaborator_total_cost'),
+                'held' => (int) (clone $assignedOrders)->whereIn('status', ['pending', 'processing', 'review'])->sum('collaborator_total_cost'),
+                'settled' => (int) (clone $assignedOrders)->sum('collaborator_settlement_amount'),
                 'available' => (int) $wallet->balance,
                 'withdrawal_hold' => (int) $wallet->hold_balance,
             ],
             'unread_announcements' => $this->unreadAnnouncements($user),
-            'recent_orders' => (clone $orders)->latest('id')->limit(5)->get()->map(fn (GameServiceOrder $order): array => $this->orderPayload($order))->all(),
+            'recent_orders' => (clone $visibleOrders)->latest('id')->limit(5)->get()
+                ->map(fn (GameServiceOrder $order): array => $this->orderPayload($order, $user))->all(),
         ];
     }
 
@@ -49,7 +58,7 @@ class CollaboratorDashboardService
     public function financialData(User $user): array
     {
         $this->assertActive($user);
-        $profile = AffiliateProfile::query()->where('user_id', $user->id)->firstOrFail();
+        $profile = $this->profile($user);
         $wallet = Wallet::query()->firstOrCreate(
             ['user_id' => $user->id, 'type' => Wallet::TYPE_COLLABORATOR],
             ['tenant_id' => $user->tenant_id, 'balance' => 0, 'hold_balance' => 0, 'total_recharge' => 0, 'total_spent' => 0],
@@ -80,11 +89,53 @@ class CollaboratorDashboardService
         ];
     }
 
+    /** @return array<string, mixed> */
+    public function announcements(User $user): array
+    {
+        $this->assertActive($user);
+        $announcements = AffiliateAnnouncement::query()
+            ->where('audience', AffiliateAnnouncement::AUDIENCE_COLLABORATOR)
+            ->where('is_published', true)
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->orderByDesc('is_pinned')
+            ->latest('published_at')
+            ->latest('id')
+            ->limit(50)
+            ->withExists(['reads as is_read' => fn ($query) => $query->where('user_id', $user->id)])
+            ->get(['id', 'title', 'content', 'is_pinned', 'published_at'])
+            ->map(fn (AffiliateAnnouncement $announcement): array => $this->announcementPayload($announcement))
+            ->all();
+
+        return [
+            'announcements' => $announcements,
+            'unread_count' => collect($announcements)->where('is_read', false)->count(),
+        ];
+    }
+
+    public function readAnnouncement(User $user, AffiliateAnnouncement $announcement): int
+    {
+        $this->assertActive($user);
+        abort_unless(
+            $announcement->audience === AffiliateAnnouncement::AUDIENCE_COLLABORATOR
+                && $announcement->is_published
+                && $announcement->published_at?->lte(now()),
+            404,
+        );
+
+        AffiliateAnnouncementRead::query()->firstOrCreate(
+            ['affiliate_announcement_id' => $announcement->id, 'user_id' => $user->id],
+            ['read_at' => now()],
+        );
+
+        return $this->unreadAnnouncements($user);
+    }
+
     /** @param array<string, mixed> $payload */
     public function updatePayout(User $user, array $payload): AffiliateProfile
     {
         $this->assertActive($user);
-        $profile = AffiliateProfile::query()->where('user_id', $user->id)->firstOrFail();
+        $profile = $this->profile($user);
         $profile->fill($payload)->save();
 
         return $profile->refresh();
@@ -95,20 +146,19 @@ class CollaboratorDashboardService
     {
         $this->assertActive($user);
         $search = trim((string) ($filters['search'] ?? ''));
-        $paginator = GameServiceOrder::query()
-            ->whereBelongsTo($user, 'collaborator')
+        $paginator = $this->visibleOrders($user)
             ->when($search !== '', fn (Builder $query) => $query->where('code', 'like', "%{$search}%"))
             ->when(filled($filters['game_id'] ?? null), fn (Builder $query) => $query->where('game_id', $filters['game_id']))
             ->when(filled($filters['status'] ?? null), fn (Builder $query) => $query->where('status', $filters['status']))
             ->latest('id')
             ->paginate(min(max((int) ($filters['per_page'] ?? 30), 1), 100));
 
-        $games = GameServiceOrder::query()->whereBelongsTo($user, 'collaborator')
+        $games = $this->visibleOrders($user)
             ->whereNotNull('game_id')->select(['game_id', 'game_name'])->distinct()->orderBy('game_name')->get()
             ->map(fn (GameServiceOrder $order): array => ['id' => (int) $order->game_id, 'name' => $order->game_name])->values()->all();
 
         return [
-            'data' => $paginator->getCollection()->map(fn (GameServiceOrder $order): array => $this->orderPayload($order))->all(),
+            'data' => $paginator->getCollection()->map(fn (GameServiceOrder $order): array => $this->orderPayload($order, $user))->all(),
             'games' => $games,
             'meta' => ['current_page' => $paginator->currentPage(), 'last_page' => $paginator->lastPage(), 'total' => $paginator->total()],
         ];
@@ -120,9 +170,23 @@ class CollaboratorDashboardService
 
         return DB::transaction(function () use ($user, $order): GameServiceOrder {
             $locked = GameServiceOrder::query()->lockForUpdate()->findOrFail($order->id);
-            abort_unless($locked->collaborator_id === $user->id, 403);
+            abort_if($locked->collaborator_id !== null && $locked->collaborator_id !== $user->id, 403);
             abort_unless($locked->status === 'pending', 422, 'Chỉ có thể nhận đơn đang chờ xử lý.');
-            $locked->forceFill(['status' => 'processing', 'processing_at' => now()])->save();
+
+            if ($locked->collaborator_id === null && $user->role === User::ROLE_COLLABORATOR) {
+                abort_unless(
+                    $locked->game_service_id !== null
+                        && $user->allowedGameServices()->whereKey($locked->game_service_id)->exists(),
+                    403,
+                    'Bạn chưa được cấp quyền nhận dịch vụ này.',
+                );
+            }
+
+            $locked->forceFill([
+                'collaborator_id' => $user->id,
+                'status' => 'processing',
+                'processing_at' => now(),
+            ])->save();
 
             return $locked->refresh();
         }, 3);
@@ -142,29 +206,74 @@ class CollaboratorDashboardService
         }, 3);
     }
 
-    public function readAnnouncement(User $user, AffiliateAnnouncement $announcement): int
+    /** @return array<string, mixed> */
+    public function orderData(GameServiceOrder $order, User $viewer): array
+    {
+        return $this->orderPayload($order, $viewer);
+    }
+
+    /** @return array<string, mixed> */
+    public function payload(User $user, GameServiceOrder $order): array
     {
         $this->assertActive($user);
-        abort_unless($announcement->is_published && $announcement->published_at?->lte(now()), 404);
-        AffiliateAnnouncementRead::query()->firstOrCreate(
-            ['affiliate_announcement_id' => $announcement->id, 'user_id' => $user->id],
-            ['read_at' => now()],
+        abort_unless(
+            $user->role === User::ROLE_ADMIN || $order->collaborator_id === $user->id,
+            403,
         );
 
-        return $this->unreadAnnouncements($user);
+        return $this->payloadCipher->decrypt((string) $order->getRawOriginal('payload'));
     }
 
     private function unreadAnnouncements(User $user): int
     {
         return AffiliateAnnouncement::query()
+            ->where('audience', AffiliateAnnouncement::AUDIENCE_COLLABORATOR)
             ->where('is_published', true)->whereNotNull('published_at')->where('published_at', '<=', now())
             ->whereDoesntHave('reads', fn (Builder $query) => $query->where('user_id', $user->id))
             ->count();
     }
 
+    /** @return array<string, mixed> */
+    private function announcementPayload(AffiliateAnnouncement $announcement): array
+    {
+        return [
+            'id' => $announcement->id,
+            'title' => $announcement->title,
+            'content_html' => $this->contentRenderer->renderNodes($announcement->content ?? [])->toHtml(),
+            'is_pinned' => $announcement->is_pinned,
+            'is_read' => (bool) $announcement->is_read,
+            'published_at' => $announcement->published_at?->toISOString(),
+        ];
+    }
+
     private function assertActive(User $user): void
     {
-        abort_unless($user->status === 'active' && AffiliateProfile::query()->where('user_id', $user->id)->where('status', 'active')->exists(), 403);
+        abort_unless($user->canAccessCollaboratorDashboard(), 403);
+    }
+
+    private function visibleOrders(User $user): Builder
+    {
+        return GameServiceOrder::query()->where(function (Builder $query) use ($user): void {
+            $query->where('collaborator_id', $user->id)
+                ->orWhere(function (Builder $availableQuery) use ($user): void {
+                    $availableQuery->whereNull('collaborator_id')->where('status', 'pending');
+
+                    if ($user->role === User::ROLE_COLLABORATOR) {
+                        $availableQuery->whereIn(
+                            'game_service_id',
+                            $user->allowedGameServices()->select('game_services.id'),
+                        );
+                    }
+                });
+        });
+    }
+
+    private function profile(User $user): AffiliateProfile
+    {
+        return AffiliateProfile::query()->firstOrCreate(
+            ['user_id' => $user->id],
+            ['tenant_id' => $user->tenant_id, 'status' => 'active'],
+        );
     }
 
     private function mask(string $value): string
@@ -173,12 +282,17 @@ class CollaboratorDashboardService
     }
 
     /** @return array<string, mixed> */
-    private function orderPayload(GameServiceOrder $order): array
+    private function orderPayload(GameServiceOrder $order, User $viewer): array
     {
+        $isAssignedToViewer = $order->collaborator_id !== null && $order->collaborator_id === $viewer->id;
+
         return [
             'code' => $order->code, 'game_id' => $order->game_id, 'game_name' => $order->game_name,
             'service_name' => $order->service_name, 'package_name' => $order->package_name, 'server_name' => $order->server_name,
-            'payload' => $order->payload ?? [], 'quantity' => $order->quantity, 'status' => $order->status, 'collaborator_amount' => $order->collaborator_total_cost,
+            'payload' => [], 'payload_locked' => $isAssignedToViewer, 'quantity' => $order->quantity, 'status' => $order->status,
+            'collaborator_id' => $order->collaborator_id,
+            'collaborator_amount' => $order->collaborator_total_cost, 'can_claim' => $order->status === 'pending' && ($order->collaborator_id === null || $isAssignedToViewer),
+            'can_chat' => $isAssignedToViewer,
             'settled_at' => $order->collaborator_settled_at?->toISOString(), 'created_at' => $order->created_at?->toISOString(),
         ];
     }
