@@ -1,11 +1,7 @@
 <template>
     <Teleport to="body">
         <Transition name="fade">
-            <div
-                v-if="modelValue"
-                class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm"
-                @click.self="close"
-            >
+            <div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-slate-950/60 p-4 backdrop-blur-sm">
                 <Transition name="scale">
                     <div
                         v-if="modelValue"
@@ -45,7 +41,6 @@
 
 <script setup lang="ts">
 import { X } from 'lucide-vue-next';
-import { onBeforeUnmount, onMounted } from 'vue';
 
 defineProps<{
     modelValue: boolean;
@@ -58,20 +53,6 @@ const emit = defineEmits(['update:modelValue']);
 const close = () => {
     emit('update:modelValue', false);
 };
-
-const handleEsc = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-        close();
-    }
-};
-
-onMounted(() => {
-    window.addEventListener('keydown', handleEsc);
-});
-
-onBeforeUnmount(() => {
-    window.removeEventListener('keydown', handleEsc);
-});
 </script>
 
 <style scoped>

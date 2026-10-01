@@ -34,6 +34,7 @@ const editingId = ref<number | null>(null);
 const serviceModalOpen = ref(false);
 const packageModalOpen = ref(false);
 const packageGameFilter = ref<number | ''>('');
+const packageServiceFilter = ref<number | ''>('');
 const servicePage = ref(1);
 const packagePage = ref(1);
 const servicePageSize = 10;
@@ -55,13 +56,17 @@ const rows = computed(() => {
 const gameRows = computed(() => rows.value as GameServiceGame[]);
 const serviceRows = computed(() => rows.value as GameServiceItem[]);
 const packageRows = computed(() => {
-    const source = rows.value as GameServicePackage[];
+    let source = rows.value as GameServicePackage[];
 
-    if (packageGameFilter.value === '') {
-        return source;
+    if (packageGameFilter.value !== '') {
+        source = source.filter((item) => item.service.game_id === Number(packageGameFilter.value));
     }
 
-    return source.filter((item) => item.service.game_id === Number(packageGameFilter.value));
+    if (packageServiceFilter.value !== '') {
+        source = source.filter((item) => item.game_service_id === Number(packageServiceFilter.value));
+    }
+
+    return source;
 });
 const serviceTotalPages = computed(() => Math.max(1, Math.ceil(serviceRows.value.length / servicePageSize)));
 const displayedServiceRows = computed(() => {
@@ -100,6 +105,7 @@ const changePackagePage = async (page: number): Promise<void> => {
 };
 const clearPackageFilters = (): void => {
     packageGameFilter.value = '';
+    packageServiceFilter.value = '';
     search.value = '';
 };
 
@@ -131,6 +137,9 @@ const packageForm = reactive({
 
 const availableServers = computed(() => servers.value.filter((server) => server.game_id === Number(serviceForm.game_id)));
 const availablePackageServices = computed(() => services.value.filter((service) => service.game_id === Number(packageForm.game_id)));
+const packageFilterServices = computed(() =>
+    packageGameFilter.value === '' ? [] : services.value.filter((service) => service.game_id === Number(packageGameFilter.value)),
+);
 const money = (value: number | null): string => `${new Intl.NumberFormat('vi-VN').format(value ?? 0)}đ`;
 const pageMeta = computed(
     () =>
@@ -399,6 +408,7 @@ watch(
         servicePage.value = 1;
         packagePage.value = 1;
         packageGameFilter.value = '';
+        packageServiceFilter.value = '';
         resetForm();
     },
 );
@@ -407,6 +417,10 @@ watch(search, () => {
     packagePage.value = 1;
 });
 watch(packageGameFilter, () => {
+    packageServiceFilter.value = '';
+    packagePage.value = 1;
+});
+watch(packageServiceFilter, () => {
     packagePage.value = 1;
 });
 watch(
@@ -930,13 +944,27 @@ onMounted(async () => {
             </Modal>
 
             <div class="mb-4 grid gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm lg:grid-cols-[1fr_auto] lg:items-end">
-                <div class="grid gap-3 sm:grid-cols-2">
+                <div class="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     <label class="grid gap-1.5 text-sm font-bold text-slate-700">
                         <span>Lọc gói theo game</span>
                         <select v-model="packageGameFilter" :class="inputClass">
                             <option value="">Tất cả game</option>
                             <option v-for="game in games" :key="game.id" :value="game.id">
                                 {{ game.name }}
+                            </option>
+                        </select>
+                    </label>
+
+                    <label class="grid gap-1.5 text-sm font-bold text-slate-700">
+                        <span>Lọc theo dịch vụ</span>
+                        <select
+                            v-model="packageServiceFilter"
+                            :disabled="packageGameFilter === ''"
+                            :class="[inputClass, 'disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500']"
+                        >
+                            <option value="">{{ packageGameFilter === '' ? 'Chọn game trước' : 'Tất cả dịch vụ' }}</option>
+                            <option v-for="service in packageFilterServices" :key="service.id" :value="service.id">
+                                {{ service.name }}
                             </option>
                         </select>
                     </label>
@@ -950,7 +978,7 @@ onMounted(async () => {
                 <div class="flex min-h-11 items-center justify-between gap-3 lg:justify-end">
                     <span class="text-sm text-slate-500">Hiển thị {{ packageRows.length }} gói</span>
                     <button
-                        v-if="packageGameFilter !== '' || search"
+                        v-if="packageGameFilter !== '' || packageServiceFilter !== '' || search"
                         type="button"
                         class="min-h-10 rounded-lg border border-slate-300 bg-white px-4 text-sm font-bold text-slate-700 hover:bg-slate-100"
                         @click="clearPackageFilters"

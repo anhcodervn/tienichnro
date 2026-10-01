@@ -661,7 +661,6 @@ onBeforeUnmount(() => {
             <div
                 v-if="showNewConversation"
                 class="fixed inset-0 z-50 flex items-end justify-center bg-slate-950/50 p-0 backdrop-blur-sm sm:items-center sm:p-4"
-                @click.self="showNewConversation = false"
             >
                 <form
                     class="max-h-[calc(100dvh-1rem)] w-full max-w-lg overflow-y-auto rounded-t-[16px] bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl sm:rounded-[16px]"

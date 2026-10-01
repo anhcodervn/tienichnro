@@ -304,7 +304,7 @@ onMounted(() => void loadLogs());
             </div>
         </section>
 
-        <div v-if="selectedLog" class="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4" @click.self="selectedLog = null">
+        <div v-if="selectedLog" class="fixed inset-0 z-50 grid place-items-center bg-slate-950/45 p-4">
             <section class="max-h-[90vh] w-full max-w-4xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
                 <header class="flex items-start justify-between gap-4 border-b border-slate-200 px-5 py-4">
                     <div>

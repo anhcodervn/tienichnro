@@ -293,7 +293,7 @@ onBeforeUnmount(() => {
             </div>
         </section>
 
-        <div v-if="selectedOrder" class="fixed inset-0 z-[90] grid place-items-center bg-slate-950/55 p-3" @click.self="closeOrder">
+        <div v-if="selectedOrder" class="fixed inset-0 z-[90] grid place-items-center bg-slate-950/55 p-3">
             <section class="flex max-h-[calc(100dvh-1.5rem)] w-full max-w-5xl flex-col overflow-hidden rounded-lg bg-white shadow-2xl">
                 <header class="flex items-start justify-between gap-4 border-b border-slate-200 p-4 sm:p-5">
                     <div>

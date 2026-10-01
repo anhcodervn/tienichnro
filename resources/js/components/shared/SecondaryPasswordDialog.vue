@@ -38,11 +38,7 @@ const submit = (): void => {
 </script>
 
 <template>
-    <div
-        v-if="open"
-        class="fixed inset-0 z-[150] grid place-items-center bg-slate-950/65 p-4 backdrop-blur-sm"
-        @click.self="!blocking && emit('close')"
-    >
+    <div v-if="open" class="fixed inset-0 z-[150] grid place-items-center bg-slate-950/65 p-4 backdrop-blur-sm">
         <section class="w-full max-w-md overflow-hidden rounded-[11px] border border-slate-200 bg-white shadow-2xl" role="dialog" aria-modal="true">
             <header class="flex items-start justify-between gap-4 border-b border-slate-200 bg-slate-50 px-5 py-4">
                 <div class="flex items-center gap-3">
