@@ -124,6 +124,7 @@ class TopupPackagePricingService
 
         return [
             ...$source,
+            'retail_price' => $tenantPrice['selling_price'],
             'final_price' => $userPrice['price'],
             'tenant_cost_price' => $billingPrice['price'],
             'tenant_profit' => $userPrice['price'] - $billingPrice['price'],

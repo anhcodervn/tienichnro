@@ -18,6 +18,18 @@ test('game description editor uploads embedded images before saving', function (
         ->not->toContain('ref="descriptionEditor" v-model="form.description" format="html" :allow-images="false"');
 });
 
+test('game service description uses the html editor and uploads embedded images before saving', function (): void {
+    $source = file_get_contents(resource_path('js/pages/admin/game-services/catalog/index.vue'));
+
+    expect($source)
+        ->toContain("import { uploadEditorImages, uploadEditorImagesInHtml } from '@/utils/editor-image-upload'")
+        ->toContain('ref="serviceDescriptionEditor"')
+        ->toContain('v-model="serviceForm.description"')
+        ->toContain('format="html"')
+        ->toContain('serviceDescriptionEditor.value?.flush()')
+        ->toContain('uploadEditorImagesInHtml(latestDescription)');
+});
+
 test('game rich description is sanitized and rendered with image viewer', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $description = <<<'HTML'

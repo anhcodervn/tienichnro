@@ -1,7 +1,7 @@
 @extends('client.layouts.app')
 
 @section('document_title', $gameService->name.' - Dịch vụ game '.$game->name)
-@section('description', filled($gameService->description) ? $gameService->description : 'Thông tin và bảng giá '.$gameService->name.' cho game '.$game->name.'.')
+@section('description', filled($gameServiceDescription) ? $gameServiceDescription : 'Thông tin và bảng giá '.$gameService->name.' cho game '.$game->name.'.')
 @section('canonical', route('game-services.service', ['game' => $game, 'gameService' => $gameService]))
 @if ($gameService->background_image)
     @section('image', $gameService->background_image)
@@ -45,7 +45,7 @@
                     <h2 class="mt-1 text-2xl font-extrabold text-slate-950">Mô tả về dịch vụ</h2>
                 </div>
                 @if (filled($gameService->description))
-                    <div class="mt-4 whitespace-pre-line break-words text-sm leading-7 text-slate-600 sm:text-base">{{ $gameService->description }}</div>
+                    <div class="article-content mt-4 min-w-0 max-w-full break-words text-sm leading-7 text-slate-600 sm:text-base" data-game-service-description="{{ $gameService->id }}" data-client-image-viewer>{!! $gameServiceDescriptionHtml !!}</div>
                 @else
                     <p class="mt-4 text-sm leading-7 text-slate-500">Thông tin chi tiết về dịch vụ đang được cập nhật.</p>
                 @endif

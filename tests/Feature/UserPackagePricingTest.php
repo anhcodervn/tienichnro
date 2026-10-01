@@ -148,6 +148,29 @@ test('billing account discount becomes cost for every linked child website', fun
         ->and($secondPrice['final_price'])->toBe(90000);
 });
 
+test('child site retail price is snapshotted before the member discount', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $billingUser = User::factory()->create(['tenant_id' => $main->id]);
+    $tenant = Tenant::factory()->create(['billing_user_id' => $billingUser->id]);
+    $member = User::factory()->create(['tenant_id' => $tenant->id]);
+    $package = TopupPackage::factory()->create([
+        'price' => 90000,
+        'provider_price' => 70000,
+    ]);
+    TenantPackagePrice::factory()->for($tenant)->for($package, 'package')->create(['markup_amount' => 5000]);
+    UserPackagePrice::factory()->for($member)->for($package, 'package')->create([
+        'pricing_mode' => UserPackagePrice::MODE_FIXED,
+        'discount_basis_points' => null,
+        'fixed_price' => 94000,
+    ]);
+
+    $price = Site::for($tenant, fn (): array => app(TopupPackagePricingService::class)->resolve($package, $member));
+
+    expect($price['retail_price'])->toBe(95000)
+        ->and($price['final_price'])->toBe(94000)
+        ->and($price['user_discount_amount'])->toBe(1000);
+});
+
 test('child admin can manage pricing only for members of their website', function (): void {
     $tenant = Tenant::factory()->create();
     TenantDomain::factory()->for($tenant)->create(['domain' => 'member-price.test']);

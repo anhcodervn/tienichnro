@@ -6,14 +6,21 @@ use App\Http\Controllers\Controller;
 use App\Models\Game;
 use App\Models\GameService;
 use App\Support\EditorContentRenderer;
+use App\Support\RichTextSanitizer;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\HtmlString;
+use Illuminate\Support\Str;
 use Illuminate\View\View;
 
 class GameServiceDetailController extends Controller
 {
-    public function __invoke(Game $game, GameService $gameService, EditorContentRenderer $contentRenderer): View
-    {
+    public function __invoke(
+        Game $game,
+        GameService $gameService,
+        EditorContentRenderer $contentRenderer,
+        RichTextSanitizer $richTextSanitizer,
+    ): View {
         abort_unless($game->status === 'active' && $game->game_services_enabled && $gameService->status === 'active', 404);
 
         $gameService->load([
@@ -40,6 +47,8 @@ class GameServiceDetailController extends Controller
         return view('client.game-services.service', [
             'game' => $game,
             'gameService' => $gameService,
+            'gameServiceDescription' => Str::squish(html_entity_decode(strip_tags((string) $gameService->description), ENT_QUOTES | ENT_HTML5, 'UTF-8')),
+            'gameServiceDescriptionHtml' => new HtmlString($richTextSanitizer->sanitize($gameService->description)),
             'recentOrders' => $recentOrders,
             'seoContentHtml' => $contentRenderer->renderNodes($gameService->seo_content ?? []),
             'seoFaqs' => $seoFaqs,

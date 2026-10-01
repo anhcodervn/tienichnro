@@ -49,7 +49,7 @@ class StoreGameServiceRequest extends FormRequest
             'name' => ['required', 'string', 'max:255'],
             'slug' => ['required', 'string', 'max:255', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique(GameService::class, 'slug')->where('game_id', $this->integer('game_id'))->ignore($serviceId)],
             'code' => ['required', 'string', 'max:100', 'regex:/^[A-Za-z0-9._-]+$/', Rule::unique(GameService::class, 'code')->where('game_id', $this->integer('game_id'))->ignore($serviceId)],
-            'description' => ['nullable', 'string', 'max:5000'],
+            'description' => ['nullable', 'string', 'max:100000'],
             'background_image' => ['required', 'string', 'max:2048'],
             'server_ids' => ['required', 'array', 'min:1'],
             'server_ids.*' => ['required', 'integer', 'distinct', Rule::exists(GameServer::class, 'id')],

@@ -13,7 +13,7 @@ import {
     type PayloadField,
     type Status,
 } from '@/services/admin-game-service.service';
-import { uploadEditorImages } from '@/utils/editor-image-upload';
+import { uploadEditorImages, uploadEditorImagesInHtml } from '@/utils/editor-image-upload';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { Boxes, Gamepad2, Layers3, LoaderCircle, Pencil, Plus, Save, Server, Trash2 } from 'lucide-vue-next';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
@@ -38,6 +38,7 @@ const servicePage = ref(1);
 const packagePage = ref(1);
 const servicePageSize = 10;
 const packagePageSize = 10;
+const serviceDescriptionEditor = ref<{ flush: () => unknown[] | string } | null>(null);
 const serviceSeoEditor = ref<{ flush: () => unknown[] | string } | null>(null);
 
 const inputClass =
@@ -267,6 +268,10 @@ const openCreateServiceModal = (): void => {
 const saveService = async (): Promise<void> => {
     saving.value = true;
     try {
+        const latestDescription = serviceDescriptionEditor.value?.flush();
+        if (typeof latestDescription === 'string') {
+            serviceForm.description = await uploadEditorImagesInHtml(latestDescription);
+        }
         const latestSeoContent = serviceSeoEditor.value?.flush();
         if (Array.isArray(latestSeoContent)) serviceForm.seo_content = latestSeoContent;
         await nextTick();
@@ -524,9 +529,17 @@ onMounted(async () => {
                     <label class="grid gap-1 text-sm font-bold"
                         >Slug<input v-model.trim="serviceForm.slug" required pattern="[a-z0-9]+(?:-[a-z0-9]+)*" :class="[inputClass, 'font-mono']"
                     /></label>
-                    <label class="grid gap-1 text-sm font-bold"
-                        >Mô tả<textarea v-model="serviceForm.description" rows="2" :class="inputClass"></textarea>
-                    </label>
+                    <fieldset class="grid min-w-0 gap-3 rounded-md border border-slate-200 p-3">
+                        <div>
+                            <legend class="text-sm font-black text-slate-900">Mô tả dịch vụ</legend>
+                            <p class="mt-1 text-xs font-normal leading-5 text-slate-500">
+                                Nội dung hiển thị tại phần mô tả dịch vụ. Có thể định dạng tiêu đề, màu sắc, danh sách, bảng và hình ảnh.
+                            </p>
+                        </div>
+                        <div class="min-w-0">
+                            <Editor ref="serviceDescriptionEditor" v-model="serviceForm.description" format="html" :debounce="0" :height="360" />
+                        </div>
+                    </fieldset>
                     <fieldset class="grid gap-3 rounded-md border border-slate-200 bg-slate-50 p-3">
                         <div class="flex items-start justify-between gap-3">
                             <div>

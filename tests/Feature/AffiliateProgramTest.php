@@ -139,6 +139,7 @@ test('percentage commission uses the paid order total snapshot', function (): vo
         'user_id' => $buyer->id,
         'game_id' => $package->game_id,
         'topup_package_id' => $package->id,
+        'retail_unit_price' => 100000,
         'total_amount' => 99000,
     ]);
 
@@ -150,6 +151,37 @@ test('percentage commission uses the paid order total snapshot', function (): vo
         ->and($commission->base_amount)->toBe(99000)
         ->and($commission->amount)->toBe(4950)
         ->and(AffiliateProfile::query()->withoutGlobalScopes()->where('user_id', $referrer->id)->exists())->toBeTrue();
+});
+
+test('fixed commission is reduced by the buyer discount percentage', function (): void {
+    $main = Tenant::query()->where('is_main', true)->firstOrFail();
+    $package = TopupPackage::factory()->create();
+    $referrer = User::factory()->create(['tenant_id' => $main->id]);
+    $buyer = User::factory()->create(['tenant_id' => $main->id, 'referred_by' => $referrer->id]);
+    AffiliateProgram::factory()->create(['tenant_id' => $main->id, 'is_enabled' => true]);
+    AffiliatePackageRate::factory()->create([
+        'tenant_id' => $main->id,
+        'topup_package_id' => $package->id,
+        'commission_type' => AffiliatePackageRate::TYPE_FIXED,
+        'fixed_amount' => 150,
+    ]);
+    $order = Order::factory()->create([
+        'tenant_id' => $main->id,
+        'user_id' => $buyer->id,
+        'game_id' => $package->game_id,
+        'topup_package_id' => $package->id,
+        'quantity' => 1,
+        'retail_unit_price' => 8500,
+        'sale_unit_price' => 8400,
+        'total_amount' => 8400,
+    ]);
+
+    $commission = Site::for($main, fn () => app(AffiliateCommissionService::class)->snapshot($order));
+
+    expect($commission)->toBeInstanceOf(AffiliateCommission::class)
+        ->and($commission->rate_value)->toBe(150)
+        ->and($commission->base_amount)->toBe(8400)
+        ->and($commission->amount)->toBe(148);
 });
 
 test('a referral from another site never creates a commission', function (): void {

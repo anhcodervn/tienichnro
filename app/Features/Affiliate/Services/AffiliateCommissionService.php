@@ -82,9 +82,7 @@ class AffiliateCommissionService
         $rateValue = $rate->commission_type === AffiliatePackageRate::TYPE_PERCENTAGE
             ? (int) $rate->percentage_basis_points
             : (int) $rate->fixed_amount;
-        $amount = $rate->commission_type === AffiliatePackageRate::TYPE_PERCENTAGE
-            ? intdiv($baseAmount * $rateValue, 10000)
-            : $rateValue * $quantity;
+        $amount = $this->calculateAmount($order, $rate->commission_type, $rateValue, $baseAmount, $quantity);
 
         if ($amount < 1) {
             return null;
@@ -105,6 +103,22 @@ class AffiliateCommissionService
                 'holding_days' => self::HOLDING_DAYS,
             ],
         );
+    }
+
+    private function calculateAmount(Order $order, string $commissionType, int $rateValue, int $baseAmount, int $quantity): int
+    {
+        if ($commissionType === AffiliatePackageRate::TYPE_PERCENTAGE) {
+            return intdiv($baseAmount * $rateValue, 10000);
+        }
+
+        $standardUnitPrice = (int) $order->retail_unit_price;
+        $paidUnitPrice = (int) $order->sale_unit_price;
+
+        if ($standardUnitPrice <= 0 || $paidUnitPrice <= 0 || $paidUnitPrice >= $standardUnitPrice) {
+            return $rateValue * $quantity;
+        }
+
+        return intdiv($rateValue * $paidUnitPrice, $standardUnitPrice) * $quantity;
     }
 
     public function markOrderCompleted(Order $order): void

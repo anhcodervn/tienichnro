@@ -152,6 +152,57 @@ test('admin creates a service with dynamic payload fields and servers from the s
         ->and($service->faqs[0]['answer'])->toBe('Thời gian tùy từng gói dịch vụ.');
 });
 
+test('service rich description is sanitized and rendered as html', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $game = Game::factory()->create(['game_services_enabled' => true, 'status' => 'active']);
+    $server = GameServer::factory()->for($game)->create();
+    $payload = validGameServicePayload($game, $server);
+    $payload['description'] = <<<'HTML'
+<h2 style="color: #15803d" onclick="alert(1)">Dịch vụ nổi bật</h2>
+<p>Nội dung <strong>nhấn mạnh</strong>.</p>
+<img src="/storage/editor/service.webp" alt="Ảnh dịch vụ" onerror="alert(1)">
+<img src="https://evil.example/image.webp" alt="Ảnh ngoài">
+<script>alert('xss')</script>
+HTML;
+
+    $response = $this->actingAs($admin)
+        ->postJson('/api/admin-api/game-services', $payload)
+        ->assertCreated();
+
+    $service = GameService::query()->findOrFail($response->json('data.id'));
+
+    expect($service->description)
+        ->toContain('<h2 style="color: #15803d">Dịch vụ nổi bật</h2>')
+        ->toContain('<img src="/storage/editor/service.webp" alt="Ảnh dịch vụ">')
+        ->not->toContain('onclick')
+        ->not->toContain('onerror')
+        ->not->toContain('evil.example')
+        ->not->toContain('<script');
+
+    $this->get(route('game-services.service', ['game' => $game, 'gameService' => $service]))
+        ->assertSuccessful()
+        ->assertSee('<meta name="description" content="Dịch vụ nổi bật Nội dung nhấn mạnh.">', false)
+        ->assertSee('data-game-service-description="'.$service->id.'"', false)
+        ->assertSee('data-client-image-viewer', false)
+        ->assertSee('<h2 style="color: #15803d">Dịch vụ nổi bật</h2>', false)
+        ->assertSee('src="/storage/editor/service.webp"', false)
+        ->assertDontSee('onclick=', false)
+        ->assertDontSee('evil.example', false)
+        ->assertDontSee('&lt;h2', false);
+
+    $updatePayload = validGameServicePayload($game, $server);
+    $updatePayload['description'] = '<p onmouseover="alert(1)">Nội dung cập nhật</p><iframe src="https://evil.example"></iframe>';
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/game-services/{$service->id}", $updatePayload)
+        ->assertSuccessful();
+
+    expect($service->refresh()->description)
+        ->toBe('<p>Nội dung cập nhật</p>')
+        ->not->toContain('onmouseover')
+        ->not->toContain('iframe');
+});
+
 test('service requires its own background image', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $game = Game::factory()->create(['game_services_enabled' => true]);

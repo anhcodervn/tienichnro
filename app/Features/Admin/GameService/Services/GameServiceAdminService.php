@@ -12,6 +12,7 @@ use App\Models\GameServiceOrderProgress;
 use App\Models\GameServicePackage;
 use App\Models\GameServicePackagePrice;
 use App\Models\User;
+use App\Support\RichTextSanitizer;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
@@ -26,6 +27,7 @@ class GameServiceAdminService
     public function __construct(
         private readonly AffiliateWalletService $affiliateWalletService,
         private readonly GameServiceOrderService $gameServiceOrderService,
+        private readonly RichTextSanitizer $richTextSanitizer,
     ) {}
 
     /** @param array<string, mixed> $filters */
@@ -77,6 +79,8 @@ class GameServiceAdminService
     /** @param array<string, mixed> $payload */
     public function createService(array $payload, User $admin, Request $request): GameService
     {
+        $payload['description'] = $this->richTextSanitizer->sanitize($payload['description'] ?? null);
+
         return DB::transaction(function () use ($payload, $admin, $request): GameService {
             $serverIds = Arr::pull($payload, 'server_ids', []);
             $service = GameService::query()->create($payload);
@@ -90,6 +94,8 @@ class GameServiceAdminService
     /** @param array<string, mixed> $payload */
     public function updateService(GameService $service, array $payload, User $admin, Request $request): GameService
     {
+        $payload['description'] = $this->richTextSanitizer->sanitize($payload['description'] ?? null);
+
         return DB::transaction(function () use ($service, $payload, $admin, $request): GameService {
             $locked = GameService::query()->lockForUpdate()->findOrFail($service->id);
             $old = $locked->getAttributes();

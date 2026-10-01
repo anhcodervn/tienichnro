@@ -59,20 +59,34 @@ onMounted(load);
             <section class="grid gap-4 sm:grid-cols-2">
                 <article class="flex items-center gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm">
                     <span class="grid size-12 place-items-center rounded-2xl bg-emerald-600 text-white"><Gamepad2 class="size-6" /></span>
-                    <div><p class="text-sm font-bold text-emerald-800">Game có hoa hồng</p><p class="text-2xl font-black text-emerald-950">{{ games.length }}</p></div>
+                    <div>
+                        <p class="text-sm font-bold text-emerald-800">Game có hoa hồng</p>
+                        <p class="text-2xl font-black text-emerald-950">{{ games.length }}</p>
+                    </div>
                 </article>
                 <article class="flex items-center gap-4 rounded-2xl border border-blue-200 bg-blue-50 p-5 shadow-sm">
                     <span class="grid size-12 place-items-center rounded-2xl bg-blue-600 text-white"><CircleDollarSign class="size-6" /></span>
-                    <div><p class="text-sm font-bold text-blue-800">Gói đang áp dụng</p><p class="text-2xl font-black text-blue-950">{{ data.rates.length }}</p></div>
+                    <div>
+                        <p class="text-sm font-bold text-blue-800">Gói đang áp dụng</p>
+                        <p class="text-2xl font-black text-blue-950">{{ data.rates.length }}</p>
+                    </div>
                 </article>
             </section>
 
             <section class="grid gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:grid-cols-[minmax(0,1fr)_16rem] sm:p-5">
                 <label class="relative">
                     <Search class="pointer-events-none absolute left-3 top-1/2 size-5 -translate-y-1/2 text-slate-400" />
-                    <input v-model="search" type="search" placeholder="Tìm theo tên game hoặc gói nạp" class="min-h-12 w-full rounded-xl border-2 border-slate-200 pl-11 pr-4 outline-none focus:border-emerald-500" />
+                    <input
+                        v-model="search"
+                        type="search"
+                        placeholder="Tìm theo tên game hoặc gói nạp"
+                        class="min-h-12 w-full rounded-xl border-2 border-slate-200 pl-11 pr-4 outline-none focus:border-emerald-500"
+                    />
                 </label>
-                <select v-model="selectedGame" class="min-h-12 rounded-xl border-2 border-slate-200 bg-white px-4 font-bold text-slate-700 outline-none focus:border-emerald-500">
+                <select
+                    v-model="selectedGame"
+                    class="min-h-12 rounded-xl border-2 border-slate-200 bg-white px-4 font-bold text-slate-700 outline-none focus:border-emerald-500"
+                >
                     <option value="">Tất cả game</option>
                     <option v-for="game in games" :key="game" :value="game">{{ game }}</option>
                 </select>
@@ -92,22 +106,38 @@ onMounted(load);
                         </thead>
                         <tbody class="divide-y divide-slate-100">
                             <tr v-for="rate in filteredRates" :key="rate.package_id" class="hover:bg-slate-50/70">
-                                <td class="px-5 py-4"><p class="font-black text-slate-900">{{ rate.game }}</p><p class="text-xs text-slate-500">{{ rate.package }}</p></td>
+                                <td class="px-5 py-4">
+                                    <p class="font-black text-slate-900">{{ rate.game }}</p>
+                                    <p class="text-xs text-slate-500">{{ rate.package }}</p>
+                                </td>
                                 <td class="px-5 py-4 font-semibold">{{ money(rate.selling_price) }}</td>
-                                <td class="px-5 py-4"><span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">{{ rateLabel(rate) }}</span></td>
-                                <td class="px-5 py-4"><strong class="text-lg text-emerald-700">{{ money(rate.estimated_commission) }}</strong><p v-if="rate.commission_type === 'percentage'" class="mt-1 text-xs text-slate-500">Ước tính theo giá hiện tại</p></td>
-                                <td class="px-5 py-4"><span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{{ rate.source === 'global' ? 'Chính sách Global' : 'Riêng gói' }}</span></td>
+                                <td class="px-5 py-4">
+                                    <span class="rounded-full bg-blue-100 px-2.5 py-1 text-xs font-bold text-blue-800">{{ rateLabel(rate) }}</span>
+                                </td>
+                                <td class="px-5 py-4">
+                                    <strong class="text-lg text-emerald-700">{{ money(rate.estimated_commission) }}</strong>
+                                    <p v-if="rate.commission_type === 'percentage'" class="mt-1 text-xs text-slate-500">Ước tính theo giá hiện tại</p>
+                                </td>
+                                <td class="px-5 py-4">
+                                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-600">{{
+                                        rate.source === 'global' ? 'Chính sách Global' : 'Riêng gói'
+                                    }}</span>
+                                </td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
                 <div v-if="!filteredRates.length" class="grid min-h-52 place-items-center p-8 text-center text-slate-500">
-                    <div><BadgePercent class="mx-auto size-10 text-slate-300" /><p class="mt-3 font-bold">Không tìm thấy gói phù hợp</p></div>
+                    <div>
+                        <BadgePercent class="mx-auto size-10 text-slate-300" />
+                        <p class="mt-3 font-bold">Không tìm thấy gói phù hợp</p>
+                    </div>
                 </div>
             </section>
 
             <section class="rounded-2xl border border-amber-200 bg-amber-50 p-5 text-sm leading-6 text-amber-900">
-                <strong>Lưu ý:</strong> Hoa hồng cố định được tính trên mỗi lượt nạp thành công. Với hoa hồng phần trăm, số tiền thực nhận được tính trên giá trị đơn thanh toán thực tế nên có thể thay đổi khi khách được giảm giá.
+                <strong>Lưu ý:</strong> Hoa hồng thực nhận được giảm theo đúng tỷ lệ ưu đãi giá của người mua. Hoa hồng phần trăm được tính trực tiếp
+                trên giá trị đơn thanh toán thực tế.
             </section>
         </template>
     </main>
