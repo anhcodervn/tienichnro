@@ -411,9 +411,14 @@ class TopupAdminService
 
     private function completeOrder(Order $order): void
     {
-        if (! in_array($order->order_status, [OrderStatus::Processing, OrderStatus::Cancelled], true)) {
+        $isPaidFailedOrder = $order->order_status === OrderStatus::Failed
+            && $order->payment_status === PaymentStatus::Paid;
+        $isPaidCancelledOrder = $order->order_status === OrderStatus::Cancelled
+            && $order->payment_status === PaymentStatus::Paid;
+
+        if (! $isPaidFailedOrder && ! $isPaidCancelledOrder && $order->order_status !== OrderStatus::Processing) {
             throw ValidationException::withMessages([
-                'complete' => 'Chỉ có thể hoàn thành đơn đang xử lý hoặc đơn lỗi đã được hủy.',
+                'complete' => 'Chỉ có thể hoàn thành đơn đang xử lý, đơn lỗi đã thanh toán hoặc đơn đã huỷ.',
             ]);
         }
 

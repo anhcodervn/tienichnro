@@ -160,13 +160,20 @@ const primaryActionFor = (order: OrderRow): ActionOption => {
 
 const secondaryActionsFor = (order: OrderRow): ActionOption[] => {
     const actions: ActionOption[] = [{ action: 'detail', label: 'Xem chi tiết', tone: 'neutral' }];
-    if (order.order_status === 'cancelled' || (order.order_status === 'processing' && order.can_sync_provider)) {
+
+    if (order.can_cancel_refund) {
+        actions.push({ action: 'cancel', label: 'Huỷ đơn không hoàn tiền', tone: 'danger' });
+        actions.push({ action: 'cancel_refund', label: 'Huỷ đơn hoàn tiền', tone: 'danger' });
+        actions.push({ action: 'complete', label: 'Hoàn thành thủ công', tone: 'neutral' });
+
+        return actions;
+    }
+
+    if ((order.order_status === 'cancelled' && order.payment_status === 'paid') || (order.order_status === 'processing' && order.can_sync_provider)) {
         actions.push({ action: 'complete', label: 'Hoàn thành thủ công', tone: 'neutral' });
     }
     if (['pending', 'processing'].includes(order.order_status)) actions.push({ action: 'fail', label: 'Báo lỗi đơn', tone: 'danger' });
-    if (order.can_cancel_refund) {
-        actions.push({ action: 'cancel_refund', label: 'Huỷ đơn hoàn tiền', tone: 'danger' });
-    } else if (!['completed', 'cancelled'].includes(order.order_status)) {
+    if (!['completed', 'cancelled'].includes(order.order_status)) {
         actions.push({ action: 'cancel', label: 'Hủy đơn', tone: 'danger' });
     }
     return actions;
@@ -357,7 +364,7 @@ const copyCode = async (code: string): Promise<void> => {
 const toggleMenu = async (event: MouseEvent, order: OrderRow): Promise<void> => {
     if (activeMenuCode.value === order.code) return closeMenu();
     const rect = (event.currentTarget as HTMLElement).getBoundingClientRect();
-    const estimatedMenuHeight = 142;
+    const estimatedMenuHeight = 190;
     const top = rect.bottom + estimatedMenuHeight + 12 > window.innerHeight ? Math.max(12, rect.top - estimatedMenuHeight - 8) : rect.bottom + 8;
     menuPosition.value = { top, right: Math.max(12, window.innerWidth - rect.right) };
     activeMenuCode.value = order.code;
@@ -389,7 +396,11 @@ const confirmationFor = (order: OrderRow, action: Exclude<OrderAction, 'detail'>
         },
         complete: { title: 'Đánh dấu hoàn thành?', text: `Xác nhận toàn bộ đơn ${order.code} đã hoàn thành.`, confirm: 'Hoàn thành' },
         fail: { title: 'Báo lỗi đơn?', text: `Đơn ${order.code} sẽ chuyển sang trạng thái lỗi.`, confirm: 'Báo lỗi' },
-        cancel: { title: 'Hủy đơn?', text: `Thao tác này sẽ hủy đơn ${order.code}.`, confirm: 'Hủy đơn' },
+        cancel: {
+            title: 'Huỷ đơn không hoàn tiền?',
+            text: `Đơn ${order.code} sẽ bị huỷ và không hoàn tiền vào ví khách hàng.`,
+            confirm: 'Huỷ không hoàn tiền',
+        },
         cancel_refund: {
             title: 'Huỷ đơn và hoàn tiền?',
             text: `Toàn bộ ${formatMoney(order.total_amount)} sẽ được hoàn vào ví tài khoản đăng ký bằng email ${order.email}.`,

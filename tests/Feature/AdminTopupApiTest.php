@@ -176,7 +176,7 @@ test('admin can find a completed order by topup id', function (): void {
         ->assertJsonPath('data.data.0.topup_id', $order->topup_id);
 });
 
-test('platform admin can manually complete a failed topup order after cancelling it', function (): void {
+test('platform admin can manually complete a paid failed topup order', function (): void {
     Mail::fake();
 
     $admin = User::factory()->create(['role' => 'admin']);
@@ -207,22 +207,6 @@ test('platform admin can manually complete a failed topup order after cancelling
 
     $this->actingAs($admin)
         ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'complete'])
-        ->assertUnprocessable()
-        ->assertJsonValidationErrors('complete');
-
-    expect($order->refresh()->order_status)->toBe(OrderStatus::Failed);
-
-    $this->actingAs($admin)
-        ->putJson("/api/admin-api/orders/{$order->code}", [
-            'action' => 'cancel',
-            'reason' => 'Đã đối soát và chờ xác nhận hoàn thành thủ công.',
-        ])
-        ->assertSuccessful()
-        ->assertJsonPath('data.order_status', 'cancelled')
-        ->assertJsonPath('data.recipients.0.status', 'cancelled');
-
-    $this->actingAs($admin)
-        ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'complete'])
         ->assertSuccessful()
         ->assertJsonPath('data.order_status', 'completed')
         ->assertJsonPath('data.failure_reason', null)
@@ -242,15 +226,43 @@ test('platform admin can manually complete a failed topup order after cancelling
             'action' => 'order_complete',
             'subject_type' => Order::class,
             'subject_id' => $order->id,
-        ])->exists())->toBeTrue()
-        ->and(AdminAuditLog::query()->where([
-            'admin_id' => $admin->id,
-            'action' => 'order_cancel',
-            'subject_type' => Order::class,
-            'subject_id' => $order->id,
         ])->exists())->toBeTrue();
 
     Mail::assertQueued(OrderCompletedMail::class, fn (OrderCompletedMail $mail): bool => $mail->hasTo($order->email));
+});
+
+test('platform admin cannot manually complete an unpaid failed topup order', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $order = Order::factory()->create([
+        'payment_status' => PaymentStatus::Pending,
+        'order_status' => OrderStatus::Failed,
+        'failed_at' => now(),
+    ]);
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'complete'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('complete');
+
+    expect($order->refresh()->order_status)->toBe(OrderStatus::Failed);
+});
+
+test('platform admin cannot complete a cancelled order after its payment was refunded', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $order = Order::factory()->create([
+        'payment_status' => PaymentStatus::Refunded,
+        'order_status' => OrderStatus::Cancelled,
+        'cancelled_at' => now(),
+        'failure_reason' => 'huỷ đơn hoàn tiền',
+    ]);
+
+    $this->actingAs($admin)
+        ->putJson("/api/admin-api/orders/{$order->code}", ['action' => 'complete'])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors('complete');
+
+    expect($order->refresh()->order_status)->toBe(OrderStatus::Cancelled)
+        ->and($order->payment_status)->toBe(PaymentStatus::Refunded);
 });
 
 test('admin order list exposes and searches bank transfer payment codes', function (): void {

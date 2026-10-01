@@ -505,7 +505,7 @@ const formatDebug = (value: unknown): string => {
         </div>
 
         <template v-if="displayOrder" #footer>
-            <footer class="flex w-full items-center justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">
+            <footer class="flex w-full flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-white px-5 py-4 sm:px-6">
                 <button
                     type="button"
                     class="min-h-11 rounded-xl border border-slate-200 px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"
@@ -527,6 +527,16 @@ const formatDebug = (value: unknown): string => {
                 <button
                     v-if="displayOrder.can_cancel_refund"
                     type="button"
+                    class="inline-flex min-h-11 items-center justify-center rounded-xl border border-rose-300 bg-white px-4 text-sm font-bold text-rose-700 shadow-sm transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    :disabled="acting"
+                    @click="emit('action', 'cancel')"
+                >
+                    <LoaderCircle v-if="acting" class="mr-2 h-4 w-4 animate-spin" />
+                    Huỷ đơn không hoàn tiền
+                </button>
+                <button
+                    v-if="displayOrder.can_cancel_refund"
+                    type="button"
                     class="inline-flex min-h-11 items-center justify-center rounded-xl bg-rose-700 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="acting"
                     @click="emit('action', 'cancel_refund')"
@@ -536,7 +546,7 @@ const formatDebug = (value: unknown): string => {
                     Huỷ đơn hoàn tiền
                 </button>
                 <button
-                    v-if="displayOrder.order_status === 'cancelled'"
+                    v-if="displayOrder.can_cancel_refund || (displayOrder.order_status === 'cancelled' && displayOrder.payment_status === 'paid')"
                     type="button"
                     class="inline-flex min-h-11 items-center justify-center rounded-xl bg-amber-600 px-4 text-sm font-bold text-white shadow-sm transition hover:bg-amber-700 disabled:cursor-not-allowed disabled:opacity-50"
                     :disabled="acting"
