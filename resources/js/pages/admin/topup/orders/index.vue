@@ -57,6 +57,7 @@ type AdminTopupOrderUpdatedEvent = Pick<
     | 'can_reorder'
     | 'can_sync_provider'
     | 'can_retry_provider_submission'
+    | 'can_cancel_refund'
     | 'provider_reference'
     | 'failure_reason'
     | 'paid_at'
@@ -163,7 +164,11 @@ const secondaryActionsFor = (order: OrderRow): ActionOption[] => {
         actions.push({ action: 'complete', label: 'Hoàn thành thủ công', tone: 'neutral' });
     }
     if (['pending', 'processing'].includes(order.order_status)) actions.push({ action: 'fail', label: 'Báo lỗi đơn', tone: 'danger' });
-    if (!['completed', 'cancelled'].includes(order.order_status)) actions.push({ action: 'cancel', label: 'Hủy đơn', tone: 'danger' });
+    if (order.can_cancel_refund) {
+        actions.push({ action: 'cancel_refund', label: 'Huỷ đơn hoàn tiền', tone: 'danger' });
+    } else if (!['completed', 'cancelled'].includes(order.order_status)) {
+        actions.push({ action: 'cancel', label: 'Hủy đơn', tone: 'danger' });
+    }
     return actions;
 };
 
@@ -228,6 +233,7 @@ const applyRealtimeSnapshot = (event: AdminTopupOrderUpdatedEvent): void => {
         can_reorder: event.can_reorder,
         can_sync_provider: event.can_sync_provider,
         can_retry_provider_submission: event.can_retry_provider_submission,
+        can_cancel_refund: event.can_cancel_refund,
         provider_reference: event.provider_reference,
         failure_reason: event.failure_reason,
         paid_at: event.paid_at,
@@ -384,6 +390,11 @@ const confirmationFor = (order: OrderRow, action: Exclude<OrderAction, 'detail'>
         complete: { title: 'Đánh dấu hoàn thành?', text: `Xác nhận toàn bộ đơn ${order.code} đã hoàn thành.`, confirm: 'Hoàn thành' },
         fail: { title: 'Báo lỗi đơn?', text: `Đơn ${order.code} sẽ chuyển sang trạng thái lỗi.`, confirm: 'Báo lỗi' },
         cancel: { title: 'Hủy đơn?', text: `Thao tác này sẽ hủy đơn ${order.code}.`, confirm: 'Hủy đơn' },
+        cancel_refund: {
+            title: 'Huỷ đơn và hoàn tiền?',
+            text: `Toàn bộ ${formatMoney(order.total_amount)} sẽ được hoàn vào ví tài khoản đăng ký bằng email ${order.email}.`,
+            confirm: 'Huỷ đơn hoàn tiền',
+        },
     })[action];
 
 type OrderActionResponse = { data: { data: OrderRow; message?: string } };
@@ -413,8 +424,9 @@ const act = async (order: OrderRow, action: OrderAction): Promise<void> => {
     if (actingCode.value !== null) return;
     const confirmation = confirmationFor(order, action);
     const needsReason = ['fail', 'cancel'].includes(action);
+    const isDestructive = needsReason || action === 'cancel_refund';
     const result = await Swal.fire({
-        icon: needsReason ? 'warning' : 'question',
+        icon: isDestructive ? 'warning' : 'question',
         title: confirmation.title,
         text: confirmation.text,
         input: needsReason ? 'textarea' : undefined,
@@ -424,7 +436,7 @@ const act = async (order: OrderRow, action: OrderAction): Promise<void> => {
         showCancelButton: true,
         confirmButtonText: confirmation.confirm,
         cancelButtonText: 'Đóng',
-        confirmButtonColor: needsReason ? '#be123c' : '#4f46e5',
+        confirmButtonColor: isDestructive ? '#be123c' : '#4f46e5',
         reverseButtons: true,
     });
     if (!result.isConfirmed) return;

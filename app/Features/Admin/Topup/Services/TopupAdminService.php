@@ -4,6 +4,7 @@ namespace App\Features\Admin\Topup\Services;
 
 use App\Enums\OrderStatus;
 use App\Enums\PaymentStatus;
+use App\Features\Admin\Topup\Actions\CancelAndRefundFailedOrderAction;
 use App\Features\Admin\Topup\Actions\ReorderFailedTopupOrderAction;
 use App\Features\Admin\Topup\Actions\RetryProviderBalanceOrderAction;
 use App\Features\Topup\Exceptions\TopupProviderConnectionException;
@@ -38,6 +39,7 @@ class TopupAdminService
 {
     public function __construct(
         private readonly OrderStatusService $orderStatusService,
+        private readonly CancelAndRefundFailedOrderAction $cancelAndRefundFailedOrder,
         private readonly ReorderFailedTopupOrderAction $reorderFailedTopupOrder,
         private readonly RetryProviderBalanceOrderAction $retryProviderBalanceOrder,
         private readonly RecipientFulfillmentService $recipientFulfillmentService,
@@ -330,6 +332,7 @@ class TopupAdminService
                 'complete' => $this->completeOrder($order),
                 'fail' => $this->orderStatusService->transition($order, OrderStatus::Failed, $reason),
                 'cancel' => $this->orderStatusService->transition($order, OrderStatus::Cancelled, $reason),
+                'cancel_refund' => $this->cancelAndRefundFailedOrder->handle($order),
             };
 
             $dispatchTopup = in_array($action, ['mark_paid', 'process'], true);

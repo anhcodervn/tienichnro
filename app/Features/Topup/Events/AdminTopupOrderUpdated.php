@@ -34,6 +34,8 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
 
     public readonly bool $canRetryProviderSubmission;
 
+    public readonly bool $canCancelRefund;
+
     public readonly ?string $providerReference;
 
     public readonly ?string $failureReason;
@@ -64,6 +66,8 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
             && $order->order_status === OrderStatus::Processing
             && TopupProviderResolver::supportsBalance($order->provider?->slug)
             && data_get($order->metadata, 'provider_manual_review.code') === 'provider_balance_insufficient';
+        $this->canCancelRefund = $order->payment_status === PaymentStatus::Paid
+            && $order->order_status === OrderStatus::Failed;
         $this->providerReference = $order->provider_reference;
         $this->failureReason = $order->failure_reason;
         $this->paidAt = $order->paid_at?->toISOString();
@@ -97,6 +101,7 @@ class AdminTopupOrderUpdated implements ShouldBroadcastNow, ShouldDispatchAfterC
             'can_reorder' => $this->canReorder,
             'can_sync_provider' => $this->canSyncProvider,
             'can_retry_provider_submission' => $this->canRetryProviderSubmission,
+            'can_cancel_refund' => $this->canCancelRefund,
             'provider_reference' => $this->providerReference,
             'failure_reason' => $this->failureReason,
             'paid_at' => $this->paidAt,

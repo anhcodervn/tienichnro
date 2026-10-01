@@ -121,6 +121,7 @@ export type OrderRow = {
     can_reorder: boolean;
     can_sync_provider: boolean;
     can_retry_provider_submission: boolean;
+    can_cancel_refund: boolean;
     provider_reference?: string | null;
     failure_reason?: string | null;
     paid_at?: string | null;
@@ -137,7 +138,8 @@ export type OrderAction =
     | 'sync_provider'
     | 'complete'
     | 'fail'
-    | 'cancel';
+    | 'cancel'
+    | 'cancel_refund';
 
 export type ActionOption = {
     action: OrderAction;

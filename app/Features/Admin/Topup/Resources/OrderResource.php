@@ -139,6 +139,9 @@ class OrderResource extends JsonResource
                 && $this->order_status === OrderStatus::Processing
                 && TopupProviderResolver::supportsBalance($this->provider?->slug)
                 && ($this->isProviderBalanceManualReview() || str_contains((string) $this->failure_reason, 'Provider không đủ số dư')),
+            'can_cancel_refund' => Site::isMain()
+                && $this->payment_status === PaymentStatus::Paid
+                && $this->order_status === OrderStatus::Failed,
             'provider_reference' => $this->provider_reference, 'failure_reason' => $this->failure_reason,
             'paid_at' => $this->paid_at?->toISOString(), 'created_at' => $this->created_at?->toISOString(),
         ];
