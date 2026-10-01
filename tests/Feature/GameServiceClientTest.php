@@ -138,6 +138,7 @@ test('client opens a scoped game service detail page with active packages', func
         ->assertSee('data-game-service-step-panel="2"', false)
         ->assertSee('data-game-service-step-panel="3"', false)
         ->assertSee('name="note"', false)
+        ->assertSee('placeholder="Ghi chú thêm yêu cầu hoặc nhắc nhở của bạn cho đơn hàng này"', false)
         ->assertSee('Ghi chú')
         ->assertSee('Bước 1')
         ->assertSee('Bước 2')

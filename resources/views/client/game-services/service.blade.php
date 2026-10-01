@@ -167,7 +167,7 @@
 
                             <label class="grid gap-1.5 text-sm font-bold text-slate-700">
                                 <span>Ghi chú <small class="font-normal text-slate-400">(không bắt buộc)</small></span>
-                                <textarea name="note" rows="4" maxlength="1000" class="min-h-24 resize-y rounded-[5px] border-2 border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500" placeholder="Nhập thông điệp hoặc yêu cầu thêm cho cộng tác viên...">{{ old('note') }}</textarea>
+                                <textarea name="note" rows="4" maxlength="1000" class="min-h-24 resize-y rounded-[5px] border-2 border-slate-300 bg-white px-3 py-2 text-sm focus:border-emerald-500 focus:ring-emerald-500" placeholder="Ghi chú thêm yêu cầu hoặc nhắc nhở của bạn cho đơn hàng này">{{ old('note') }}</textarea>
                             </label>
 
                             @guest
