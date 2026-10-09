@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { formatNroRelativeTime, initializeNroFilters, initializeNroNotifications } from '../../resources/js/nro-notifications.js';
 
-function ajaxFixture() {
+function ajaxFixture(dataset = {}, alerts = { fire: async () => ({ isConfirmed: false }) }) {
     const keys = ['document', 'window', 'HTMLElement', 'EventSource', 'FormData', 'fetch'];
     const originals = Object.fromEntries(keys.map((key) => [key, globalThis[key]]));
     const sanitize = DOMPurify.sanitize;
@@ -52,6 +52,7 @@ function ajaxFixture() {
         }
     }
     const root = new Element();
+    Object.assign(root.dataset, dataset);
     DOMPurify.sanitize = (html) => html;
     globalThis.HTMLElement = Element;
     globalThis.document = { querySelector: () => root };
@@ -84,7 +85,7 @@ function ajaxFixture() {
         }
     };
     globalThis.fetch = (url, options) => new Promise((resolve, reject) => requests.push({ url, options, resolve, reject }));
-    initializeNroNotifications();
+    initializeNroNotifications(alerts);
     return {
         handlers,
         requests,
@@ -125,6 +126,36 @@ function ajaxResponse(query, html) {
 }
 
 const settleAjax = () => new Promise((resolve) => setImmediate(resolve));
+
+test('guest limit events preserve rows and prevent SSE reconnection after filters or browser restoration', async () => {
+    const dialogs = [];
+    const fixture = ajaxFixture(
+        { nroGuestExpires: String(Date.parse('2026-10-08T12:09:00+07:00')), nroLoginUrl: '/dang-nhap' },
+        {
+            fire: async (options) => {
+                dialogs.push(options);
+                return { isConfirmed: false };
+            },
+        },
+    );
+    try {
+        fixture.streams[0].handlers['guest-limit']({ data: '{}' });
+        fixture.requests[0].resolve({ json: async () => ({ guest: true, realtime: false }) });
+        await settleAjax();
+        assert.equal(fixture.streams[0].closed, true);
+        assert.equal(fixture.list.innerHTML, 'Original rows');
+        assert.equal(fixture.reloads.count, 0);
+        assert.equal(dialogs.length, 1);
+        fixture.handlers.pageshow({ persisted: true });
+        fixture.handlers.submit({ preventDefault() {} });
+        fixture.requests[1].resolve(ajaxResponse('limit=10', 'Manual refresh rows'));
+        await settleAjax();
+        assert.equal(fixture.list.innerHTML, 'Manual refresh rows');
+        assert.equal(fixture.streams.length, 1);
+    } finally {
+        fixture.restore();
+    }
+});
 
 test('expired realtime access closes SSE and reloads without accepting late events', () => {
     const fixture = ajaxFixture();

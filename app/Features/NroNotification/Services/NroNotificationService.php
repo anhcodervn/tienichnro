@@ -226,7 +226,7 @@ class NroNotificationService
         $query = $this->filteredQuery($filters)
             ->when(($filters['state'] ?? '') === 'respawning', fn (Builder $query): Builder => $query->orderBy('respawn_at'))
             ->orderByDesc('time_start')->orderByDesc('id');
-        if (isset($filters['_preview_cutoff'])) {
+        if (isset($filters['_preview_since'])) {
             $rows = $query->limit(30)->get();
             $limit = min((int) ($filters['limit'] ?? 10), 10);
             $page = (int) ($filters['page'] ?? 1);
@@ -251,9 +251,8 @@ class NroNotificationService
     private function filteredQuery(array $filters): Builder
     {
         return Notify::query()->with(['boss', 'server', 'code'])
-            ->when(isset($filters['_preview_cutoff']), fn (Builder $query): Builder => $query
-                ->whereBetween('time_start', [$filters['_preview_since'], $filters['_preview_cutoff']])
-                ->where(fn (Builder $lifecycle): Builder => $lifecycle->whereNull('death_time')->orWhere('death_time', '<=', $filters['_preview_cutoff'])))
+            ->when(isset($filters['_preview_since']), fn (Builder $query): Builder => $query
+                ->where('time_start', '>=', $filters['_preview_since']))
             ->when($filters['server_id'] ?? null, fn (Builder $query, int $id): Builder => $query->where('server_id', $id))
             ->when(isset($filters['server_code']), fn (Builder $query): Builder => $query->whereHas('server', fn (Builder $servers): Builder => $servers->where('server_code', $filters['server_code'])))
             ->when($filters['boss_id'] ?? null, fn (Builder $query, int $id): Builder => $query->where('boss_id', $id))

@@ -1,7 +1,7 @@
 @php
     $selectedType = $notificationTypes->firstWhere('code', $filters['code'] ?? '');
     $additionalFilters = $selectedType?->additional_filters ?? [];
-    $limitOptions = $realtime ? collect([10, 25, 50, 100, (int) $limit])->unique()->sort() : collect([10]);
+    $limitOptions = auth()->check() ? collect([10, 25, 50, 100, (int) $limit])->unique()->sort() : collect([10]);
 @endphp
 <form method="GET" action="{{ route('nro.notifies.page') }}" data-nro-filters class="mb-6 rounded-xl border border-slate-300 bg-white p-4 shadow-sm sm:p-5">
     <div class="grid grid-cols-2 items-end gap-3 sm:gap-4 lg:grid-cols-[1fr_1fr_2fr]">

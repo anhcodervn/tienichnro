@@ -14,6 +14,8 @@ class NotificationAccessService
 {
     public const SESSION_KEY = 'nro_realtime_access';
 
+    public const GUEST_EXPIRY_KEY = 'nro_guest_realtime_expires_at';
+
     public function __construct(private readonly SettingStore $settings) {}
 
     public function isAdmin(Request $request): bool
@@ -54,12 +56,23 @@ class NotificationAccessService
 
     public function realtime(Request $request): bool
     {
-        if ($this->isAdmin($request)) {
+        if ($request->user()) {
             return true;
         }
-        $key = $this->grantKey($request);
 
-        return $this->configured() && $key !== null && (int) Cache::get($key, 0) > now()->timestamp;
+        return ($this->guestExpiresAt($request) ?? 0) > now()->timestamp;
+    }
+
+    public function guestExpiresAt(Request $request): ?int
+    {
+        if ($request->user() || ! $request->hasSession()) {
+            return null;
+        }
+        if (! $request->session()->has(self::GUEST_EXPIRY_KEY)) {
+            $request->session()->put(self::GUEST_EXPIRY_KEY, now()->addMinutes(15)->timestamp);
+        }
+
+        return (int) $request->session()->get(self::GUEST_EXPIRY_KEY);
     }
 
     public function verify(Request $request, string $token): void
@@ -92,14 +105,13 @@ class NotificationAccessService
      */
     public function filters(Request $request, array $filters): array
     {
-        if ($this->realtime($request)) {
+        if ($request->user()) {
             return $filters;
         }
-        $cutoff = now()->subMinutes(5)->startOfMinute();
-        abort_if((int) ($filters['page'] ?? 1) > 3, 403, 'Đăng nhập và xác minh để xem thêm lịch sử thông báo.');
+        $this->guestExpiresAt($request);
+        abort_if((int) ($filters['page'] ?? 1) > 3, 403, 'Vui lòng đăng nhập để xem thêm lịch sử thông báo.');
 
         return [...$filters, 'limit' => 10,
-            '_preview_cutoff' => $cutoff->format('Y-m-d H:i:s.u'),
-            '_preview_since' => now()->subHour()->startOfMinute()->format('Y-m-d H:i:s.u')];
+            '_preview_since' => now()->subHour()->format('Y-m-d H:i:s.u')];
     }
 }

@@ -1,4 +1,6 @@
 import DOMPurify from 'dompurify';
+import Swal from 'sweetalert2';
+import { createNroGuestReminders } from './nro-guest-reminders.js';
 
 export function formatNroRelativeTime(timestamp, currentTime) {
     const seconds = Math.floor((currentTime - Date.parse(timestamp)) / 1000);
@@ -39,7 +41,7 @@ export function initializeNroFilters(root) {
     return synchronize;
 }
 
-export function initializeNroNotifications() {
+export function initializeNroNotifications(alerts = Swal) {
     const root = document.querySelector('[data-nro-clock]');
     if (!(root instanceof HTMLElement)) return;
     const synchronizeFilters = initializeNroFilters(root);
@@ -62,6 +64,33 @@ export function initializeNroNotifications() {
     let source = null;
     let timer = null;
     let maintenance = false;
+    let guestEnded = root.dataset.nroRealtime === 'false';
+    const currentTime = () => (Number.isFinite(serverTime) ? serverTime + performance.now() - startedAt : Date.now());
+    const stopGuestStream = () => {
+        if (guestEnded) return;
+        guestEnded = true;
+        source?.close();
+        source = null;
+        delete root.dataset.nroStream;
+        setStatus('Đã dừng cập nhật · vui lòng đăng nhập');
+    };
+    const guestReminders = createNroGuestReminders({
+        expiresAt: root.dataset.nroGuestExpires,
+        loginUrl: root.dataset.nroLoginUrl,
+        clock: currentTime,
+        alerts,
+        browser: window,
+        stopStream: stopGuestStream,
+        checkMember: async () => {
+            try {
+                const response = await fetch(window.location.href, { headers: { Accept: 'application/json' }, credentials: 'same-origin' });
+                const payload = await response.json();
+                return payload.guest === false && payload.realtime === true;
+            } catch {
+                return false;
+            }
+        },
+    });
 
     const showMaintenance = () => {
         maintenance = true;
@@ -83,12 +112,12 @@ export function initializeNroNotifications() {
         startedAt = performance.now();
     };
     const updateCountdowns = () => {
-        const currentTime = Number.isFinite(serverTime) ? serverTime + performance.now() - startedAt : Date.now();
+        const time = currentTime();
         root.querySelectorAll('[data-nro-relative]').forEach((element) => {
-            element.textContent = ` - ${formatNroRelativeTime(element.dataset.nroRelative || '', currentTime)}`;
+            element.textContent = ` - ${formatNroRelativeTime(element.dataset.nroRelative || '', time)}`;
         });
         root.querySelectorAll('[data-nro-respawn]').forEach((element) => {
-            const remaining = Math.ceil((Date.parse(element.dataset.nroRespawn || '') - currentTime) / 1000);
+            const remaining = Math.ceil((Date.parse(element.dataset.nroRespawn || '') - time) / 1000);
             if (!Number.isFinite(remaining)) {
                 element.textContent = 'Không xác định';
             } else if (remaining <= 0) {
@@ -100,6 +129,7 @@ export function initializeNroNotifications() {
                 element.textContent = `Còn ${hours ? `${hours} giờ ` : ''}${minutes} phút ${seconds} giây`;
             }
         });
+        void guestReminders.tick();
     };
     const setStatus = (message) => {
         if (status) status.textContent = message;
@@ -122,13 +152,13 @@ export function initializeNroNotifications() {
         if (total) total.textContent = String(snapshot.total);
         if (limit) limit.textContent = String(snapshot.per_page);
         updateCountdowns();
-        setStatus(root.dataset.nroRealtime === 'false' ? 'Bản xem giới hạn · trễ 5 phút' : 'Đang cập nhật trực tiếp');
+        setStatus(guestEnded ? 'Đã dừng cập nhật · vui lòng đăng nhập' : 'Đang cập nhật trực tiếp');
     };
     const start = () => {
         if (maintenance) return;
         updateCountdowns();
         if (timer === null) timer = window.setInterval(updateCountdowns, 1000);
-        if (!root.dataset.nroStream || source) return;
+        if (guestEnded || guestReminders.isExpired() || !root.dataset.nroStream || source) return;
         if (!('EventSource' in window)) {
             setStatus('Trình duyệt chưa hỗ trợ cập nhật trực tiếp. Bấm Làm mới để cập nhật.');
             return;
@@ -162,6 +192,11 @@ export function initializeNroNotifications() {
         connection.addEventListener('access-expired', () => {
             if (source === connection) showMaintenance();
         });
+        connection.addEventListener('guest-limit', () => {
+            if (source !== connection) return;
+            stopGuestStream();
+            void guestReminders.expire();
+        });
         connection.addEventListener('error', async () => {
             if (source !== connection || checkingAvailability) return;
             setStatus('Đang kết nối lại…');
@@ -174,8 +209,12 @@ export function initializeNroNotifications() {
                 if (source !== connection) return;
                 const payload = await response.json();
                 if (source === connection && payload.service_maintenance === true) showMaintenance();
-                else if (payload.realtime === false || response.status === 403) showMaintenance();
-                else if (response.status === 429) {
+                else if (payload.realtime === false || response.status === 403) {
+                    if (root.dataset.nroGuestExpires) {
+                        stopGuestStream();
+                        void guestReminders.expire();
+                    } else showMaintenance();
+                } else if (response.status === 429) {
                     connection.close();
                     source = null;
                     setStatus(payload.message || 'Đã đạt giới hạn kết nối. Hãy đợi rồi bấm Làm mới.');

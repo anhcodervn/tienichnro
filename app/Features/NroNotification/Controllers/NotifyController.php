@@ -49,6 +49,7 @@ class NotifyController extends Controller
         $filters = $this->access->filters($request, $request->publicFilters());
         $visibleFilters = Arr::except($filters, ['_preview_cutoff', '_preview_since']);
         $realtime = $this->access->realtime($request);
+        $guestExpiresAt = $this->access->guestExpiresAt($request);
         $tool = $this->services->interaction('game_notifications');
         if ($request->expectsJson()) {
             $this->ensureAvailable();
@@ -56,11 +57,12 @@ class NotifyController extends Controller
         $snapshot = $tool['is_enabled'] ? $feed->snapshot($filters) : null;
         if ($request->expectsJson()) {
             return response()->json(['data' => $snapshot, 'filters' => $visibleFilters,
-                'url' => route('nro.notifies.page', $visibleFilters), 'stream_url' => $realtime ? route('nro.notifies.stream', $visibleFilters) : '', 'realtime' => $realtime]);
+                'url' => route('nro.notifies.page', $visibleFilters), 'stream_url' => $realtime ? route('nro.notifies.stream', $visibleFilters) : '', 'realtime' => $realtime,
+                'guest' => ! $request->user(), 'guest_expires_at' => $guestExpiresAt === null ? null : $guestExpiresAt * 1000]);
         }
 
         return view('pages.nro.notifies', ['snapshot' => $snapshot, 'filters' => $visibleFilters, 'service' => $tool,
-            'realtime' => $realtime, 'turnstileSiteKey' => $this->access->siteKey(),
+            'realtime' => $realtime, 'guestExpiresAt' => $guestExpiresAt,
             'limit' => $filters['limit'],
             'notificationTypes' => CodeNotify::query()->orderBy('id')->get(),
             'servers' => NroServer::query()->where('is_active', true)->orderBy('sort_order')->orderBy('server_code')->get(),
@@ -70,8 +72,8 @@ class NotifyController extends Controller
     public function stream(NotifyIndexRequest $request, NroNotificationFeedService $feed, NotificationStreamSlotsService $slots): StreamedResponse
     {
         $this->ensureAvailable();
-        abort_unless($this->access->realtime($request), 403, 'Đăng nhập và xác minh để xem thông báo trực tiếp.');
-        $filters = $request->publicFilters();
+        abort_unless($this->access->realtime($request), 403, 'Vui lòng đăng nhập để tiếp tục sử dụng.');
+        $filters = $this->access->filters($request, $request->publicFilters());
         if ($request->hasSession()) {
             $request->session()->save();
         }
@@ -82,7 +84,7 @@ class NotifyController extends Controller
             try {
                 foreach ($feed->events($filters) as $event) {
                     if (! $this->access->realtime($request)) {
-                        yield new StreamedEvent('access-expired', ['message' => 'Quyền xem trực tiếp đã hết hạn. Vui lòng xác minh lại.']);
+                        yield new StreamedEvent('guest-limit', ['message' => 'Vui lòng đăng nhập để tiếp tục sử dụng.']);
 
                         return;
                     }
