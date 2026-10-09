@@ -26,7 +26,7 @@
     <div hidden data-nro-loading role="status" class="mb-4 flex items-center gap-3 rounded-[10px] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
         <span aria-hidden="true" class="h-5 w-5 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-700 motion-reduce:animate-none"></span>Đang tải thông báo…
     </div>
-    <div class="grid gap-3 transition-opacity duration-200 motion-reduce:transition-none max-sm:w-[111.111111111%] max-sm:[zoom:0.9]" data-nro-list role="list" aria-label="Danh sách thông báo game">
+    <div class="grid gap-3 transition-opacity duration-200 motion-reduce:transition-none" data-nro-list role="list" aria-label="Danh sách thông báo game">
         {!! $snapshot['html'] !!}
 
     </div>

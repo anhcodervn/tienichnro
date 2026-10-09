@@ -1032,6 +1032,54 @@ html[data-client-theme].dark .to-rose-50 {
     }
 }
 
+@media (max-width: 639.98px) {
+    .nro-feed-page [data-nro-list] {
+        gap: 0.675rem;
+    }
+
+    .nro-feed-page [data-notify-id] {
+        padding: 0.9rem;
+        font-size: 0.7875rem;
+        line-height: 1.35rem;
+        overflow-wrap: anywhere;
+    }
+
+    .nro-feed-page [data-notify-id] h2 {
+        min-width: 0;
+        max-width: 100%;
+        font-size: 1.0125rem;
+        line-height: 1.35rem;
+    }
+
+    .nro-feed-page [data-notify-id] .text-xs {
+        font-size: 0.675rem;
+    }
+
+    .nro-feed-page [data-notify-id] .text-sm {
+        font-size: 0.7875rem;
+    }
+
+    .nro-feed-page [data-notify-id] .leading-5 {
+        line-height: 1.125rem;
+    }
+
+    .nro-feed-page [data-notify-id] .mt-2 {
+        margin-top: 0.45rem;
+    }
+
+    .nro-feed-page [data-notify-id] .gap-2 {
+        gap: 0.45rem;
+    }
+
+    .nro-feed-page [data-notify-id] .gap-1 {
+        gap: 0.225rem;
+    }
+
+    .nro-feed-page [data-notify-id] .shrink-0 {
+        max-width: 100%;
+    }
+}
+
 .client-page-scale {
     width: 111.111111111%;
     zoom: 0.9;

@@ -24,7 +24,9 @@ test('notification state colors and readable labels survive page ajax and realti
         $page->assertSee('data-notify-state="'.$state.'"', false);
     }
     $page->assertSee('nro-feed-page bg-slate-50', false)
-        ->assertSee('grid gap-3 transition-opacity', false);
+        ->assertSee('grid gap-3 transition-opacity', false)
+        ->assertDontSee('max-sm:w-[111.111111111%]', false)
+        ->assertDontSee('max-sm:[zoom:0.9]', false);
     $page->assertSee('Boss: Broly 1')->assertSee('Map: Núi khỉ vàng')->assertSee('Người tiêu diệt: Player')->assertSee('data-nro-respawn=', false);
     expect($ajax)->toContain('&lt;script&gt;alert(1)&lt;/script&gt;')->not->toContain('<script>alert(1)</script>');
 });
