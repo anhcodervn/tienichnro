@@ -1,0 +1,4 @@
+curl -fsS -X POST \
+  "http://localhost:8000/api/nro/cron/prune-notifies" \
+  -H "Accept: application/json" \
+  -H "X-Cron-Key:YOUR_CRON_KEY"
