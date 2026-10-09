@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
-use App\Support\TenantContext;
 use App\Utils\ApiResponse;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -12,17 +11,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsurePlatformAdmin
 {
-    public function __construct(private readonly TenantContext $tenantContext) {}
-
     /** @param Closure(Request): Response $next */
     public function handle(Request $request, Closure $next): Response
     {
         $user = $request->user();
 
-        if (! $user instanceof User
-            || $user->role !== 'admin'
-            || ! $this->tenantContext->isMain()
-            || ($this->tenantContext->isActive() && $user->tenant_id !== $this->tenantContext->id())) {
+        if (! $user instanceof User || $user->role !== 'admin') {
             return $this->forbiddenResponse('Chức năng này chỉ dành cho quản trị viên NapCarot.');
         }
 

@@ -2,19 +2,18 @@
 
 namespace App\Models;
 
-use App\Models\Concerns\BelongsToTenant;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AdminAuditLog extends Model
 {
-    use BelongsToTenant, HasFactory;
+    use HasFactory;
 
     public const UPDATED_AT = null;
 
     protected $fillable = [
-        'tenant_id', 'admin_id', 'request_id', 'action', 'route_name', 'method', 'path', 'status_code',
+        'admin_id', 'request_id', 'action', 'route_name', 'method', 'path', 'status_code',
         'duration_ms', 'subject_type', 'subject_id', 'old_values', 'new_values', 'ip', 'user_agent', 'created_at',
     ];
 

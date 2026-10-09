@@ -2,36 +2,18 @@
 
 namespace App\Features\Admin\User\Controllers;
 
-use App\Features\Admin\User\Actions\AdjustUserWalletAction;
-use App\Features\Admin\User\Actions\BulkSetUserDiscountsAction;
 use App\Features\Admin\User\Actions\ListAdminUsersAction;
-use App\Features\Admin\User\Actions\ListUserDiscountsAction;
 use App\Features\Admin\User\Actions\ListUserLogsAction;
-use App\Features\Admin\User\Actions\ListUserWalletTransactionsAction;
 use App\Features\Admin\User\Actions\ResetAdminUserPasswordAction;
 use App\Features\Admin\User\Actions\ShowAdminUserAction;
-use App\Features\Admin\User\Actions\UpdateAdminUserRoleAction;
 use App\Features\Admin\User\Actions\UpdateAdminUserStatusAction;
-use App\Features\Admin\User\Actions\UpdateUserGameServiceSecondaryPasswordAction;
 use App\Features\Admin\User\Requests\AdminResetUserPasswordRequest;
-use App\Features\Admin\User\Requests\AdminUserDiscountIndexRequest;
 use App\Features\Admin\User\Requests\AdminUserIndexRequest;
 use App\Features\Admin\User\Requests\AdminUserRelatedListRequest;
-use App\Features\Admin\User\Requests\AdminUserRoleRequest;
 use App\Features\Admin\User\Requests\AdminUserStatusRequest;
-use App\Features\Admin\User\Requests\AdminWalletAdjustRequest;
-use App\Features\Admin\User\Requests\BulkSetUserDiscountRequest;
-use App\Features\Admin\User\Requests\QuickSetUserPackagePricesRequest;
-use App\Features\Admin\User\Requests\UpdateUserGameServicePermissionsRequest;
-use App\Features\Admin\User\Requests\UpdateUserGameServiceSecondaryPasswordRequest;
-use App\Features\Admin\User\Requests\UpsertUserPackagePriceRequest;
 use App\Features\Admin\User\Resources\AdminUserDetailResource;
 use App\Features\Admin\User\Resources\AdminUserResource;
-use App\Features\Admin\User\Services\UserGameServicePermissionService;
-use App\Features\Admin\User\Services\UserPackagePriceAdminService;
 use App\Http\Controllers\Controller;
-use App\Models\GlobalTopupPackage;
-use App\Models\TopupPackage;
 use App\Models\User;
 use App\Utils\ApiResponse;
 use Illuminate\Http\JsonResponse;
@@ -42,19 +24,6 @@ class UserController extends Controller
     public function index(AdminUserIndexRequest $request, ListAdminUsersAction $action): JsonResponse
     {
         return response()->json(ApiResponse::success(data: $action->handle($request->validated())));
-    }
-
-    public function discounts(AdminUserDiscountIndexRequest $request, ListUserDiscountsAction $action): JsonResponse
-    {
-        return response()->json(ApiResponse::success(data: $action->handle($request->validated())));
-    }
-
-    public function bulkSetDiscounts(BulkSetUserDiscountRequest $request, BulkSetUserDiscountsAction $action): JsonResponse
-    {
-        return response()->json(ApiResponse::success(
-            'Đã áp dụng chiết khấu hàng loạt cho người dùng đã chọn.',
-            $action->handle($request->validated()),
-        ));
     }
 
     public function show(User $user, ShowAdminUserAction $action): JsonResponse
@@ -71,31 +40,7 @@ class UserController extends Controller
 
         return response()->json(ApiResponse::success(
             'Cập nhật trạng thái người dùng thành công.',
-            ['user' => AdminUserResource::make($updatedUser->load('wallet'))->resolve()],
-        ));
-    }
-
-    public function updateRole(
-        AdminUserRoleRequest $request,
-        User $user,
-        UpdateAdminUserRoleAction $action,
-    ): JsonResponse {
-        $updatedUser = $action->handle($user, $request->validated());
-
-        return response()->json(ApiResponse::success(
-            'Cập nhật vai trò người dùng thành công.',
-            ['user' => AdminUserResource::make($updatedUser->load('wallet'))->resolve()],
-        ));
-    }
-
-    public function walletAdjust(
-        AdminWalletAdjustRequest $request,
-        User $user,
-        AdjustUserWalletAction $action,
-    ): JsonResponse {
-        return response()->json(ApiResponse::success(
-            'Điều chỉnh số dư ví thành công.',
-            $action->handle($user, $request->validated(), $this->admin($request), $request),
+            ['user' => AdminUserResource::make($updatedUser)->resolve()],
         ));
     }
 
@@ -109,112 +54,6 @@ class UserController extends Controller
         return response()->json(ApiResponse::success(
             'Cấp lại mật khẩu người dùng thành công.',
         ));
-    }
-
-    public function prices(User $user, UserPackagePriceAdminService $service): JsonResponse
-    {
-        return response()->json(ApiResponse::success(data: $service->catalog($user)));
-    }
-
-    public function gameServices(User $user, UserGameServicePermissionService $service): JsonResponse
-    {
-        return response()->json(ApiResponse::success(data: $service->catalog($user)));
-    }
-
-    public function syncGameServices(
-        UpdateUserGameServicePermissionsRequest $request,
-        User $user,
-        UserGameServicePermissionService $service,
-    ): JsonResponse {
-        return response()->json(ApiResponse::success(
-            'Đã cập nhật danh sách dịch vụ CTV được phép nhận.',
-            $service->sync($user, $request->validated()['game_service_ids']),
-        ));
-    }
-
-    public function updateGameServiceSecondaryPassword(
-        UpdateUserGameServiceSecondaryPasswordRequest $request,
-        User $user,
-        UpdateUserGameServiceSecondaryPasswordAction $action,
-    ): JsonResponse {
-        $updatedUser = $action->handle($user, $request->validated(), $this->admin($request), $request);
-
-        return response()->json(ApiResponse::success(
-            'Đã cập nhật mật khẩu C2 riêng cho CTV.',
-            ['has_game_service_secondary_password' => filled($updatedUser->game_service_secondary_password)],
-        ));
-    }
-
-    public function quickSetPrices(
-        QuickSetUserPackagePricesRequest $request,
-        User $user,
-        UserPackagePriceAdminService $service,
-    ): JsonResponse {
-        $service->quickSet($user, $request->validated());
-
-        return response()->json(ApiResponse::success(
-            'Đã áp dụng nhanh chiết khấu cho thành viên.',
-            $service->catalog($user),
-        ));
-    }
-
-    public function updatePrice(
-        UpsertUserPackagePriceRequest $request,
-        User $user,
-        TopupPackage $topupPackage,
-        UserPackagePriceAdminService $service,
-    ): JsonResponse {
-        $service->save($user, $topupPackage, $request->validated());
-
-        return response()->json(ApiResponse::success(
-            'Đã cập nhật chiết khấu riêng cho thành viên.',
-            $service->catalog($user),
-        ));
-    }
-
-    public function deletePrice(User $user, TopupPackage $topupPackage, UserPackagePriceAdminService $service): JsonResponse
-    {
-        $service->delete($user, $topupPackage);
-
-        return response()->json(ApiResponse::success(
-            'Đã đưa thành viên về giá mặc định của website.',
-            $service->catalog($user),
-        ));
-    }
-
-    public function updateGlobalPrice(
-        UpsertUserPackagePriceRequest $request,
-        User $user,
-        GlobalTopupPackage $globalTopupPackage,
-        UserPackagePriceAdminService $service,
-    ): JsonResponse {
-        $service->saveGlobal($user, $globalTopupPackage, $request->validated());
-
-        return response()->json(ApiResponse::success(
-            'Đã cập nhật chiết khấu Global cho thành viên.',
-            $service->catalog($user),
-        ));
-    }
-
-    public function deleteGlobalPrice(
-        User $user,
-        GlobalTopupPackage $globalTopupPackage,
-        UserPackagePriceAdminService $service,
-    ): JsonResponse {
-        $service->deleteGlobal($user, $globalTopupPackage);
-
-        return response()->json(ApiResponse::success(
-            'Đã xóa chiết khấu Global của thành viên.',
-            $service->catalog($user),
-        ));
-    }
-
-    public function walletTransactions(
-        AdminUserRelatedListRequest $request,
-        User $user,
-        ListUserWalletTransactionsAction $action,
-    ): JsonResponse {
-        return response()->json(ApiResponse::success(data: $action->handle($user, $request->validated())));
     }
 
     public function logs(

@@ -19,8 +19,8 @@ return new class extends Migration
             $table->unsignedSmallInteger('status_code')->nullable()->after('path');
             $table->unsignedInteger('duration_ms')->nullable()->after('status_code');
 
-            $table->index(['tenant_id', 'admin_id', 'created_at'], 'admin_audit_tenant_admin_created_idx');
-            $table->index(['tenant_id', 'route_name', 'created_at'], 'admin_audit_tenant_route_created_idx');
+            $table->index(['admin_id', 'created_at'], 'admin_audit_admin_created_idx');
+            $table->index(['route_name', 'created_at'], 'admin_audit_route_created_idx');
         });
     }
 
@@ -30,8 +30,8 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('admin_audit_logs', function (Blueprint $table): void {
-            $table->dropIndex('admin_audit_tenant_admin_created_idx');
-            $table->dropIndex('admin_audit_tenant_route_created_idx');
+            $table->dropIndex('admin_audit_admin_created_idx');
+            $table->dropIndex('admin_audit_route_created_idx');
             $table->dropColumn([
                 'request_id',
                 'route_name',

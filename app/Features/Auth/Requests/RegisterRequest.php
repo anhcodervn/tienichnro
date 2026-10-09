@@ -4,7 +4,6 @@ namespace App\Features\Auth\Requests;
 
 use App\Exceptions\ApiException;
 use App\Models\User;
-use App\Utils\Site;
 use Closure;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
@@ -54,7 +53,7 @@ class RegisterRequest extends FormRequest
                         $fail('Tên đăng nhập không được có định dạng email.');
                     }
                 },
-                Rule::unique(User::class, 'username')->where('tenant_id', Site::id()),
+                Rule::unique(User::class, 'username'),
             ],
             'email' => [
                 'required',
@@ -62,13 +61,13 @@ class RegisterRequest extends FormRequest
                 'lowercase',
                 'email',
                 'max:255',
-                Rule::unique(User::class, 'email')->where('tenant_id', Site::id()),
+                Rule::unique(User::class, 'email'),
             ],
             'phone' => [
                 'nullable',
                 'string',
                 'max:20',
-                Rule::unique(User::class, 'phone')->where('tenant_id', Site::id()),
+                Rule::unique(User::class, 'phone'),
             ],
             'name' => [
                 'nullable',

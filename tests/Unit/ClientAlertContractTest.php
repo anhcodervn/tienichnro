@@ -1,40 +1,14 @@
 <?php
 
-test('client errors use sweetalert while the homepage announcement remains admin configured', function (): void {
-    $projectRoot = dirname(__DIR__, 2);
-    $flash = file_get_contents($projectRoot.'/resources/views/client/partials/flash.blade.php');
-    $script = file_get_contents($projectRoot.'/resources/js/client.js');
-    $home = file_get_contents($projectRoot.'/resources/views/client/home/index.blade.php');
-    $controller = file_get_contents($projectRoot.'/app/Features/Client/Topup/Controllers/HomeController.php');
-    $clientCss = file_get_contents($projectRoot.'/resources/css/client.css');
+test('Blade notification assets connect escaped flash messages to the shared client bundle', function (): void {
+    $root = dirname(__DIR__, 2);
+    $layout = file_get_contents($root.'/resources/views/client/layouts/app.blade.php');
+    $flash = file_get_contents($root.'/resources/views/client/partials/flash.blade.php');
+    $entry = file_get_contents($root.'/resources/js/client.js');
+    $script = file_get_contents($root.'/resources/js/client-notifications.js');
 
-    expect($flash)
-        ->toContain('hidden data-client-alert')
-        ->toContain('data-alert-type="error"')
-        ->toContain('data-alert-message')
-        ->not->toContain('client-container pt-4')
-        ->not->toContain('border-rose-200')
-        ->and($script)
-        ->toContain("import Swal from 'sweetalert2'")
-        ->toContain("document.querySelectorAll('[data-client-alert]')")
-        ->toContain('void Swal.fire({')
-        ->toContain("icon: 'error'")
-        ->not->toContain("document.querySelectorAll('[data-client-toast]')")
-        ->and($home)
-        ->toContain('@if ($homeNoticeIsPublished && $homeNoticeHtml->isNotEmpty())')
-        ->toContain('<div class="home-notice-banner" role="note"')
-        ->toContain('class="home-notice-header"')
-        ->toContain('{{ $homeNoticeTitle }}')
-        ->toContain('{!! $homeNoticeHtml->toHtml() !!}')
-        ->not->toContain('<details class="home-notice-banner"')
-        ->not->toContain('Xem chi tiết')
-        ->and($clientCss)
-        ->toContain('.home-notice-content *')
-        ->toContain('font-family: inherit !important;')
-        ->toContain('.home-notice-content a')
-        ->toContain('pointer-events: auto;')
-        ->and($controller)
-        ->toContain("'home_notice_title'")
-        ->toContain("'home_notice_content'")
-        ->toContain("'home_notice_is_published'");
+    expect($layout)->toContain("@include('client.partials.flash')", "@vite('resources/js/client.js')");
+    expect($entry)->toContain("from './client-notifications'", 'initializeClientNotifications()');
+    expect($flash)->toContain('data-client-alert', '{{ $error }}', 'auth_google_error');
+    expect($script)->toContain("from 'sweetalert2'", 'sweetalert2/dist/sweetalert2.min.css');
 });

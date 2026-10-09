@@ -20,7 +20,7 @@ class PublicContentPageController extends Controller
         return [
             'gioi-thieu' => [
                 'fallback_title' => 'Giới thiệu',
-                'fallback_description' => 'Thông tin tổng quan về dịch vụ nạp Carot game Teamobi và cam kết vận hành.',
+                'fallback_description' => 'Website chia sẻ tiện ích, hướng dẫn và kinh nghiệm chơi Ngọc Rồng Online.',
                 'title_key' => 'about_page_title',
                 'excerpt_key' => 'about_page_excerpt',
                 'content_key' => 'about_page_content',
@@ -30,7 +30,7 @@ class PublicContentPageController extends Controller
             ],
             'lien-he' => [
                 'fallback_title' => 'Liên hệ',
-                'fallback_description' => 'Thông tin hỗ trợ và các kênh kết nối với đội ngũ vận hành dịch vụ nạp game.',
+                'fallback_description' => 'Liên hệ ban biên tập để góp ý, gửi bài viết và trao đổi về Ngọc Rồng Online.',
                 'title_key' => 'contact_page_title',
                 'excerpt_key' => 'contact_page_excerpt',
                 'content_key' => 'contact_page_content',
@@ -58,29 +58,9 @@ class PublicContentPageController extends Controller
                 'seo_description_key' => 'privacy_page_seo_description',
                 'published_key' => 'privacy_page_is_published',
             ],
-            'chinh-sach-hoan-tien' => [
-                'fallback_title' => 'Chính sách hoàn tiền',
-                'fallback_description' => 'Điều kiện hoàn tiền, thời gian xử lý và các trường hợp không áp dụng hoàn tiền.',
-                'title_key' => 'refund_policy_title',
-                'excerpt_key' => 'refund_policy_excerpt',
-                'content_key' => 'refund_policy_content',
-                'seo_title_key' => 'refund_policy_seo_title',
-                'seo_description_key' => 'refund_policy_seo_description',
-                'published_key' => 'refund_policy_is_published',
-            ],
-            'chinh-sach-thanh-toan' => [
-                'fallback_title' => 'Chính sách thanh toán',
-                'fallback_description' => 'Quy định về phương thức thanh toán, kích hoạt đơn hàng và đối soát giao dịch.',
-                'title_key' => 'payment_policy_title',
-                'excerpt_key' => 'payment_policy_excerpt',
-                'content_key' => 'payment_policy_content',
-                'seo_title_key' => 'payment_policy_seo_title',
-                'seo_description_key' => 'payment_policy_seo_description',
-                'published_key' => 'payment_policy_is_published',
-            ],
             'huong-dan' => [
-                'fallback_title' => 'Hướng dẫn nạp game',
-                'fallback_description' => 'Các bước chọn game, tạo đơn, chuyển khoản và theo dõi trạng thái nạp Carot.',
+                'fallback_title' => 'Hướng dẫn Ngọc Rồng Online',
+                'fallback_description' => 'Tổng hợp hướng dẫn nhiệm vụ, cách chơi và các tiện ích dành cho Ngọc Rồng Online.',
                 'title_key' => 'guide_page_title',
                 'excerpt_key' => 'guide_page_excerpt',
                 'content_key' => 'guide_page_content',
@@ -90,7 +70,7 @@ class PublicContentPageController extends Controller
             ],
             'cau-hoi-thuong-gap' => [
                 'fallback_title' => 'Câu hỏi thường gặp',
-                'fallback_description' => 'Những câu hỏi phổ biến về tạo đơn, thanh toán, nạp Carot và hoàn tiền.',
+                'fallback_description' => 'Giải đáp các câu hỏi thường gặp về nội dung và tiện ích trên website.',
                 'title_key' => 'faq_page_title',
                 'excerpt_key' => 'faq_page_excerpt',
                 'content_key' => 'faq_page_content',

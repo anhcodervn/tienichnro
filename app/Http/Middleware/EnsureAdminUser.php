@@ -3,7 +3,6 @@
 namespace App\Http\Middleware;
 
 use App\Models\User;
-use App\Support\TenantContext;
 use App\Utils\ApiResponse;
 use Closure;
 use Illuminate\Http\JsonResponse;
@@ -12,8 +11,6 @@ use Symfony\Component\HttpFoundation\Response;
 
 class EnsureAdminUser
 {
-    public function __construct(private readonly TenantContext $tenantContext) {}
-
     /**
      * @param  Closure(Request): Response  $next
      */
@@ -25,8 +22,7 @@ class EnsureAdminUser
             return $this->forbiddenResponse('Bạn cần đăng nhập để truy cập API admin.');
         }
 
-        if ($user->role !== 'admin'
-            || ($this->tenantContext->isActive() && $user->tenant_id !== $this->tenantContext->id())) {
+        if ($user->role !== 'admin') {
             return $this->forbiddenResponse('Bạn không có quyền truy cập API admin.');
         }
 

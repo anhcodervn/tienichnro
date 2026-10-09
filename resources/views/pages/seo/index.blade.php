@@ -1,7 +1,7 @@
 @extends('client.layouts.app')
 @section('title', $pageMetaTitle)
 @section('description', $pageMetaDescription)
-@section('canonical', $pageMetaUrl)
+@section('canonical', $pageMetaCanonical)
 @section('robots', $pageMetaRobots)
 @section('content')
 @php
@@ -23,7 +23,7 @@
         </nav>
 
         <div class="mt-6 max-w-3xl">
-            <p class="inline-flex items-center gap-2 text-sm font-bold text-emerald-700"><i class="bx bx-book-open text-lg" aria-hidden="true"></i>{{ $activeCategory?->name ?: 'Kiến thức nạp game' }}</p>
+            <p class="inline-flex items-center gap-2 text-sm font-bold text-emerald-700"><i class="bx bx-book-open text-lg" aria-hidden="true"></i>{{ $activeCategory?->name ?: 'Cẩm nang Ngọc Rồng Online' }}</p>
             <h1 class="mt-2 break-words text-3xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">{{ $pageTitle }}</h1>
             <p class="mt-4 break-words text-base leading-7 text-slate-600 sm:text-lg">{{ $pageDescription }}</p>
         </div>
@@ -89,6 +89,7 @@
                     <p>Chưa tìm thấy bài viết phù hợp.</p>
                 </div>
             @endif
+            <div class="mt-6">{{ $posts->links() }}</div>
         </main>
 
         <aside class="min-w-0 space-y-5 lg:sticky lg:top-24 lg:self-start">

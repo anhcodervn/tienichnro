@@ -46,8 +46,6 @@ export interface GeneralSettingType {
 
 export interface MaintenanceSettingType {
     site_active: boolean;
-    topup_maintenance_enabled: boolean;
-    topup_maintenance_message: string;
 }
 
 export interface HomepageNoticeSettingType {
@@ -68,11 +66,6 @@ export interface PopupNoticeSettingType {
 export interface GameServiceMenuItem {
     label: string;
     url: string;
-}
-
-export interface ServiceArticlesSettingType {
-    game_service_enabled: boolean;
-    game_service_items: GameServiceMenuItem[];
 }
 
 export interface BioLinkItemType {
@@ -142,16 +135,6 @@ export interface ContactSettingType {
     [key: string]: unknown;
 }
 
-export interface SupportChannelItemType {
-    icon: string;
-    url: string;
-    is_active: boolean;
-}
-
-export interface SupportChannelSettingType {
-    support_channels: SupportChannelItemType[];
-}
-
 export interface DiscordWebhookSettingItemType {
     name: string;
     url: string;
@@ -170,13 +153,6 @@ export interface SecuritySettingType {
     turnstile_site_key: string;
     turnstile_secret_key: string;
     turnstile_secret_configured: boolean;
-}
-
-export interface TaxSettingType {
-    tax_enabled: boolean;
-    tax_calculation_type: 'revenue';
-    vat_rate: string | number;
-    pit_rate: string | number;
 }
 
 export interface SeoSettingType {

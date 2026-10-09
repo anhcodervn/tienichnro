@@ -3,7 +3,7 @@ import Breadcrumb from '@/components/MasterLayouts/Breadcrumb/index.vue';
 import Editor from '@/components/shared/Editor/index.vue';
 import UploadImage from '@/components/shared/UpladImage/index.vue';
 import { adminSeoService } from '@/services/admin-seo.service';
-import type { AdminSeoPostPayload, SeoPostStatus, SeoRobotsValue, SeoServiceOption } from '@/types/admin-seo.type';
+import type { AdminSeoPostPayload, SeoPostStatus, SeoRobotsValue } from '@/types/admin-seo.type';
 import { uploadEditorImages } from '@/utils/editor-image-upload';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink, Eye, ImageIcon, Link2, Plus, Save, Search, Trash2 } from 'lucide-vue-next';
@@ -18,7 +18,6 @@ const slugManuallyEdited = ref(false);
 const canonicalMode = ref<'auto' | 'custom'>('auto');
 const contentEditor = ref<{ flush: () => unknown[] | string } | null>(null);
 const categories = ref<Array<{ id: number; name: string; slug: string }>>([]);
-const services = ref<SeoServiceOption[]>([]);
 
 const editingId = computed(() => {
     const raw = Number(route.params.seo_post_id);
@@ -139,7 +138,6 @@ const toLocalDatetime = (value: string | null): string | null => {
 const fetchMeta = async (): Promise<void> => {
     const response = await adminSeoService.postOptions();
     categories.value = response.categories;
-    services.value = response.services;
 };
 
 const fetchPost = async (): Promise<void> => {
@@ -150,8 +148,8 @@ const fetchPost = async (): Promise<void> => {
     const post = await adminSeoService.getPost(editingId.value);
 
     form.title = post.title;
-    form.type = post.type;
-    form.service_id = post.service_id;
+    form.type = post.type === 'guide' ? 'guide' : 'knowledge';
+    form.service_id = null;
     form.slug = post.slug;
     form.seo_category_id = post.seo_category_id;
     form.excerpt = post.excerpt ?? '';
@@ -212,7 +210,7 @@ const handleSave = async (): Promise<void> => {
             focus_keyword: form.focus_keyword?.trim() ?? '',
             canonical_url: canonicalMode.value === 'custom' ? form.canonical_url?.trim() || null : null,
             content: form.content ?? [],
-            service_id: form.type === 'price' ? form.service_id : null,
+            service_id: null,
             faq: (form.faq ?? [])
                 .map((item) => ({ question: item.question.trim(), answer: item.answer.trim() }))
                 .filter((item) => item.question || item.answer),
@@ -298,20 +296,6 @@ onMounted(async () => {
                             >
                                 <option value="knowledge">Knowledge — Kiến thức</option>
                                 <option value="guide">Guide — Hướng dẫn</option>
-                                <option value="price">Price — Bảng giá động</option>
-                            </select>
-                        </label>
-
-                        <label v-if="form.type === 'price'" class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Dịch vụ lấy bảng giá <span class="text-rose-500">*</span></span>
-                            <select
-                                v-model="form.service_id"
-                                class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                            >
-                                <option :value="null">Chọn dịch vụ</option>
-                                <option v-for="service in services" :key="service.id" :value="service.id">
-                                    {{ service.name }}{{ service.status !== 'active' ? ' (đang tắt)' : '' }}
-                                </option>
                             </select>
                         </label>
 
@@ -431,9 +415,6 @@ onMounted(async () => {
                         <h2 class="text-lg font-semibold text-slate-950">Nội dung chính</h2>
                         <p class="mt-1 text-sm text-slate-500">
                             Có thể kéo-thả ảnh trực tiếp vào trình soạn thảo; ảnh sẽ được upload và chuyển WebP.
-                        </p>
-                        <p v-if="form.type === 'price'" class="mt-2 rounded-[8px] bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-800">
-                            Không nhập giá vào nội dung. Bảng giá được hệ thống tự động lấy từ các package đang hoạt động của dịch vụ đã chọn.
                         </p>
                     </div>
                     <div class="min-w-0 pt-5">

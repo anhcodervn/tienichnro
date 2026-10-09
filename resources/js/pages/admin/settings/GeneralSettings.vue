@@ -12,7 +12,7 @@
                         :disabled="isSaving"
                         @click="submitForm"
                     >
-                        {{ isSaving ? "Đang lưu..." : "Lưu thay đổi" }}
+                        {{ isSaving ? 'Đang lưu...' : 'Lưu thay đổi' }}
                     </button>
                 </div>
 
@@ -49,9 +49,7 @@
             <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                 <div class="mb-4">
                     <h2 class="text-base font-semibold text-slate-900">Chế độ vận hành</h2>
-                    <p class="text-sm text-slate-500">
-                        Các thông số ảnh hưởng trực tiếp đến hoạt động của website.
-                    </p>
+                    <p class="text-sm text-slate-500">Các thông số ảnh hưởng trực tiếp đến hoạt động của website.</p>
                 </div>
 
                 <div class="grid gap-4 md:grid-cols-2">
@@ -59,9 +57,7 @@
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <p class="font-medium text-slate-900">Website đang hoạt động</p>
-                                <p class="mt-1 text-sm text-slate-500">
-                                    Tắt chế độ bảo trì và cho phép truy cập bình thường.
-                                </p>
+                                <p class="mt-1 text-sm text-slate-500">Tắt chế độ bảo trì và cho phép truy cập bình thường.</p>
                             </div>
                             <input v-model="formData.site_active" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300" />
                         </div>
@@ -71,9 +67,7 @@
                         <div class="flex items-start justify-between gap-3">
                             <div>
                                 <p class="font-medium text-slate-900">Đăng ký tài khoản mới</p>
-                                <p class="mt-1 text-sm text-slate-500">
-                                    Cho phép người dùng tự tạo tài khoản trên hệ thống.
-                                </p>
+                                <p class="mt-1 text-sm text-slate-500">Cho phép người dùng tự tạo tài khoản trên hệ thống.</p>
                             </div>
                             <input v-model="formData.allow_register" type="checkbox" class="mt-1 h-4 w-4 rounded border-slate-300" />
                         </div>
@@ -90,14 +84,14 @@
                     <div class="rounded-xl bg-white/5 p-3">
                         <p class="text-sm text-slate-300">Trạng thái hệ thống</p>
                         <p class="mt-1 text-lg font-semibold">
-                            {{ formData.site_active ? "Ổn định" : "Tạm dừng" }}
+                            {{ formData.site_active ? 'Ổn định' : 'Tạm dừng' }}
                         </p>
                     </div>
 
                     <div class="rounded-xl bg-white/5 p-3">
                         <p class="text-sm text-slate-300">Domain hiện tại</p>
                         <p class="mt-1 break-all text-lg font-semibold">
-                            {{ formData.site_domain || "-" }}
+                            {{ formData.site_domain || '-' }}
                         </p>
                     </div>
                 </div>
@@ -107,18 +101,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from "vue";
-import { adminSettingService } from "@/services/admin-setting.service";
-import type { GeneralSettingType } from "@/types/setting.type";
-import { handleErrorResponse, handleSuccessResponse } from "@/utils/response";
+import { adminSettingService } from '@/services/admin-setting.service';
+import type { GeneralSettingType } from '@/types/setting.type';
+import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
+import { onMounted, ref } from 'vue';
 
 const isSaving = ref(false);
 const formData = ref<GeneralSettingType>({
-    site_name: "",
-    site_domain: "",
-    site_description: "",
+    site_name: '',
+    site_domain: '',
+    site_description: '',
     site_active: true,
     allow_register: false,
+    footer_game_links: [],
 });
 
 const loadData = async (): Promise<void> => {
@@ -135,7 +130,7 @@ const submitForm = async (): Promise<void> => {
         isSaving.value = true;
         const res = await adminSettingService.updateGeneral(formData.value);
         formData.value = { ...res.settings };
-        handleSuccessResponse({ data: { status: true, message: "Cập nhật cài đặt tổng quan thành công" } });
+        handleSuccessResponse({ data: { status: true, message: 'Cập nhật cài đặt tổng quan thành công' } });
     } catch (err) {
         handleErrorResponse(err);
     } finally {

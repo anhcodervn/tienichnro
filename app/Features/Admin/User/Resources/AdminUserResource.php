@@ -24,7 +24,6 @@ class AdminUserResource extends JsonResource
             'phone' => $this->phone,
             'role' => $this->role,
             'status' => $this->status === 'banned' ? 'blocked' : $this->status,
-            'wallet_balance' => $this->wallet ? (float) $this->wallet->balance : null,
             'created_at' => $this->created_at?->toISOString(),
             'last_login_at' => $this->last_login_at?->toISOString(),
         ];

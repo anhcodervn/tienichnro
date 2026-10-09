@@ -24,11 +24,6 @@ return new class extends Migration
             $table->enum('status', ['active', 'inactive', 'banned'])->default('active')->index();
             $table->timestamp('last_login_at')->nullable();
             $table->string('last_login_ip', 45)->nullable();
-            $table->string('referral_code')->nullable()->unique();
-            $table->foreignId('referred_by')
-                ->nullable()
-                ->constrained('users')
-                ->nullOnDelete();
             $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();

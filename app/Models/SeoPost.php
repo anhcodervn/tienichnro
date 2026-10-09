@@ -51,9 +51,4 @@ class SeoPost extends Model
     {
         return $this->belongsTo(SeoCategory::class, 'seo_category_id');
     }
-
-    public function service(): BelongsTo
-    {
-        return $this->belongsTo(Game::class, 'service_id');
-    }
 }

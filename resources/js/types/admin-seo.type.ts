@@ -18,45 +18,6 @@ export interface AdminHomeSeoSettings {
     is_published: boolean;
 }
 
-export interface AdminGameSeoSettings {
-    id: number;
-    name: string;
-    slug: string;
-    image: string | null;
-    status: string;
-    meta_title: string | null;
-    meta_description: string | null;
-    meta_keywords: string | null;
-    h1: string;
-    article_title: string;
-    content: unknown[];
-    og_image: string | null;
-    og_image_alt: string | null;
-    fallback_og_image: string;
-    canonical_url: string | null;
-    robots: SeoRobotsValue;
-    faqs: SeoFaqItem[];
-    is_published: boolean;
-    breadcrumb_schema: boolean;
-    webpage_schema: boolean;
-    public_url: string;
-    updated_at: string | null;
-}
-
-export type AdminGameSeoPayload = Pick<
-    AdminGameSeoSettings,
-    'content' | 'robots' | 'faqs' | 'is_published' | 'breadcrumb_schema' | 'webpage_schema'
-> & {
-    meta_title: string | null;
-    meta_description: string | null;
-    meta_keywords: string | null;
-    h1: string | null;
-    article_title: string | null;
-    og_image: string | null;
-    og_image_alt: string | null;
-    canonical_url: string | null;
-};
-
 export interface SeoServiceOption {
     id: number;
     name: string;

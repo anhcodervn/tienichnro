@@ -1,14 +1,22 @@
 <!DOCTYPE html>
-<html lang="vi">
+<html lang="vi" data-client-theme>
 <head>
+    <script data-client-theme-init>
+        (() => {
+            let theme;
+            try { theme = localStorage.getItem('client-theme'); } catch {}
+            const dark = theme === 'dark' || (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+            document.documentElement.classList.toggle('dark', dark);
+        })();
+    </script>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     @php
         $settings = $systemSettings ?? [];
-        $siteName = $settings['site_name'] ?? config('app.name', 'Nạp Carot');
+        $siteName = trim((string) ($settings['site_name'] ?? '')) ?: config('app.name', 'Tiện ích NRO');
         $title = trim($__env->yieldContent('title')) ?: ($settings['meta_title'] ?? $siteName);
-        $description = trim($__env->yieldContent('description')) ?: ($settings['meta_description'] ?? $settings['site_description'] ?? 'Nạp Carot game Teamobi nhanh chóng, minh bạch.');
+        $description = trim($__env->yieldContent('description')) ?: ($settings['meta_description'] ?? $settings['site_description'] ?? 'Tiện ích và hướng dẫn game Ngọc Rồng Online.');
         $keywords = trim($__env->yieldContent('keywords'));
         $canonical = trim($__env->yieldContent('canonical')) ?: url()->current();
         $favicon = trim((string) ($settings['favicon'] ?? ''));
@@ -18,20 +26,12 @@
             ? url($shareImage)
             : $shareImage;
         $shareImageAlt = trim($__env->yieldContent('image_alt'));
-        $footerGameLinks = is_array($settings['footer_game_links'] ?? null) ? $settings['footer_game_links'] : [];
-        $showGameServicePicker = ($gameServiceGames ?? collect())->isNotEmpty();
-        $showAgencyWebsite = app(\App\Support\TenantContext::class)->isActive() && \App\Utils\Site::isMain();
         $explicitDocumentTitle = trim($__env->yieldContent('document_title'));
         $documentTitle = $explicitDocumentTitle !== ''
             ? $explicitDocumentTitle
             : ($title === $siteName || \Illuminate\Support\Str::endsWith($title, ' | '.$siteName)
                 ? $title
                 : $title.' | '.$siteName);
-        $orderHistoryUrl = auth()->check() ? route('account.orders.index') : route('orders.lookup');
-        $topupOrderHistoryActive = request()->routeIs(['orders.*', 'account.orders.*']);
-        $serviceOrderHistoryActive = request()->routeIs('account.game-service-orders.*');
-        $orderHistoryActive = $topupOrderHistoryActive || $serviceOrderHistoryActive;
-        $exploreActive = request()->routeIs(['client.affiliate.spa', 'seo.*', 'content.guide', 'content.contact']);
         $loadsClientTracking = ! request()->routeIs(['auth.*', 'password.*', 'verification.*']);
         $gtmId = $loadsClientTracking ? ($clientTracking['gtm_id'] ?? '') : '';
         $metaPixelId = $loadsClientTracking ? ($clientTracking['meta_pixel_id'] ?? '') : '';
@@ -113,7 +113,7 @@
     @endif
     @stack('head')
 </head>
-<body class="pb-[calc(4rem+env(safe-area-inset-bottom))] lg:pb-0" data-authenticated="{{ auth()->check() ? 'true' : 'false' }}" data-order-lookup-url="{{ route('orders.lookup') }}" data-order-detail-url-template="{{ route('orders.details', ['order' => '__ORDER__']) }}">
+<body class="pb-[calc(4rem+env(safe-area-inset-bottom))] bg-gray-50 lg:pb-0" data-authenticated="{{ auth()->check() ? 'true' : 'false' }}">
     @if ($gtmId !== '')
         <noscript data-site-gtm-noscript><iframe src="https://www.googletagmanager.com/ns.html?id={{ urlencode($gtmId) }}" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     @endif
@@ -121,336 +121,87 @@
         <noscript data-site-meta-pixel-noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id={{ urlencode($metaPixelId) }}&amp;ev=PageView&amp;noscript=1" alt=""></noscript>
     @endif
     <a href="#main-content" class="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[5px] focus:bg-slate-950 focus:px-4 focus:py-3 focus:text-white">Bỏ qua điều hướng</a>
+    @php
+        $clientLinks = [
+            ['label' => 'Trang chủ', 'url' => route('home'), 'icon' => 'bx-home-alt-2', 'active' => request()->routeIs('home')],
+            ['label' => 'Công cụ', 'url' => route('home').'#cong-cu', 'icon' => 'bx-joystick', 'active' => false, 'opens_tools' => true],
+            ['label' => 'Tin tức', 'url' => route('seo.index'), 'icon' => 'bx-news', 'active' => request()->routeIs('seo.*')],
+        ];
+    @endphp
     <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur lg:z-40">
         <div class="client-container flex min-h-[4.5rem] items-center justify-between gap-3 sm:min-h-20">
             <a href="{{ route('home') }}" class="flex min-w-0 items-center gap-3 rounded-[5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" data-client-home>
                 @if ($headerLogo !== '')
-                    <img src="{{ $headerLogo }}" alt="{{ $siteName }}"
-                    class="h-10 w-auto max-w-[8rem] shrink-0 object-contain object-left sm:h-12 sm:max-w-[12rem] lg:h-14 lg:max-w-none">
+                    <img src="{{ $headerLogo }}" alt="{{ $siteName }}" class="h-10 w-auto max-w-[5rem] shrink-0 object-contain object-left sm:h-12 sm:max-w-[12rem] lg:h-14 lg:max-w-none">
                 @else
-                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-[5px] bg-emerald-600 font-extrabold text-white">C</span>
-                    <span class="truncate font-extrabold tracking-tight text-slate-950">{{ $siteName }}</span>
+                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-[5px] bg-emerald-600 font-extrabold text-white">N</span><span class="truncate font-extrabold tracking-tight text-slate-950">{{ $siteName }}</span>
                 @endif
             </a>
             <nav class="hidden min-w-0 items-center gap-2 text-sm font-semibold text-slate-700 lg:flex xl:gap-4" aria-label="Điều hướng chính">
-                <button type="button" @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('topup.game'), 'hover:text-emerald-700' => ! request()->routeIs('topup.game')]) data-game-picker-open data-game-picker-trigger="desktop" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-bolt text-lg" aria-hidden="true"></i><span>Nạp game</span></button>
-                @if ($showGameServicePicker)
-                    <button type="button" @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('game-services.*'), 'hover:text-emerald-700' => ! request()->routeIs('game-services.*')]) data-game-service-picker-open data-game-service-picker-trigger="desktop" aria-controls="game-service-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-joystick text-lg" aria-hidden="true"></i><span>Dịch vụ game</span></button>
-                @endif
-                <a @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2', 'text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i><span>Nạp tiền</span></a>
-                <details class="group relative shrink-0" data-desktop-nav-menu data-order-history-menu>
-                    <summary @class(['flex min-h-11 cursor-pointer list-none items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden', 'text-emerald-700' => $orderHistoryActive])>
-                        <i class="bx bx-history text-lg" aria-hidden="true"></i><span>Đơn hàng</span><i class="bx bx-chevron-down text-base transition-transform group-open:rotate-180" aria-hidden="true"></i>
-                    </summary>
-                    <div class="absolute left-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-[10px] border border-slate-200 bg-white p-2 shadow-xl">
-                        <div class="grid gap-1">
-                            <a @class(['flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => $topupOrderHistoryActive, 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => ! $topupOrderHistoryActive]) href="{{ $orderHistoryUrl }}" @if ($topupOrderHistoryActive) aria-current="page" @endif><i class="bx bx-receipt text-lg" aria-hidden="true"></i><span>Lịch sử nạp</span></a>
-                            <a @class(['flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => $serviceOrderHistoryActive, 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => ! $serviceOrderHistoryActive]) href="{{ route('account.game-service-orders.index') }}" @if ($serviceOrderHistoryActive) aria-current="page" @endif><i class="bx bx-joystick text-lg" aria-hidden="true"></i><span>Lịch sử dịch vụ</span></a>
-                        </div>
-                    </div>
-                </details>
-                <details class="group relative shrink-0" data-desktop-nav-menu>
-                    <summary @class(['flex min-h-11 cursor-pointer list-none items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden', 'text-emerald-700' => $exploreActive])>
-                        <i class="bx bx-compass text-lg" aria-hidden="true"></i>
-                        <span>Khám phá</span>
-                        <i class="bx bx-chevron-down text-base transition-transform group-open:rotate-180" aria-hidden="true"></i>
-                    </summary>
-                    <div class="absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-[10px] border border-slate-200 bg-white p-2 shadow-xl">
-                        <div class="grid gap-1">
-                            @if ($affiliateEnabled ?? false)
-                                <a @class(['flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.affiliate.spa'), 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => ! request()->routeIs('client.affiliate.spa')]) href="{{ route('client.affiliate.spa') }}" @if (request()->routeIs('client.affiliate.spa')) aria-current="page" @endif><i class="bx bx-group text-lg" aria-hidden="true"></i><span>Cộng tác viên</span></a>
-                            @endif
-                            <a @class(['flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('seo.*'), 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => ! request()->routeIs('seo.*')]) href="{{ route('seo.index') }}" @if (request()->routeIs('seo.*')) aria-current="page" @endif><i class="bx bx-news text-lg" aria-hidden="true"></i><span>Bài viết</span></a>
-                            <a @class(['flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('content.guide'), 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => ! request()->routeIs('content.guide')]) href="{{ route('content.guide') }}" @if (request()->routeIs('content.guide')) aria-current="page" @endif><i class="bx bx-book-open text-lg" aria-hidden="true"></i><span>Hướng dẫn</span></a>
-                            <a @class(['flex min-h-11 items-center gap-3 rounded-[8px] px-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('content.contact'), 'text-slate-700 hover:bg-emerald-50 hover:text-emerald-700' => ! request()->routeIs('content.contact')]) href="{{ route('content.contact') }}" @if (request()->routeIs('content.contact')) aria-current="page" @endif>
-                                <svg class="h-[18px] w-[18px] shrink-0" data-support-icon aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4z" />
-                                    <path d="M8 9h8M8 13h5" />
-                                </svg>
-                                <span>Liên hệ hỗ trợ</span>
-                            </a>
-                        </div>
-                    </div>
-                </details>
+                @foreach ($clientLinks as $link)
+                    <a @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => $link['active']]) href="{{ $link['url'] }}" @if($link['opens_tools'] ?? false) data-client-tools-open role="button" aria-haspopup="dialog" aria-controls="client-tools-modal" @endif @if($link['active']) aria-current="page" @endif><i class="bx {{ $link['icon'] }} text-lg" aria-hidden="true"></i>{{ $link['label'] }}</a>
+                @endforeach
             </nav>
-            <div class="hidden items-center gap-2 lg:flex">
-                @auth
-                    <div class="relative" data-account-menu>
-                        <button
-                            type="button"
-                            class="flex min-h-10 w-[11rem] items-center gap-2 rounded-[5px] border border-slate-200 bg-white px-2.5 py-1.5 text-left shadow-sm transition duration-200 hover:border-slate-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
-                            data-account-menu-toggle
-                            aria-controls="client-account-menu"
-                            aria-expanded="false"
-                            aria-haspopup="true"
-                        >
-                            <span class="grid h-7 w-7 shrink-0 place-items-center overflow-hidden rounded-full bg-slate-950 text-xs font-extrabold text-white">
-                                @if ($clientAccount['avatar'] !== '')
-                                    <img class="h-full w-full object-cover" src="{{ $clientAccount['avatar'] }}" alt="Ảnh đại diện của {{ $clientAccount['name'] }}" referrerpolicy="no-referrer">
-                                @else
-                                    {{ $clientAccount['initial'] }}
-                                @endif
-                            </span>
-                            <span class="min-w-0 flex-1">
-                                <span class="block truncate text-xs font-bold leading-4 text-slate-900" title="{{ $clientAccount['email'] }}">{{ $clientAccount['email'] }}</span>
-                                <span class="block truncate text-[11px] font-semibold leading-4 tabular-nums text-emerald-700" data-header-wallet-balance>{{ number_format((float) $clientAccount['balance'], 0, ',', '.') }}đ</span>
-                            </span>
-                            <i class="bx bx-chevron-down shrink-0 text-base text-slate-400 transition-transform duration-200" data-account-menu-chevron aria-hidden="true"></i>
-                        </button>
-
-                        <div id="client-account-menu" class="absolute right-0 top-full z-50 mt-2 w-72 overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-xl" data-account-menu-panel hidden>
-                            <div class="border-b border-slate-100 bg-slate-50 px-4 py-3">
-                                <p class="truncate text-sm font-bold text-slate-950">{{ $clientAccount['name'] }}</p>
-                                <p class="mt-0.5 truncate text-xs text-slate-500">{{ $clientAccount['email'] }}</p>
-                                <p class="mt-2 text-xs text-slate-500">Số dư khả dụng</p>
-                                <p class="text-lg font-extrabold tabular-nums text-emerald-700" data-account-menu-balance>{{ number_format((float) $clientAccount['balance'], 0, ',', '.') }}đ</p>
-                            </div>
-                            <nav class="grid gap-1 p-2" aria-label="Menu tài khoản">
-                                <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.index') }}"><i class="bx bx-user-circle text-lg" aria-hidden="true"></i>Tổng quan tài khoản</a>
-                                <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('wallet.deposit.index') }}"><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i>Nạp tiền</a>
-                                <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.orders.index') }}"><i class="bx bx-receipt text-lg" aria-hidden="true"></i>Lịch sử nạp</a>
-                                <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.game-service-orders.index') }}"><i class="bx bx-joystick text-lg" aria-hidden="true"></i>Lịch sử dịch vụ</a>
-                                @if ($affiliateEnabled ?? false)
-                                    <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('client.affiliate.spa') }}"><i class="bx bx-group text-lg" aria-hidden="true"></i>Cộng tác viên</a>
-                                @endif
-                                <a data-account-support-link class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('content.contact') }}"><i class="bx bx-message-circle-dots text-lg" aria-hidden="true"></i>Liên hệ hỗ trợ</a>
-                                @if ($showAgencyWebsite)
-                                    <a @class(['flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.agency.website'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.agency.website')]) href="{{ route('client.agency.website') }}"><i class="bx bx-store-alt text-lg" aria-hidden="true"></i>Tạo website đại lý</a>
-                                @endif
-                                <a @class(['flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.agency.api'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.agency.api')]) href="{{ route('client.agency.api') }}"><i class="bx bx-code text-lg" aria-hidden="true"></i>Kết nối API</a>
-                                @if ($clientAccount['role'] === 'admin')
-                                    <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="/admin"><i class="bx bx-shield text-lg" aria-hidden="true"></i>Trang quản trị</a>
-                                @endif
-                            </nav>
-                            <form class="border-t border-slate-100 p-2" method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <button type="submit" class="flex min-h-10 w-full items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"><i class="bx bx-log-out text-lg" aria-hidden="true"></i>Đăng xuất</button>
-                            </form>
-                        </div>
-                    </div>
-                @else
-                    <a class="client-button-secondary gap-2" href="{{ route('auth.login') }}"><i class="bx bx-user text-lg" aria-hidden="true"></i>Đăng nhập</a>
-                    <a class="client-button gap-2" href="{{ route('auth.register') }}"><i class="bx bx-user-plus text-lg" aria-hidden="true"></i>Đăng ký</a>
-                @endauth
-            </div>
-            <div class="flex min-w-0 shrink-0 items-center lg:hidden">
-                @auth
-                    <div class="relative" data-account-menu data-mobile-account-menu>
-                        <button
-                            type="button"
-                            class="flex h-12 w-[9.5rem] items-center gap-2 rounded-[5px] border border-slate-200 bg-white px-2.5 text-left shadow-sm transition hover:border-emerald-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 sm:w-44"
-                            data-account-menu-toggle
-                            aria-controls="client-mobile-account-menu"
-                            aria-expanded="false"
-                            aria-haspopup="true"
-                            aria-label="Mở menu tài khoản"
-                        >
-                            <span class="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-emerald-600 text-sm font-extrabold text-white">
-                                @if ($clientAccount['avatar'] !== '')
-                                    <img class="h-full w-full object-cover" src="{{ $clientAccount['avatar'] }}" alt="Ảnh đại diện của {{ $clientAccount['name'] }}" referrerpolicy="no-referrer">
-                                @else
-                                    {{ $clientAccount['initial'] }}
-                                @endif
-                            </span>
-                            <span class="min-w-0 flex-1">
-                                <span class="block truncate text-xs font-bold leading-5 text-slate-900">{{ $clientAccount['name'] }}</span>
-                                <span class="block truncate text-[11px] font-bold leading-4 tabular-nums text-emerald-700" data-mobile-header-wallet-balance>{{ number_format((float) $clientAccount['balance'], 0, ',', '.') }}đ</span>
-                            </span>
-                        </button>
-
-                        <div id="client-mobile-account-menu" class="absolute right-0 top-full z-[60] mt-2 w-72 max-w-[calc(100vw-1.5rem)] origin-top-right overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-xl" data-account-menu-panel data-mobile-account-menu-panel hidden>
-                            <div class="border-b border-slate-100 bg-slate-50 px-4 py-3">
-                                <p class="truncate text-sm font-bold text-slate-950">{{ $clientAccount['name'] }}</p>
-                                <p class="mt-0.5 truncate text-xs text-slate-500">{{ $clientAccount['email'] }}</p>
-                                <p class="mt-2 text-xs text-slate-500">Số dư khả dụng</p>
-                                <p class="text-lg font-extrabold tabular-nums text-emerald-700" data-account-menu-balance>{{ number_format((float) $clientAccount['balance'], 0, ',', '.') }}đ</p>
-                            </div>
-                            <nav class="grid gap-1 p-2" aria-label="Menu tài khoản trên di động">
-                                <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.index') }}"><i class="bx bx-user-circle text-lg" aria-hidden="true"></i>Tổng quan tài khoản</a>
-                                <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('wallet.deposit.index') }}"><i class="bx bx-wallet-alt text-lg" aria-hidden="true"></i>Nạp tiền</a>
-                                <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.orders.index') }}"><i class="bx bx-receipt text-lg" aria-hidden="true"></i>Lịch sử nạp</a>
-                                <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('account.game-service-orders.index') }}"><i class="bx bx-joystick text-lg" aria-hidden="true"></i>Lịch sử dịch vụ</a>
-                                @if ($affiliateEnabled ?? false)
-                                    <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('client.affiliate.spa') }}"><i class="bx bx-group text-lg" aria-hidden="true"></i>Cộng tác viên</a>
-                                @endif
-                                <a data-account-support-link class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('content.contact') }}"><i class="bx bx-message-circle-dots text-lg" aria-hidden="true"></i>Liên hệ hỗ trợ</a>
-                                @if ($showAgencyWebsite)
-                                    <a @class(['flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.agency.website'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.agency.website')]) href="{{ route('client.agency.website') }}"><i class="bx bx-store-alt text-lg" aria-hidden="true"></i>Tạo website đại lý</a>
-                                @endif
-                                <a @class(['flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.agency.api'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.agency.api')]) href="{{ route('client.agency.api') }}"><i class="bx bx-code text-lg" aria-hidden="true"></i>Kết nối API</a>
-                                @if ($clientAccount['role'] === 'admin')
-                                    <a class="flex min-h-10 items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="/admin"><i class="bx bx-shield text-lg" aria-hidden="true"></i>Trang quản trị</a>
-                                @endif
-                            </nav>
-                            <form class="border-t border-slate-100 p-2" method="POST" action="{{ route('logout') }}">
-                                @csrf
-                                <button type="submit" class="flex min-h-10 w-full items-center gap-3 rounded-[5px] px-3 text-sm font-semibold text-rose-600 transition hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500"><i class="bx bx-log-out text-lg" aria-hidden="true"></i>Đăng xuất</button>
-                            </form>
-                        </div>
-                    </div>
-                @else
-                    <a class="flex h-12 items-center gap-2 rounded-[5px] border border-slate-200 bg-white px-3 text-sm font-bold text-slate-700 shadow-sm transition hover:border-emerald-300 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ route('auth.login') }}" data-mobile-login>
-                        <span class="grid h-8 w-8 place-items-center rounded-full bg-emerald-600 text-white"><i class="bx bx-user" aria-hidden="true"></i></span>
-                        <span>Đăng nhập</span>
-                    </a>
-                @endauth
-            </div>
-        </div>
-    </header>
-
-    <div id="mobile-menu" class="fixed inset-0 z-[70] lg:hidden" data-mobile-menu aria-hidden="true" hidden>
-        <button type="button" class="absolute inset-0 bg-slate-950/45 backdrop-blur-[1px]" data-menu-close data-menu-backdrop tabindex="-1" aria-label="Đóng menu"></button>
-
-        <aside
-            class="absolute inset-y-0 right-0 flex h-dvh w-[min(22rem,calc(100%-2rem))] flex-col border-l border-slate-200 bg-white pb-[env(safe-area-inset-bottom)] pt-[env(safe-area-inset-top)] shadow-2xl"
-            data-menu-panel
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="mobile-menu-title"
-            tabindex="-1"
-        >
-            <div class="flex min-h-16 items-center justify-between gap-3 border-b border-slate-200 px-4">
-                <div class="min-w-0">
-                    <p id="mobile-menu-title" class="truncate font-extrabold text-slate-950">{{ $siteName }}</p>
-                    <p class="text-xs text-slate-500">Điều hướng nhanh</p>
-                </div>
-                <button type="button" class="grid h-10 w-10 shrink-0 place-items-center rounded-[5px] border border-slate-300 text-slate-600 transition hover:border-rose-300 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" data-menu-close aria-label="Đóng menu">
-                    <svg class="h-5 w-5" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-                        <path d="M6 6l12 12M18 6 6 18" />
-                    </svg>
+            <div class="flex shrink-0 items-center gap-2">
+                <button type="button" data-client-theme-toggle aria-label="Đổi giao diện sáng/tối" aria-pressed="false" title="Đổi giao diện sáng/tối" class="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] border border-slate-200 bg-white text-xl text-slate-700 transition hover:border-emerald-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600">
+                    <i class="bx bx-moon dark:hidden" aria-hidden="true"></i><i class="bx bx-sun hidden dark:block" aria-hidden="true"></i>
                 </button>
-            </div>
-
-            <nav class="min-h-0 flex-1 overscroll-contain overflow-y-auto px-3 py-4" aria-label="Điều hướng di động">
-                <div class="grid gap-1">
-                    <button type="button" data-menu-item data-game-picker-open data-game-picker-trigger="mobile-menu" class="flex items-center gap-3 rounded-[5px] bg-emerald-50 px-4 py-3 text-left text-sm font-semibold text-emerald-700 transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-bolt text-xl" aria-hidden="true"></i><span>Nạp game</span><i class="bx bx-chevron-right ml-auto text-xl" aria-hidden="true"></i></button>
-                    @if ($showGameServicePicker)
-                        <button type="button" data-menu-item data-game-service-picker-open data-game-service-picker-trigger="mobile-menu" @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-left text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'bg-emerald-50 text-emerald-700' => request()->routeIs('game-services.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('game-services.*')]) aria-controls="game-service-picker-modal" aria-expanded="false" aria-haspopup="dialog"><i class="bx bx-joystick text-xl" aria-hidden="true"></i><span class="flex-1">Dịch vụ game</span><i class="bx bx-chevron-right ml-auto text-xl" aria-hidden="true"></i></button>
-                    @endif
-                    <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('home'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('home')]) href="{{ route('home') }}" @if (request()->routeIs('home')) aria-current="page" @endif><i class="bx bx-home-alt-2 text-xl" aria-hidden="true"></i><span>Trang chủ</span></a>
-                    <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif><i class="bx bx-wallet-alt text-xl" aria-hidden="true"></i><span>Nạp tiền</span></a>
-                    <details class="group" data-order-history-mobile-menu>
-                        <summary @class(['flex cursor-pointer list-none items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition [&::-webkit-details-marker]:hidden', 'bg-emerald-50 text-emerald-700' => $orderHistoryActive, 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! $orderHistoryActive])><i class="bx bx-history text-xl" aria-hidden="true"></i><span>Đơn hàng</span><i class="bx bx-chevron-down ml-auto text-xl transition-transform group-open:rotate-180" aria-hidden="true"></i></summary>
-                        <div class="grid gap-1 pb-1 pl-5 pt-1">
-                            <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-2.5 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => $topupOrderHistoryActive, 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! $topupOrderHistoryActive]) href="{{ $orderHistoryUrl }}"><i class="bx bx-receipt text-lg" aria-hidden="true"></i><span>Lịch sử nạp</span></a>
-                            <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-2.5 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => $serviceOrderHistoryActive, 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => ! $serviceOrderHistoryActive]) href="{{ route('account.game-service-orders.index') }}"><i class="bx bx-joystick text-lg" aria-hidden="true"></i><span>Lịch sử dịch vụ</span></a>
+                @auth
+                    <details class="group relative" data-client-menu>
+                        <summary class="flex h-12 cursor-pointer list-none items-center gap-2 rounded-[5px] border border-slate-200 bg-white px-2.5 text-left shadow-sm transition hover:border-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden">
+                            <span class="grid h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-emerald-600 text-sm font-extrabold text-white">@if($clientAccount['avatar'] !== '')<img class="h-full w-full object-cover" src="{{ $clientAccount['avatar'] }}" alt="{{ $clientAccount['name'] }}" referrerpolicy="no-referrer">@else{{ $clientAccount['initial'] }}@endif</span>
+                            <span class="hidden max-w-32 truncate text-xs font-bold text-slate-900 sm:block">{{ $clientAccount['name'] }}</span><i class="bx bx-chevron-down text-lg text-slate-400" aria-hidden="true"></i>
+                        </summary>
+                        <div class="absolute right-0 top-full z-[60] mt-2 w-64 overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-xl">
+                            <div class="border-b border-slate-100 bg-slate-50 px-4 py-3"><p class="truncate text-sm font-bold">{{ $clientAccount['name'] }}</p><p class="mt-1 truncate text-xs text-slate-500">{{ $clientAccount['email'] }}</p></div>
+                            <nav class="grid gap-1 p-2" aria-label="Menu tài khoản"><a class="rounded-[5px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('account.index') }}">Thông tin tài khoản</a>@if($clientAccount['role'] === 'admin')<a class="rounded-[5px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('admin.spa') }}">Trang quản trị</a>@endif<a class="rounded-[5px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('content.contact') }}">Liên hệ hỗ trợ</a></nav>
+                            <form class="border-t border-slate-100 p-2" method="POST" action="{{ route('logout') }}">@csrf<button class="w-full rounded-[5px] px-3 py-2.5 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50" type="submit">Đăng xuất</button></form>
                         </div>
                     </details>
-                    @if ($affiliateEnabled ?? false)
-                        <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('client.affiliate.spa'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('client.affiliate.spa')]) href="{{ route('client.affiliate.spa') }}" @if (request()->routeIs('client.affiliate.spa')) aria-current="page" @endif><i class="bx bx-group text-xl" aria-hidden="true"></i><span>Cộng tác viên</span></a>
-                    @endif
-                    <a data-menu-item @class(['flex items-center gap-3 rounded-[5px] px-4 py-3 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-700' => request()->routeIs('seo.*'), 'text-slate-700 hover:bg-slate-50 hover:text-emerald-700' => ! request()->routeIs('seo.*')]) href="{{ route('seo.index') }}" @if (request()->routeIs('seo.*')) aria-current="page" @endif><i class="bx bx-news text-xl" aria-hidden="true"></i><span>Bài viết</span></a>
-                </div>
-            </nav>
-
-            @auth
-                <div class="shrink-0 border-t border-slate-200 bg-white p-3" data-mobile-sidebar-footer>
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button type="submit" class="flex min-h-12 w-full items-center justify-center gap-2 rounded-[5px] bg-rose-50 px-4 text-sm font-bold text-rose-600 transition hover:bg-rose-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500" data-mobile-sidebar-logout>
-                            <i class="bx bx-log-out text-xl" aria-hidden="true"></i>
-                            <span>Đăng xuất</span>
-                        </button>
-                    </form>
-                </div>
-            @else
-                <div class="border-t border-slate-200 bg-slate-50 p-4">
-                    <div class="grid grid-cols-2 gap-2">
-                        <a class="client-button-secondary bg-white" href="{{ route('auth.login') }}">Đăng nhập</a>
-                        <a class="client-button" href="{{ route('auth.register') }}">Đăng ký</a>
-                    </div>
-                </div>
-            @endauth
-        </aside>
-    </div>
-
+                @else
+                    <a class="client-button-secondary gap-2" href="{{ route('auth.login') }}"><i class="bx bx-user text-lg" aria-hidden="true"></i><span class="hidden sm:inline">Đăng nhập</span><span class="sm:hidden">Tài khoản</span></a>
+                    <a class="client-button hidden gap-2 lg:inline-flex" href="{{ route('auth.register') }}"><i class="bx bx-user-plus text-lg" aria-hidden="true"></i>Đăng ký</a>
+                @endauth
+                <details class="relative lg:hidden" data-client-menu>
+                    <summary class="grid h-11 w-11 cursor-pointer list-none place-items-center rounded-[5px] border border-slate-200 text-2xl text-slate-700 [&::-webkit-details-marker]:hidden" aria-label="Menu điều hướng"><i class="bx bx-menu" aria-hidden="true"></i></summary>
+                    <nav class="absolute right-0 top-full z-[60] mt-2 grid w-64 gap-1 rounded-[5px] border border-slate-200 bg-white p-2 shadow-xl" aria-label="Điều hướng di động">
+                        @foreach($clientLinks as $link)<a class="flex items-center gap-3 rounded-[5px] px-3 py-3 text-sm font-semibold hover:bg-emerald-50" href="{{ $link['url'] }}" @if($link['opens_tools'] ?? false) data-client-tools-open role="button" aria-haspopup="dialog" aria-controls="client-tools-modal" @endif><i class="bx {{ $link['icon'] }} text-lg" aria-hidden="true"></i>{{ $link['label'] }}</a>@endforeach
+                        <a class="rounded-[5px] px-3 py-3 text-sm font-semibold hover:bg-emerald-50" href="{{ route('content.guide') }}">Hướng dẫn</a><a class="rounded-[5px] px-3 py-3 text-sm font-semibold hover:bg-emerald-50" href="{{ route('content.contact') }}">Liên hệ</a>
+                    </nav>
+                </details>
+            </div>
+        </div>
+        @if(request()->routeIs('seo.*') && ($navigationCategories ?? collect())->isNotEmpty())
+            <nav class="client-container flex gap-4 overflow-x-auto pb-3 text-sm text-emerald-700" aria-label="Chủ đề tin tức">@foreach($navigationCategories as $navigationCategory)<a class="shrink-0" href="{{ route('seo.category', $navigationCategory->slug) }}">{{ $navigationCategory->name }}</a>@endforeach</nav>
+        @endif
+    </header>
     <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_18px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden" aria-label="Điều hướng nhanh trên di động" data-mobile-bottom-nav>
-        <div @class(['mx-auto grid h-16 max-w-lg', 'grid-cols-5' => $showGameServicePicker, 'grid-cols-4' => ! $showGameServicePicker])>
-            <button type="button" @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs(['home', 'topup.*', 'pricing']), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs(['home', 'topup.*', 'pricing'])]) data-game-picker-open data-game-picker-trigger="mobile-bottom" aria-controls="game-picker-modal" aria-expanded="false" aria-haspopup="dialog" data-mobile-nav-item="topup">
-                <i class="bx bx-bolt text-xl" aria-hidden="true"></i>
-                <span class="truncate">Nạp game</span>
-            </button>
-            @if ($showGameServicePicker)
-                <button type="button" @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600', 'text-emerald-700' => request()->routeIs('game-services.*'), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs('game-services.*')]) data-game-service-picker-open data-game-service-picker-trigger="mobile-bottom" aria-controls="game-service-picker-modal" aria-expanded="false" aria-haspopup="dialog" data-mobile-nav-item="service">
-                    <i class="bx bx-joystick text-xl" aria-hidden="true"></i>
-                    <span class="truncate">Dịch vụ</span>
-                </button>
-            @endif
-            <a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition', 'text-emerald-700' => request()->routeIs('wallet.deposit.*'), 'text-slate-500 hover:text-emerald-700' => ! request()->routeIs('wallet.deposit.*')]) href="{{ route('wallet.deposit.index') }}" @if (request()->routeIs('wallet.deposit.*')) aria-current="page" @endif data-mobile-nav-item="wallet">
-                <i class="bx bx-wallet-alt text-xl" aria-hidden="true"></i>
-                <span class="truncate">Nạp tiền</span>
-            </a>
-            <button type="button" @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600', 'text-emerald-700' => $orderHistoryActive, 'text-slate-500 hover:text-emerald-700' => ! $orderHistoryActive]) data-order-history-picker-open aria-controls="order-history-picker-modal" aria-expanded="false" aria-haspopup="dialog" data-mobile-nav-item="history">
-                <i class="bx bx-history text-xl" aria-hidden="true"></i>
-                <span class="truncate">Lịch sử</span>
-            </button>
-            <button
-                type="button"
-                class="flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold text-slate-500 transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600 aria-expanded:text-emerald-700"
-                data-menu-toggle
-                data-mobile-sidebar-toggle
-                aria-controls="mobile-menu"
-                aria-expanded="false"
-                aria-haspopup="dialog"
-                aria-label="Mở menu"
-                data-mobile-nav-item="menu"
-            >
-                <span class="relative grid h-5 w-5 place-items-center text-xl" aria-hidden="true">
-                    <i class="bx bx-menu absolute" data-menu-icon-open></i>
-                    <i class="bx bx-x absolute" data-menu-icon-close></i>
-                </span>
-                <span>Menu</span>
-            </button>
+        <div class="mx-auto grid h-16 max-w-lg grid-cols-4">
+            @foreach($clientLinks as $link)<a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition hover:text-emerald-700', 'text-emerald-700' => $link['active'], 'text-slate-500' => ! $link['active']]) href="{{ $link['url'] }}" @if($link['opens_tools'] ?? false) data-client-tools-open role="button" aria-haspopup="dialog" aria-controls="client-tools-modal" @endif><i class="bx {{ $link['icon'] }} text-xl" aria-hidden="true"></i><span class="truncate">{{ $link['label'] === 'Thông báo game' ? 'Thông báo' : $link['label'] }}</span></a>@endforeach
+            <a class="flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold text-slate-500 hover:text-emerald-700" href="{{ auth()->check() ? route('account.index') : route('auth.login') }}"><i class="bx bx-user-circle text-xl" aria-hidden="true"></i><span>Tài khoản</span></a>
         </div>
     </nav>
-
-    <x-client.game-picker-modal :games="$navigationGames ?? collect()" />
-    <x-client.game-service-picker-modal :games="$gameServiceGames ?? collect()" />
-    <x-client.order-history-picker-modal :topup-url="$orderHistoryUrl" :service-url="route('account.game-service-orders.index')" />
-
     <main id="main-content" class="client-page-scale min-w-0 focus:outline-none" tabindex="-1" data-page-enter>
         @include('client.partials.flash')
         @yield('content')
     </main>
-
-    <x-client.floating-support :channels="$systemSettings['support_channels'] ?? []" raised />
-
     <footer class="mt-16 border-t border-slate-200 bg-white">
-        <div @class([
-            'client-container grid gap-8 py-10 sm:grid-cols-2',
-            'lg:grid-cols-5' => $footerGameLinks !== [],
-            'lg:grid-cols-4' => $footerGameLinks === [],
-        ])>
-            <div class="sm:col-span-2">
-                @if ($headerLogo !== '')
-                    <img src="{{ $headerLogo }}" alt="{{ $siteName }}" class="h-auto w-[15rem] object-contain object-left sm:w-36">
-                @else
-                    <p class="font-extrabold text-slate-950">{{ $siteName }}</p>
-                @endif
-                <p class="mt-3 max-w-md text-sm leading-6 text-slate-600">Dịch vụ nạp Carot game Teamobi với trạng thái đơn minh bạch và hỗ trợ rõ ràng.</p>
-            </div>
-            <div><p class="font-bold">Dịch vụ</p><div class="mt-3 grid gap-2 text-sm text-slate-600"><a href="{{ route('home') }}">Nạp game</a><a href="{{ route('wallet.deposit.index') }}">Nạp tiền</a><a href="{{ $orderHistoryUrl }}">Lịch sử nạp</a><a href="{{ route('account.game-service-orders.index') }}">Lịch sử dịch vụ</a></div></div>
-            <div><p class="font-bold">Hỗ trợ</p><div class="mt-3 grid gap-2 text-sm text-slate-600"><a href="{{ route('content.guide') }}">Hướng dẫn</a><a href="{{ route('content.contact') }}">Liên hệ</a></div></div>
-            @if ($footerGameLinks !== [])
-                <div data-footer-game-links>
-                    <p class="font-bold">Nạp game khác</p>
-                    <nav class="mt-3 grid gap-2 text-sm text-slate-600" aria-label="Nạp game khác">
-                        @foreach ($footerGameLinks as $footerGameLink)
-                            <a class="transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ $footerGameLink['url'] }}" data-footer-game-link>{{ $footerGameLink['label'] }}</a>
-                        @endforeach
-                    </nav>
-                </div>
-            @endif
+        <div class="client-container grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="sm:col-span-2">@if($headerLogo !== '')<img src="{{ $headerLogo }}" alt="{{ $siteName }}" class="h-auto w-36 object-contain object-left">@else<p class="font-extrabold text-slate-950">{{ $siteName }}</p>@endif<p class="mt-3 max-w-md text-sm leading-6 text-slate-600">Công cụ hỗ trợ, thông báo game, tin tức và hướng dẫn dành cho cộng đồng Ngọc Rồng Online.</p><a class="mt-3 inline-flex items-center gap-2 text-sm font-bold text-emerald-700" href="https://napcarot.com/community"><i class="bx bx-group text-lg" aria-hidden="true"></i>Tham gia cộng đồng</a></div>
+            <nav class="grid content-start gap-3 text-sm text-slate-600" aria-label="Khám phá"><p class="font-extrabold text-slate-950">Khám phá</p><a href="{{ route('home') }}#cong-cu">Công cụ hỗ trợ</a><a href="{{ route('nro.notifies.page') }}">Thông báo game</a><a href="{{ route('seo.index') }}">Tin tức & hướng dẫn</a></nav>
+            <nav class="grid content-start gap-3 text-sm text-slate-600" aria-label="Thông tin website"><p class="font-extrabold text-slate-950">Thông tin</p><a href="{{ route('content.about') }}">Giới thiệu</a><a href="{{ route('content.contact') }}">Liên hệ</a><a href="{{ route('content.terms') }}">Điều khoản sử dụng</a><a href="{{ route('content.privacy') }}">Chính sách bảo mật</a></nav>
         </div>
+        <div class="border-t border-slate-100"><div class="client-container py-4 text-xs text-slate-500">© {{ now()->year }} {{ $siteName }}. Công cụ dành cho cộng đồng NRO.</div></div>
     </footer>
-    @vite('resources/js/client.js')
-    @if (($customCodeAssets['js'] ?? false) && ! request()->routeIs(['auth.*', 'password.*', 'verification.*']))
-        <script src="{{ route('site_custom.js') }}" data-site-custom-js></script>
-    @endif
     @if ($customScript !== '')
         <!-- custom-script -->
         {!! $customScript !!}
         <!-- /custom-script -->
+    @endif
+    <x-client.tools-modal />
+    @vite('resources/js/client.js')
+    @if (($customCodeAssets['js'] ?? false) && ! request()->routeIs(['auth.*', 'password.*', 'verification.*']))
+        <script src="{{ route('site_custom.js') }}" defer data-site-custom-js></script>
     @endif
     @stack('scripts')
 </body>

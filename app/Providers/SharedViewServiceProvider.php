@@ -2,15 +2,11 @@
 
 namespace App\Providers;
 
-use App\Models\AffiliateProgram;
-use App\Models\Game;
+use App\Models\SeoCategory;
 use App\Models\User;
 use App\Support\CustomHeadTags;
-use App\Support\SafeNavigationUrl;
 use App\Support\SettingStore;
-use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\View as ViewFacade;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Str;
@@ -38,11 +34,6 @@ class SharedViewServiceProvider extends ServiceProvider
                 'color_primary' => '#0F172A',
                 'color_accent' => '#2563EB',
                 'color_surface' => '#F8FAFC',
-                'game_service_enabled' => false,
-                'game_service_items' => [],
-                'game_service_url' => '',
-                'footer_game_links' => [],
-                'support_channels' => [],
                 'gtm_id' => '',
                 'meta_pixel_id' => '',
                 'custom_head_tags' => '',
@@ -60,55 +51,16 @@ class SharedViewServiceProvider extends ServiceProvider
                 'custom_head_tags',
                 'custom_script',
             ]);
-            $gameServiceItems = $this->normalizeNavigationItems($storedSettings['game_service_items']);
-            $footerGameLinks = $this->normalizeNavigationItems($storedSettings['footer_game_links']);
-            $supportChannels = $this->normalizeSupportChannels($storedSettings['support_channels']);
-
-            if ($gameServiceItems === [] && SafeNavigationUrl::passes($storedSettings['game_service_url'])) {
-                $gameServiceItems = [[
-                    'label' => 'Dịch vụ game',
-                    'url' => $storedSettings['game_service_url'],
-                ]];
-            }
-
-            $sharedSettings['game_service_items'] = $gameServiceItems;
             $viewSettings = $view->getData()['systemSettings'] ?? [];
-            $navigationGames = $view->getData()['navigationGames'] ?? null;
-            $gameServiceGames = $view->getData()['gameServiceGames'] ?? null;
             $user = auth()->user();
-
-            if ($navigationGames === null) {
-                $navigationGames = Schema::hasTable('games')
-                    ? Game::query()
-                        ->active()
-                        ->orderBy('sort_order')
-                        ->orderBy('id')
-                        ->get(['id', 'name', 'slug', 'short_name', 'image'])
-                    : collect();
-            }
-
-            if ($gameServiceGames === null) {
-                $gameServiceGames = Schema::hasTable('games') && Schema::hasTable('game_services')
-                    ? Game::query()
-                        ->active()
-                        ->where('game_services_enabled', true)
-                        ->whereHas('gameServices', fn (Builder $query) => $query->active())
-                        ->withCount(['gameServices as active_game_services_count' => fn (Builder $query) => $query->active()])
-                        ->orderBy('sort_order')
-                        ->orderBy('id')
-                        ->get(['id', 'name', 'slug', 'short_name', 'image'])
-                    : collect();
-            }
+            $view->with('navigationCategories', SeoCategory::query()
+                ->where('is_active', true)->orderBy('sort_order')->orderBy('name')
+                ->get(['id', 'name', 'slug']));
 
             if ($user instanceof User) {
                 $displayName = $user->name ?: $user->email;
-                $walletBalance = $user->relationLoaded('wallet')
-                    ? $user->wallet?->balance
-                    : $user->wallet()->value('balance');
-
                 $view->with('clientAccount', [
                     'avatar' => (string) ($user->avatar ?? ''),
-                    'balance' => (string) ($walletBalance ?? '0'),
                     'email' => (string) $user->email,
                     'initial' => Str::upper(Str::substr($displayName, 0, 1)),
                     'name' => $displayName,
@@ -119,12 +71,7 @@ class SharedViewServiceProvider extends ServiceProvider
             $view->with('systemSettings', [
                 ...$sharedSettings,
                 ...(is_array($viewSettings) ? $viewSettings : []),
-                'game_service_items' => $gameServiceItems,
-                'footer_game_links' => $footerGameLinks,
-                'support_channels' => $supportChannels,
             ]);
-            $view->with('navigationGames', $navigationGames);
-            $view->with('gameServiceGames', $gameServiceGames);
             $view->with('customCodeAssets', [
                 'css' => $storedSettings['custom_css_enabled'] === true && $storedSettings['custom_css'] !== '',
                 'js' => $storedSettings['custom_js_enabled'] === true && $storedSettings['custom_js'] !== '',
@@ -137,41 +84,7 @@ class SharedViewServiceProvider extends ServiceProvider
                 'head' => $customHeadTags->sanitize($storedSettings['custom_head_tags']),
                 'script' => is_string($storedSettings['custom_script']) ? $storedSettings['custom_script'] : '',
             ]);
-            $view->with('affiliateEnabled', Schema::hasTable('affiliate_programs')
-                && AffiliateProgram::query()->where('is_enabled', true)->exists());
         });
-    }
-
-    /**
-     * @return array<int, array{label: string, url: string}>
-     */
-    private function normalizeNavigationItems(mixed $items): array
-    {
-        if (! is_array($items)) {
-            return [];
-        }
-
-        return collect($items)
-            ->filter(function (mixed $item): bool {
-                if (! is_array($item)) {
-                    return false;
-                }
-
-                $label = $item['label'] ?? null;
-
-                return is_string($label)
-                    && trim($label) !== ''
-                    && mb_strlen(trim($label)) <= 80
-                    && preg_match('/[\x00-\x1F\x7F]/u', $label) !== 1
-                    && SafeNavigationUrl::passes($item['url'] ?? null);
-            })
-            ->take(20)
-            ->map(fn (array $item): array => [
-                'label' => trim($item['label']),
-                'url' => trim($item['url']),
-            ])
-            ->values()
-            ->all();
     }
 
     private function normalizeGtmId(mixed $value): string
@@ -184,26 +97,6 @@ class SharedViewServiceProvider extends ServiceProvider
     /**
      * @return array<int, array{icon: string, url: string}>
      */
-    private function normalizeSupportChannels(mixed $channels): array
-    {
-        if (! is_array($channels)) {
-            return [];
-        }
-
-        return collect($channels)
-            ->filter(fn (mixed $channel): bool => is_array($channel)
-                && ($channel['is_active'] ?? false) === true
-                && SafeNavigationUrl::passes($channel['icon'] ?? null)
-                && SafeNavigationUrl::passes($channel['url'] ?? null))
-            ->take(10)
-            ->map(fn (array $channel): array => [
-                'icon' => trim($channel['icon']),
-                'url' => trim($channel['url']),
-            ])
-            ->values()
-            ->all();
-    }
-
     private function normalizeMetaPixelId(mixed $value): string
     {
         $metaPixelId = is_string($value) ? trim($value) : '';

@@ -175,7 +175,7 @@ test('sitemap only contains published indexable canonical urls', function (): vo
         ->assertSee(route('sitemap.pages'))
         ->assertSee(route('sitemap.articles'))
         ->assertSee(route('sitemap.categories'))
-        ->assertSee(route('sitemap.games'))
+        ->assertDontSee('sitemap-games.xml')
         ->assertDontSee($noindexPost->slug)
         ->assertDontSee($externalCanonicalPost->slug);
 

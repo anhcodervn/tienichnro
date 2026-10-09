@@ -2,7 +2,6 @@
 
 namespace App\Http\Controllers;
 
-use App\Features\Topup\Services\SeoPricePageService;
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use App\Models\SeoRedirect;
@@ -19,7 +18,6 @@ class PublicSeoPageController extends Controller
 {
     public function __construct(
         protected EditorContentRenderer $contentRenderer,
-        protected SeoPricePageService $pricePageService,
     ) {}
 
     public function index(Request $request, SettingStore $settingStore): View
@@ -65,6 +63,7 @@ class PublicSeoPageController extends Controller
             ->where('is_active', true)
             ->withCount([
                 'posts' => fn (Builder $query) => $query
+                    ->whereIn('type', ['knowledge', 'guide'])
                     ->where('status', 'published')
                     ->whereNotNull('published_at')
                     ->where('published_at', '<=', now()),
@@ -182,16 +181,17 @@ class PublicSeoPageController extends Controller
         $posts = (clone $baseQuery)
             ->orderByDesc('published_at')
             ->orderByDesc('id')
-            ->take(7)
-            ->get();
+            ->paginate(12)
+            ->withQueryString();
 
-        $featuredPost = $posts->first();
-        $latestPosts = $posts->skip($featuredPost ? 1 : 0)->take(6)->values();
+        $featuredPost = $posts->getCollection()->first();
+        $latestPosts = $posts->getCollection()->skip($featuredPost ? 1 : 0)->values();
 
         $categories = SeoCategory::query()
             ->where('is_active', true)
             ->withCount([
                 'posts' => fn (Builder $query) => $query
+                    ->whereIn('type', ['knowledge', 'guide'])
                     ->where('status', 'published')
                     ->whereNotNull('published_at')
                     ->where('published_at', '<=', now()),
@@ -201,23 +201,23 @@ class PublicSeoPageController extends Controller
             ->get();
 
         $systemSettings = $this->systemSettings($settingStore);
-        $defaultTitle = 'Tin tức và hướng dẫn nạp game Teamobi';
-        $defaultDescription = 'Hướng dẫn chọn gói Carot, thanh toán an toàn và xử lý các tình huống thường gặp khi nạp game Teamobi.';
+        $defaultTitle = 'Tin tức và hướng dẫn Ngọc Rồng Online';
+        $defaultDescription = 'Tin tức, kinh nghiệm chơi, hướng dẫn nhiệm vụ và cập nhật game Ngọc Rồng Online.';
         $pageTitle = $activeCategory?->seo_title ?: ($activeCategory?->name ?: $defaultTitle);
         $pageDescription = $activeCategory?->seo_description ?: $defaultDescription;
-        $pageUrl = $activeCategory
-            ? route('seo.category', $activeCategory->slug)
-            : route('seo.index');
+        $pageUrl = $activeCategory ? route('seo.category', $activeCategory->slug) : route('seo.index');
 
         return view('pages.seo.index', [
             'systemSettings' => $systemSettings,
+            'posts' => $posts,
             'pageTitle' => $pageTitle,
             'pageDescription' => $pageDescription,
             'pageMetaTitle' => $search !== ''
                 ? "Tìm kiếm: {$search} | {$pageTitle}"
-                : $pageTitle.' | '.($systemSettings['site_name'] ?: config('app.name', 'Nạp Carot')),
+                : $pageTitle.' | '.($systemSettings['site_name'] ?: config('app.name', 'Tiện ích NRO')),
             'pageMetaDescription' => $pageDescription,
             'pageMetaUrl' => $pageUrl,
+            'pageMetaCanonical' => $posts->currentPage() > 1 && $search === '' ? $pageUrl.'?page='.$posts->currentPage() : $pageUrl,
             'pageMetaRobots' => $search !== '' ? 'noindex,follow' : ($activeCategory?->robots ?: 'index,follow'),
             'featuredPost' => $featuredPost ? $this->transformPost($featuredPost) : null,
             'latestPosts' => $latestPosts->map(fn (SeoPost $post) => $this->transformPost($post)),
@@ -249,6 +249,7 @@ class PublicSeoPageController extends Controller
             ->where('is_active', true)
             ->withCount([
                 'posts' => fn (Builder $query) => $query
+                    ->whereIn('type', ['knowledge', 'guide'])
                     ->where('status', 'published')
                     ->whereNotNull('published_at')
                     ->where('published_at', '<=', now()),
@@ -266,19 +267,16 @@ class PublicSeoPageController extends Controller
         $siteName = $systemSettings['site_name'] ?: config('app.name', 'Nạp Carot');
         $absoluteCoverImage = $coverImage && ! Str::startsWith($coverImage, ['http://', 'https://']) ? url($coverImage) : $coverImage;
         $canonicalUrl = $this->canonicalUrl($post, $request, $postUrl);
-        $pricePage = $this->pricePageService->resolve($post, $request->user());
-        $displayUpdatedAt = $post->type === 'price' ? $pricePage['updated_at'] : $post->updated_at;
+        $displayUpdatedAt = $post->updated_at;
         $pageSchema = $post->article_schema ? array_filter([
             '@context' => 'https://schema.org',
-            '@type' => $post->type === 'price' ? 'WebPage' : 'Article',
-            'name' => $post->type === 'price' ? $post->title : null,
-            'headline' => $post->type !== 'price' ? $post->title : null,
+            '@type' => 'Article',
+            'headline' => $post->title,
             'description' => $post->seo_description ?: $post->excerpt,
             'image' => $absoluteCoverImage,
             'datePublished' => $post->published_at?->toAtomString(),
             'dateModified' => $displayUpdatedAt?->toAtomString(),
-            'url' => $post->type === 'price' ? $canonicalUrl : null,
-            'mainEntityOfPage' => $post->type !== 'price' ? $canonicalUrl : null,
+            'mainEntityOfPage' => $canonicalUrl,
             'publisher' => ['@type' => 'Organization', 'name' => $siteName],
         ]) : null;
         $faq = collect($post->faq ?? [])
@@ -299,7 +297,7 @@ class PublicSeoPageController extends Controller
             'pageMetaCanonical' => $canonicalUrl,
             'pageMetaUrl' => $postUrl,
             'pageMetaImage' => $coverImage,
-            'pageOgType' => $post->type === 'price' ? 'website' : 'article',
+            'pageOgType' => 'article',
             'pageSchema' => $pageSchema,
             'faq' => $faq,
             'faqSchema' => $faq->isNotEmpty() ? [
@@ -314,9 +312,6 @@ class PublicSeoPageController extends Controller
                     ],
                 ])->all(),
             ] : null,
-            'priceService' => $pricePage['service'],
-            'pricePackages' => $pricePage['packages'],
-            'priceUpdatedAt' => $pricePage['updated_at'],
             'displayUpdatedAt' => $displayUpdatedAt,
             'breadcrumbSchema' => $post->breadcrumb_schema ? [
                 '@context' => 'https://schema.org',
@@ -339,6 +334,7 @@ class PublicSeoPageController extends Controller
     protected function publishedPosts(): Builder
     {
         return SeoPost::query()
+            ->whereIn('type', ['knowledge', 'guide'])
             ->where('status', 'published')
             ->whereNotNull('published_at')
             ->where('published_at', '<=', now())

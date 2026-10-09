@@ -15,6 +15,6 @@ class VerifyEmailController extends Controller
             event(new Verified($request->user()));
         }
 
-        return redirect()->route('account.index')->with('success', 'Email đã được xác minh. Các đơn guest cũ đã được liên kết.');
+        return redirect()->route('account.index')->with('success', 'Email đã được xác minh thành công.');
     }
 }

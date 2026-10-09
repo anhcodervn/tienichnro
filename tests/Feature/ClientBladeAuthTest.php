@@ -5,6 +5,7 @@ use App\Models\User;
 use App\Notifications\QueuedResetPasswordNotification;
 use App\Notifications\QueuedVerifyEmailNotification;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Queue;
@@ -17,48 +18,89 @@ beforeEach(function (): void {
 });
 
 test('client authentication pages are rendered by blade', function (): void {
-    $this->get(route('auth.login'))->assertOk()->assertSee('Đăng nhập');
-    $this->get(route('auth.register'))->assertOk()->assertSee('Tạo tài khoản');
+    $this->get(route('auth.login'))->assertOk()->assertSee('Đăng nhập')->assertSee('data-client-auth-form', false);
+    $this->get(route('auth.register'))->assertOk()->assertSee('Tạo tài khoản')->assertSee('data-client-auth-form', false);
     $this->get(route('password.request'))->assertOk()->assertSee('Quên mật khẩu');
 });
 
-test('authenticated client header shows the account dropdown and current wallet balance', function (): void {
+test('ajax login authenticates with a session and returns the intended destination', function (bool $hasIntended): void {
+    $user = User::factory()->create();
+    $destination = $hasIntended ? route('account.index') : route('home');
+
+    $this->withSession($hasIntended ? ['url.intended' => $destination] : [])
+        ->postJson(route('auth.login.submit'), [
+            'login' => $user->email,
+            'password' => 'password',
+            'remember' => '1',
+        ])->assertOk()
+        ->assertJsonPath('status', true)
+        ->assertJsonPath('redirect', $destination)
+        ->assertSessionMissing('url.intended')
+        ->assertCookie(Auth::guard('web')->getRecallerName());
+
+    $this->assertAuthenticatedAs($user);
+    expect($user->tokens()->count())->toBe(0);
+})->with([true, false]);
+
+test('ajax authentication failures return field errors without redirecting', function (): void {
+    $user = User::factory()->create();
+
+    $this->postJson(route('auth.login.submit'), [
+        'login' => $user->email,
+        'password' => 'wrong-password',
+    ])->assertUnprocessable()->assertJsonValidationErrors('login');
+
+    $this->postJson(route('auth.register.submit'), [
+        'username' => $user->username,
+        'email' => $user->email,
+        'password' => 'password',
+        'password_confirmation' => 'different-password',
+    ])->assertUnprocessable()->assertJsonValidationErrors(['username', 'email', 'password', 'accept_terms']);
+
+    $this->assertGuest();
+    expect(User::query()->count())->toBe(1);
+});
+
+test('ajax registration returns the login destination and queues verification', function (): void {
+    $this->postJson(route('auth.register.submit'), [
+        'username' => 'ajaxplayer',
+        'email' => 'AJAX@EXAMPLE.COM',
+        'password' => 'password',
+        'password_confirmation' => 'password',
+        'accept_terms' => '1',
+    ])->assertCreated()
+        ->assertJsonPath('status', true)
+        ->assertJsonPath('redirect', route('auth.login'));
+
+    $user = User::query()->where('email', 'ajax@example.com')->firstOrFail();
+    Notification::assertSentTo($user, QueuedVerifyEmailNotification::class);
+    Queue::assertPushed(SendSystemMailJob::class);
+    $this->assertGuest();
+});
+
+test('authenticated client header shows the account without retired commerce or support chat', function (): void {
     $user = User::factory()->create([
         'avatar' => 'https://example.com/avatar.png',
         'email' => 'player@example.com',
     ]);
-    $user->wallet()->firstOrFail()->update(['balance' => 101925579]);
-
-    $this->actingAs($user)
-        ->get(route('account.index'))
+    $this->actingAs($user)->get(route('account.index'))
         ->assertOk()
-        ->assertSee('data-account-menu', false)
-        ->assertSee('data-account-menu-toggle', false)
-        ->assertSee('data-account-menu-panel', false)
-        ->assertSee('data-mobile-account-menu', false)
-        ->assertSee('data-mobile-bottom-nav', false)
-        ->assertSee('data-mobile-header-wallet-balance', false)
-        ->assertSee('data-mobile-sidebar-toggle', false)
-        ->assertSee('data-mobile-sidebar-footer', false)
-        ->assertSee('data-mobile-sidebar-logout', false)
-        ->assertSee(route('logout'), false)
-        ->assertSee('client-mobile-account-menu', false)
-        ->assertSee('data-header-wallet-balance', false)
         ->assertSee('player@example.com')
-        ->assertSee('101.925.579đ')
         ->assertSee('https://example.com/avatar.png')
-        ->assertSee(route('account.orders.index'), false)
-        ->assertSee(route('wallet.deposit.index'), false);
+        ->assertSee(route('account.index'), false)
+        ->assertSee(route('logout'), false)
+        ->assertSee('data-mobile-bottom-nav', false)
+        ->assertDontSee('data-header-wallet-balance', false)
+        ->assertDontSee('data-mobile-header-wallet-balance', false)
+        ->assertDontSee('/tai-khoan/ho-tro', false);
 });
 
-test('guest client header does not render an account dropdown', function (): void {
-    $this->get(route('home'))
-        ->assertOk()
-        ->assertDontSee('data-account-menu', false)
-        ->assertDontSee('data-mobile-sidebar-footer', false)
-        ->assertSee('data-mobile-login', false)
+test('guest client header offers login and registration without an account logout', function (): void {
+    $this->get(route('home'))->assertOk()
+        ->assertSee(route('auth.login'), false)
+        ->assertSee(route('auth.register'), false)
         ->assertSee('data-mobile-bottom-nav', false)
-        ->assertSee('data-mobile-sidebar-toggle', false);
+        ->assertDontSee(route('logout'), false);
 });
 
 test('user can register login and logout through clean client routes', function (): void {
@@ -90,7 +132,7 @@ test('user can register login and logout through clean client routes', function 
     ])->assertRedirect(route('home'));
     $this->assertAuthenticatedAs($user);
 
-    $this->post(route('logout'))->assertRedirect(route('login'));
+    $this->post(route('logout'))->assertRedirect(route('auth.login'));
     $this->assertGuest();
 });
 

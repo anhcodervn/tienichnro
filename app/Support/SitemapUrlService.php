@@ -2,7 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\Game;
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
 use Illuminate\Database\Eloquent\Builder;
@@ -20,7 +19,6 @@ class SitemapUrlService
     public function urls(): Collection
     {
         return $this->pageUrls()
-            ->concat($this->gameUrls())
             ->concat($this->categoryUrls())
             ->concat($this->articleUrls())
             ->unique('loc')
@@ -30,50 +28,9 @@ class SitemapUrlService
     /** @return Collection<int, array{loc: string, lastmod: mixed}> */
     public function pageUrls(): Collection
     {
-        $gameLandings = config('seo.home_game_landings', []);
-        $landingUrls = collect(array_keys(config('seo.landings', [])))
-            ->reject(fn (string $slug): bool => in_array($slug, $gameLandings, true))
-            ->map(fn (string $slug): array => [
-                'loc' => route('seo.landing', ['landingSlug' => $slug]),
-                'lastmod' => null,
-            ]);
-
         return $this->staticUrls()
             ->concat($this->contentPageUrls())
-            ->concat($landingUrls)
-            ->unique('loc')
-            ->values();
-    }
-
-    /** @return Collection<int, array{loc: string, lastmod: mixed}> */
-    public function gameUrls(): Collection
-    {
-        return Game::query()
-            ->active()
-            ->with('seoSetting')
-            ->orderBy('sort_order')
-            ->orderBy('id')
-            ->get(['id', 'slug', 'updated_at'])
-            ->map(function (Game $game): ?array {
-                $setting = $game->seoSetting;
-                $localUrl = route('topup.game', ['game' => $game]);
-
-                if ($setting?->is_published && $setting->robots !== 'index,follow') {
-                    return null;
-                }
-
-                if ($setting?->is_published && filled($setting->canonical_url)
-                    && rtrim((string) $setting->canonical_url, '/') !== rtrim($localUrl, '/')) {
-                    return null;
-                }
-
-                return [
-                    'loc' => $localUrl,
-                    'lastmod' => $setting?->updated_at ?? $game->updated_at,
-                ];
-            })
-            ->filter()
-            ->values();
+            ->unique('loc')->values();
     }
 
     /** @return Collection<int, array{loc: string, lastmod: mixed}> */
@@ -96,8 +53,8 @@ class SitemapUrlService
     {
         return collect([
             ['loc' => route('home'), 'lastmod' => null],
-            ['loc' => route('pricing'), 'lastmod' => null],
             ['loc' => route('seo.index'), 'lastmod' => null],
+            ['loc' => route('nro.notifies.page'), 'lastmod' => null],
         ]);
     }
 
@@ -112,8 +69,6 @@ class SitemapUrlService
             'content.guide' => 'guide_page_is_published',
             'content.terms' => 'terms_page_is_published',
             'content.privacy' => 'privacy_page_is_published',
-            'content.refund' => 'refund_policy_is_published',
-            'content.payment' => 'payment_policy_is_published',
             'content.faq' => 'faq_page_is_published',
         ];
         $published = $this->settingStore->getMany(array_fill_keys(array_values($pages), true));
@@ -131,6 +86,7 @@ class SitemapUrlService
     public function articleUrls(): Collection
     {
         return SeoPost::query()
+            ->whereIn('type', ['knowledge', 'guide'])
             ->with('category:id,slug,is_active,robots')
             ->where('status', 'published')
             ->where('robots', 'index,follow')

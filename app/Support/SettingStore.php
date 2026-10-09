@@ -3,7 +3,6 @@
 namespace App\Support;
 
 use App\Models\Setting;
-use App\Models\TenantSetting;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
@@ -20,19 +19,15 @@ class SettingStore
             ->whereIn('key', array_keys($defaults))
             ->get()
             ->keyBy('key');
-        $globalSettings = $this->usesTenantSettings()
-            ? Setting::query()->whereIn('key', array_keys($defaults))->get()->keyBy('key')
-            : collect();
 
         $resolved = [];
 
         foreach ($defaults as $key => $default) {
-            /** @var Setting|TenantSetting|null $setting */
+            /** @var Setting|null $setting */
             $setting = $settings->get($key);
-            $globalSetting = $globalSettings->get($key);
             $resolved[$key] = $setting !== null
                 ? $this->decode($setting, $default)
-                : ($globalSetting !== null ? $this->decode($globalSetting, $default) : $default);
+                : $default;
         }
 
         return $resolved;
@@ -56,10 +51,10 @@ class SettingStore
         return is_array($value) ? $value : $default;
     }
 
-    public function putString(string $key, string $value): Setting|TenantSetting
+    public function putString(string $key, string $value): Setting
     {
         return $this->settingQuery()->updateOrCreate(
-            $this->settingIdentity($key),
+            ['key' => $key],
             [
                 'value' => $value,
                 'type' => 'string',
@@ -67,10 +62,10 @@ class SettingStore
         );
     }
 
-    public function putEncryptedString(string $key, string $value): Setting|TenantSetting
+    public function putEncryptedString(string $key, string $value): Setting
     {
         return $this->settingQuery()->updateOrCreate(
-            $this->settingIdentity($key),
+            ['key' => $key],
             [
                 'value' => Crypt::encryptString($value),
                 'type' => 'encrypted',
@@ -81,10 +76,10 @@ class SettingStore
     /**
      * @param  array<string, mixed>  $value
      */
-    public function putArray(string $key, array $value): Setting|TenantSetting
+    public function putArray(string $key, array $value): Setting
     {
         return $this->settingQuery()->updateOrCreate(
-            $this->settingIdentity($key),
+            ['key' => $key],
             [
                 'value' => json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
                 'type' => 'json',
@@ -100,12 +95,6 @@ class SettingStore
             return $this->decode($setting, $default);
         }
 
-        if ($this->usesTenantSettings()) {
-            $globalSetting = Setting::query()->where('key', $key)->first();
-
-            return $globalSetting === null ? $default : $this->decode($globalSetting, $default);
-        }
-
         return $default;
     }
 
@@ -119,7 +108,7 @@ class SettingStore
                 $payload = $this->prepareValue($value);
 
                 $this->settingQuery()->updateOrCreate(
-                    $this->settingIdentity($key),
+                    ['key' => $key],
                     [
                         'value' => $payload['value'],
                         'type' => $payload['type'],
@@ -134,7 +123,7 @@ class SettingStore
         $this->settingQuery()->whereIn('key', $keys)->delete();
     }
 
-    public function decode(Setting|TenantSetting $setting, mixed $default = null): mixed
+    public function decode(Setting $setting, mixed $default = null): mixed
     {
         if ($setting->type === 'json') {
             $decoded = json_decode((string) $setting->value, true);
@@ -178,25 +167,8 @@ class SettingStore
         ];
     }
 
-    private function usesTenantSettings(): bool
-    {
-        $context = app(TenantContext::class);
-
-        return $context->current() !== null && ! $context->isMain();
-    }
-
     private function settingQuery(): Builder
     {
-        return $this->usesTenantSettings() ? TenantSetting::query() : Setting::query();
-    }
-
-    /** @return array<string, int|string> */
-    private function settingIdentity(string $key): array
-    {
-        if (! $this->usesTenantSettings()) {
-            return ['key' => $key];
-        }
-
-        return ['tenant_id' => app(TenantContext::class)->id(), 'key' => $key];
+        return Setting::query();
     }
 }

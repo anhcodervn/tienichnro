@@ -30,6 +30,6 @@ final class Setting
 
     public static function global(string $key, mixed $default = null): mixed
     {
-        return Site::globalSetting($key, $default);
+        return app(SettingStore::class)->get($key, $default);
     }
 }

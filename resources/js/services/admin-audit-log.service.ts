@@ -10,7 +10,6 @@ export type AdminAuditActor = {
 
 export type AdminAuditLog = {
     id: number;
-    tenant_id: number | null;
     admin_id: number | null;
     request_id: string | null;
     action: string;

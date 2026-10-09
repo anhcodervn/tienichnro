@@ -2,142 +2,23 @@ export default {
     path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),
     children: [
+        { path: 'services', name: 'admin.services', component: () => import('@/pages/admin/services/index.vue') },
+        { path: 'nro/servers', name: 'admin.nro.servers', component: () => import('@/pages/admin/nro/servers/index.vue') },
+        { path: 'nro/bosses', name: 'admin.nro.bosses', component: () => import('@/pages/admin/nro/bosses/index.vue') },
+        { path: 'nro/notifies', name: 'admin.nro.notifies', component: () => import('@/pages/admin/nro/notifies/index.vue') },
         {
-            path: 'sites',
-            name: 'admin.sites.index',
-            component: () => import('@/pages/admin/sites/index.vue'),
-        },
-        {
-            path: 'site-prices',
-            name: 'admin.site-prices.index',
-            component: () => import('@/pages/admin/site-prices/index.vue'),
+            path: 'nro/notification-types',
+            name: 'admin.nro.notification-types',
+            component: () => import('@/pages/admin/nro/notification-types/index.vue'),
         },
         {
             path: '',
-            name: 'admin.dashboard',
-            component: () => import('@/pages/admin/home/index.vue'),
-        },
-        {
-            path: 'reports',
-            redirect: { name: 'admin.reports.topup' },
-        },
-        {
-            path: 'reports/topup',
-            name: 'admin.reports.topup',
-            component: () => import('@/pages/admin/reports/index.vue'),
-        },
-        {
-            path: 'reports/game-services',
-            name: 'admin.reports.game-services',
-            component: () => import('@/pages/admin/reports/game-services.vue'),
+            redirect: { name: 'admin.seo.posts' },
         },
         {
             path: 'audit-logs',
             name: 'admin.audit-logs.index',
             component: () => import('@/pages/admin/audit-logs/index.vue'),
-        },
-        {
-            path: 'affiliate',
-            name: 'admin.affiliate.index',
-            component: () => import('@/pages/admin/affiliate/index.vue'),
-        },
-        {
-            path: 'affiliate/announcements',
-            name: 'admin.affiliate.announcements',
-            component: () => import('@/pages/admin/affiliate/announcements.vue'),
-            props: { announcementChannel: 'affiliate' },
-        },
-        {
-            path: 'support',
-            name: 'admin.support.index',
-            component: () => import('@/pages/admin/support/index.vue'),
-        },
-        {
-            path: 'topup/catalog',
-            name: 'admin.topup.catalog',
-            redirect: { name: 'admin.topup.games' },
-        },
-        {
-            path: 'topup/games',
-            name: 'admin.topup.games',
-            component: () => import('@/pages/admin/topup/catalog/index.vue'),
-            props: { catalogType: 'games' },
-        },
-        {
-            path: 'topup/servers',
-            name: 'admin.topup.servers',
-            component: () => import('@/pages/admin/topup/catalog/index.vue'),
-            props: { catalogType: 'servers' },
-        },
-        {
-            path: 'topup/packages',
-            name: 'admin.topup.packages',
-            component: () => import('@/pages/admin/topup/catalog/index.vue'),
-            props: { catalogType: 'packages' },
-        },
-        {
-            path: 'topup/global-packages',
-            name: 'admin.topup.global-packages',
-            component: () => import('@/pages/admin/topup/global-packages/index.vue'),
-        },
-        {
-            path: 'topup/global-rewards',
-            name: 'admin.topup.global-rewards',
-            component: () => import('@/pages/admin/topup/global-rewards/index.vue'),
-        },
-        {
-            path: 'topup/providers',
-            name: 'admin.topup.providers',
-            component: () => import('@/pages/admin/topup/providers/index.vue'),
-        },
-        {
-            path: 'topup/provider-prices',
-            name: 'admin.topup.provider-prices',
-            component: () => import('@/pages/admin/topup/provider-prices/index.vue'),
-        },
-        {
-            path: 'topup/orders',
-            name: 'admin.topup.orders',
-            component: () => import('@/pages/admin/topup/orders/index.vue'),
-        },
-        {
-            path: 'game-services/announcements',
-            name: 'admin.game-services.announcements',
-            component: () => import('@/pages/admin/affiliate/announcements.vue'),
-            props: { announcementChannel: 'collaborator' },
-        },
-        {
-            path: 'game-services/games',
-            name: 'admin.game-services.games',
-            component: () => import('@/pages/admin/game-services/catalog/index.vue'),
-            props: { catalogType: 'games' },
-        },
-        {
-            path: 'game-services/services',
-            name: 'admin.game-services.services',
-            component: () => import('@/pages/admin/game-services/catalog/index.vue'),
-            props: { catalogType: 'services' },
-        },
-        {
-            path: 'game-services/packages',
-            name: 'admin.game-services.packages',
-            component: () => import('@/pages/admin/game-services/catalog/index.vue'),
-            props: { catalogType: 'packages' },
-        },
-        {
-            path: 'game-services/orders',
-            name: 'admin.game-services.orders',
-            component: () => import('@/pages/admin/game-services/orders/index.vue'),
-        },
-        {
-            path: 'game-services/order-reviews',
-            name: 'admin.game-services.order-reviews',
-            component: () => import('@/pages/admin/game-services/order-reviews/index.vue'),
-        },
-        {
-            path: 'game-services/chats',
-            name: 'admin.game-services.chats',
-            component: () => import('@/pages/admin/game-services/chats/index.vue'),
         },
         {
             path: 'users',
@@ -148,49 +29,9 @@ export default {
                     component: () => import('@/pages/admin/users/lists/index.vue'),
                 },
                 {
-                    path: 'discounts',
-                    name: 'admin.users.discounts',
-                    component: () => import('@/pages/admin/users/discounts/index.vue'),
-                },
-                {
                     path: ':user_id(\\d+)',
                     name: 'admin.users.show',
                     component: () => import('@/pages/admin/users/info/index.vue'),
-                },
-                {
-                    path: 'wallet-transactions',
-                    name: 'admin.users.wallet-transaction',
-                    component: () => import('@/pages/admin/users/wallet-transactions/index.vue'),
-                },
-                {
-                    path: 'wallet-transactions/:user_id(\\d+)',
-                    name: 'admin.users.wallet-transaction.show',
-                    component: () => import('@/pages/admin/users/wallet-transactions/index.vue'),
-                },
-            ],
-        },
-        {
-            path: 'notifications',
-            children: [
-                {
-                    path: '',
-                    name: 'admin.notifications.index',
-                    component: () => import('@/pages/admin/notifications/list/index.vue'),
-                },
-                {
-                    path: 'create',
-                    name: 'admin.notifications.create',
-                    component: () => import('@/pages/admin/notifications/form/index.vue'),
-                },
-                {
-                    path: ':notification_id(\\d+)/edit',
-                    name: 'admin.notifications.edit',
-                    component: () => import('@/pages/admin/notifications/form/index.vue'),
-                },
-                {
-                    path: 'history',
-                    name: 'admin.notifications.history',
-                    component: () => import('@/pages/admin/notifications/history/index.vue'),
                 },
             ],
         },
@@ -214,18 +55,12 @@ export default {
             children: [
                 {
                     path: '',
-                    name: 'admin.seo.dashboard',
-                    component: () => import('@/pages/admin/seo/dashboard/index.vue'),
+                    redirect: { name: 'admin.seo.posts' },
                 },
                 {
                     path: 'home',
                     name: 'admin.seo.home',
                     component: () => import('@/pages/admin/seo/home/index.vue'),
-                },
-                {
-                    path: 'games',
-                    name: 'admin.seo.games',
-                    component: () => import('@/pages/admin/seo/games/index.vue'),
                 },
                 {
                     path: 'categories',
@@ -255,20 +90,6 @@ export default {
             ],
         },
         {
-            path: 'recharge',
-            redirect: { name: 'admin.recharge.config' },
-        },
-        {
-            path: 'recharge/config',
-            name: 'admin.recharge.config',
-            component: () => import('@/pages/admin/settings/recharge/index.vue'),
-        },
-        {
-            path: 'recharge/history',
-            name: 'admin.recharge.history',
-            component: () => import('@/pages/admin/recharge/history/index.vue'),
-        },
-        {
             path: 'setting',
             redirect: { name: 'admin.settings.general' },
         },
@@ -291,10 +112,6 @@ export default {
             path: 'settings/maintenance',
             name: 'admin.settings.maintenance',
             component: () => import('@/pages/admin/settings/maintenance/index.vue'),
-        },
-        {
-            path: 'settings/recharge',
-            redirect: { name: 'admin.recharge.config' },
         },
         {
             path: ':pathMatch(.*)*',

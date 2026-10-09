@@ -1,7 +1,5 @@
 <script setup lang="ts">
-import { useSupportStore } from '@/stores/support.store';
-import { useUserStore } from '@/stores/user.store';
-import { computed, onBeforeUnmount, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import Header from './admin/header/index.vue';
 import Sidebar from './admin/sidebar/index.vue';
@@ -9,9 +7,6 @@ import { resolveAdminPageTitle } from './admin/sidebar/navigation';
 
 const route = useRoute();
 const isSidebarOpen = ref(false);
-const userStore = useUserStore();
-const supportStore = useSupportStore();
-const isSupportRoute = computed(() => route.path === '/admin/support');
 
 const currentPageTitle = computed(() => {
     return resolveAdminPageTitle(route.path);
@@ -28,22 +23,6 @@ onMounted(() => {
 
 onUnmounted(() => {
     window.removeEventListener('resize', syncSidebarWithViewport);
-});
-
-watch(
-    () => userStore.user?.id ?? null,
-    (userId) => {
-        if (userId !== null) {
-            void supportStore.start('admin', userId, userStore.user?.site?.id);
-        }
-    },
-    { immediate: true },
-);
-
-onBeforeUnmount(() => {
-    if (supportStore.context === 'admin') {
-        supportStore.stop();
-    }
 });
 </script>
 
@@ -66,7 +45,7 @@ onBeforeUnmount(() => {
             <div class="min-w-0 flex-1">
                 <Header :page-title="currentPageTitle" @open-sidebar="isSidebarOpen = true" />
 
-                <main :class="isSupportRoute ? 'px-3 py-3 sm:px-4' : 'px-4 pb-8 pt-6 sm:px-6 xl:px-8'">
+                <main class="px-4 pb-8 pt-6 sm:px-6 xl:px-8">
                     <div class="mx-auto w-full min-w-0 max-w-[1800px]">
                         <router-view />
                     </div>

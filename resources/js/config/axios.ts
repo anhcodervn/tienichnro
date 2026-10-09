@@ -1,4 +1,3 @@
-import { clearGameServiceSecondaryGrant, getGameServiceSecondaryToken } from '@/utils/game-service-secondary-auth';
 import axios, { AxiosError, AxiosInstance, InternalAxiosRequestConfig } from 'axios';
 
 /**
@@ -24,16 +23,6 @@ const getCsrfFromMeta = () => {
 };
 
 api.defaults.headers.common['X-CSRF-TOKEN'] = getCsrfFromMeta();
-
-api.interceptors.request.use((config) => {
-    const secondaryToken = getGameServiceSecondaryToken();
-
-    if (secondaryToken) {
-        config.headers.set('X-Game-Service-Secondary-Token', secondaryToken);
-    }
-
-    return config;
-});
 
 /**
  * =========================
@@ -77,13 +66,6 @@ api.interceptors.response.use(
     (response) => response,
 
     async (error: AxiosError) => {
-        const responseData = error.response?.data as { code?: string } | undefined;
-
-        if (error.response?.status === 423 && responseData?.code === 'SECONDARY_PASSWORD_REQUIRED') {
-            clearGameServiceSecondaryGrant();
-            window.dispatchEvent(new Event('game-service-secondary-auth:locked'));
-        }
-
         const originalRequest = error.config as InternalAxiosRequestConfig & {
             _retry?: boolean;
         };

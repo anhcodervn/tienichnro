@@ -120,9 +120,6 @@ onMounted(async () => {
                             <td class="px-4 py-3 text-sm text-slate-600">
                                 <span class="rounded-full bg-violet-50 px-2 py-1 text-xs font-bold uppercase text-violet-700">{{ row.type }}</span>
                                 <p class="mt-2">{{ row.category?.name || '-' }}</p>
-                                <p v-if="row.type === 'price'" class="mt-1 text-xs text-emerald-700">
-                                    {{ row.service?.name || 'Chưa chọn dịch vụ' }}
-                                </p>
                             </td>
                             <td class="px-4 py-3 text-sm text-slate-600">
                                 <a

@@ -4,17 +4,14 @@ namespace App\Features\Auth\Controllers;
 
 use App\Actions\RecordUserLogAction;
 use App\Exceptions\ApiException;
-use App\Features\Affiliate\Services\AffiliateReferralService;
 use App\Features\Auth\Requests\ForgotPasswordRequest;
 use App\Features\Auth\Requests\LoginRequest;
 use App\Features\Auth\Requests\RegisterRequest;
 use App\Features\Auth\Services\GoogleAuthService;
-use App\Features\Client\Wallet\Services\WalletService;
 use App\Features\Reporting\Services\DiscordReportService;
 use App\Http\Controllers\Controller;
 use App\Models\User;
 use App\Support\MailQueue;
-use App\Utils\Site;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Auth\Events\Verified;
 use Illuminate\Http\JsonResponse;
@@ -29,12 +26,10 @@ use Throwable;
 class AuthController extends Controller
 {
     public function __construct(
-        private readonly WalletService $walletService,
         private readonly RecordUserLogAction $recordUserLogAction,
         private readonly MailQueue $mailQueue,
         private readonly GoogleAuthService $googleAuthService,
         private readonly DiscordReportService $discordReportService,
-        private readonly AffiliateReferralService $affiliateReferralService,
     ) {}
 
     public function index(): JsonResponse
@@ -60,13 +55,13 @@ class AuthController extends Controller
         $this->recordUserLogAction->handle($user, 'login', 'Đăng nhập hệ thống', $request);
 
         if (! $request->expectsJson()) {
-            return redirect()->intended(route('home'));
+            return redirect()->intended(route('home'))->with('success', 'Đăng nhập thành công.');
         }
 
         return response()->json([
             'status' => true,
             'message' => 'Đăng nhập thành công.',
-            'redirect' => url('/'),
+            'redirect' => redirect()->intended(route('home'))->getTargetUrl(),
             'user' => $this->userPayload($user),
         ]);
     }
@@ -107,7 +102,6 @@ class AuthController extends Controller
     public function register(RegisterRequest $request): JsonResponse|RedirectResponse
     {
         $validated = $request->validated();
-        $referrer = $this->affiliateReferralService->referrer($request);
 
         $user = User::create([
             'name' => $validated['name'] ?? $validated['full_name'] ?? null,
@@ -115,12 +109,8 @@ class AuthController extends Controller
             'email' => $validated['email'] ?? null,
             'phone' => $validated['phone'] ?? null,
             'password' => $validated['password'],
-            'referred_by' => $referrer?->id,
         ]);
 
-        $this->affiliateReferralService->forget($request);
-
-        $this->walletService->createWallet($user);
         $this->recordUserLogAction->handle($user, 'register', 'Đăng ký tài khoản', $request);
 
         if (is_string($user->email) && $user->email !== '') {
@@ -146,7 +136,7 @@ class AuthController extends Controller
 
         return response()->json([
             'status' => true,
-            'message' => 'Đăng ký thành công.',
+            'message' => 'Đăng ký thành công. Vui lòng kiểm tra email để xác minh tài khoản.',
             'redirect' => route('auth.login'),
             'user' => $this->userPayload($user),
         ], 201);
@@ -164,7 +154,6 @@ class AuthController extends Controller
 
     public function redirectToGoogle(Request $request): RedirectResponse
     {
-        abort_unless(Site::isMain(), 404);
         if (! $this->googleAuthService->isConfigured()) {
             return redirect()
                 ->route('auth.login')
@@ -179,7 +168,6 @@ class AuthController extends Controller
 
     public function handleGoogleCallback(Request $request): RedirectResponse
     {
-        abort_unless(Site::isMain(), 404);
         $expectedState = $request->session()->pull('google_oauth_state');
         $receivedState = $request->string('state')->toString();
 
@@ -233,7 +221,6 @@ class AuthController extends Controller
                 ])->save();
             } else {
                 $isNewUser = true;
-                $referrer = $this->affiliateReferralService->referrer($request);
                 $user = User::query()->create([
                     'username' => Str::of($googleUser['email'])->before('@')->slug('')->value() ?: null,
                     'email' => $googleUser['email'],
@@ -244,9 +231,7 @@ class AuthController extends Controller
                     'password' => Str::random(64),
                     'status' => 'active',
                     'role' => 'user',
-                    'referred_by' => $referrer?->id,
                 ]);
-                $this->affiliateReferralService->forget($request);
             }
 
             Auth::guard('web')->login($user, true);
@@ -263,7 +248,7 @@ class AuthController extends Controller
                 $this->queueRegistrationReport($user, 'google');
             }
 
-            return redirect('/');
+            return redirect('/')->with('success', 'Đăng nhập Google thành công.');
         } catch (Throwable $exception) {
             return redirect()
                 ->route('auth.login')
@@ -292,7 +277,7 @@ class AuthController extends Controller
             ]);
         }
 
-        return redirect()->route('login');
+        return redirect()->route('auth.login')->with('success', 'Đăng xuất thành công.');
     }
 
     private function queueRegistrationReport(User $user, string $registrationType): void
@@ -319,8 +304,7 @@ class AuthController extends Controller
      *     phone:?string,
      *     full_name:?string,
      *     role:mixed,
-     *     status:mixed,
-     *     wallet:array{id:int,user_id:int,type:string,balance:string,hold_balance:string,total_recharge:string,total_spent:string,created_at:?string,updated_at:?string}
+     *     status:mixed
      * }
      */
     protected function userPayload(User $user): array
@@ -335,7 +319,6 @@ class AuthController extends Controller
                 'role',
                 'status',
             ]),
-            'wallet' => $this->walletService->getWalletInfo($user),
         ];
     }
 

@@ -29,8 +29,8 @@ test('homepage shows the community call to action without the topup form', funct
     $response
         ->assertSee('data-community-cta', false)
         ->assertSee('Tham gia cộng đồng')
-        ->assertSee('Nổi bật')
-        ->assertSee('href="'.route('bio.show').'"', false)
+        ->assertSee('data-home-tool-grid', false)
+        ->assertSee('href="https://napcarot.com/community"', false)
         ->assertDontSee('data-topup-form', false);
 });
 

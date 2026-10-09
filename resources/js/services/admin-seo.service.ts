@@ -1,7 +1,5 @@
 import api from '@/config/axios';
 import type {
-    AdminGameSeoPayload,
-    AdminGameSeoSettings,
     AdminHomeSeoSettings,
     AdminSeoCategoryItem,
     AdminSeoCategoryPayload,
@@ -13,16 +11,6 @@ import type {
 } from '@/types/admin-seo.type';
 
 export const adminSeoService = {
-    async gameSeoSettings(): Promise<{ games: AdminGameSeoSettings[]; defaults: { og_image: string } }> {
-        const response = await api.get('/api/admin-api/seo/games');
-
-        return response.data.data as { games: AdminGameSeoSettings[]; defaults: { og_image: string } };
-    },
-
-    async updateGameSeo(id: number, payload: AdminGameSeoPayload) {
-        return api.patch(`/api/admin-api/seo/games/${id}`, payload);
-    },
-
     async getHomeSeo(): Promise<AdminHomeSeoSettings> {
         const response = await api.get('/api/admin-api/seo/home');
 

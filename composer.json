@@ -1,11 +1,13 @@
 {
     "$schema": "https://getcomposer.org/schema.json",
-    "name": "laravel/vue-starter-kit",
+    "name": "tienichnro/article-website",
     "type": "project",
-    "description": "The skeleton application for the Laravel framework.",
+    "description": "Ngoc Rong Online article and utility website with Vue administration and Blade client.",
     "keywords": [
         "laravel",
-        "framework"
+        "vue",
+        "seo",
+        "ngoc-rong-online"
     ],
     "license": "MIT",
     "require": {
@@ -54,12 +56,14 @@
         ],
         "post-create-project-cmd": [
             "@php artisan key:generate --ansi",
-            "@php -r \"file_exists('database/database.sqlite') || touch('database/database.sqlite');\"",
-            "@php artisan migrate --graceful --ansi"
+            "@php artisan site:setup --no-interaction"
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#86efac,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --queue=topup,mails,user-logs,default --tries=3\" \"php artisan reverb:start --debug\" \"npm run dev\" --names='server,queue,reverb,vite'"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#86efac,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --queue=mails,user-logs,default --tries=3\" \"php artisan reverb:start --debug\" \"npm run dev\" --names='server,queue,reverb,vite'"
+        ],
+        "setup:site": [
+            "@php artisan site:setup --no-interaction"
         ]
     },
     "extra": {

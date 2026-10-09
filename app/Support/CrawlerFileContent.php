@@ -3,14 +3,9 @@
 namespace App\Support;
 
 use App\Models\Setting;
-use App\Models\TenantSetting;
 
 class CrawlerFileContent
 {
-    public function __construct(
-        protected TenantContext $tenantContext,
-    ) {}
-
     public function robots(SettingStore $settingStore): string
     {
         if (! (bool) $settingStore->get('site_active', true)) {
@@ -56,13 +51,6 @@ class CrawlerFileContent
 
     private function localString(string $key): string
     {
-        if ($this->tenantContext->isActive() && ! $this->tenantContext->isMain()) {
-            return (string) (TenantSetting::query()
-                ->where('tenant_id', $this->tenantContext->id())
-                ->where('key', $key)
-                ->value('value') ?? '');
-        }
-
         return (string) (Setting::query()->where('key', $key)->value('value') ?? '');
     }
 

@@ -47,8 +47,8 @@
             <div class="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm font-medium text-slate-500">
                 <span class="inline-flex items-center gap-1.5"><i class="bx bx-calendar text-lg text-emerald-600" aria-hidden="true"></i>{{ $post->published_at?->format('d/m/Y') }}</span>
                 <span class="inline-flex items-center gap-1.5"><i class="bx bx-time-five text-lg text-emerald-600" aria-hidden="true"></i>{{ $readingMinutes }} phút đọc</span>
-                @if ($displayUpdatedAt && ($post->type === 'price' || ($post->published_at && $displayUpdatedAt->gt($post->published_at))))
-                    <span class="inline-flex items-center gap-1.5"><i class="bx bx-refresh text-lg text-emerald-600" aria-hidden="true"></i>{{ $post->type === 'price' ? 'Giá cập nhật' : 'Cập nhật' }} {{ $displayUpdatedAt->format('d/m/Y') }}</span>
+                @if ($displayUpdatedAt && ($post->published_at && $displayUpdatedAt->gt($post->published_at)))
+                    <span class="inline-flex items-center gap-1.5"><i class="bx bx-refresh text-lg text-emerald-600" aria-hidden="true"></i>Cập nhật {{ $displayUpdatedAt->format('d/m/Y') }}</span>
                 @endif
             </div>
         </header>
@@ -64,41 +64,6 @@
 <section class="client-container py-8 sm:py-10">
     <div class="grid min-w-0 gap-7 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <main class="min-w-0">
-            @if ($post->type === 'price')
-                <section class="client-card mb-5 overflow-hidden" aria-labelledby="dynamic-price-table-title">
-                    <div class="border-b border-slate-200 bg-emerald-50 px-5 py-4 sm:px-6">
-                        <h2 id="dynamic-price-table-title" class="text-xl font-extrabold text-slate-950">Bảng giá {{ $priceService?->name ?: 'dịch vụ' }}</h2>
-                        @if ($priceUpdatedAt)
-                            <p class="mt-1 text-sm text-slate-600">Cập nhật trực tiếp từ hệ thống lúc {{ $priceUpdatedAt->format('H:i d/m/Y') }}.</p>
-                        @endif
-                    </div>
-                    @if ($pricePackages->isNotEmpty())
-                        <div class="overflow-x-auto">
-                            <table class="w-full min-w-[560px] text-left text-sm">
-                                <thead class="bg-slate-50 text-slate-600">
-                                    <tr>
-                                        <th class="px-5 py-3 font-bold sm:px-6">Mệnh giá</th>
-                                        <th class="px-5 py-3 font-bold sm:px-6">Giá bán</th>
-                                        <th class="px-5 py-3 font-bold sm:px-6">Giá trị / thực nhận</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-slate-100">
-                                    @foreach ($pricePackages as $package)
-                                        <tr>
-                                            <td class="px-5 py-3 font-semibold text-slate-800 sm:px-6">{{ number_format((int) $package->denomination, 0, ',', '.') }}đ</td>
-                                            <td class="px-5 py-3 font-extrabold text-emerald-700 sm:px-6">{{ number_format((int) $package->selling_price, 0, ',', '.') }}đ</td>
-                                            <td class="px-5 py-3 text-slate-600 sm:px-6">{{ $package->rewardDisplay('base_amount', 1, $priceService?->reward_label) ?: '—' }}</td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    @else
-                        <p class="px-5 py-6 text-sm text-slate-600 sm:px-6">Hiện chưa có gói đang hoạt động để hiển thị.</p>
-                    @endif
-                </section>
-            @endif
-
             <div class="article-content client-card min-w-0 max-w-full break-words p-5 sm:p-8 lg:p-10" data-client-image-viewer>{!! $contentHtml !!}</div>
 
             @if ($faq->isNotEmpty())

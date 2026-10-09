@@ -15,20 +15,7 @@ import type {
 } from '@/types/setting.type';
 import { uploadEditorImages } from '@/utils/editor-image-upload';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import {
-    BookOpenText,
-    CircleHelp,
-    Eye,
-    Flag,
-    Info,
-    Landmark,
-    Mail,
-    RefreshCcw,
-    Scale,
-    ShieldCheck,
-    ShieldQuestion,
-    WalletCards,
-} from 'lucide-vue-next';
+import { BookOpenText, CircleHelp, Eye, Flag, Info, Landmark, Mail, Scale, ShieldCheck, ShieldQuestion } from 'lucide-vue-next';
 import { computed, onMounted, ref } from 'vue';
 
 type PageDefinition = {
@@ -116,34 +103,6 @@ const pageDefinitions: PageDefinition[] = [
         seoTitleKey: 'about_page_seo_title',
         seoDescriptionKey: 'about_page_seo_description',
         publishedKey: 'about_page_is_published',
-    },
-    {
-        key: 'refund_policy',
-        label: 'Hoàn tiền',
-        subtitle: 'Chính sách hoàn tiền',
-        description: 'Thiết lập chính sách hoàn tiền, thời gian xử lý và các ngoại lệ.',
-        slug: 'chinh-sach-hoan-tien',
-        icon: RefreshCcw,
-        titleKey: 'refund_policy_title',
-        excerptKey: 'refund_policy_excerpt',
-        contentKey: 'refund_policy_content',
-        seoTitleKey: 'refund_policy_seo_title',
-        seoDescriptionKey: 'refund_policy_seo_description',
-        publishedKey: 'refund_policy_is_published',
-    },
-    {
-        key: 'payment_policy',
-        label: 'Thanh toán',
-        subtitle: 'Phương thức thanh toán',
-        description: 'Quản lý chính sách thanh toán, kích hoạt đơn hàng và đối soát.',
-        slug: 'chinh-sach-thanh-toan',
-        icon: WalletCards,
-        titleKey: 'payment_policy_title',
-        excerptKey: 'payment_policy_excerpt',
-        contentKey: 'payment_policy_content',
-        seoTitleKey: 'payment_policy_seo_title',
-        seoDescriptionKey: 'payment_policy_seo_description',
-        publishedKey: 'payment_policy_is_published',
     },
     {
         key: 'api_usage_policy',

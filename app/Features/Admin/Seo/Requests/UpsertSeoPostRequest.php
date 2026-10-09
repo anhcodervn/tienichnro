@@ -29,14 +29,8 @@ class UpsertSeoPostRequest extends FormRequest
         $postId = $this->route('seoPost')?->id ?? $this->route('seoPost');
 
         return [
-            'type' => ['required', Rule::in(['knowledge', 'guide', 'price'])],
-            'service_id' => [
-                Rule::requiredIf($this->input('type') === 'price'),
-                'nullable',
-                'integer',
-                'exists:games,id',
-                Rule::prohibitedIf($this->input('type') !== 'price'),
-            ],
+            'type' => ['required', Rule::in(['knowledge', 'guide'])],
+            'service_id' => ['prohibited'],
             'seo_category_id' => [
                 Rule::requiredIf(in_array($this->input('status'), ['published', 'scheduled'], true)),
                 'nullable',

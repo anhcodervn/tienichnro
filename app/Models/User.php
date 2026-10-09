@@ -2,20 +2,14 @@
 
 namespace App\Models;
 
-use App\Features\Affiliate\Events\AffiliateDashboardUpdated;
-use App\Models\Concerns\BelongsToTenant;
 use App\Notifications\QueuedResetPasswordNotification;
 use App\Notifications\QueuedVerifyEmailNotification;
-use App\Support\TenantContext;
 use Illuminate\Auth\MustVerifyEmail;
 use Illuminate\Auth\Passwords\CanResetPassword as CanResetPasswordTrait;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -25,16 +19,13 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
 
 class User extends Authenticatable implements CanResetPassword, JWTSubject, MustVerifyEmailContract
 {
-    use BelongsToTenant, CanResetPasswordTrait, HasApiTokens, HasFactory, MustVerifyEmail, Notifiable, SoftDeletes;
+    use CanResetPasswordTrait, HasApiTokens, HasFactory, MustVerifyEmail, Notifiable, SoftDeletes;
 
     public const ROLE_USER = 'user';
 
     public const ROLE_ADMIN = 'admin';
 
-    public const ROLE_COLLABORATOR = 'ctv';
-
     protected $fillable = [
-        'tenant_id',
         'name',
         'username',
         'email',
@@ -48,8 +39,6 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         'email_verified_at',
         'last_login_at',
         'last_login_ip',
-        'referral_code',
-        'referred_by',
     ];
 
     protected $hidden = [
@@ -68,7 +57,6 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',
-            'game_service_secondary_password' => 'hashed',
             'deleted_at' => 'datetime',
         ];
     }
@@ -80,27 +68,8 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
                 $user->username = $user->generateUniqueUsername();
             }
 
-            $user->referral_code ??= $user->generateUniqueReferralCode();
         });
 
-        static::created(function (self $user): void {
-            $walletIdentity = ['type' => Wallet::TYPE_MAIN];
-
-            if (app(TenantContext::class)->hasTenantColumn('wallets')) {
-                $walletIdentity['tenant_id'] = $user->tenant_id;
-            }
-
-            $user->wallets()->firstOrCreate($walletIdentity, [
-                'balance' => 0,
-                'hold_balance' => 0,
-                'total_recharge' => 0,
-                'total_spent' => 0,
-            ]);
-
-            if ($user->referred_by) {
-                AffiliateDashboardUpdated::dispatch((int) $user->referred_by);
-            }
-        });
     }
 
     public function getNameAttribute(): string
@@ -113,79 +82,9 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         $this->attributes['full_name'] = $value;
     }
 
-    public function referrer(): BelongsTo
-    {
-        return $this->belongsTo(self::class, 'referred_by');
-    }
-
-    public function referrals(): HasMany
-    {
-        return $this->hasMany(self::class, 'referred_by');
-    }
-
-    public function affiliateProfile(): HasOne
-    {
-        return $this->hasOne(AffiliateProfile::class);
-    }
-
-    public function affiliateCommissions(): HasMany
-    {
-        return $this->hasMany(AffiliateCommission::class, 'referrer_id');
-    }
-
     public function userSessions(): HasMany
     {
         return $this->hasMany(UserSession::class);
-    }
-
-    public function wallet(): HasOne
-    {
-        return $this->hasOne(Wallet::class)->where('type', Wallet::TYPE_MAIN);
-    }
-
-    public function wallets(): HasMany
-    {
-        return $this->hasMany(Wallet::class);
-    }
-
-    public function paymentTransactions(): HasMany
-    {
-        return $this->hasMany(PaymentTransaction::class);
-    }
-
-    public function orders(): HasMany
-    {
-        return $this->hasMany(Order::class);
-    }
-
-    public function memberLevelAccount(): HasOne
-    {
-        return $this->hasOne(MemberLevelAccount::class);
-    }
-
-    public function memberLevelCredits(): HasMany
-    {
-        return $this->hasMany(MemberLevelOrderCredit::class);
-    }
-
-    public function memberLevelHistories(): HasMany
-    {
-        return $this->hasMany(MemberLevelHistory::class);
-    }
-
-    public function apiKeys(): HasMany
-    {
-        return $this->hasMany(ApiKey::class);
-    }
-
-    public function packagePrices(): HasMany
-    {
-        return $this->hasMany(UserPackagePrice::class);
-    }
-
-    public function globalPackagePrices(): HasMany
-    {
-        return $this->hasMany(UserGlobalPackagePrice::class);
     }
 
     public function adminAuditLogs(): HasMany
@@ -196,38 +95,6 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);
-    }
-
-    public function supportConversation(): HasOne
-    {
-        return $this->hasOne(SupportConversation::class);
-    }
-
-    public function supportMessages(): HasMany
-    {
-        return $this->hasMany(SupportMessage::class, 'sender_id');
-    }
-
-    public function assignedGameServiceOrders(): HasMany
-    {
-        return $this->hasMany(GameServiceOrder::class, 'collaborator_id');
-    }
-
-    public function allowedGameServices(): BelongsToMany
-    {
-        return $this->belongsToMany(GameService::class, 'collaborator_game_service_permissions')
-            ->withTimestamps();
-    }
-
-    public function gameServiceOrderMessages(): HasMany
-    {
-        return $this->hasMany(GameServiceOrderMessage::class, 'sender_id');
-    }
-
-    public function canAccessCollaboratorDashboard(): bool
-    {
-        return $this->status === 'active'
-            && in_array($this->role, [self::ROLE_ADMIN, self::ROLE_COLLABORATOR], true);
     }
 
     public function notificationReads(): HasMany
@@ -267,22 +134,13 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         $original = $username;
         $counter = 1;
 
-        while (static::withTrashed()->where('tenant_id', $this->tenant_id)->where('username', $username)->exists()) {
+        while (static::withTrashed()->where('username', $username)->exists()) {
             $suffix = (string) $counter;
             $username = Str::limit($original, max(1, 32 - strlen($suffix)), '').$suffix;
             $counter++;
         }
 
         return $username;
-    }
-
-    protected function generateUniqueReferralCode(): string
-    {
-        do {
-            $code = Str::upper(Str::random(10));
-        } while (static::withTrashed()->withoutGlobalScopes()->where('referral_code', $code)->exists());
-
-        return $code;
     }
 
     public function sendPasswordResetNotification($token): void

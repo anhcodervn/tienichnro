@@ -19,7 +19,6 @@ class SitemapController extends Controller
             ['loc' => route('sitemap.pages'), 'lastmod' => $this->latestLastmod($this->sitemapUrlService->pageUrls())],
             ['loc' => route('sitemap.articles'), 'lastmod' => $this->latestLastmod($this->sitemapUrlService->articleUrls())],
             ['loc' => route('sitemap.categories'), 'lastmod' => $this->latestLastmod($this->sitemapUrlService->categoryUrls())],
-            ['loc' => route('sitemap.games'), 'lastmod' => $this->latestLastmod($this->sitemapUrlService->gameUrls())],
         ]);
 
         return response()

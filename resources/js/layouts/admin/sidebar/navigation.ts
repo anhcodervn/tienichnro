@@ -1,31 +1,8 @@
-import {
-    BadgeDollarSign,
-    BellRing,
-    BookMarked,
-    ChartNoAxesCombined,
-    Gamepad2,
-    Globe2,
-    HandCoins,
-    Layers3,
-    LayoutDashboard,
-    ListChecks,
-    Mail,
-    MessagesSquare,
-    ScrollText,
-    Settings,
-    ShoppingCart,
-    Users,
-    WalletCards,
-    type LucideIcon,
-} from 'lucide-vue-next';
+import { BookMarked, Globe2, Layers3, ListChecks, Mail, MessagesSquare, ScrollText, Settings, Users, type LucideIcon } from 'lucide-vue-next';
 
 export type AdminMenuChild = {
     label: string;
     href: string;
-    badge?: 'game-service-reviews';
-    platformOnly?: boolean;
-    childOnly?: boolean;
-    tenancyOnly?: boolean;
 };
 
 export type AdminMenuGroup = {
@@ -34,261 +11,40 @@ export type AdminMenuGroup = {
     icon: LucideIcon;
     href?: string;
     children?: AdminMenuChild[];
-    badge?: 'support' | 'game-service-reviews';
-    platformOnly?: boolean;
-    childOnly?: boolean;
-    tenancyOnly?: boolean;
 };
 
 export const adminMenuGroups: AdminMenuGroup[] = [
+    { key: 'services', label: 'Quản lý dịch vụ', icon: Layers3, href: '/admin/services' },
+    { key: 'nro-servers', label: 'Server NRO', icon: Globe2, href: '/admin/nro/servers' },
     {
-        key: 'dashboard',
-        label: 'Dashboard',
-        icon: LayoutDashboard,
-        href: '/admin',
-    },
-    {
-        key: 'reports',
-        label: 'Báo cáo doanh thu',
-        icon: ChartNoAxesCombined,
+        key: 'nro-notifications',
+        label: 'Thông báo game',
+        icon: ListChecks,
         children: [
-            { label: 'Doanh thu nạp game', href: '/admin/reports/topup' },
-            { label: 'Doanh thu dịch vụ', href: '/admin/reports/game-services', platformOnly: true },
+            { label: 'Quản lý loại thông báo', href: '/admin/nro/notification-types' },
+            { label: 'Quản lý thông báo', href: '/admin/nro/notifies' },
+            { label: 'Quản lý boss', href: '/admin/nro/bosses' },
         ],
     },
-    {
-        key: 'audit-logs',
-        label: 'Nhật ký quản trị',
-        icon: ScrollText,
-        href: '/admin/audit-logs',
-    },
-    {
-        key: 'topup-orders',
-        label: 'Đơn nạp game',
-        icon: ShoppingCart,
-        href: '/admin/topup/orders',
-    },
-    {
-        key: 'topup-catalog',
-        label: 'Danh mục nạp game',
-        icon: Gamepad2,
-        children: [
-            {
-                label: 'Game',
-                href: '/admin/topup/games',
-            },
-            {
-                label: 'Máy chủ',
-                href: '/admin/topup/servers',
-            },
-            {
-                label: 'Gói nạp',
-                href: '/admin/topup/packages',
-            },
-            {
-                label: 'Gói nạp Global',
-                href: '/admin/topup/global-packages',
-            },
-            {
-                label: 'Bảng thực nhận game',
-                href: '/admin/topup/global-rewards',
-            },
-        ],
-        platformOnly: true,
-    },
-    {
-        key: 'game-services',
-        label: 'Dịch vụ game',
-        icon: Layers3,
-        badge: 'game-service-reviews',
-        children: [
-            { label: 'Quản lý game', href: '/admin/game-services/games' },
-            { label: 'Quản lý dịch vụ', href: '/admin/game-services/services' },
-            { label: 'Gói dịch vụ', href: '/admin/game-services/packages' },
-            { label: 'Quản lý đơn order', href: '/admin/game-services/orders' },
-            { label: 'Duyệt hoàn thành', href: '/admin/game-services/order-reviews', badge: 'game-service-reviews' },
-            { label: 'Quản lý chat', href: '/admin/game-services/chats' },
-            { label: 'Thông báo Dashboard CTV', href: '/admin/game-services/announcements' },
-        ],
-        platformOnly: true,
-    },
-    {
-        key: 'topup-providers',
-        label: 'Nhà cung cấp',
-        icon: HandCoins,
-        children: [
-            {
-                label: 'Danh sách provider',
-                href: '/admin/topup/providers',
-            },
-            {
-                label: 'So sánh giá provider',
-                href: '/admin/topup/provider-prices',
-            },
-        ],
-        platformOnly: true,
-    },
-    {
-        key: 'recharge',
-        label: 'Quản lý nạp tiền',
-        icon: WalletCards,
-        children: [
-            {
-                label: 'Cấu hình nạp tiền',
-                href: '/admin/recharge/config',
-            },
-            {
-                label: 'Lịch sử nạp tiền',
-                href: '/admin/recharge/history',
-            },
-        ],
-    },
-    {
-        key: 'users',
-        label: 'Quản lý người dùng',
-        icon: Users,
-        children: [
-            {
-                label: 'Danh sách thành viên',
-                href: '/admin/users',
-            },
-            {
-                label: 'User chiết khấu',
-                href: '/admin/users/discounts',
-            },
-            {
-                label: 'Lịch sử dòng tiền',
-                href: '/admin/users/wallet-transactions',
-            },
-        ],
-    },
-    {
-        key: 'notifications',
-        label: 'Thông báo hệ thống',
-        icon: BellRing,
-        children: [
-            {
-                label: 'Tạo thông báo mới',
-                href: '/admin/notifications/create',
-            },
-            {
-                label: 'Danh sách thông báo',
-                href: '/admin/notifications',
-            },
-        ],
-        platformOnly: true,
-    },
-    {
-        key: 'seo-management',
-        label: 'Quản trị SEO',
-        icon: BookMarked,
-        children: [
-            {
-                label: 'Tổng quan SEO',
-                href: '/admin/seo',
-            },
-            {
-                label: 'SEO trang chủ',
-                href: '/admin/seo/home',
-            },
-            {
-                label: 'SEO từng game',
-                href: '/admin/seo/games',
-            },
-            {
-                label: 'Danh mục SEO',
-                href: '/admin/seo/categories',
-            },
-            {
-                label: 'Bài viết SEO',
-                href: '/admin/seo/posts',
-            },
-            {
-                label: 'Tạo bài viết',
-                href: '/admin/seo/posts/create',
-            },
-            {
-                label: 'Sitemap & index',
-                href: '/admin/seo/sitemaps',
-            },
-        ],
-        platformOnly: true,
-    },
+    { key: 'posts', label: 'Bài viết', icon: BookMarked, href: '/admin/seo/posts' },
+    { key: 'categories', label: 'Danh mục', icon: Layers3, href: '/admin/seo/categories' },
+    { key: 'seo-home', label: 'SEO trang chủ', icon: Globe2, href: '/admin/seo/home' },
+    { key: 'sitemaps', label: 'Sitemap & index', icon: ListChecks, href: '/admin/seo/sitemaps' },
+    { key: 'users', label: 'Người dùng', icon: Users, href: '/admin/users' },
     {
         key: 'settings',
-        label: 'Cấu hình hệ thống',
+        label: 'Cấu hình',
         icon: Settings,
         children: [
-            {
-                label: 'Cấu hình chung',
-                href: '/admin/settings/general',
-            },
-            {
-                label: 'Cấu hình nội dung',
-                href: '/admin/settings/content',
-            },
-            {
-                label: 'Cấu hình Bio',
-                href: '/admin/settings/bio',
-            },
-            {
-                label: 'Bảo trì hệ thống',
-                href: '/admin/settings/maintenance',
-            },
+            { label: 'Cấu hình chung', href: '/admin/settings/general' },
+            { label: 'Trang thông tin', href: '/admin/settings/content' },
+            { label: 'Bảo trì', href: '/admin/settings/maintenance' },
         ],
     },
-    {
-        key: 'affiliate',
-        label: 'Affiliate',
-        icon: HandCoins,
-        children: [
-            {
-                label: 'Tổng quan',
-                href: '/admin/affiliate',
-            },
-            {
-                label: 'Thông báo',
-                href: '/admin/affiliate/announcements',
-            },
-        ],
-    },
-    {
-        key: 'tenant-sites',
-        label: 'Website đại lý',
-        icon: Globe2,
-        href: '/admin/sites',
-        platformOnly: true,
-        tenancyOnly: true,
-    },
-    {
-        key: 'tenant-prices',
-        label: 'Giá bán website',
-        icon: BadgeDollarSign,
-        href: '/admin/site-prices',
-        childOnly: true,
-        tenancyOnly: true,
-    },
-    {
-        key: 'mail',
-        label: 'Gửi email',
-        icon: Mail,
-        href: '/admin/mail',
-        platformOnly: true,
-    },
-    {
-        key: 'support',
-        label: 'Tin nhắn hỗ trợ',
-        icon: MessagesSquare,
-        href: '/admin/support',
-        badge: 'support',
-    },
-    {
-        key: 'queues',
-        label: 'Quản lý queue',
-        icon: ListChecks,
-        href: '/admin/queues',
-        platformOnly: true,
-    },
+    { key: 'audit-logs', label: 'Nhật ký quản trị', icon: ScrollText, href: '/admin/audit-logs' },
+    { key: 'feedbacks', label: 'Liên hệ', icon: MessagesSquare, href: '/admin/feedbacks' },
+    { key: 'mail', label: 'Email', icon: Mail, href: '/admin/mail' },
+    { key: 'queues', label: 'Hàng đợi', icon: ListChecks, href: '/admin/queues' },
 ];
 
 export const resolveAdminPageTitle = (path: string): string => {

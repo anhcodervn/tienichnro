@@ -23,7 +23,6 @@ class SendMessage
         'daily_report' => 'daily_report',
         'provider' => 'provider',
         'feedback' => 'feedback',
-        'support' => 'support',
         'activity' => 'activity',
     ];
 

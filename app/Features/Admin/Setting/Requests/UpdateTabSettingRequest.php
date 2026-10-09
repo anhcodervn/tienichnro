@@ -31,8 +31,6 @@ class UpdateTabSettingRequest extends FormRequest
         return match ((string) $this->route('tab')) {
             'maintenance' => [
                 'site_active' => ['required', 'boolean'],
-                'topup_maintenance_enabled' => ['required', 'boolean'],
-                'topup_maintenance_message' => ['nullable', 'string', 'max:2000', 'required_if:topup_maintenance_enabled,true'],
             ],
             'general' => [
                 'site_name' => ['required', 'string', 'max:190'],
@@ -67,22 +65,6 @@ class UpdateTabSettingRequest extends FormRequest
                 'home_popup_allow_dismiss' => ['required', 'boolean'],
                 'home_popup_dismiss_hours' => ['required', 'integer', 'between:1,8760'],
             ],
-            'service-articles' => [
-                'game_service_enabled' => ['required', 'boolean'],
-                'game_service_items' => [
-                    'present',
-                    'array',
-                    'max:20',
-                    function (string $attribute, mixed $value, Closure $fail): void {
-                        if ($this->boolean('game_service_enabled') && is_array($value) && $value === []) {
-                            $fail('Vui lòng thêm ít nhất một dịch vụ game trước khi bật hiển thị.');
-                        }
-                    },
-                ],
-                'game_service_items.*' => ['required', 'array:label,url'],
-                'game_service_items.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
-                'game_service_items.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeServiceUrlRule()],
-            ],
             'bio' => [
                 'bio_title' => ['required', 'string', 'max:120', 'not_regex:/[\x00-\x1F\x7F]/u'],
                 'bio_description' => ['nullable', 'string', 'max:500'],
@@ -110,13 +92,6 @@ class UpdateTabSettingRequest extends FormRequest
                 'facebook' => ['nullable', 'string', 'max:255'],
                 'zalo' => ['nullable', 'string', 'max:255'],
                 'youtube' => ['nullable', 'string', 'max:255'],
-            ],
-            'support-channels' => [
-                'support_channels' => ['present', 'array', 'max:10'],
-                'support_channels.*' => ['required', 'array:icon,url,is_active'],
-                'support_channels.*.icon' => ['required', 'string', 'max:2048', $this->safeSupportUrlRule('icon')],
-                'support_channels.*.url' => ['required', 'string', 'max:2048', 'distinct:strict', $this->safeSupportUrlRule('link')],
-                'support_channels.*.is_active' => ['required', 'boolean'],
             ],
             'seo' => [
                 'meta_title' => ['nullable', 'string', 'max:255'],
@@ -149,13 +124,7 @@ class UpdateTabSettingRequest extends FormRequest
                 'discord_webhooks.*.url' => ['required', 'url', 'max:2048'],
                 'discord_webhooks.*.is_active' => ['required', 'boolean'],
                 'discord_webhooks.*.events' => ['nullable', 'array'],
-                'discord_webhooks.*.events.*' => ['string', 'in:test_ping,user_registered,recharge_success'],
-            ],
-            'tax' => [
-                'tax_enabled' => ['required', 'boolean'],
-                'tax_calculation_type' => ['required', Rule::in(['revenue'])],
-                'vat_rate' => ['required', 'decimal:0,4', 'between:0,100'],
-                'pit_rate' => ['required', 'decimal:0,4', 'between:0,100'],
+                'discord_webhooks.*.events.*' => ['string', 'in:test_ping,user_registered'],
             ],
             'security' => [
                 'turnstile_enabled' => ['required', 'boolean'],
@@ -210,11 +179,6 @@ class UpdateTabSettingRequest extends FormRequest
             'color_primary.regex' => 'Màu chính phải đúng mã HEX.',
             'color_accent.regex' => 'Màu nhấn phải đúng mã HEX.',
             'color_surface.regex' => 'Màu nền phải đúng mã HEX.',
-            'game_service_items.max' => 'Chỉ được cấu hình tối đa 20 dịch vụ game.',
-            'game_service_items.*.label.required' => 'Vui lòng nhập tên dịch vụ.',
-            'game_service_items.*.label.max' => 'Tên dịch vụ không được vượt quá 80 ký tự.',
-            'game_service_items.*.url.required' => 'Vui lòng nhập liên kết dịch vụ.',
-            'game_service_items.*.url.distinct' => 'Liên kết dịch vụ không được trùng nhau.',
             'footer_game_links.max' => 'Chỉ được cấu hình tối đa 20 liên kết game ở footer.',
             'footer_game_links.*.label.required' => 'Vui lòng nhập tên game ở footer.',
             'footer_game_links.*.label.max' => 'Tên game ở footer không được vượt quá 80 ký tự.',
@@ -224,11 +188,6 @@ class UpdateTabSettingRequest extends FormRequest
             'bio_links.*.label.required' => 'Vui lòng nhập tên liên kết bio.',
             'bio_links.*.url.required' => 'Vui lòng nhập URL liên kết bio.',
             'bio_links.*.url.distinct' => 'URL liên kết bio không được trùng nhau.',
-            'support_channels.max' => 'Chỉ được cấu hình tối đa 10 kênh hỗ trợ.',
-            'support_channels.*.icon.required' => 'Vui lòng nhập icon cho kênh hỗ trợ.',
-            'support_channels.*.url.required' => 'Vui lòng nhập liên kết hỗ trợ.',
-            'support_channels.*.url.distinct' => 'Liên kết hỗ trợ không được trùng nhau.',
-            'topup_maintenance_message.required_if' => 'Vui lòng nhập nội dung thông báo bảo trì cổng nạp game.',
         ];
     }
 
@@ -242,13 +201,9 @@ class UpdateTabSettingRequest extends FormRequest
             'site_domain' => 'domain website',
             'site_description' => 'mô tả hệ thống',
             'site_active' => 'trạng thái website',
-            'topup_maintenance_enabled' => 'trạng thái bảo trì cổng nạp game',
-            'topup_maintenance_message' => 'nội dung bảo trì cổng nạp game',
             'allow_register' => 'trạng thái đăng ký',
             'game_service_enabled' => 'trạng thái dịch vụ game',
             'game_service_items' => 'danh sách dịch vụ game',
-            'game_service_items.*.label' => 'tên dịch vụ',
-            'game_service_items.*.url' => 'liên kết dịch vụ',
             'footer_game_links' => 'danh sách game khác ở footer',
             'footer_game_links.*.label' => 'tên game ở footer',
             'footer_game_links.*.url' => 'liên kết game ở footer',
@@ -270,10 +225,6 @@ class UpdateTabSettingRequest extends FormRequest
             'facebook' => 'liên kết Facebook',
             'zalo' => 'liên kết Zalo',
             'youtube' => 'liên kết YouTube',
-            'support_channels' => 'danh sách kênh hỗ trợ',
-            'support_channels.*.icon' => 'icon kênh hỗ trợ',
-            'support_channels.*.url' => 'liên kết kênh hỗ trợ',
-            'support_channels.*.is_active' => 'trạng thái kênh hỗ trợ',
             'meta_title' => 'meta title',
             'meta_description' => 'meta description',
             'robots' => 'robots',
@@ -324,15 +275,9 @@ class UpdateTabSettingRequest extends FormRequest
             return;
         }
 
-        if ((string) $this->route('tab') === 'support-channels') {
-            $this->prepareSupportChannels();
-
-            return;
-        }
-
         $tab = (string) $this->route('tab');
 
-        if (! in_array($tab, ['general', 'service-articles'], true)) {
+        if (! in_array($tab, ['general'], true)) {
             return;
         }
 
@@ -398,40 +343,6 @@ class UpdateTabSettingRequest extends FormRequest
                 $fail('Liên kết bio phải là URL http/https hoặc đường dẫn nội bộ bắt đầu bằng /.');
             }
         };
-    }
-
-    private function safeSupportUrlRule(string $field): Closure
-    {
-        return function (string $attribute, mixed $value, Closure $fail) use ($field): void {
-            if ($value !== null && $value !== '' && ! SafeNavigationUrl::passes($value)) {
-                $fail($field === 'icon'
-                    ? 'Icon hỗ trợ phải là URL http/https hoặc đường dẫn nội bộ bắt đầu bằng /.'
-                    : 'Liên kết hỗ trợ phải là URL http/https hoặc đường dẫn nội bộ bắt đầu bằng /.');
-            }
-        };
-    }
-
-    private function prepareSupportChannels(): void
-    {
-        $channels = $this->input('support_channels');
-
-        if (! is_array($channels)) {
-            return;
-        }
-
-        $this->merge([
-            'support_channels' => array_map(static function (mixed $channel): mixed {
-                if (! is_array($channel)) {
-                    return $channel;
-                }
-
-                return [
-                    ...$channel,
-                    'icon' => is_string($channel['icon'] ?? null) ? trim($channel['icon']) : ($channel['icon'] ?? null),
-                    'url' => is_string($channel['url'] ?? null) ? trim($channel['url']) : ($channel['url'] ?? null),
-                ];
-            }, $channels),
-        ]);
     }
 
     private function prepareBioSettings(): void

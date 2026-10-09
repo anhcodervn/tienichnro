@@ -13,7 +13,7 @@ return new class extends Migration
     {
         Schema::table('seo_posts', function (Blueprint $table): void {
             $table->string('type')->default('knowledge')->index()->after('seo_category_id');
-            $table->foreignId('service_id')->nullable()->after('type')->constrained('games')->nullOnDelete();
+            $table->unsignedBigInteger('service_id')->nullable()->after('type');
             $table->json('faq')->nullable()->after('content');
         });
     }
@@ -24,8 +24,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('seo_posts', function (Blueprint $table): void {
-            $table->dropConstrainedForeignId('service_id');
-            $table->dropColumn(['type', 'faq']);
+            $table->dropColumn(['type', 'service_id', 'faq']);
         });
     }
 };

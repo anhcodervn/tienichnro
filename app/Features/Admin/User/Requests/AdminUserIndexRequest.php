@@ -22,7 +22,7 @@ class AdminUserIndexRequest extends FormRequest
         return [
             'search' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'in:active,inactive,blocked'],
-            'role' => ['nullable', 'string', 'in:user,admin,ctv'],
+            'role' => ['nullable', 'string', 'in:user,admin'],
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
             'per_page' => ['nullable', 'integer', 'min:1', 'max:100'],

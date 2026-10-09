@@ -2,6 +2,168 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Shared client palette also covers HTML fragments inserted by the notification feed. */
+html[data-client-theme].dark {
+    color-scheme: dark;
+}
+html[data-client-theme].dark body {
+    @apply bg-slate-950 text-slate-100;
+}
+html[data-client-theme].dark .nro-feed-page {
+    @apply bg-slate-950;
+}
+html[data-client-theme].dark .nro-feed-page .text-violet-800 {
+    @apply text-violet-300;
+}
+html[data-client-theme].dark :is(.bg-white, .client-card, .client-input, .client-button-secondary, .client-swal-popup, .client-toast) {
+    @apply border-slate-700 bg-slate-900 text-slate-100;
+}
+html[data-client-theme].dark .bg-white\/95 {
+    background-color: rgb(15 23 42 / 95%);
+}
+html[data-client-theme].dark :is(.bg-slate-50, .bg-slate-100, .status-pill) {
+    @apply bg-slate-800;
+}
+html[data-client-theme].dark :is(.border-slate-100, .border-slate-200, .border-slate-300, .divide-slate-200 > :not([hidden]) ~ :not([hidden])) {
+    @apply border-slate-700;
+}
+html[data-client-theme].dark
+    :is(.text-slate-950, .text-slate-900, .text-slate-800, .client-label, .article-content :is(h1, h2, h3, h4, h5, h6, strong)) {
+    @apply text-slate-100;
+}
+html[data-client-theme].dark :is(.text-slate-700, .text-slate-600, .article-content, .client-button-secondary) {
+    @apply text-slate-300;
+}
+html[data-client-theme].dark :is(.text-slate-500, .text-slate-400) {
+    color: theme('colors.slate.400');
+}
+html[data-client-theme].dark .hover\:bg-slate-50:hover {
+    @apply bg-slate-800;
+}
+html[data-client-theme].dark .hover\:bg-emerald-50:hover {
+    @apply bg-emerald-950;
+}
+html[data-client-theme].dark .hover\:bg-rose-50:hover {
+    @apply bg-rose-950;
+}
+html[data-client-theme].dark :is(.article-content blockquote, .article-content code) {
+    @apply bg-sky-950 text-sky-200;
+}
+html[data-client-theme].dark .client-swal-popup,
+html[data-client-theme].dark .client-toast {
+    background: #0f172a !important;
+    color: #f1f5f9 !important;
+    border-color: #334155 !important;
+}
+
+html[data-client-theme].dark :is(.bg-emerald-50, .bg-emerald-100, .bg-emerald-50\/60) {
+    @apply bg-emerald-950;
+}
+html[data-client-theme].dark :is(.text-emerald-700, .text-emerald-800, .text-emerald-900) {
+    @apply text-emerald-300;
+}
+html[data-client-theme].dark :is(.border-emerald-200, .border-emerald-300) {
+    @apply border-emerald-800;
+}
+html[data-client-theme].dark .from-emerald-50 {
+    --tw-gradient-from: theme('colors.emerald.950') var(--tw-gradient-from-position);
+    --tw-gradient-to: transparent var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+html[data-client-theme].dark .to-emerald-50 {
+    --tw-gradient-to: theme('colors.emerald.900') var(--tw-gradient-to-position);
+}
+
+html[data-client-theme].dark :is(.bg-cyan-50, .bg-cyan-100, .bg-cyan-50\/60) {
+    @apply bg-cyan-950;
+}
+html[data-client-theme].dark :is(.text-cyan-700, .text-cyan-800, .text-cyan-900) {
+    @apply text-cyan-300;
+}
+html[data-client-theme].dark :is(.border-cyan-200, .border-cyan-300) {
+    @apply border-cyan-800;
+}
+html[data-client-theme].dark .from-cyan-50 {
+    --tw-gradient-from: theme('colors.cyan.950') var(--tw-gradient-from-position);
+    --tw-gradient-to: transparent var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+html[data-client-theme].dark .to-cyan-50 {
+    --tw-gradient-to: theme('colors.cyan.900') var(--tw-gradient-to-position);
+}
+
+html[data-client-theme].dark :is(.bg-sky-50, .bg-sky-100, .bg-sky-50\/60) {
+    @apply bg-sky-950;
+}
+html[data-client-theme].dark :is(.text-sky-700, .text-sky-800, .text-sky-900) {
+    @apply text-sky-300;
+}
+html[data-client-theme].dark :is(.border-sky-200, .border-sky-300) {
+    @apply border-sky-800;
+}
+html[data-client-theme].dark .from-sky-50 {
+    --tw-gradient-from: theme('colors.sky.950') var(--tw-gradient-from-position);
+    --tw-gradient-to: transparent var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+html[data-client-theme].dark .to-sky-50 {
+    --tw-gradient-to: theme('colors.sky.900') var(--tw-gradient-to-position);
+}
+
+html[data-client-theme].dark :is(.bg-blue-50, .bg-blue-100, .bg-blue-50\/60) {
+    @apply bg-blue-950;
+}
+html[data-client-theme].dark :is(.text-blue-700, .text-blue-800, .text-blue-900) {
+    @apply text-blue-300;
+}
+html[data-client-theme].dark :is(.border-blue-200, .border-blue-300) {
+    @apply border-blue-800;
+}
+html[data-client-theme].dark .from-blue-50 {
+    --tw-gradient-from: theme('colors.blue.950') var(--tw-gradient-from-position);
+    --tw-gradient-to: transparent var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+html[data-client-theme].dark .to-blue-50 {
+    --tw-gradient-to: theme('colors.blue.900') var(--tw-gradient-to-position);
+}
+
+html[data-client-theme].dark :is(.bg-amber-50, .bg-amber-100, .bg-amber-50\/60) {
+    @apply bg-amber-950;
+}
+html[data-client-theme].dark :is(.text-amber-700, .text-amber-800, .text-amber-900) {
+    @apply text-amber-300;
+}
+html[data-client-theme].dark :is(.border-amber-200, .border-amber-300) {
+    @apply border-amber-800;
+}
+html[data-client-theme].dark .from-amber-50 {
+    --tw-gradient-from: theme('colors.amber.950') var(--tw-gradient-from-position);
+    --tw-gradient-to: transparent var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+html[data-client-theme].dark .to-amber-50 {
+    --tw-gradient-to: theme('colors.amber.900') var(--tw-gradient-to-position);
+}
+
+html[data-client-theme].dark :is(.bg-rose-50, .bg-rose-100, .bg-rose-50\/60) {
+    @apply bg-rose-950;
+}
+html[data-client-theme].dark :is(.text-rose-700, .text-rose-800, .text-rose-900) {
+    @apply text-rose-300;
+}
+html[data-client-theme].dark :is(.border-rose-200, .border-rose-300) {
+    @apply border-rose-800;
+}
+html[data-client-theme].dark .from-rose-50 {
+    --tw-gradient-from: theme('colors.rose.950') var(--tw-gradient-from-position);
+    --tw-gradient-to: transparent var(--tw-gradient-to-position);
+    --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);
+}
+html[data-client-theme].dark .to-rose-50 {
+    --tw-gradient-to: theme('colors.rose.900') var(--tw-gradient-to-position);
+}
+
 @layer base {
     :root {
         color-scheme: light;
@@ -797,7 +959,7 @@
     }
 
     .client-swal-popup {
-        border-radius: 5px !important;
+        border-radius: 10px !important;
         border: 1px solid rgb(203 213 225) !important;
         width: min(25rem, calc(100% - 2rem)) !important;
         padding: 1.5rem !important;
@@ -813,6 +975,7 @@
     .client-swal-popup .swal2-html-container {
         font-size: 0.875rem !important;
         line-height: 1.5 !important;
+        white-space: pre-line;
     }
 
     .client-swal-popup .swal2-loader {

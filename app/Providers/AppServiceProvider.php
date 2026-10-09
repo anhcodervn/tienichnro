@@ -2,30 +2,21 @@
 
 namespace App\Providers;
 
-use App\Features\Client\Wallet\Observers\WalletTransactionObserver;
 use App\Models\QueueLog;
-use App\Models\WalletTransaction;
-use App\Support\TenantContext;
 use App\Utils\SendMessage;
-use Illuminate\Cache\RateLimiting\Limit;
-use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Queue;
-use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
 
 class AppServiceProvider extends ServiceProvider
 {
-    public function register(): void
-    {
-        $this->app->scoped(TenantContext::class, fn (): TenantContext => new TenantContext);
-    }
+    public function register(): void {}
 
     /**
      * Bootstrap any application services.
@@ -34,14 +25,6 @@ class AppServiceProvider extends ServiceProvider
     {
         App::setLocale('vi');
         config(['app.locale' => 'vi']);
-        WalletTransaction::observe(WalletTransactionObserver::class);
-        RateLimiter::for('game-service-secondary-auth', fn (Request $request): Limit => Limit::perMinute(5)
-            ->by('game-service-secondary-auth:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
-        RateLimiter::for('game-service-chat-message', fn (Request $request): Limit => Limit::perMinute(30)
-            ->by('game-service-chat-message:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
-        RateLimiter::for('game-service-withdrawal', fn (Request $request): Limit => Limit::perMinute(5)
-            ->by('game-service-withdrawal:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
-
         Queue::before(function (JobProcessing $event): void {
             $payload = $event->job->payload();
             $jobUuid = $event->job->uuid() ?: Arr::get($payload, 'uuid');

@@ -14,12 +14,9 @@ import type {
     PopupNoticeSettingType,
     SecuritySettingType,
     SeoSettingType,
-    ServiceArticlesSettingType,
     SettingApiResponse,
     SliderImageSettingType,
-    SupportChannelSettingType,
     SystemSettingType,
-    TaxSettingType,
 } from '@/types/setting.type';
 
 const getTab = async <T>(tab: string): Promise<SettingApiResponse<T>> => {
@@ -63,12 +60,6 @@ export const adminSettingService = {
     updatePopupNotice(payload: PopupNoticeSettingType) {
         return updateTab<PopupNoticeSettingType>('popup-notice', payload);
     },
-    getServiceArticles() {
-        return getTab<ServiceArticlesSettingType>('service-articles');
-    },
-    updateServiceArticles(payload: ServiceArticlesSettingType) {
-        return updateTab<ServiceArticlesSettingType>('service-articles', payload);
-    },
     getBio() {
         return getTab<BioSettingType>('bio');
     },
@@ -99,12 +90,6 @@ export const adminSettingService = {
     updateContact(payload: ContactSettingType) {
         return updateTab<ContactSettingType>('contact', payload);
     },
-    getSupportChannels() {
-        return getTab<SupportChannelSettingType>('support-channels');
-    },
-    updateSupportChannels(payload: SupportChannelSettingType) {
-        return updateTab<SupportChannelSettingType>('support-channels', payload);
-    },
     getSeo() {
         return getTab<SeoSettingType>('seo');
     },
@@ -128,12 +113,6 @@ export const adminSettingService = {
     },
     updateSecurity(payload: SecuritySettingType) {
         return updateTab<SecuritySettingType>('security', payload);
-    },
-    getTax() {
-        return getTab<TaxSettingType>('tax');
-    },
-    updateTax(payload: TaxSettingType) {
-        return updateTab<TaxSettingType>('tax', payload);
     },
     getOptions() {
         return getTab<OptionSettingType>('options');

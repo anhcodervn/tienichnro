@@ -9,7 +9,6 @@ use App\Features\Admin\Setting\Requests\UpdateTabSettingRequest;
 use App\Http\Controllers\Controller;
 use App\Support\CrawlerFileContent;
 use App\Support\SettingStore;
-use App\Utils\Site;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Arr;
 use Illuminate\Validation\ValidationException;
@@ -38,8 +37,6 @@ class SettingController extends Controller
             ],
             'maintenance' => [
                 'site_active' => true,
-                'topup_maintenance_enabled' => false,
-                'topup_maintenance_message' => 'Cổng nạp game đang bảo trì. Vui lòng quay lại sau.',
             ],
             'homepage' => [
                 'home_notice_title' => 'Thông báo quan trọng',
@@ -53,10 +50,6 @@ class SettingController extends Controller
                 'home_popup_display_mode' => 'modal',
                 'home_popup_allow_dismiss' => false,
                 'home_popup_dismiss_hours' => 24,
-            ],
-            'service-articles' => [
-                'game_service_enabled' => false,
-                'game_service_items' => [],
             ],
             'bio' => [
                 'bio_title' => '',
@@ -80,9 +73,6 @@ class SettingController extends Controller
                 'facebook' => '',
                 'zalo' => '',
                 'youtube' => '',
-            ],
-            'support-channels' => [
-                'support_channels' => [],
             ],
             'seo' => [
                 'meta_title' => '',
@@ -183,12 +173,6 @@ class SettingController extends Controller
             'monitoring' => [
                 'discord_webhooks' => [],
             ],
-            'tax' => [
-                'tax_enabled' => false,
-                'tax_calculation_type' => 'revenue',
-                'vat_rate' => '1.0000',
-                'pit_rate' => '0.5000',
-            ],
             'security' => [
                 'turnstile_enabled' => false,
                 'turnstile_site_key' => '',
@@ -227,8 +211,6 @@ class SettingController extends Controller
             ],
             'maintenance' => [
                 'site_active' => 'site_active',
-                'topup_maintenance_enabled' => 'topup_maintenance_enabled',
-                'topup_maintenance_message' => 'topup_maintenance_message',
             ],
             'homepage' => [
                 'home_notice_title' => 'home_notice_title',
@@ -242,10 +224,6 @@ class SettingController extends Controller
                 'home_popup_display_mode' => 'home_popup_display_mode',
                 'home_popup_allow_dismiss' => 'home_popup_allow_dismiss',
                 'home_popup_dismiss_hours' => 'home_popup_dismiss_hours',
-            ],
-            'service-articles' => [
-                'game_service_enabled' => 'game_service_enabled',
-                'game_service_items' => 'game_service_items',
             ],
             'bio' => [
                 'bio_title' => 'bio_title',
@@ -269,9 +247,6 @@ class SettingController extends Controller
                 'facebook' => 'facebook',
                 'zalo' => 'zalo',
                 'youtube' => 'youtube',
-            ],
-            'support-channels' => [
-                'support_channels' => 'support_channels',
             ],
             'seo' => [
                 'meta_title' => 'meta_title',
@@ -306,12 +281,6 @@ class SettingController extends Controller
             ],
             'monitoring' => [
                 'discord_webhooks' => 'discord_webhooks',
-            ],
-            'tax' => [
-                'tax_enabled' => 'tax_enabled',
-                'tax_calculation_type' => 'tax_calculation_type',
-                'vat_rate' => 'vat_rate',
-                'pit_rate' => 'pit_rate',
             ],
             'security' => [
                 'turnstile_enabled' => 'turnstile_enabled',
@@ -381,7 +350,6 @@ class SettingController extends Controller
 
     public function show(string $tab, SettingStore $settingStore): JsonResponse
     {
-        $this->assertTabAllowed($tab);
         if ($tab === self::SYSTEM_TAB) {
             return response()->json([
                 'status' => true,
@@ -424,7 +392,6 @@ class SettingController extends Controller
         SettingStore $settingStore,
         UpdateCustomCodeSettingsAction $updateCustomCodeSettings,
     ): JsonResponse {
-        $this->assertTabAllowed($tab);
         abort_if($tab === self::SYSTEM_TAB || $tab === 'options', 404);
         abort_if(! $this->tabExists($tab), 404);
 
@@ -540,18 +507,6 @@ class SettingController extends Controller
             'turnstile_secret_key' => '',
             'turnstile_secret_configured' => $secretKey !== '',
         ];
-    }
-
-    private function assertTabAllowed(string $tab): void
-    {
-        if (Site::isMain()) {
-            return;
-        }
-
-        abort_unless(in_array($tab, [
-            'system', 'general', 'homepage', 'popup-notice', 'service-articles', 'bio', 'branding', 'support-channels',
-            'contact', 'seo', 'options', 'content-pages', 'slider-images',
-        ], true), 403, 'Website đại lý không được thay đổi cấu hình hệ thống này.');
     }
 
     /**

@@ -3,7 +3,6 @@
 namespace App\Service;
 
 use App\Exceptions\ApiException;
-use App\Models\PaymentTransaction;
 use App\Models\User;
 use App\Support\SettingStore;
 use Illuminate\Support\Arr;
@@ -23,7 +22,6 @@ class DiscordWebhookNotifier
         return [
             ['label' => 'Ping kiểm tra', 'value' => 'test_ping'],
             ['label' => 'Đăng ký mới', 'value' => 'user_registered'],
-            ['label' => 'Nạp tiền thành công', 'value' => 'recharge_success'],
         ];
     }
 
@@ -65,22 +63,6 @@ class DiscordWebhookNotifier
                 ['name' => 'Thời gian', 'value' => (string) now()->format('H:i d/m/Y'), 'inline' => false],
             ],
             'color' => 0x1D4ED8,
-        ]);
-    }
-
-    public function sendRechargeSuccess(PaymentTransaction $paymentTransaction, ?User $user = null): void
-    {
-        $owner = $user ?? $paymentTransaction->user;
-
-        $this->notify('recharge_success', [
-            'title' => 'Nạp tiền thành công',
-            'description' => 'Ví người dùng đã được cộng tiền.',
-            'fields' => [
-                ['name' => 'Mã giao dịch', 'value' => $paymentTransaction->transaction_code, 'inline' => true],
-                ['name' => 'Số tiền', 'value' => number_format((float) $paymentTransaction->amount, 0, ',', '.').' đ', 'inline' => true],
-                ['name' => 'Người dùng', 'value' => (string) ($owner?->full_name ?: $owner?->username ?: $owner?->email ?: '--'), 'inline' => false],
-            ],
-            'color' => 0x16A34A,
         ]);
     }
 
