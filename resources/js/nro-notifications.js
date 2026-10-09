@@ -122,7 +122,7 @@ export function initializeNroNotifications() {
         if (total) total.textContent = String(snapshot.total);
         if (limit) limit.textContent = String(snapshot.per_page);
         updateCountdowns();
-        setStatus('Đang cập nhật trực tiếp');
+        setStatus(root.dataset.nroRealtime === 'false' ? 'Bản xem giới hạn · trễ 5 phút' : 'Đang cập nhật trực tiếp');
     };
     const start = () => {
         if (maintenance) return;
@@ -159,6 +159,9 @@ export function initializeNroNotifications() {
         connection.addEventListener('maintenance', () => {
             if (source === connection) showMaintenance();
         });
+        connection.addEventListener('access-expired', () => {
+            if (source === connection) showMaintenance();
+        });
         connection.addEventListener('error', async () => {
             if (source !== connection || checkingAvailability) return;
             setStatus('Đang kết nối lại…');
@@ -168,9 +171,15 @@ export function initializeNroNotifications() {
                     headers: { Accept: 'application/json' },
                     credentials: 'same-origin',
                 });
-                if (source !== connection || response.status !== 503) return;
+                if (source !== connection) return;
                 const payload = await response.json();
                 if (source === connection && payload.service_maintenance === true) showMaintenance();
+                else if (payload.realtime === false || response.status === 403) showMaintenance();
+                else if (response.status === 429) {
+                    connection.close();
+                    source = null;
+                    setStatus(payload.message || 'Đã đạt giới hạn kết nối. Hãy đợi rồi bấm Làm mới.');
+                }
             } catch {
                 if (source === connection) setStatus('Đang kết nối lại…');
             } finally {
@@ -231,7 +240,7 @@ export function initializeNroNotifications() {
                     return;
                 }
                 const message = Object.values(payload.errors || {}).flat()[0];
-                throw new Error(message || 'Không tải được thông báo. Bấm Làm mới để thử lại.');
+                throw new Error(message || payload.message || 'Không tải được thông báo. Bấm Làm mới để thử lại.');
             }
             if (
                 typeof payload.data?.html !== 'string' ||
@@ -241,6 +250,7 @@ export function initializeNroNotifications() {
             ) {
                 throw new Error('Dữ liệu phản hồi không hợp lệ. Bấm Làm mới để thử lại.');
             }
+            if (typeof payload.realtime === 'boolean') root.dataset.nroRealtime = String(payload.realtime);
             applySnapshot(payload.data);
             synchronizeForm(payload.filters || {});
             root.dataset.nroStream = payload.stream_url;

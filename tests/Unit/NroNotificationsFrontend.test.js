@@ -126,6 +126,38 @@ function ajaxResponse(query, html) {
 
 const settleAjax = () => new Promise((resolve) => setImmediate(resolve));
 
+test('expired realtime access closes SSE and reloads without accepting late events', () => {
+    const fixture = ajaxFixture();
+    try {
+        fixture.streams[0].handlers['access-expired']({ data: '{}' });
+        assert.equal(fixture.streams[0].closed, true);
+        assert.equal(fixture.reloads.count, 1);
+        fixture.streams[0].handlers.notifications({ data: JSON.stringify({ html: 'Private data', signature: 'late' }) });
+        assert.equal(fixture.list.innerHTML, 'Original rows');
+    } finally {
+        fixture.restore();
+    }
+});
+
+test('SSE rate limits stop reconnection and expired grants trigger a preview reload', async () => {
+    for (const [status, payload, reloads] of [
+        [429, {}, 0],
+        [200, { realtime: false }, 1],
+    ]) {
+        const fixture = ajaxFixture();
+        try {
+            const checking = fixture.streams[0].handlers.error();
+            fixture.requests[0].resolve({ status, json: async () => payload });
+            await checking;
+            assert.equal(fixture.streams[0].closed, true);
+            assert.equal(fixture.reloads.count, reloads);
+            assert.equal(fixture.streams.length, 1);
+        } finally {
+            fixture.restore();
+        }
+    }
+});
+
 test('maintenance SSE closes the live stream and reloads the page without reconnecting', () => {
     const fixture = ajaxFixture();
     try {

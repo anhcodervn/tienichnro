@@ -5,6 +5,7 @@ namespace App\Features\NroNotification\Services;
 use App\Features\Admin\Setting\Services\ToolAvailabilityService;
 use Generator;
 use Illuminate\Http\StreamedEvent;
+use Illuminate\Support\Arr;
 use Throwable;
 
 class NroNotificationFeedService
@@ -21,7 +22,7 @@ class NroNotificationFeedService
         $filters['page'] = $filters['page'] ?? 1;
         unset($filters['per_page']);
         $notifies = $this->notifications->paginate($filters);
-        $notifies->withPath(route('nro.notifies.page'))->appends($filters);
+        $notifies->withPath(route('nro.notifies.page'))->appends(Arr::except($filters, ['_preview_cutoff', '_preview_since']));
         $html = view('pages.nro.partials.notification-list', ['notifies' => $notifies])->render();
         $pagination = $notifies->onEachSide(1)->links('pages.nro.partials.notification-pagination')->toHtml();
 

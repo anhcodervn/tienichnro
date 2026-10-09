@@ -56,7 +56,7 @@ onMounted(loadSettings);
             <div class="mb-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
                     <h3 class="text-sm font-semibold text-slate-900">Cloudflare Turnstile cho đơn hàng guest</h3>
-                    <p class="text-sm text-slate-500">Chỉ yêu cầu captcha khi người chưa đăng nhập tạo đơn nạp game.</p>
+                    <p class="text-sm text-slate-500">Xác minh thành viên trước khi mở dữ liệu thông báo game trực tiếp.</p>
                 </div>
                 <button
                     type="button"
@@ -72,7 +72,7 @@ onMounted(loadSettings);
                 <label class="flex items-center justify-between rounded-[10px] border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-700">
                     <span>
                         <strong class="block font-semibold text-slate-900">Bật Turnstile khi tạo đơn</strong>
-                        <small class="mt-1 block text-slate-500">Thành viên đã đăng nhập không bị yêu cầu captcha.</small>
+                        <small class="mt-1 block text-slate-500">Thành viên xác minh để xem trực tiếp trong 15 phút. Admin được miễn xác minh.</small>
                     </span>
                     <input v-model="form.turnstile_enabled" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
                 </label>
@@ -118,7 +118,7 @@ onMounted(loadSettings);
                 <li>Lưu cấu hình rồi bật Turnstile và thử tạo một đơn khi chưa đăng nhập.</li>
             </ol>
             <p class="mt-4 rounded-[8px] border border-cyan-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600">
-                Backend luôn xác minh token trực tiếp với Cloudflare trước khi tạo đơn; tắt tab này sẽ bỏ qua captcha.
+                Backend xác minh token với Cloudflare trước khi cấp quyền. Nếu tắt Turnstile, thành viên chỉ xem được bản thông báo giới hạn.
             </p>
         </aside>
     </div>

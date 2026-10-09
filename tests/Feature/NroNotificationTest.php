@@ -50,7 +50,7 @@ test('unknown respawn interval remains null and is rendered clearly', function (
 test('the live page and SSE use vertical rows with spawn and death details', function (): void {
     $id = nroSend(nroSpawn())->assertCreated()->json('data.id');
     $living = $this->get('/thong-bao-game')->assertOk()
-        ->assertSee('role="list"', false)->assertSee('divide-y', false)
+        ->assertSee('role="list"', false)->assertSee('grid gap-3 transition-opacity', false)
         ->assertDontSee('md:grid-cols-2 xl:grid-cols-3', false)
         ->assertSee('Boss: Broly 3')->assertSee('Map: Rừng Bamboo')
         ->assertSee('Thời gian xuất hiện')->assertSee('06/10/2026 - 09:10:00')

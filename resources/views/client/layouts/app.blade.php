@@ -171,6 +171,13 @@
                 </details>
             </div>
         </div>
+        <div class="client-header-marquee border-t border-emerald-200 bg-emerald-50 py-2 text-[13px] font-medium text-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-600" data-client-header-marquee tabindex="0">
+            <p class="sr-only">Website phục vụ mục đích học tập và nghiên cứu.</p>
+            <div class="client-header-marquee-track" aria-hidden="true">
+                <span>Website phục vụ mục đích học tập và nghiên cứu.</span>
+                <span>Website phục vụ mục đích học tập và nghiên cứu.</span>
+            </div>
+        </div>
         @if(request()->routeIs('seo.*') && ($navigationCategories ?? collect())->isNotEmpty())
             <nav class="client-container flex gap-4 overflow-x-auto pb-3 text-sm text-emerald-700" aria-label="Chủ đề tin tức">@foreach($navigationCategories as $navigationCategory)<a class="shrink-0" href="{{ route('seo.category', $navigationCategory->slug) }}">{{ $navigationCategory->name }}</a>@endforeach</nav>
         @endif

@@ -2,6 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
+.client-header-marquee {
+    overflow: hidden;
+}
+
+.client-header-marquee-track {
+    display: flex;
+    width: max-content;
+    animation: client-header-marquee 24s linear infinite;
+}
+
+.client-header-marquee-track > span {
+    flex-shrink: 0;
+    min-width: 100vw;
+    padding-inline: 2rem;
+    text-align: center;
+    white-space: nowrap;
+}
+
+.client-header-marquee:hover .client-header-marquee-track,
+.client-header-marquee:focus-within .client-header-marquee-track {
+    animation-play-state: paused;
+}
+
+@keyframes client-header-marquee {
+    to {
+        transform: translateX(-50%);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .client-header-marquee-track {
+        display: block;
+        width: auto;
+        animation: none;
+    }
+
+    .client-header-marquee-track > span {
+        display: block;
+        min-width: 0;
+        padding-inline: 1rem;
+        white-space: normal;
+    }
+
+    .client-header-marquee-track > span + span {
+        display: none;
+    }
+}
+
 /* Shared client palette also covers HTML fragments inserted by the notification feed. */
 html[data-client-theme].dark {
     color-scheme: dark;

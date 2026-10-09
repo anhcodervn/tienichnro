@@ -1,13 +1,15 @@
-import { initializeNroNotifications } from './nro-notifications';
-import { initializeClientNotifications } from './client-notifications';
-import { initializeClientTheme } from './client-theme';
 import { initializeClientAuth } from './client-auth';
+import { initializeClientNotifications } from './client-notifications';
 import { initializePotentialCalculator } from './client-potential';
+import { initializeClientTheme } from './client-theme';
+import { initializeNroAccess } from './nro-access';
+import { initializeNroNotifications } from './nro-notifications';
 
 initializeClientTheme();
 void initializeClientNotifications();
 initializeClientAuth();
 initializePotentialCalculator();
+initializeNroAccess();
 
 const toolsModal = document.querySelector('[data-client-tools-modal]');
 

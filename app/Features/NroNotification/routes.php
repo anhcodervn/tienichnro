@@ -4,12 +4,13 @@ use App\Features\NroNotification\Controllers\BossController;
 use App\Features\NroNotification\Controllers\NotificationTypeController;
 use App\Features\NroNotification\Controllers\NotifyController;
 use App\Features\NroNotification\Controllers\ServerController;
+use App\Features\NroNotification\Middleware\LimitNotificationTraffic;
 use Illuminate\Support\Facades\Route;
 
-Route::prefix('nro')->name('nro.')->middleware('throttle:120,1')->group(function (): void {
-    Route::get('/notifies', [NotifyController::class, 'index'])->name('notifies.index');
-    Route::get('/notifies/stream', [NotifyController::class, 'stream'])->name('notifies.stream');
-    Route::get('/options', [NotifyController::class, 'options'])->name('options');
+Route::prefix('nro')->name('nro.')->middleware('web')->group(function (): void {
+    Route::get('/notifies', [NotifyController::class, 'index'])->middleware(LimitNotificationTraffic::class)->name('notifies.index');
+    Route::get('/notifies/stream', [NotifyController::class, 'stream'])->middleware(LimitNotificationTraffic::class.':stream')->name('notifies.stream');
+    Route::get('/options', [NotifyController::class, 'options'])->middleware(LimitNotificationTraffic::class)->name('options');
 });
 Route::prefix('admin-api/nro')->name('admin.nro.')->middleware(['auth:sanctum', 'admin', 'platform.admin', 'throttle:120,1'])->group(function (): void {
     Route::get('/servers', [ServerController::class, 'index'])->name('servers.index');
