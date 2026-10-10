@@ -2,8 +2,25 @@ export default {
     path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),
     children: [
+        { path: 'licenses', name: 'admin.licenses', component: () => import('@/pages/admin/licenses/index.vue') },
+        {
+            path: 'licenses/products',
+            name: 'admin.licenses.products',
+            component: () => import('@/pages/admin/licenses/index.vue'),
+            props: { section: 'products' },
+        },
+        {
+            path: 'licenses/plans',
+            name: 'admin.licenses.plans',
+            component: () => import('@/pages/admin/licenses/index.vue'),
+            props: { section: 'plans' },
+        },
+        { path: 'tools', name: 'admin.tools', component: () => import('@/pages/admin/tools/index.vue') },
+        { path: 'wallets', name: 'admin.wallets', component: () => import('@/pages/admin/wallets/index.vue') },
         { path: 'services', name: 'admin.services', component: () => import('@/pages/admin/services/index.vue') },
+        { path: 'service-packages', name: 'admin.service-packages', component: () => import('@/pages/admin/service-packages/index.vue') },
         { path: 'nro/servers', name: 'admin.nro.servers', component: () => import('@/pages/admin/nro/servers/index.vue') },
+        { path: 'nro/zalo-receivers', name: 'admin.nro.zalo-receivers', component: () => import('@/pages/admin/nro/zalo-receivers/index.vue') },
         { path: 'nro/bosses', name: 'admin.nro.bosses', component: () => import('@/pages/admin/nro/bosses/index.vue') },
         { path: 'nro/notifies', name: 'admin.nro.notifies', component: () => import('@/pages/admin/nro/notifies/index.vue') },
         {

@@ -5,6 +5,7 @@ use App\Features\NroNotification\Controllers\NotificationPruneController;
 use App\Features\NroNotification\Controllers\NotificationTypeController;
 use App\Features\NroNotification\Controllers\NotifyController;
 use App\Features\NroNotification\Controllers\ServerController;
+use App\Features\NroNotification\Controllers\ZaloReceiveNotificationController;
 use App\Features\NroNotification\Middleware\LimitNotificationTraffic;
 use Illuminate\Support\Facades\Route;
 
@@ -17,6 +18,10 @@ Route::prefix('nro')->name('nro.')->middleware('web')->group(function (): void {
     Route::get('/options', [NotifyController::class, 'options'])->middleware(LimitNotificationTraffic::class)->name('options');
 });
 Route::prefix('admin-api/nro')->name('admin.nro.')->middleware(['auth:sanctum', 'admin', 'platform.admin', 'throttle:120,1'])->group(function (): void {
+    Route::get('/zalo-receivers', [ZaloReceiveNotificationController::class, 'index'])->name('zalo-receivers.index');
+    Route::post('/zalo-receivers', [ZaloReceiveNotificationController::class, 'store'])->name('zalo-receivers.store');
+    Route::patch('/zalo-receivers/{receiver}', [ZaloReceiveNotificationController::class, 'update'])->whereNumber('receiver')->name('zalo-receivers.update');
+    Route::delete('/zalo-receivers/{receiver}', [ZaloReceiveNotificationController::class, 'destroy'])->whereNumber('receiver')->name('zalo-receivers.destroy');
     Route::get('/servers', [ServerController::class, 'index'])->name('servers.index');
     Route::post('/servers', [ServerController::class, 'store'])->name('servers.store');
     Route::patch('/servers/{server}', [ServerController::class, 'update'])->name('servers.update');

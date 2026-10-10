@@ -107,7 +107,7 @@ test('new service invalid fields are rejected without leaving definitions', func
 ]);
 
 test('service management uses the shared data table and modal CRUD controls', function (): void {
-    $page = file_get_contents(resource_path('js/pages/admin/services/index.vue'));
+    $page = file_get_contents(resource_path('js/pages/admin/tools/index.vue'));
     expect($page)->toContain('<DataTable', '<Dialog', '<DialogTitle', 'adminServiceManagement.create', 'adminServiceManagement.remove', 'v-model="draft.code"', 'v-model="draft.url"', 'v-model="query"', 'v-model="status"', 'v-model.number="perPage"', 'showCancelButton: true');
     expect($page)->toContain('v-model.number="draft.sort_order"', "accessorKey: 'sort_order'", "ref('order_asc')");
 });

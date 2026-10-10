@@ -2,8 +2,13 @@
 
 <div {{ $attributes->class(['grid w-full grid-cols-2 gap-x-3 gap-y-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6']) }}>
             @foreach($tools as $tool)
-                @if(($tool['route'] ?? null) || (($tool['url'] ?? null) && ($tool['is_enabled'] ?? true)))
-                <a class="group flex min-w-0 flex-col items-center gap-2 rounded-[10px] text-center transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-4" href="{{ ($tool['is_enabled'] ?? true) && filled($tool['url'] ?? null) ? $tool['url'] : route($tool['route'], $tool['parameters']) }}" title="{{ $tool['description'] }}">
+                @php
+                    $toolLink = ($tool['is_enabled'] ?? true) && \App\Support\SafeNavigationUrl::passes($tool['url'] ?? null)
+                        ? $tool['url']
+                        : (filled($tool['route'] ?? null) && \Illuminate\Support\Facades\Route::has($tool['route']) ? route($tool['route'], $tool['parameters'] ?? []) : null);
+                @endphp
+                @if($toolLink)
+                <a class="group flex min-w-0 flex-col items-center gap-2 rounded-[10px] text-center transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-4" href="{{ $toolLink }}" title="{{ $tool['description'] }}">
                     <span class="relative grid aspect-square w-full max-w-[7.5rem] place-items-center rounded-[12px] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-cyan-50 text-4xl text-emerald-700 shadow-sm transition group-hover:shadow-md">
                         @if(($tool['icon_type'] ?? 'icon') === 'image' && filled($tool['image_url'] ?? null))
                             <img src="{{ $tool['image_url'] }}" alt="" width="256" height="256" loading="lazy" decoding="async" class="absolute inset-0 h-full w-full rounded-[12px] object-cover" />

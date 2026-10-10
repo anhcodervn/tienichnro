@@ -45,3 +45,15 @@ foreach ($adminFeatures as $feature) {
 if (file_exists(base_path('app/Features/NroNotification/routes.php'))) {
     require base_path('app/Features/NroNotification/routes.php');
 }
+
+if (file_exists(base_path('app/Features/Admin/Wallet/routes.php'))) {
+    require base_path('app/Features/Admin/Wallet/routes.php');
+}
+
+if (file_exists(base_path('app/Features/License/routes.php'))) {
+    require base_path('app/Features/License/routes.php');
+}
+
+if (file_exists(base_path('app/Features/Admin/License/routes.php'))) {
+    require base_path('app/Features/Admin/License/routes.php');
+}

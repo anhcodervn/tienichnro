@@ -10,6 +10,7 @@
         ['key' => 'profile', 'route' => 'account.index', 'icon' => 'bx-user-circle', 'title' => 'Thông tin user', 'description' => 'Hồ sơ và trạng thái tài khoản'],
         ['key' => 'password', 'route' => 'account.profile.password', 'icon' => 'bx-key', 'title' => 'Đổi mật khẩu', 'description' => 'Bảo mật phiên đăng nhập'],
         ['key' => 'logs', 'route' => 'account.profile.logs', 'icon' => 'bx-history', 'title' => 'Lịch sử người dùng', 'description' => 'Nhật ký thao tác tài khoản'],
+        ['key' => 'wallet', 'route' => 'account.wallet', 'icon' => 'bx-wallet', 'title' => 'Ví & dòng tiền', 'description' => 'Số dư và lịch sử giao dịch'],
     ];
     $statusLabel = match ($user->status) {
         'active' => 'Đang hoạt động',

@@ -25,8 +25,8 @@ test('only administrators can list and update registered services', function ():
     $this->patchJson('/api/admin-api/settings/services/game_notifications', array_replace($payload, ['is_enabled' => true]))->assertOk();
     expect(app(ToolAvailabilityService::class)->find('game_password')['is_enabled'])->toBeFalse();
     $this->assertDatabaseMissing('settings', ['key' => 'tool_unknown_enabled']);
-    expect(file_get_contents(resource_path('js/pages/admin/services/index.vue')))->toContain('v-model="draft.is_enabled"', 'v-model="draft.maintenance_message"', 'adminServiceManagement.update');
-    expect(file_get_contents(resource_path('js/layouts/admin/sidebar/navigation.ts')))->toContain("href: '/admin/services'");
+    expect(file_get_contents(resource_path('js/pages/admin/tools/index.vue')))->toContain('v-model="draft.is_enabled"', 'v-model="draft.maintenance_message"', 'adminServiceManagement.update');
+    expect(file_get_contents(resource_path('js/layouts/admin/sidebar/navigation.ts')))->toContain("href: '/admin/tools'");
 });
 
 test('service maintenance replaces only client interaction and preserves SEO content and ingestion', function (): void {

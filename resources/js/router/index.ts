@@ -5,10 +5,18 @@ import adminRouter from './modules/admin';
 const routes: RouteRecordRaw[] = [adminRouter];
 
 const routeTitles: Record<string, string> = {
+    'admin.licenses': 'License keys',
+    'admin.licenses.products': 'Sản phẩm / tool',
+    'admin.licenses.plans': 'Gói license',
+    'admin.services': 'Cấu hình dịch vụ',
+    'admin.tools': 'Cấu hình công cụ',
+    'admin.wallets': 'Ví & dòng tiền',
+    'admin.service-packages': 'Cấu hình gói',
     'admin.nro.bosses': 'Quản lý boss',
     'admin.nro.notifies': 'Quản lý thông báo game',
     'admin.nro.notification-types': 'Quản lý loại thông báo',
     'admin.nro.servers': 'Quản lý server NRO',
+    'admin.nro.zalo-receivers': 'Zalo nhận thông báo',
     'admin.users.index': 'Quản lý người dùng',
     'admin.users.show': 'Chi tiết người dùng',
     'admin.notifications.index': 'Thông báo hệ thống',

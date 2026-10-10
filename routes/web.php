@@ -3,6 +3,8 @@
 use App\Features\Admin\Setting\Controllers\SiteCustomAssetController;
 use App\Features\Auth\Controllers\AuthController;
 use App\Features\Client\Profile\Controllers\ProfilePageController;
+use App\Features\Client\Subscription\Controllers\NotificationSubscriptionController;
+use App\Features\Client\Wallet\Controllers\WalletPageController;
 use App\Features\NroNotification\Controllers\NotifyController;
 use App\Features\NroNotification\Middleware\LimitNotificationTraffic;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
@@ -17,6 +19,7 @@ use App\Http\Controllers\MaintenanceController;
 use App\Http\Controllers\PublicContentPageController;
 use App\Http\Controllers\PublicHomePageController;
 use App\Http\Controllers\PublicSeoPageController;
+use App\Http\Controllers\PublicServicePageController;
 use App\Models\User;
 use App\Support\SettingStore;
 use Illuminate\Http\Request;
@@ -33,6 +36,8 @@ Route::get('/robots.txt', [CrawlerFileController::class, 'robots'])->name('robot
 Route::get('/ads.txt', [CrawlerFileController::class, 'ads'])->name('ads');
 Route::get('/community', BioPageController::class)->name('bio.show');
 Route::get('/', PublicHomePageController::class)->name('home');
+Route::get('/dich-vu', PublicServicePageController::class)->name('services.index');
+Route::get('/dich-vu-nhan-thong-bao', [NotificationSubscriptionController::class, 'index'])->name('notification-subscriptions.index');
 
 Route::middleware(['guest', 'site.active'])->group(function (): void {
     Route::view('/dang-nhap', 'pages.auth.login')->name('auth.login');
@@ -55,12 +60,15 @@ Route::middleware(['guest', 'site.active'])->group(function (): void {
 });
 
 Route::middleware('auth')->group(function (): void {
+    Route::post('/dich-vu-nhan-thong-bao', [NotificationSubscriptionController::class, 'store'])->middleware('throttle:10,1')->name('notification-subscriptions.store');
+    Route::patch('/dich-vu-nhan-thong-bao/{subscription}', [NotificationSubscriptionController::class, 'update'])->whereNumber('subscription')->middleware('throttle:30,1')->name('notification-subscriptions.update');
     Route::post('/dang-xuat', [AuthController::class, 'logout'])->name('logout');
     Route::get('/verify-email', EmailVerificationPromptController::class)->name('verification.notice');
     Route::get('/verify-email/{id}/{hash}', VerifyEmailController::class)->middleware('signed')->name('verification.verify');
     Route::post('/email/verification-notification', EmailVerificationNotificationController::class)
         ->middleware('throttle:6,1')->name('verification.send');
     Route::prefix('tai-khoan')->name('account.')->group(function (): void {
+        Route::get('/vi', [WalletPageController::class, 'index'])->name('wallet');
         Route::get('/', ProfilePageController::class)->defaults('tab', 'profile')->name('index');
     });
 });

@@ -2,8 +2,11 @@
 
 namespace App\Providers;
 
+use App\Features\Admin\Setting\Services\ServiceCatalogService;
+use App\Features\Admin\Setting\Services\ToolAvailabilityService;
 use App\Models\SeoCategory;
 use App\Models\User;
+use App\Models\Wallet;
 use App\Support\CustomHeadTags;
 use App\Support\SettingStore;
 use Illuminate\Support\Arr;
@@ -17,9 +20,11 @@ class SharedViewServiceProvider extends ServiceProvider
     /**
      * Bootstrap services.
      */
-    public function boot(SettingStore $settingStore, CustomHeadTags $customHeadTags): void
+    public function boot(SettingStore $settingStore, CustomHeadTags $customHeadTags, ToolAvailabilityService $tools, ServiceCatalogService $services): void
     {
-        ViewFacade::composer('client.layouts.app', function (View $view) use ($customHeadTags, $settingStore): void {
+        ViewFacade::composer('client.layouts.app', function (View $view) use ($customHeadTags, $settingStore, $tools, $services): void {
+            $view->with('clientTools', $tools->all());
+            $view->with('clientServices', $services->all());
             $storedSettings = $settingStore->getMany([
                 'site_name' => config('app.name', 'Nạp Carot'),
                 'site_domain' => '',
@@ -65,6 +70,7 @@ class SharedViewServiceProvider extends ServiceProvider
                     'initial' => Str::upper(Str::substr($displayName, 0, 1)),
                     'name' => $displayName,
                     'role' => (string) $user->role,
+                    'wallet_balance' => (int) (Wallet::query()->where('user_id', $user->id)->value('balance') ?? 0),
                 ]);
             }
 

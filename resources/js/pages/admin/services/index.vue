@@ -1,14 +1,14 @@
 <script setup lang="ts">
 import DataTable from '@/components/shared/DataTable/index.vue';
 import UploadImage from '@/components/shared/UpladImage/index.vue';
-import { adminServiceManagement, type ManagedService } from '@/services/admin-service-management.service';
+import { adminServiceCatalog, type ServiceOffering, type ServicePayloadField } from '@/services/admin-service-catalog.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue';
 import { isAxiosError } from 'axios';
 import Swal from 'sweetalert2';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 
-const services = ref<ManagedService[]>([]);
+const services = ref<ServiceOffering[]>([]);
 const loading = ref(true);
 const failed = ref(false);
 const saving = ref(false);
@@ -21,27 +21,52 @@ const status = ref('all');
 const sort = ref('order_asc');
 const perPage = ref(10);
 const currentPage = ref(1);
-const emptyDraft = (): ManagedService => ({
+const emptyDraft = (): ServiceOffering => ({
     code: '',
     name: '',
     sort_order: 1,
     description: '',
     icon_type: 'icon',
-    icon: 'bx-grid-alt',
+    icon: 'bx-store',
     image_url: null,
     url: null,
-    route: null,
+    page_slug: null,
+    payload_fields: [],
     is_enabled: true,
     is_available: false,
     maintenance_message: 'Dịch vụ đang bảo trì. Vui lòng quay lại sau.',
 });
-const draft = reactive<ManagedService>(emptyDraft());
+const draft = reactive<ServiceOffering>(emptyDraft());
+const payloadInputClass =
+    'min-h-11 w-full rounded-[10px] border border-slate-300 bg-white px-3 text-sm font-normal dark:border-slate-600 dark:bg-slate-800 dark:text-white';
+const payloadTypes = [
+    { value: 'text', label: 'Văn bản' },
+    { value: 'textarea', label: 'Văn bản nhiều dòng' },
+    { value: 'password', label: 'Mật khẩu' },
+    { value: 'email', label: 'Email' },
+    { value: 'number', label: 'Số' },
+    { value: 'boolean', label: 'Đúng / sai' },
+    { value: 'select', label: 'Danh sách chọn' },
+];
+const addPayloadField = () => {
+    if (draft.payload_fields.length >= 50) return;
+    draft.payload_fields.push({ name: '', label: '', type: 'text', required: true, placeholder: '', options: [] });
+};
+const movePayloadField = (index: number, direction: number) => {
+    const target = index + direction;
+    if (target < 0 || target >= draft.payload_fields.length) return;
+    const [field] = draft.payload_fields.splice(index, 1);
+    draft.payload_fields.splice(target, 0, field);
+};
+const changePayloadType = (field: ServicePayloadField) => {
+    field.options = field.type === 'select' ? [{ value: '', label: '' }] : [];
+};
 const columns = [
     { accessorKey: 'sort_order', header: 'Thứ tự' },
     { id: 'visual', header: 'Icon / Ảnh' },
     { accessorKey: 'name', header: 'Dịch vụ' },
     { accessorKey: 'code', header: 'Mã dịch vụ' },
-    { accessorKey: 'url', header: 'Liên kết' },
+    { accessorKey: 'page_slug', header: 'Slug trang' },
     { accessorKey: 'is_enabled', header: 'Trạng thái' },
     { id: 'actions', header: 'Thao tác' },
 ];
@@ -49,7 +74,7 @@ const filtered = computed(() => {
     const keyword = query.value.trim().toLocaleLowerCase('vi');
     return services.value
         .filter((service) => {
-            const matches = [service.name, service.code, service.description, service.url].some((value) =>
+            const matches = [service.name, service.code, service.description, service.page_slug].some((value) =>
                 (value || '').toLocaleLowerCase('vi').includes(keyword),
             );
             const matchesStatus =
@@ -82,7 +107,7 @@ const load = async () => {
     loading.value = true;
     failed.value = false;
     try {
-        services.value = await adminServiceManagement.list();
+        services.value = await adminServiceCatalog.list();
     } catch (error) {
         failed.value = true;
         handleErrorResponse(error);
@@ -103,9 +128,13 @@ const add = () => {
     errors.value = [];
     showForm.value = true;
 };
-const edit = (service: ManagedService) => {
+const edit = (service: ServiceOffering) => {
     editingCode.value = service.code;
     Object.assign(draft, emptyDraft(), service);
+    draft.payload_fields = (service.payload_fields ?? []).map((field) => ({
+        ...field,
+        options: (field.options ?? []).map((option) => ({ ...option })),
+    }));
     errors.value = [];
     showForm.value = true;
 };
@@ -114,7 +143,7 @@ const save = async () => {
     saving.value = true;
     errors.value = [];
     try {
-        const result = editingCode.value === null ? await adminServiceManagement.create(draft) : await adminServiceManagement.update(draft);
+        const result = editingCode.value === null ? await adminServiceCatalog.create(draft) : await adminServiceCatalog.update(draft);
         services.value = [...services.value.filter((service) => service.code !== result.code), result];
         showForm.value = false;
         handleSuccessResponse({ data: { status: true, message: 'Đã lưu dịch vụ.' } });
@@ -128,7 +157,7 @@ const save = async () => {
         saving.value = false;
     }
 };
-const remove = async (service: ManagedService) => {
+const remove = async (service: ServiceOffering) => {
     if (deletingCode.value !== null || saving.value) return;
     deletingCode.value = service.code;
     try {
@@ -142,7 +171,7 @@ const remove = async (service: ManagedService) => {
             confirmButtonColor: '#dc2626',
         });
         if (!result.isConfirmed) return;
-        await adminServiceManagement.remove(service.code);
+        await adminServiceCatalog.remove(service.code);
         services.value = services.value.filter((item) => item.code !== service.code);
         handleSuccessResponse({ data: { status: true, message: 'Đã xóa dịch vụ.' } });
     } catch (error) {
@@ -160,7 +189,7 @@ onMounted(load);
             class="flex flex-wrap items-center justify-between gap-4 rounded-[10px] border border-slate-300 bg-white p-5 dark:border-slate-600 dark:bg-slate-900"
         >
             <div>
-                <h1 class="text-xl font-bold text-slate-950 dark:text-white">Quản lý dịch vụ</h1>
+                <h1 class="text-xl font-bold text-slate-950 dark:text-white">Cấu hình dịch vụ</h1>
                 <p class="mt-2 text-sm text-slate-600 dark:text-slate-300">
                     Quản lý danh sách, hình hiển thị và trạng thái dịch vụ. Nội dung SEO được giữ riêng.
                 </p>
@@ -241,10 +270,8 @@ onMounted(load);
                 ><strong>{{ row.name }}</strong>
                 <p class="mt-1 max-w-xs break-words text-xs leading-5 text-slate-500">{{ row.description }}</p></template
             >
-            <template #url="{ row }"
-                ><span class="block max-w-xs break-all text-xs">{{
-                    row.url || (row.route ? 'Trang dịch vụ có sẵn' : 'Chưa có liên kết')
-                }}</span></template
+            <template #page_slug="{ row }"
+                ><span class="block max-w-xs break-all text-xs">{{ row.page_slug || 'Chưa cấu hình slug' }}</span></template
             >
             <template #is_enabled="{ row }"
                 ><span
@@ -312,7 +339,7 @@ onMounted(load);
                                 <div>
                                     <h2 class="font-bold text-slate-900 dark:text-white">{{ draft.name }}</h2>
                                     <p class="mt-1 text-sm leading-6 text-slate-600 dark:text-slate-300">{{ draft.description }}</p>
-                                    <p v-if="!(draft.route || draft.url)" class="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                                    <p v-if="!draft.page_slug" class="mt-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
                                         Đang phát triển. Bật dịch vụ vẫn hiển thị “Sắp ra mắt” cho đến khi có chức năng.
                                     </p>
                                 </div>
@@ -342,7 +369,7 @@ onMounted(load);
                                         required
                                         class="min-h-11 w-full rounded-[10px] border border-slate-300 bg-white px-3 font-normal focus:border-emerald-600 focus:outline-none focus:ring-2 focus:ring-emerald-600/20 dark:border-slate-600 dark:bg-slate-800 dark:text-white"
                                     />
-                                    <span class="text-xs font-normal text-slate-500">Số nhỏ hiển thị trước trong danh sách công cụ.</span>
+                                    <span class="text-xs font-normal text-slate-500">Số nhỏ hiển thị trước trong nhóm đã chọn.</span>
                                 </label>
                                 <label class="grid gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
                                     Tên hiển thị
@@ -363,16 +390,18 @@ onMounted(load);
                                     ></textarea>
                                 </label>
                                 <label class="grid gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
-                                    Liên kết dịch vụ
+                                    Slug trang dịch vụ
                                     <input
-                                        v-model="draft.url"
-                                        maxlength="2048"
-                                        placeholder="/duong-dan-dich-vu hoặc https://..."
+                                        v-model="draft.page_slug"
+                                        maxlength="120"
+                                        pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                                        placeholder="dich-vu-nhan-thong-bao"
                                         class="min-h-11 w-full rounded-[10px] border border-slate-300 bg-white px-3 font-normal dark:border-slate-600 dark:bg-slate-800 dark:text-white"
                                     />
-                                    <span class="text-xs font-normal text-slate-500">{{
-                                        draft.route ? 'Để trống để dùng trang dịch vụ có sẵn.' : 'Để trống để hiển thị Sắp ra mắt.'
-                                    }}</span>
+                                    <span class="text-xs font-normal text-slate-500"
+                                        >Chỉ nhập slug, không có dấu /. Ví dụ: dich-vu-nhan-thong-bao. Gói và payload sẽ lấy theo dịch vụ của trang
+                                        này.</span
+                                    >
                                 </label>
                                 <label class="grid gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
                                     Hình hiển thị
@@ -435,7 +464,7 @@ onMounted(load);
                                         />
                                         <i v-else class="bx" :class="draft.icon" aria-hidden="true"></i>
                                         <span
-                                            v-if="!draft.is_enabled || !(draft.route || draft.url)"
+                                            v-if="!draft.is_enabled || !draft.page_slug"
                                             class="absolute inset-x-1 bottom-2 rounded-[6px] border border-amber-300 bg-amber-100 py-0.5 text-center text-[10px] font-semibold leading-4 text-amber-900"
                                             >{{ draft.is_enabled ? 'Sắp ra mắt' : 'Bảo trì' }}</span
                                         >
@@ -448,6 +477,149 @@ onMounted(load);
                                     <input v-model="draft.is_enabled" type="checkbox" class="size-5 accent-emerald-600" />
                                     {{ draft.is_enabled ? 'Bật dịch vụ' : 'Tắt dịch vụ · Bảo trì' }}
                                 </label>
+                                <section
+                                    class="grid min-w-0 gap-4 rounded-[10px] border border-slate-200 p-4 dark:border-slate-600"
+                                    aria-labelledby="service-payload-heading"
+                                >
+                                    <div class="flex flex-wrap items-center justify-between gap-3">
+                                        <h2 id="service-payload-heading" class="font-bold text-slate-900 dark:text-white">Payload nhận vào</h2>
+                                        <button
+                                            type="button"
+                                            :disabled="draft.payload_fields.length >= 50"
+                                            class="min-h-10 rounded-[10px] border border-emerald-600 px-3 text-sm font-semibold text-emerald-700 disabled:opacity-50 dark:text-emerald-400"
+                                            @click="addPayloadField"
+                                        >
+                                            Thêm trường
+                                        </button>
+                                    </div>
+                                    <p class="text-xs leading-5 text-slate-500 dark:text-slate-400">
+                                        Cấu hình tên key và kiểu dữ liệu dịch vụ nhận vào, tối đa 50 trường. Đây là cấu trúc payload, không nhập giá
+                                        trị tài khoản tại đây.
+                                    </p>
+                                    <p v-if="!draft.payload_fields.length" class="text-sm text-slate-500 dark:text-slate-400">
+                                        Chưa có trường dữ liệu.
+                                    </p>
+                                    <div
+                                        v-for="(field, index) in draft.payload_fields"
+                                        :key="index"
+                                        class="grid min-w-0 gap-3 rounded-[10px] border border-slate-200 bg-slate-50 p-3 dark:border-slate-600 dark:bg-slate-800"
+                                    >
+                                        <div class="flex flex-wrap items-center justify-between gap-2">
+                                            <strong class="text-sm text-slate-900 dark:text-white">Trường {{ index + 1 }}</strong>
+                                            <div class="flex gap-2">
+                                                <button
+                                                    type="button"
+                                                    :disabled="index === 0"
+                                                    :aria-label="`Đưa trường ${index + 1} lên`"
+                                                    class="min-h-10 rounded-[10px] border border-slate-300 px-3 text-sm disabled:opacity-40 dark:text-white"
+                                                    @click="movePayloadField(index, -1)"
+                                                >
+                                                    ↑
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    :disabled="index === draft.payload_fields.length - 1"
+                                                    :aria-label="`Đưa trường ${index + 1} xuống`"
+                                                    class="min-h-10 rounded-[10px] border border-slate-300 px-3 text-sm disabled:opacity-40 dark:text-white"
+                                                    @click="movePayloadField(index, 1)"
+                                                >
+                                                    ↓
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    :aria-label="`Xoá trường ${index + 1}`"
+                                                    class="min-h-10 rounded-[10px] border border-rose-300 px-3 text-sm text-rose-700 dark:text-rose-400"
+                                                    @click="draft.payload_fields.splice(index, 1)"
+                                                >
+                                                    Xoá
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="grid min-w-0 gap-3 sm:grid-cols-2">
+                                            <label class="grid min-w-0 gap-1 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                                                >Tên key<input
+                                                    v-model="field.name"
+                                                    required
+                                                    maxlength="64"
+                                                    pattern="[a-zA-Z][a-zA-Z0-9_]*"
+                                                    placeholder="username"
+                                                    :class="payloadInputClass"
+                                            /></label>
+                                            <label class="grid min-w-0 gap-1 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                                                >Nhãn hiển thị<input
+                                                    v-model="field.label"
+                                                    required
+                                                    maxlength="120"
+                                                    placeholder="Tên tài khoản"
+                                                    :class="payloadInputClass"
+                                            /></label>
+                                            <label class="grid min-w-0 gap-1 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                                                >Kiểu dữ liệu<select
+                                                    v-model="field.type"
+                                                    :class="payloadInputClass"
+                                                    @change="changePayloadType(field)"
+                                                >
+                                                    <option v-for="type in payloadTypes" :key="type.value" :value="type.value">
+                                                        {{ type.label }}
+                                                    </option>
+                                                </select></label
+                                            >
+                                            <label class="grid min-w-0 gap-1 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                                                >Placeholder<input
+                                                    v-model="field.placeholder"
+                                                    maxlength="200"
+                                                    placeholder="Gợi ý nhập dữ liệu"
+                                                    :class="payloadInputClass"
+                                            /></label>
+                                        </div>
+                                        <label class="flex min-h-10 items-center gap-2 text-sm text-slate-800 dark:text-slate-200"
+                                            ><input v-model="field.required" type="checkbox" class="size-5 accent-emerald-600" />Bắt buộc nhập</label
+                                        >
+                                        <div v-if="field.type === 'select'" class="grid min-w-0 gap-3">
+                                            <div class="flex flex-wrap items-center justify-between gap-2">
+                                                <strong class="text-xs text-slate-800 dark:text-slate-200">Các lựa chọn</strong>
+                                                <button
+                                                    type="button"
+                                                    :disabled="(field.options?.length ?? 0) >= 100"
+                                                    class="min-h-10 rounded-[10px] border border-slate-300 px-3 text-xs disabled:opacity-40 dark:text-white"
+                                                    @click="(field.options ??= []).push({ value: '', label: '' })"
+                                                >
+                                                    Thêm lựa chọn
+                                                </button>
+                                            </div>
+                                            <div
+                                                v-for="(option, optionIndex) in field.options"
+                                                :key="optionIndex"
+                                                class="grid min-w-0 gap-2 sm:grid-cols-[1fr_1fr_auto]"
+                                            >
+                                                <label class="grid min-w-0 gap-1 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                                                    >Giá trị gửi lên<input
+                                                        v-model="option.value"
+                                                        required
+                                                        maxlength="120"
+                                                        placeholder="server_1"
+                                                        :class="payloadInputClass"
+                                                /></label>
+                                                <label class="grid min-w-0 gap-1 text-xs font-semibold text-slate-800 dark:text-slate-200"
+                                                    >Nhãn lựa chọn<input
+                                                        v-model="option.label"
+                                                        required
+                                                        maxlength="120"
+                                                        placeholder="Server 1"
+                                                        :class="payloadInputClass"
+                                                /></label>
+                                                <button
+                                                    type="button"
+                                                    :aria-label="`Xoá lựa chọn ${optionIndex + 1} của trường ${index + 1}`"
+                                                    class="min-h-11 self-end rounded-[10px] border border-rose-300 px-3 text-xs text-rose-700 dark:text-rose-400"
+                                                    @click="field.options?.splice(optionIndex, 1)"
+                                                >
+                                                    Xoá
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </section>
                                 <label class="grid gap-2 text-sm font-semibold text-slate-800 dark:text-slate-200">
                                     Nội dung thông báo bảo trì
                                     <textarea

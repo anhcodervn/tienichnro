@@ -14,7 +14,17 @@ export type AdminMenuGroup = {
 };
 
 export const adminMenuGroups: AdminMenuGroup[] = [
-    { key: 'services', label: 'Quản lý dịch vụ', icon: Layers3, href: '/admin/services' },
+    { key: 'tools', label: 'Cấu hình công cụ', icon: Layers3, href: '/admin/tools' },
+    {
+        key: 'licenses',
+        label: 'License key',
+        icon: Layers3,
+        children: [
+            { label: 'License keys', href: '/admin/licenses' },
+            { label: 'Sản phẩm / tool', href: '/admin/licenses/products' },
+            { label: 'Gói license', href: '/admin/licenses/plans' },
+        ],
+    },
     { key: 'nro-servers', label: 'Server NRO', icon: Globe2, href: '/admin/nro/servers' },
     {
         key: 'nro-notifications',
@@ -24,13 +34,22 @@ export const adminMenuGroups: AdminMenuGroup[] = [
             { label: 'Quản lý loại thông báo', href: '/admin/nro/notification-types' },
             { label: 'Quản lý thông báo', href: '/admin/nro/notifies' },
             { label: 'Quản lý boss', href: '/admin/nro/bosses' },
+            { label: 'Zalo nhận thông báo', href: '/admin/nro/zalo-receivers' },
         ],
     },
     { key: 'posts', label: 'Bài viết', icon: BookMarked, href: '/admin/seo/posts' },
     { key: 'categories', label: 'Danh mục', icon: Layers3, href: '/admin/seo/categories' },
     { key: 'seo-home', label: 'SEO trang chủ', icon: Globe2, href: '/admin/seo/home' },
     { key: 'sitemaps', label: 'Sitemap & index', icon: ListChecks, href: '/admin/seo/sitemaps' },
-    { key: 'users', label: 'Người dùng', icon: Users, href: '/admin/users' },
+    {
+        key: 'users',
+        label: 'Người dùng',
+        icon: Users,
+        children: [
+            { label: 'Danh sách người dùng', href: '/admin/users' },
+            { label: 'Ví & dòng tiền', href: '/admin/wallets' },
+        ],
+    },
     {
         key: 'settings',
         label: 'Cấu hình',

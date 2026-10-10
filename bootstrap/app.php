@@ -1,16 +1,21 @@
 <?php
 
+use App\Features\License\Services\LicenseFailure;
 use App\Http\Middleware\EnsureAdminUser;
 use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsureSiteIsActive;
 use App\Http\Middleware\EnsureUserHasRole;
 use App\Http\Middleware\RecordAdminActivity;
+use App\Models\LicenseEvent;
 use App\Support\SettingStore;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Auth\AuthenticationException;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
+use Illuminate\Validation\ValidationException;
 use Symfony\Component\HttpKernel\Exception\HttpExceptionInterface;
 
 return Application::configure(basePath: dirname(__DIR__))
@@ -42,6 +47,47 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->render(function (Throwable $throwable, Request $request) {
+            if (! $request->is('api/v1/licenses/*')) {
+                return null;
+            }
+
+            $status = 503;
+            $code = 'SERVICE_UNAVAILABLE';
+            $errors = [];
+            if ($throwable instanceof LicenseFailure) {
+                $status = $throwable->httpStatus;
+                $code = $throwable->errorCode;
+            } elseif ($throwable instanceof ValidationException) {
+                $status = 422;
+                $code = 'INVALID_REQUEST';
+                $errors = $throwable->errors();
+            } elseif ($throwable instanceof AuthenticationException) {
+                $status = 401;
+                $code = 'UNAUTHENTICATED';
+            } elseif ($throwable instanceof AuthorizationException) {
+                $status = 403;
+                $code = 'FORBIDDEN';
+            } elseif ($throwable instanceof HttpExceptionInterface && in_array($throwable->getStatusCode(), [401, 403, 429], true)) {
+                $status = $throwable->getStatusCode();
+                $code = match ($status) {
+                    401 => 'UNAUTHENTICATED',
+                    403 => 'FORBIDDEN',
+                    429 => 'RATE_LIMITED',
+                };
+            }
+
+            if ($throwable instanceof LicenseFailure) {
+                try {
+                    LicenseEvent::query()->create(['event' => $code, 'ip' => $request->ip()]);
+                } catch (Throwable) {
+                }
+            }
+
+            return response()->json(['success' => false, 'code' => $code, 'message' => $code, ...($errors ? ['errors' => $errors] : [])], $status)
+                ->header('Cache-Control', 'no-store, private');
+        });
+
         $exceptions->render(function (Throwable $throwable, Request $request) {
             if ($request->expectsJson() || $request->is('api/*') || $request->is('admin-api/*')) {
                 return null;

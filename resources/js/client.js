@@ -1,7 +1,9 @@
+import { initializeClientCatalogModals } from './client-catalog-modals';
 import { initializeClientAuth } from './client-auth';
 import { initializeClientNotifications } from './client-notifications';
 import { initializePotentialCalculator } from './client-potential';
 import { initializeClientTheme } from './client-theme';
+import { initializeNotificationSubscriptions } from './client-subscriptions';
 import { initializeNroAccess } from './nro-access';
 import { initializeNroNotifications } from './nro-notifications';
 
@@ -11,44 +13,8 @@ initializeClientAuth();
 initializePotentialCalculator();
 initializeNroAccess();
 
-const toolsModal = document.querySelector('[data-client-tools-modal]');
-
-if (toolsModal instanceof HTMLDialogElement) {
-    let toolsTrigger = null;
-    let previousOverflow = '';
-
-    const openToolsModal = (event) => {
-        event.preventDefault();
-        if (toolsModal.open) return;
-        toolsTrigger = event.currentTarget;
-        document.querySelectorAll('details[data-client-menu][open]').forEach((menu) => {
-            menu.open = false;
-        });
-        previousOverflow = document.documentElement.style.overflow;
-        document.documentElement.style.overflow = 'hidden';
-        toolsModal.showModal();
-    };
-
-    document.querySelectorAll('[data-client-tools-open]').forEach((trigger) => {
-        trigger.addEventListener('click', openToolsModal);
-        trigger.addEventListener('keydown', (event) => {
-            if (event.key === ' ') openToolsModal(event);
-        });
-    });
-
-    toolsModal.querySelector('[data-client-tools-close]')?.addEventListener('click', () => toolsModal.close());
-    toolsModal.addEventListener('click', (event) => {
-        if (event.target !== toolsModal) return;
-        const bounds = toolsModal.getBoundingClientRect();
-        if (event.clientX < bounds.left || event.clientX > bounds.right || event.clientY < bounds.top || event.clientY > bounds.bottom) {
-            toolsModal.close();
-        }
-    });
-    toolsModal.addEventListener('close', () => {
-        document.documentElement.style.overflow = previousOverflow;
-        if (toolsTrigger instanceof HTMLElement) toolsTrigger.focus({ preventScroll: true });
-    });
-}
+initializeClientCatalogModals();
+initializeNotificationSubscriptions();
 
 const imageViewerContainers = Array.from(document.querySelectorAll('[data-client-image-viewer]')).filter(
     (container) => container instanceof HTMLElement && container.querySelector('img[src]'),

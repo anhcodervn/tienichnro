@@ -36,6 +36,11 @@ class AdminAuditLogService
         'custom_head_tags',
         'custom_script',
         'signature',
+        'license_key',
+        'session_token',
+        'owner_password',
+        'key_hash',
+        'token_hash',
     ];
 
     public function latestId(): int

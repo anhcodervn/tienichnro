@@ -2,6 +2,7 @@
 
 namespace App\Features\NroNotification\Services;
 
+use App\Features\NroNotification\Resources\NotifyResource;
 use App\Models\Boss;
 use App\Models\CodeNotify;
 use App\Models\Notify;
@@ -160,7 +161,17 @@ class NroNotificationService
                 'notify_id' => $notify?->id, 'status' => $status, 'content' => $payload['content'], 'occurred_at' => $time,
             ]);
 
-            return ['status' => $status, 'duplicate' => false, 'notify' => $notify?->load(['boss', 'server', 'code'])];
+            $notify?->load(['boss', 'server', 'code']);
+            $deliveryKey = hash('sha256', $payload['server_id'].':'.$eventKey);
+            app(NotificationWebhookService::class)->capture($deliveryKey, [
+                'event_id' => $deliveryKey, 'event' => 'game.notification', 'status' => $status,
+                'server_code' => NroServer::query()->whereKey($payload['server_id'])->value('server_code'),
+                'code' => $notify?->code?->code ?? $code,
+                'content' => $payload['content'], 'occurred_at' => $time->toIso8601String(),
+                'notification' => $notify ? (new NotifyResource($notify))->resolve() : null,
+            ]);
+
+            return ['status' => $status, 'duplicate' => false, 'notify' => $notify];
         }, 3);
     }
 
