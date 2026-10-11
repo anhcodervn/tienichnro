@@ -13,13 +13,13 @@ class License extends Model
 
     protected $table = 'licenses';
 
-    protected $fillable = ['product_id', 'plan_id', 'user_id', 'key_hash', 'key_prefix', 'status', 'duration_days', 'activated_at', 'expires_at', 'last_transfer_at', 'generation', 'max_active_devices', 'transfer_cooldown', 'current_device_uuid'];
+    protected $fillable = ['product_id', 'plan_id', 'user_id', 'key_hash', 'encrypted_key', 'key_prefix', 'status', 'duration_days', 'activated_at', 'expires_at', 'last_transfer_at', 'generation', 'max_active_devices', 'transfer_cooldown', 'current_device_uuid'];
 
-    protected $hidden = ['key_hash'];
+    protected $hidden = ['key_hash', 'encrypted_key'];
 
     protected function casts(): array
     {
-        return ['activated_at' => 'datetime', 'expires_at' => 'datetime', 'last_transfer_at' => 'datetime', 'generation' => 'integer', 'duration_days' => 'integer', 'transfer_cooldown' => 'integer'];
+        return ['encrypted_key' => 'encrypted', 'activated_at' => 'datetime', 'expires_at' => 'datetime', 'last_transfer_at' => 'datetime', 'generation' => 'integer', 'duration_days' => 'integer', 'transfer_cooldown' => 'integer'];
     }
 
     public function product(): BelongsTo

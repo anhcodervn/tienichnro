@@ -304,3 +304,115 @@ test('license administration audit redacts credentials and never records issued 
     expect(data_get($log->new_values, 'input.owner_password'))->toBe('[REDACTED]');
     expect(json_encode($log->new_values))->not->toContain($issued);
 });
+
+test('admin edits license ownership duration and cooldown with validated information', function (): void {
+    $this->actingAs(User::factory()->create(['role' => 'admin']));
+    $endpoint = '/api/admin-api/license/keys/'.$this->license->id;
+    $payload = ['action' => 'edit', 'user_id' => null, 'duration_days' => 90, 'expires_at' => null, 'transfer_cooldown' => 60, 'reason' => 'Update customer license'];
+    $this->patchJson($endpoint, $payload)->assertOk()->assertJsonPath('data.duration_days', 90)->assertJsonPath('data.user_id', null);
+    expect($this->license->fresh()->transfer_cooldown)->toBe(60);
+    $this->getJson($endpoint)->assertOk()->assertJsonPath('data.owner', null)->assertJsonCount(1, 'data.events');
+    $this->patchJson($endpoint, [...$payload, 'user_id' => 999999])->assertUnprocessable()->assertJsonValidationErrors('user_id');
+    $this->patchJson($endpoint, [...$payload, 'duration_days' => 0])->assertUnprocessable()->assertJsonValidationErrors('duration_days');
+    $this->patchJson($endpoint, [...$payload, 'expires_at' => now()->addDay()->toISOString()])->assertUnprocessable()->assertJsonValidationErrors('expires_at');
+    $this->patchJson($endpoint, [...$payload, 'reason' => ''])->assertUnprocessable()->assertJsonValidationErrors('reason');
+});
+
+test('editing activated expiry revokes existing sessions and can restore expired license', function (): void {
+    $session = activateTestLicense($this);
+    $this->actingAs(User::factory()->create(['role' => 'admin']));
+    $payload = ['action' => 'edit', 'user_id' => $this->owner->id, 'duration_days' => $this->license->fresh()->duration_days, 'expires_at' => now()->subDay()->toISOString(), 'transfer_cooldown' => 60, 'reason' => 'Correct expiration'];
+    $endpoint = '/api/admin-api/license/keys/'.$this->license->id;
+    $this->patchJson($endpoint, $payload)->assertOk()->assertJsonPath('data.status', 'expired');
+    expect(LicenseSession::findOrFail($session['session_id'])->status)->toBe('revoked');
+    $this->license->refresh()->update(['status' => 'expired']);
+    $this->patchJson($endpoint, [...$payload, 'expires_at' => null])->assertOk()->assertJsonPath('data.status', 'active')->assertJsonPath('data.expires_at', null);
+    $this->patchJson($endpoint, [...$payload, 'duration_days' => 7])->assertUnprocessable()->assertJsonValidationErrors('duration_days');
+});
+
+test('rotating a key invalidates the old key and sessions while retaining entitlement', function (): void {
+    $session = activateTestLicense($this);
+    $expiry = $this->license->fresh()->expires_at->toISOString();
+    $this->actingAs(User::factory()->create(['role' => 'admin']));
+    $response = $this->patchJson('/api/admin-api/license/keys/'.$this->license->id, ['action' => 'rotate', 'reason' => 'Replace leaked key'])->assertOk()->assertHeader('Cache-Control', 'no-store, private');
+    $newKey = $response->json('data.key');
+    expect($newKey)->not->toBe($this->key);
+    $license = $this->license->fresh();
+    expect($license->key_hash)->toBe(LicenseSessionService::hashKey($newKey))
+        ->and($license->expires_at->toISOString())->toBe($expiry)
+        ->and($license->user_id)->toBe($this->owner->id)
+        ->and($license->current_device_uuid)->toBeNull()
+        ->and($license->generation)->toBe($session['generation'] + 1);
+    expect(LicenseSession::findOrFail($session['session_id'])->status)->toBe('revoked');
+    signedLicenseRequest($this, '/api/v1/licenses/activate', licenseActivationPayload($this))->assertNotFound()->assertJsonPath('code', 'INVALID_LICENSE');
+    $this->key = $newKey;
+    activateTestLicense($this);
+    $this->getJson('/api/admin-api/license/keys/'.$license->id)->assertOk()->assertJsonPath('data.key', $newKey)->assertJsonMissingPath('data.key_hash')->assertJsonMissingPath('data.encrypted_key');
+    $license->refresh()->update(['status' => 'revoked']);
+    $this->patchJson('/api/admin-api/license/keys/'.$license->id, ['action' => 'rotate', 'reason' => 'Cannot restore revoked'])->assertUnprocessable();
+});
+
+test('admin deletion removes key devices sessions and retains event audit', function (): void {
+    activateTestLicense($this);
+    $this->actingAs(User::factory()->create(['role' => 'admin']));
+    $endpoint = '/api/admin-api/license/keys/'.$this->license->id;
+    $this->deleteJson($endpoint)->assertUnprocessable()->assertJsonValidationErrors('reason');
+    $this->deleteJson($endpoint, ['reason' => 'Remove obsolete license'])->assertOk();
+    $this->assertDatabaseMissing('licenses', ['id' => $this->license->id]);
+    $this->assertDatabaseMissing('license_devices', ['license_id' => $this->license->id]);
+    $this->assertDatabaseMissing('license_sessions', ['license_id' => $this->license->id]);
+    $this->assertDatabaseHas('license_events', ['license_id' => null, 'event' => 'deleted', 'reason' => 'Remove obsolete license']);
+    $this->getJson($endpoint)->assertNotFound();
+    $this->deleteJson($endpoint, ['reason' => 'Remove obsolete license'])->assertNotFound();
+});
+
+test('non admins cannot edit rotate or delete keys', function (string $method, array $payload): void {
+    $this->actingAs($this->owner);
+    $this->{$method}('/api/admin-api/license/keys/'.$this->license->id, $payload)->assertForbidden();
+})->with([
+    ['patchJson', ['action' => 'edit', 'reason' => 'Unauthorized edit']],
+    ['patchJson', ['action' => 'rotate', 'reason' => 'Unauthorized rotation']],
+    ['deleteJson', ['reason' => 'Unauthorized deletion']],
+]);
+
+test('issued keys are encrypted at rest and only revealed by admin detail', function (): void {
+    $this->actingAs(User::factory()->create(['role' => 'admin']));
+    $issued = $this->postJson('/api/admin-api/license/keys', ['plan_id' => $this->plan->id, 'quantity' => 1])->assertCreated()->json('data.0');
+    $license = License::findOrFail($issued['id']);
+    expect($license->getRawOriginal('encrypted_key'))->not->toBe($issued['key']);
+    expect($license->encrypted_key)->toBe($issued['key']);
+    expect($license->toArray())->not->toHaveKey('encrypted_key');
+    $this->getJson('/api/admin-api/license/keys')->assertOk()->assertJsonMissingPath('data.0.key')->assertJsonMissingPath('data.0.encrypted_key');
+    $this->getJson('/api/admin-api/license/keys/'.$license->id)->assertOk()->assertHeader('Cache-Control', 'no-store, private')->assertJsonPath('data.key', $issued['key']);
+    $this->actingAs($this->owner)->getJson('/api/admin-api/license/keys/'.$license->id)->assertForbidden();
+});
+
+test('admin can delete unused catalog entries and receives not found for repeat deletion', function (): void {
+    $this->actingAs(User::factory()->create(['role' => 'admin']));
+    $product = LicenseProduct::factory()->create();
+    $plan = LicensePlan::factory()->create(['product_id' => $product->id]);
+    $this->deleteJson('/api/admin-api/license/products/'.$product->id)->assertUnprocessable()->assertJsonValidationErrors('product');
+    $this->deleteJson('/api/admin-api/license/plans/'.$plan->id)->assertOk();
+    $this->assertDatabaseMissing('license_plans', ['id' => $plan->id]);
+    $this->deleteJson('/api/admin-api/license/plans/'.$plan->id)->assertNotFound();
+    $this->deleteJson('/api/admin-api/license/products/'.$product->id)->assertOk();
+    $this->assertDatabaseMissing('license_products', ['id' => $product->id]);
+    $this->deleteJson('/api/admin-api/license/products/'.$product->id)->assertNotFound();
+});
+
+test('catalog deletion cannot remove products or plans referenced by any license', function (string $status): void {
+    $this->license->update(['status' => $status]);
+    $this->actingAs(User::factory()->create(['role' => 'admin']));
+    $this->deleteJson('/api/admin-api/license/plans/'.$this->plan->id)->assertUnprocessable()->assertJsonValidationErrors('plan');
+    $this->deleteJson('/api/admin-api/license/products/'.$this->product->id)->assertUnprocessable()->assertJsonValidationErrors('product');
+    $this->assertDatabaseHas('license_plans', ['id' => $this->plan->id]);
+    $this->assertDatabaseHas('license_products', ['id' => $this->product->id]);
+    $this->assertDatabaseHas('licenses', ['id' => $this->license->id]);
+})->with(['unused', 'active', 'expired', 'revoked']);
+
+test('catalog deletion requires an authenticated admin', function (string $catalog): void {
+    $id = $catalog === 'products' ? $this->product->id : $this->plan->id;
+    $endpoint = '/api/admin-api/license/'.$catalog.'/'.$id;
+    $this->deleteJson($endpoint)->assertUnauthorized();
+    $this->actingAs($this->owner)->deleteJson($endpoint)->assertForbidden();
+})->with(['products', 'plans']);

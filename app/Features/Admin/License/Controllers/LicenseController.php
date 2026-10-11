@@ -42,6 +42,20 @@ class LicenseController extends Controller
         return response()->json(['data' => LicensePlan::query()->with('product')->latest('id')->get()]);
     }
 
+    public function destroyProduct(SaveLicenseCatalogRequest $request, LicenseProduct $product): JsonResponse
+    {
+        $this->licenses->deleteProduct($product);
+
+        return response()->json(['message' => 'Đã xóa sản phẩm/tool.']);
+    }
+
+    public function destroyPlan(SaveLicenseCatalogRequest $request, LicensePlan $plan): JsonResponse
+    {
+        $this->licenses->deletePlan($plan);
+
+        return response()->json(['message' => 'Đã xóa gói license.']);
+    }
+
     public function storePlan(SaveLicenseCatalogRequest $request): JsonResponse
     {
         return response()->json(['data' => LicensePlan::query()->create($request->validated())], 201);
@@ -80,11 +94,11 @@ class LicenseController extends Controller
         return LicenseResource::collection($query->latest('id')->paginate(20));
     }
 
-    public function show(License $license): LicenseResource
+    public function show(License $license): JsonResponse
     {
         Gate::authorize('update', $license);
 
-        return new LicenseResource($license->load(['product', 'plan', 'devices', 'sessions' => fn ($query) => $query->latest()->limit(50), 'events' => fn ($query) => $query->latest('id')->limit(100)]));
+        return (new LicenseResource($license->load(['product', 'plan', 'user', 'devices', 'sessions' => fn ($query) => $query->latest()->limit(50), 'events' => fn ($query) => $query->latest('id')->limit(100)])))->response()->header('Cache-Control', 'no-store, private');
     }
 
     public function store(ManageLicenseRequest $request): JsonResponse
@@ -92,10 +106,22 @@ class LicenseController extends Controller
         return response()->json(['data' => $this->licenses->issue($request->validated(), $request)], 201)->header('Cache-Control', 'no-store, private');
     }
 
-    public function update(ManageLicenseRequest $request, License $license): LicenseResource
+    public function update(ManageLicenseRequest $request, License $license): LicenseResource|JsonResponse
     {
         Gate::authorize('update', $license);
+        if ($request->validated('action') === 'rotate') {
+            return response()->json(['data' => $this->licenses->rotate($license, $request->validated('reason'), $request)])
+                ->header('Cache-Control', 'no-store, private');
+        }
 
         return new LicenseResource($this->licenses->manage($license, $request->validated(), $request)->load(['product', 'plan', 'sessions']));
+    }
+
+    public function destroy(ManageLicenseRequest $request, License $license): JsonResponse
+    {
+        Gate::authorize('update', $license);
+        $this->licenses->delete($license, $request->validated('reason'), $request);
+
+        return response()->json(['message' => 'Đã xóa license key.']);
     }
 }

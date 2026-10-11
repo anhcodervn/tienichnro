@@ -14,30 +14,121 @@ new Function('exports', code)(presentation);
 
 const require = createRequire(import.meta.url);
 const pageSource = readFileSync(new URL('../../resources/js/pages/admin/licenses/index.vue', import.meta.url), 'utf8');
-const { descriptor } = parse(pageSource);
-const compiledPage = compileScript(descriptor, { id: 'license-admin-test', inlineTemplate: true });
-const pageCode = ts.transpileModule(compiledPage.content, {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
-}).outputText;
-const pageModule = {};
-new Function('require', 'exports', pageCode)((name) => {
-    if (name === '@/services/admin-license.service') return { adminLicense: {} };
-    if (name === '@/utils/response') return { handleErrorResponse() {} };
-    if (name === './presentation') return presentation;
-    if (name === '@/components/shared/DataTable/index.vue') {
-        return {
-            default: {
-                props: ['columns'],
-                setup: (props) => () =>
-                    h(
-                        'table',
-                        props.columns.map((column) => h('th', column.header)),
-                    ),
-            },
-        };
-    }
-    return require(name);
-}, pageModule);
+function compilePage(source = pageSource, row = { id: 1, status: 'unused' }) {
+    const { descriptor } = parse(source);
+    const compiledPage = compileScript(descriptor, { id: 'license-admin-test', inlineTemplate: true });
+    const pageCode = ts.transpileModule(compiledPage.content, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText;
+    const pageModule = {};
+    new Function('require', 'exports', pageCode)((name) => {
+        if (name === '@/services/admin-license.service') return { adminLicense: {} };
+        if (name === '@/utils/response') return { handleErrorResponse() {} };
+        if (name === './presentation') return presentation;
+        if (name === '@headlessui/vue') {
+            const panel = {
+                setup:
+                    (_, { slots }) =>
+                    () =>
+                        h('div', slots.default?.()),
+            };
+            return {
+                Dialog: {
+                    props: ['open'],
+                    setup:
+                        (props, { slots }) =>
+                        () =>
+                            props.open ? h('div', slots.default?.()) : null,
+                },
+                DialogPanel: panel,
+                DialogTitle: panel,
+                DialogDescription: panel,
+            };
+        }
+        if (name === '@/components/shared/DataTable/index.vue') {
+            return {
+                default: {
+                    props: ['columns'],
+                    setup:
+                        (props, { slots }) =>
+                        () =>
+                            h('table', [
+                                ...props.columns.map((column) => h('th', column.header)),
+                                slots.key_prefix?.({ row }),
+                                slots.actions?.({ row }),
+                            ]),
+                },
+            };
+        }
+        return require(name);
+    }, pageModule);
+    return pageModule.default;
+}
+const pageModule = { default: compilePage() };
+
+for (const section of ['products', 'plans']) {
+    test(`${section} offers create edit and delete controls`, async () => {
+        const html = await renderToString(createSSRApp(compilePage(), { section }));
+        assert.ok(html.includes(section === 'products' ? 'Thêm sản phẩm' : 'Thêm gói license'));
+        assert.ok(html.includes('Chỉnh sửa'));
+        assert.ok(html.includes('>Xóa</button>'));
+    });
+}
+
+test('catalog deletion names the selected item and requires confirmation', async () => {
+    const source = pageSource
+        .replace(/const modal = ref<[^\n]+>\(null\);/, "const modal = ref('catalog-delete');")
+        .replace(/const catalogDeletion = ref<[^\n]+>\(null\);/, 'const catalogDeletion = ref({ id: 7, name: "Demo tool", kind: "products" });');
+    const html = await renderToString(createSSRApp(compilePage(source), { section: 'products' }));
+    assert.ok(html.includes('Demo tool'));
+    assert.ok(html.includes('Tôi xác nhận xóa mục này.'));
+    assert.match(html, /type="checkbox" required/);
+    assert.match(html, /type="submit"[^>]*disabled/);
+});
+
+test('eye control is visible beside the license key in the table', async () => {
+    const source = pageSource.replace('const loadingKeys = ref(true)', 'const loadingKeys = ref(false)');
+    const html = await renderToString(createSSRApp(compilePage(source, { id: 7, key_prefix: 'ABCD-1234', status: 'unused' }), { section: 'keys' }));
+    assert.ok(html.includes('ABCD-1234…'));
+    assert.ok(html.includes('aria-label="Xem license key"'));
+});
+
+test('eye control stays visible in detail for a legacy key', async () => {
+    const source = pageSource
+        .replace(/const modal = ref<[^\n]+>\(null\);/, "const modal = ref('detail');")
+        .replace('const detail = ref<LicenseKey | null>(null);', 'const detail = ref({ id: 7, key_prefix: "ABCD-1234", status: "unused" });');
+    const html = await renderToString(createSSRApp(compilePage(source), { section: 'keys' }));
+    assert.ok(html.includes('aria-label="Hiện key đầy đủ"'));
+});
+
+for (const visible of [false, true]) {
+    test(`detail ${visible ? 'reveals' : 'masks'} the full key with an accessible eye control`, async () => {
+        const fixture = { id: 7, key_prefix: 'ABCD-1234', key: 'ABCD-1234-SECRET-FULL-KEY', status: 'unused', activated_at: null, expires_at: null };
+        const source = pageSource
+            .replace(/const modal = ref<[^\n]+>\(null\);/, "const modal = ref('detail');")
+            .replace('const detail = ref<LicenseKey | null>(null);', `const detail = ref(${JSON.stringify(fixture)});`)
+            .replace('const keyVisible = ref(false);', `const keyVisible = ref(${visible});`);
+        const html = await renderToString(createSSRApp(compilePage(source), { section: 'keys' }));
+        assert.equal(html.includes(fixture.key), visible);
+        assert.ok(html.includes(visible ? 'Ẩn key' : 'Hiện key đầy đủ'));
+        assert.ok(html.includes(`aria-pressed="${visible}"`));
+    });
+}
+
+test('key rows expose detail edit rotation and deletion controls', async () => {
+    const page = compilePage(pageSource.replace('const loadingKeys = ref(true)', 'const loadingKeys = ref(false)'));
+    const html = await renderToString(createSSRApp(page, { section: 'keys' }));
+    for (const label of ['Chi tiết', 'Sửa', 'Đổi key', 'Xóa']) assert.ok(html.includes(label));
+});
+
+test('revoked key rows retain detail and deletion without edit or rotation', async () => {
+    const page = compilePage(pageSource.replace('const loadingKeys = ref(true)', 'const loadingKeys = ref(false)'), { id: 1, status: 'revoked' });
+    const html = await renderToString(createSSRApp(page, { section: 'keys' }));
+    assert.ok(html.includes('Chi tiết'));
+    assert.ok(html.includes('Xóa'));
+    assert.equal(html.includes('Đổi key'), false);
+    assert.equal(html.includes('>Sửa<'), false);
+});
 
 for (const [section, title, column] of [
     ['keys', 'License keys', 'Trạng thái key'],
@@ -101,7 +192,12 @@ test('issuing only offers enabled plans belonging to enabled products', () => {
 
 test('revoked keys cannot be managed and device actions require a registered device', () => {
     assert.deepEqual(presentation.licenseActions({ status: 'revoked' }), []);
-    assert.deepEqual(presentation.licenseActions({ status: 'unused', current_device_uuid: null, devices: [] }), ['extend', 'suspend', 'revoke']);
+    assert.deepEqual(presentation.licenseActions({ status: 'unused', current_device_uuid: null, devices: [] }), [
+        'extend',
+        'suspend',
+        'rotate',
+        'revoke',
+    ]);
     const suspended = presentation.licenseActions({
         status: 'suspended',
         current_device_uuid: 'a',

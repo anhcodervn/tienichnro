@@ -23,7 +23,7 @@ export function licenseActions(license: LicenseKey): string[] {
     const actions = license.status === 'suspended' ? ['resume', 'extend'] : ['extend', 'suspend'];
     if (license.current_device_uuid) actions.push('revoke-session', 'reset-device');
     if (license.devices?.some((device) => device.device_uuid !== license.current_device_uuid)) actions.push('transfer');
-    return [...actions, 'revoke'];
+    return [...actions, 'rotate', 'revoke'];
 }
 
 export function licenseExpiryLabel(license: Pick<LicenseKey, 'activated_at' | 'expires_at'>): string {

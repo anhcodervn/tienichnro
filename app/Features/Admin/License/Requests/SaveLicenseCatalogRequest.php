@@ -15,6 +15,10 @@ class SaveLicenseCatalogRequest extends FormRequest
     /** @return array<string, mixed> */
     public function rules(): array
     {
+        if ($this->isMethod('DELETE')) {
+            return [];
+        }
+
         $rules = ['name' => ['required', 'string', 'max:120'], 'is_active' => ['required', 'boolean'], 'max_active_devices' => ['required', 'integer', 'in:1'], 'transfer_cooldown' => ['required', 'integer', 'min:0', 'max:604800']];
         if ($this->routeIs('admin-api.license.plans.*')) {
             return [...$rules, 'product_id' => ['required', 'integer', Rule::exists('license_products', 'id')], 'duration_days' => ['present', 'nullable', 'integer', 'min:1', 'max:36500'], 'price' => ['required', 'integer', 'min:0', 'max:100000000000']];

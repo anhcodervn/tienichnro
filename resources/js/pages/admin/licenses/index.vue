@@ -4,7 +4,22 @@ import { adminLicense, type LicenseKey, type LicensePlan, type LicenseProduct } 
 import { handleErrorResponse } from '@/utils/response';
 import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui/vue';
 import { isAxiosError } from 'axios';
-import { AlertCircle, Check, Download, KeyRound, LoaderCircle, Monitor, Package, Plus, RefreshCw, Search, ShieldCheck, X } from 'lucide-vue-next';
+import {
+    AlertCircle,
+    Check,
+    Download,
+    Eye,
+    EyeOff,
+    KeyRound,
+    LoaderCircle,
+    Monitor,
+    Package,
+    Plus,
+    RefreshCw,
+    Search,
+    ShieldCheck,
+    X,
+} from 'lucide-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 import {
     availableLicensePlans,
@@ -57,10 +72,15 @@ const page = ref(1);
 const lastPage = ref(1);
 const totalKeys = ref(0);
 const filters = reactive({ search: '', status: '', product_id: '' });
-const modal = ref<'product' | 'plan' | 'issue' | 'manage' | 'detail' | 'issued' | null>(null);
+const modal = ref<'product' | 'plan' | 'issue' | 'manage' | 'detail' | 'issued' | 'edit' | 'delete' | 'catalog-delete' | null>(null);
+const catalogDeletion = ref<{ id: number; name: string; kind: 'products' | 'plans' } | null>(null);
 const detailTab = ref<'devices' | 'sessions' | 'history'>('devices');
 const editingId = ref<number | null>(null);
 const detail = ref<LicenseKey | null>(null);
+const keyVisible = ref(false);
+const visibleRowKeys = ref<Record<number, string>>({});
+const unavailableRowKeys = ref<Record<number, boolean>>({});
+const revealingId = ref<number | null>(null);
 const issued = ref<{ id: number; key: string }[]>([]);
 const keysSaved = ref(false);
 const revokeConfirmed = ref(false);
@@ -88,6 +108,13 @@ const plan = reactive<Omit<LicensePlan, 'id'>>({
     transfer_cooldown: 1800,
 });
 const issue = reactive({ plan_id: 0, user_id: null as number | null, quantity: 1 });
+const keyEdit = reactive({
+    user_id: null as number | null,
+    duration_days: null as number | null,
+    expires_at: '',
+    transfer_cooldown: 1800,
+    reason: '',
+});
 const action = reactive({ action: 'extend', reason: '', days: 30 as number | null, device_uuid: null as string | null });
 const statuses: Record<string, string> = {
     unused: 'Chưa kích hoạt',
@@ -105,6 +132,8 @@ const actions: Record<string, string> = {
     'reset-device': 'Reset thiết bị',
     transfer: 'Chuyển thiết bị',
     revoke: 'Thu hồi vĩnh viễn',
+    rotate: 'Đổi key',
+    edit: 'Sửa thông tin key',
 };
 const eventLabels: Record<string, string> = {
     issued: 'Đã cấp key',
@@ -125,6 +154,9 @@ const headings = computed(
             manage: 'Quản lý license',
             detail: 'Chi tiết license',
             issued: 'License key đã tạo',
+            edit: 'Sửa thông tin key',
+            delete: 'Xóa license key',
+            'catalog-delete': catalogDeletion.value?.kind === 'products' ? 'Xóa sản phẩm/tool' : 'Xóa gói license',
         })[modal.value || 'detail'],
 );
 const descriptions = computed(
@@ -135,7 +167,10 @@ const descriptions = computed(
             issue: 'Chọn gói và số lượng key cần cấp cho người sử dụng.',
             manage: 'Chọn thao tác và ghi lại lý do thay đổi.',
             detail: 'Theo dõi thiết bị, phiên sử dụng và lịch sử của key.',
-            issued: 'Key đầy đủ chỉ hiển thị tại đây. Hãy lưu trước khi đóng.',
+            issued: 'Lưu key để cấp cho người sử dụng. Có thể xem lại trong phần chi tiết.',
+            edit: 'Cập nhật chủ sở hữu, thời hạn và thời gian chờ chuyển máy.',
+            delete: 'Xóa key cùng thiết bị và phiên sử dụng. Thao tác không thể hoàn tác.',
+            'catalog-delete': 'Xác nhận xóa mục này. Thao tác không thể hoàn tác.',
         })[modal.value || 'detail'],
 );
 const primaryLabel = computed(() =>
@@ -145,10 +180,11 @@ const canCreate = computed(
     () =>
         !loading.value && (section.value === 'products' || (section.value === 'plans' ? products.value.length > 0 : availablePlans.value.length > 0)),
 );
-const dangerousAction = computed(() => ['revoke', 'reset-device'].includes(action.action));
+const dangerousAction = computed(() => ['revoke', 'reset-device', 'rotate'].includes(action.action));
 const canSave = computed(
     () =>
         !saving.value &&
+        (!['delete', 'catalog-delete'].includes(modal.value || '') || revokeConfirmed.value) &&
         (modal.value !== 'issue' || availablePlans.value.some((item) => item.id === issue.plan_id)) &&
         (modal.value !== 'manage' || (availableActions.value.includes(action.action) && (action.action !== 'revoke' || revokeConfirmed.value))),
 );
@@ -182,13 +218,19 @@ const planColumns = [
 ];
 let keyRequest = 0;
 async function loadKeys(next = page.value) {
+    visibleRowKeys.value = {};
+    unavailableRowKeys.value = {};
     const request = ++keyRequest;
     loadingKeys.value = true;
     try {
         const result = await adminLicense.keys({ page: next, ...filters });
         if (request !== keyRequest) return;
         keys.value = result.data;
-        page.value = next;
+        page.value = Math.min(next, Math.max(1, result.meta.last_page));
+        if (next > page.value) {
+            await loadKeys(page.value);
+            return;
+        }
         lastPage.value = Math.max(1, result.meta.last_page);
         totalKeys.value = result.meta.total;
         failed.value = false;
@@ -216,6 +258,7 @@ async function load() {
     }
 }
 function openModal(value: typeof modal.value) {
+    keyVisible.value = false;
     formErrors.value = [];
     revokeConfirmed.value = false;
     modal.value = value;
@@ -260,12 +303,17 @@ function openIssue() {
     keysSaved.value = false;
     openModal('issue');
 }
+function deleteCatalog(item: LicenseProduct | LicensePlan) {
+    if (section.value === 'keys') return;
+    catalogDeletion.value = { id: item.id, name: item.name, kind: section.value };
+    openModal('catalog-delete');
+}
 function create() {
     if (section.value === 'products') editProduct();
     else if (section.value === 'plans') editPlan();
     else openIssue();
 }
-async function inspect(item: LicenseKey, manage = false) {
+async function inspect(item: LicenseKey, manage: boolean | 'edit' | 'delete' | 'rotate' = false) {
     if (inspectingId.value !== null) return;
     inspectingId.value = item.id;
     try {
@@ -276,12 +324,40 @@ async function inspect(item: LicenseKey, manage = false) {
             days: 30,
             device_uuid: targetDevices.value[0]?.device_uuid || null,
         });
+        Object.assign(keyEdit, {
+            user_id: detail.value.user_id,
+            duration_days: detail.value.duration_days,
+            expires_at: detail.value.expires_at ? localDateTime(detail.value.expires_at) : '',
+            transfer_cooldown: detail.value.transfer_cooldown,
+            reason: '',
+        });
+        if (manage === 'rotate') action.action = 'rotate';
         detailTab.value = 'devices';
-        openModal(manage && availableActions.value.length ? 'manage' : 'detail');
+        openModal(manage === 'delete' || manage === 'edit' ? manage : manage && availableActions.value.length ? 'manage' : 'detail');
     } catch (error) {
         handleErrorResponse(error);
     } finally {
         inspectingId.value = null;
+    }
+}
+async function toggleRowKey(item: LicenseKey) {
+    if (visibleRowKeys.value[item.id] || unavailableRowKeys.value[item.id]) {
+        delete visibleRowKeys.value[item.id];
+        delete unavailableRowKeys.value[item.id];
+        return;
+    }
+    if (revealingId.value !== null) return;
+    revealingId.value = item.id;
+    const request = keyRequest;
+    try {
+        const value = await adminLicense.detail(item.id);
+        if (request !== keyRequest) return;
+        if (value.key) visibleRowKeys.value[item.id] = value.key;
+        else unavailableRowKeys.value[item.id] = true;
+    } catch (error) {
+        handleErrorResponse(error);
+    } finally {
+        revealingId.value = null;
     }
 }
 function close() {
@@ -291,6 +367,10 @@ function close() {
         formErrors.value = [];
     }
 }
+function localDateTime(value: string) {
+    const date = new Date(value);
+    return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
+}
 async function save() {
     if (!canSave.value) return;
     saving.value = true;
@@ -298,17 +378,34 @@ async function save() {
     try {
         if (modal.value === 'product') await adminLicense.saveProduct(product, editingId.value);
         if (modal.value === 'plan') await adminLicense.savePlan(plan, editingId.value);
-        if (modal.value === 'manage' && detail.value)
-            await adminLicense.manage(detail.value.id, {
+        if (modal.value === 'catalog-delete' && catalogDeletion.value) {
+            const item = catalogDeletion.value;
+            if (item.kind === 'products') await adminLicense.deleteProduct(item.id);
+            else await adminLicense.deletePlan(item.id);
+        }
+        if (modal.value === 'edit' && detail.value)
+            await adminLicense.edit(detail.value.id, {
+                ...keyEdit,
+                expires_at: keyEdit.expires_at ? new Date(keyEdit.expires_at).toISOString() : null,
+            });
+        if (modal.value === 'delete' && detail.value) await adminLicense.remove(detail.value.id, action.reason);
+        if (modal.value === 'manage' && detail.value) {
+            const result = await adminLicense.manage(detail.value.id, {
                 ...action,
                 days: action.action === 'extend' ? action.days : null,
                 device_uuid: action.action === 'transfer' ? action.device_uuid : null,
             });
+            if (action.action === 'rotate') {
+                issued.value = [result];
+                keysSaved.value = false;
+                modal.value = 'issued';
+            }
+        }
         if (modal.value === 'issue') {
             issued.value = await adminLicense.issue(issue);
             keysSaved.value = false;
             modal.value = 'issued';
-        } else {
+        } else if (modal.value !== 'issued') {
             notice.value = 'Đã lưu thay đổi.';
             modal.value = null;
         }
@@ -449,9 +546,27 @@ onMounted(load);
                                     ><KeyRound class="size-4"
                                 /></span>
                                 <div>
-                                    <code class="whitespace-nowrap text-sm font-semibold text-slate-900 dark:text-slate-100"
-                                        >{{ row.key_prefix }}…</code
-                                    >
+                                    <div class="flex items-center gap-2">
+                                        <code class="break-all text-sm font-semibold text-slate-900 dark:text-slate-100">{{
+                                            visibleRowKeys[row.id] || `${row.key_prefix}…`
+                                        }}</code>
+                                        <button
+                                            type="button"
+                                            :class="[buttonClass, 'shrink-0']"
+                                            :disabled="revealingId !== null"
+                                            :aria-label="visibleRowKeys[row.id] || unavailableRowKeys[row.id] ? 'Thu gọn key' : 'Xem license key'"
+                                            :aria-pressed="Boolean(visibleRowKeys[row.id] || unavailableRowKeys[row.id])"
+                                            :title="visibleRowKeys[row.id] || unavailableRowKeys[row.id] ? 'Thu gọn key' : 'Xem license key'"
+                                            @click="toggleRowKey(row)"
+                                        >
+                                            <LoaderCircle v-if="revealingId === row.id" class="size-4 animate-spin" />
+                                            <EyeOff v-else-if="visibleRowKeys[row.id] || unavailableRowKeys[row.id]" class="size-4" />
+                                            <Eye v-else class="size-4" />
+                                        </button>
+                                    </div>
+                                    <p v-if="unavailableRowKeys[row.id]" class="mt-2 max-w-xs text-xs text-amber-600 dark:text-amber-400">
+                                        Key cũ chỉ lưu hash, cần đổi key để xem mã đầy đủ.
+                                    </p>
                                     <p class="mt-1 text-xs text-slate-400">
                                         #{{ row.id }} · {{ row.user_id ? `Chủ sở hữu #${row.user_id}` : 'Chưa gán chủ sở hữu' }}
                                     </p>
@@ -486,6 +601,29 @@ onMounted(load);
                                 >
                                     Quản lý
                                 </button>
+                                <button
+                                    v-if="row.status !== 'revoked'"
+                                    :class="buttonClass"
+                                    :disabled="inspectingId !== null"
+                                    @click="inspect(row, 'edit')"
+                                >
+                                    Sửa
+                                </button>
+                                <button
+                                    v-if="row.status !== 'revoked'"
+                                    :class="buttonClass"
+                                    :disabled="inspectingId !== null"
+                                    @click="inspect(row, 'rotate')"
+                                >
+                                    Đổi key
+                                </button>
+                                <button
+                                    :class="[buttonClass, 'text-rose-600 dark:text-rose-400']"
+                                    :disabled="inspectingId !== null"
+                                    @click="inspect(row, 'delete')"
+                                >
+                                    Xóa
+                                </button>
                             </div></template
                         >
                     </DataTable>
@@ -493,7 +631,7 @@ onMounted(load);
                         class="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400"
                     >
                         <span>{{ totalKeys }} key khớp bộ lọc · Trang {{ page }}/{{ lastPage }}</span
-                        ><span>Key đầy đủ chỉ hiển thị khi tạo</span>
+                        ><span>Xem key đầy đủ trong phần chi tiết</span>
                     </div>
                 </template>
             </template>
@@ -566,7 +704,10 @@ onMounted(load);
                         ><span class="whitespace-nowrap">{{ Number(row.price).toLocaleString('vi-VN') }} đ</span></template
                     >
                     <template #actions="{ row }"
-                        ><button :class="buttonClass" @click="section === 'products' ? editProduct(row) : editPlan(row)">Chỉnh sửa</button></template
+                        ><div class="flex items-center gap-2 whitespace-nowrap">
+                            <button :class="buttonClass" @click="section === 'products' ? editProduct(row) : editPlan(row)">Chỉnh sửa</button>
+                            <button :class="[buttonClass, 'text-rose-600 dark:text-rose-400']" @click="deleteCatalog(row)">Xóa</button>
+                        </div></template
                     >
                 </DataTable>
                 <div class="border-t border-slate-100 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400">
@@ -611,11 +752,24 @@ onMounted(load);
                                 </ul>
                             </div>
                             <form
-                                v-if="['product', 'plan', 'issue', 'manage'].includes(modal || '')"
+                                v-if="['product', 'plan', 'issue', 'manage', 'edit', 'delete', 'catalog-delete'].includes(modal || '')"
                                 id="license-form"
                                 class="space-y-5"
                                 @submit.prevent="save"
                             >
+                                <div v-if="modal === 'catalog-delete' && catalogDeletion" class="space-y-4">
+                                    <p class="text-sm">
+                                        Xóa {{ catalogDeletion.kind === 'products' ? 'sản phẩm/tool' : 'gói license' }}
+                                        <strong>{{ catalogDeletion.name }}</strong> (#{{ catalogDeletion.id }})?
+                                    </p>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">
+                                        Chỉ xóa được mục chưa có dữ liệu sử dụng. Với sản phẩm còn gói hoặc gói đã cấp key, hãy chỉnh sửa và tắt mục
+                                        đó.
+                                    </p>
+                                    <label class="flex items-center gap-2 text-sm"
+                                        ><input v-model="revokeConfirmed" type="checkbox" required />Tôi xác nhận xóa mục này.</label
+                                    >
+                                </div>
                                 <div v-if="modal === 'product'" class="grid gap-3 sm:grid-cols-2">
                                     <label class="grid gap-1.5 text-sm font-medium"
                                         >Tên tool<input v-model="product.name" required maxlength="120" :class="inputClass"
@@ -731,8 +885,73 @@ onMounted(load);
                                             :class="inputClass"
                                     /></label>
                                     <p class="text-sm text-slate-500">
-                                        Gán chủ sở hữu để cho phép chuyển máy có xác minh. Key đầy đủ chỉ xuất hiện sau khi tạo.
+                                        Gán chủ sở hữu để cho phép chuyển máy có xác minh. Có thể xem lại key trong phần chi tiết.
                                     </p>
+                                </div>
+
+                                <div v-if="modal === 'edit' && detail" class="grid gap-4 sm:grid-cols-2">
+                                    <label class="grid gap-1.5 text-sm font-medium"
+                                        >ID chủ sở hữu (trống = chưa gán)<input
+                                            :value="keyEdit.user_id"
+                                            type="number"
+                                            min="1"
+                                            :class="inputClass"
+                                            @input="
+                                                keyEdit.user_id = ($event.target as HTMLInputElement).value
+                                                    ? Number(($event.target as HTMLInputElement).value)
+                                                    : null
+                                            "
+                                    /></label>
+                                    <label v-if="!detail.activated_at" class="grid gap-1.5 text-sm font-medium"
+                                        >Thời hạn (ngày, trống = vĩnh viễn)<input
+                                            :value="keyEdit.duration_days"
+                                            type="number"
+                                            min="1"
+                                            max="36500"
+                                            :class="inputClass"
+                                            @input="
+                                                keyEdit.duration_days = ($event.target as HTMLInputElement).value
+                                                    ? Number(($event.target as HTMLInputElement).value)
+                                                    : null
+                                            "
+                                    /></label>
+                                    <label v-else class="grid gap-1.5 text-sm font-medium"
+                                        >Ngày hết hạn (trống = vĩnh viễn)<input
+                                            v-model="keyEdit.expires_at"
+                                            type="datetime-local"
+                                            step="1"
+                                            :class="inputClass"
+                                    /></label>
+                                    <label class="grid gap-1.5 text-sm font-medium"
+                                        >Chờ chuyển máy (giây)<input
+                                            v-model.number="keyEdit.transfer_cooldown"
+                                            required
+                                            type="number"
+                                            min="0"
+                                            max="604800"
+                                            :class="inputClass"
+                                    /></label>
+                                    <label class="grid gap-1.5 text-sm font-medium sm:col-span-2"
+                                        >Lý do thay đổi<textarea
+                                            v-model="keyEdit.reason"
+                                            required
+                                            minlength="3"
+                                            maxlength="255"
+                                            :class="inputClass"
+                                        />
+                                    </label>
+                                    <p class="text-sm text-slate-500 sm:col-span-2">
+                                        Đổi chủ sở hữu hoặc ngày hết hạn sẽ ngắt các phiên đang sử dụng.
+                                    </p>
+                                </div>
+                                <div v-if="modal === 'delete' && detail" class="space-y-4">
+                                    <p class="text-sm">Xóa key #{{ detail.id }} ({{ detail.key_prefix }}…) cùng toàn bộ thiết bị và phiên sử dụng.</p>
+                                    <label class="grid gap-1.5 text-sm font-medium"
+                                        >Lý do xóa<textarea v-model="action.reason" required minlength="3" maxlength="255" :class="inputClass" />
+                                    </label>
+                                    <label class="flex items-center gap-2 text-sm"
+                                        ><input v-model="revokeConfirmed" type="checkbox" required />Tôi xác nhận xóa vĩnh viễn key này.</label
+                                    >
                                 </div>
 
                                 <div v-if="modal === 'manage' && detail" class="space-y-5">
@@ -788,7 +1007,9 @@ onMounted(load);
                                             {{
                                                 action.action === 'revoke'
                                                     ? 'Key sẽ bị thu hồi vĩnh viễn và không thể mở lại. Tất cả phiên đang sử dụng sẽ mất quyền.'
-                                                    : 'Phiên cũ sẽ bị thu hồi. Máy kế tiếp có key hợp lệ có thể đăng ký lại thiết bị.'
+                                                    : action.action === 'rotate'
+                                                      ? 'Mã key cũ và toàn bộ phiên sẽ mất hiệu lực. Key mới giữ nguyên chủ sở hữu, thời hạn và trạng thái. Hãy lưu mã mới sau khi đổi.'
+                                                      : 'Phiên cũ sẽ bị thu hồi. Máy kế tiếp có key hợp lệ có thể đăng ký lại thiết bị.'
                                             }}
                                         </p>
                                         <label v-if="action.action === 'revoke'" class="mt-3 flex items-start gap-2 font-medium"
@@ -807,9 +1028,9 @@ onMounted(load);
                                 >
                                     <ShieldCheck class="mt-0.5 size-5 shrink-0" />
                                     <div>
-                                        <p class="font-semibold">Đã tạo {{ issued.length }} license key</p>
+                                        <p class="font-semibold">Đã cấp {{ issued.length }} license key mới</p>
                                         <p class="mt-1 text-sm leading-6">
-                                            Tải file hoặc sao chép key và lưu ở nơi an toàn. Sau khi đóng, bạn chỉ có thể xem prefix của key.
+                                            Tải file hoặc sao chép key để cấp cho người dùng. Có thể xem lại mã đầy đủ trong phần chi tiết.
                                         </p>
                                     </div>
                                 </div>
@@ -834,7 +1055,24 @@ onMounted(load);
                                 <div class="rounded-xl border border-slate-200 bg-slate-50 p-4 dark:border-slate-700 dark:bg-slate-800">
                                     <div class="flex flex-wrap items-center justify-between gap-3">
                                         <div>
-                                            <code class="text-base font-semibold">{{ detail.key_prefix }}…</code>
+                                            <div class="flex items-start gap-2">
+                                                <code class="break-all text-base font-semibold">{{
+                                                    keyVisible && detail.key ? detail.key : `${detail.key_prefix}…`
+                                                }}</code>
+                                                <button
+                                                    type="button"
+                                                    :class="[buttonClass, 'shrink-0']"
+                                                    :aria-label="keyVisible ? 'Ẩn key' : 'Hiện key đầy đủ'"
+                                                    :title="keyVisible ? 'Ẩn key' : 'Hiện key đầy đủ'"
+                                                    :aria-pressed="keyVisible"
+                                                    @click="keyVisible = !keyVisible"
+                                                >
+                                                    <EyeOff v-if="keyVisible" class="size-4" /><Eye v-else class="size-4" />
+                                                </button>
+                                            </div>
+                                            <p v-if="keyVisible && !detail.key" class="mt-2 text-xs text-slate-500 dark:text-slate-400">
+                                                Key cũ chỉ lưu hash nên không thể xem mã đầy đủ. Đổi key để cấp mã mới có thể xem lại.
+                                            </p>
                                             <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">
                                                 {{ detail.product_name }} · {{ detail.plan_name }}
                                             </p>
@@ -849,7 +1087,13 @@ onMounted(load);
                                         <div>
                                             <dt class="text-xs text-slate-500 dark:text-slate-400">Chủ sở hữu</dt>
                                             <dd class="mt-1 text-sm font-medium">
-                                                {{ detail.user_id ? `Tài khoản #${detail.user_id}` : 'Chưa gán' }}
+                                                {{
+                                                    detail.owner
+                                                        ? `${detail.owner.username} · ${detail.owner.email}`
+                                                        : detail.user_id
+                                                          ? `Tài khoản #${detail.user_id}`
+                                                          : 'Chưa gán'
+                                                }}
                                             </dd>
                                         </div>
                                         <div>
@@ -857,6 +1101,32 @@ onMounted(load);
                                             <dd class="mt-1 text-sm font-medium" :class="detail.online ? 'text-emerald-600' : ''">
                                                 {{ detail.online ? 'Thiết bị online' : 'Thiết bị offline' }}
                                             </dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-xs text-slate-500">Ngày tạo</dt>
+                                            <dd class="mt-1 text-sm">{{ date(detail.created_at) }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-xs text-slate-500">Ngày kích hoạt</dt>
+                                            <dd class="mt-1 text-sm">{{ date(detail.activated_at) }}</dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-xs text-slate-500">Ngày hết hạn</dt>
+                                            <dd class="mt-1 text-sm">
+                                                {{
+                                                    detail.expires_at ? date(detail.expires_at) : detail.activated_at ? 'Vĩnh viễn' : 'Chưa kích hoạt'
+                                                }}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-xs text-slate-500">Thời hạn trước kích hoạt</dt>
+                                            <dd class="mt-1 text-sm">
+                                                {{ detail.duration_days === null ? 'Vĩnh viễn' : `${detail.duration_days} ngày` }}
+                                            </dd>
+                                        </div>
+                                        <div>
+                                            <dt class="text-xs text-slate-500">Chờ chuyển máy</dt>
+                                            <dd class="mt-1 text-sm">{{ detail.transfer_cooldown }} giây</dd>
                                         </div>
                                     </dl>
                                 </div>
@@ -965,20 +1235,28 @@ onMounted(load);
                                 <button :class="buttonClass" :disabled="!canCloseLicenseDialog(saving, modal, keysSaved)" @click="close">
                                     {{ modal === 'issued' || modal === 'detail' ? 'Đóng' : 'Hủy' }}</button
                                 ><button
-                                    v-if="['product', 'plan', 'issue', 'manage'].includes(modal || '')"
+                                    v-if="['product', 'plan', 'issue', 'manage', 'edit', 'delete', 'catalog-delete'].includes(modal || '')"
                                     form="license-form"
                                     type="submit"
-                                    :class="modal === 'manage' && action.action === 'revoke' ? destructiveClass : primaryClass"
+                                    :class="
+                                        ['delete', 'catalog-delete'].includes(modal || '') || (modal === 'manage' && action.action === 'revoke')
+                                            ? destructiveClass
+                                            : primaryClass
+                                    "
                                     :disabled="!canSave"
                                 >
                                     <LoaderCircle v-if="saving" class="size-4 animate-spin" />{{
                                         saving
                                             ? 'Đang lưu…'
-                                            : modal === 'issue'
-                                              ? 'Tạo key'
-                                              : modal === 'manage'
-                                                ? actions[action.action]
-                                                : 'Lưu thay đổi'
+                                            : modal === 'catalog-delete'
+                                              ? 'Xóa'
+                                              : modal === 'delete'
+                                                ? 'Xóa key'
+                                                : modal === 'issue'
+                                                  ? 'Tạo key'
+                                                  : modal === 'manage'
+                                                    ? actions[action.action]
+                                                    : 'Lưu thay đổi'
                                     }}
                                 </button>
                             </div>

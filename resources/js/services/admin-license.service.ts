@@ -27,8 +27,13 @@ export type LicenseKey = {
     product_name: string;
     plan_name: string;
     key_prefix: string;
+    key?: string;
     status: string;
     user_id: number | null;
+    duration_days: number | null;
+    transfer_cooldown: number;
+    created_at: string;
+    owner?: { id: number; username: string; email: string } | null;
     online: boolean;
     activated_at: string | null;
     expires_at: string | null;
@@ -52,6 +57,12 @@ export const adminLicense = {
     async savePlan(value: Omit<LicensePlan, 'id'>, id: number | null) {
         return id ? api.patch(`${endpoint}/plans/${id}`, value) : api.post(`${endpoint}/plans`, value);
     },
+    async deleteProduct(id: number) {
+        return api.delete(`${endpoint}/products/${id}`);
+    },
+    async deletePlan(id: number) {
+        return api.delete(`${endpoint}/plans/${id}`);
+    },
     async keys(params: {
         page: number;
         search: string;
@@ -66,7 +77,16 @@ export const adminLicense = {
     async detail(id: number): Promise<LicenseKey> {
         return (await api.get(`${endpoint}/keys/${id}`)).data.data;
     },
+    async edit(
+        id: number,
+        value: { user_id: number | null; duration_days: number | null; expires_at: string | null; transfer_cooldown: number; reason: string },
+    ) {
+        return api.patch(`${endpoint}/keys/${id}`, { action: 'edit', ...value });
+    },
+    async remove(id: number, reason: string) {
+        return api.delete(`${endpoint}/keys/${id}`, { data: { reason } });
+    },
     async manage(id: number, value: { action: string; reason: string; days: number | null; device_uuid: string | null }) {
-        return api.patch(`${endpoint}/keys/${id}`, value);
+        return (await api.patch(`${endpoint}/keys/${id}`, value)).data.data;
     },
 };

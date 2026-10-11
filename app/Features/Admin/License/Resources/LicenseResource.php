@@ -11,6 +11,9 @@ class LicenseResource extends JsonResource
     public function toArray(Request $request): array
     {
         return ['id' => $this->id, 'product_id' => $this->product_id, 'plan_id' => $this->plan_id, 'user_id' => $this->user_id,
+            'key' => $this->when($request->routeIs('admin-api.license.keys.show') && $request->user()?->role === 'admin' && $this->resource->getRawOriginal('encrypted_key') !== null, fn () => $this->encrypted_key),
+            'owner' => $this->whenLoaded('user', fn () => $this->user?->only(['id', 'username', 'email'])),
+            'duration_days' => $this->duration_days, 'transfer_cooldown' => $this->transfer_cooldown, 'created_at' => $this->created_at?->toISOString(),
             'product_name' => $this->whenLoaded('product', fn () => $this->product->name), 'plan_name' => $this->whenLoaded('plan', fn () => $this->plan->name), 'key_prefix' => $this->key_prefix,
             'status' => in_array($this->status, ['unused', 'active'], true) && $this->expires_at?->lte(now()) ? 'expired' : $this->status,
             'activated_at' => $this->activated_at?->toISOString(), 'expires_at' => $this->expires_at?->toISOString(), 'generation' => $this->generation,
