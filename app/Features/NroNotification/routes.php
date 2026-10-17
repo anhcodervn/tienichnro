@@ -1,6 +1,7 @@
 <?php
 
 use App\Features\NroNotification\Controllers\BossController;
+use App\Features\NroNotification\Controllers\InternalZaloReceiveNotificationController;
 use App\Features\NroNotification\Controllers\NotificationPruneController;
 use App\Features\NroNotification\Controllers\NotificationTypeController;
 use App\Features\NroNotification\Controllers\NotifyController;
@@ -8,6 +9,9 @@ use App\Features\NroNotification\Controllers\ServerController;
 use App\Features\NroNotification\Controllers\ZaloReceiveNotificationController;
 use App\Features\NroNotification\Middleware\LimitNotificationTraffic;
 use Illuminate\Support\Facades\Route;
+
+Route::post('nro/internal/zalo-receivers', InternalZaloReceiveNotificationController::class)
+    ->middleware('throttle:60,1')->name('nro.internal.zalo-receivers.store');
 
 Route::post('nro/cron/prune-notifies', NotificationPruneController::class)
     ->middleware('throttle:6,1')->name('nro.notifies.prune');

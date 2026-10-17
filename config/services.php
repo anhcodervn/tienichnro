@@ -67,6 +67,16 @@ return [
         ],
     ],
 
+    'zalo_bot' => [
+        'enabled' => env('ZALO_BOT_ENABLED', false),
+        'messages_url' => env('ZALO_BOT_MESSAGES_URL', 'https://zalo.tienichnro.com/api/messages'),
+        'authorization' => env('ZALO_BOT_AUTHORIZATION'),
+        'account_id' => (int) env('ZALO_BOT_ACCOUNT_ID', 1),
+        'box_id' => (string) env('ZALO_BOT_BOX_ID', ''),
+        'recipient_type' => env('ZALO_BOT_RECIPIENT_TYPE', 'group'),
+        'registration_key' => env('ZALO_BOT_REGISTRATION_KEY'),
+    ],
+
     'telegram' => [
         'bot_token' => env('TELEGRAM_BOT_TOKEN'),
         'default_chat_id' => env('TELEGRAM_DEFAULT_CHAT_ID'),

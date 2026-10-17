@@ -2,6 +2,7 @@
 
 namespace App\Features\NroNotification\Services;
 
+use App\Features\NroNotification\Jobs\SendZaloEquipmentNotification;
 use App\Features\NroNotification\Resources\NotifyResource;
 use App\Models\Boss;
 use App\Models\CodeNotify;
@@ -162,6 +163,12 @@ class NroNotificationService
             ]);
 
             $notify?->load(['boss', 'server', 'code']);
+            if ($notify !== null && config('services.zalo_bot.enabled')) {
+                $equipment = app(ZaloBotNotificationService::class)->parse($payload['content']);
+                if ($equipment !== null) {
+                    SendZaloEquipmentNotification::dispatch($equipment, $notify->server->server_code, $notify->server->name)->afterCommit();
+                }
+            }
             $deliveryKey = hash('sha256', $payload['server_id'].':'.$eventKey);
             app(NotificationWebhookService::class)->capture($deliveryKey, [
                 'event_id' => $deliveryKey, 'event' => 'game.notification', 'status' => $status,
