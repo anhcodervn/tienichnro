@@ -53,7 +53,8 @@ class ZaloBotNotificationService
             ->withOptions(['allow_redirects' => false])->connectTimeout(5)->timeout(15)
             ->post(config('services.zalo_bot.messages_url'), [
                 'accountId' => (int) config('services.zalo_bot.account_id'),
-                'recipientId' => $boxId, 'mentionUserIds' => $mentions,
+                'recipientId' => $boxId,
+                ...($mentions !== [] ? ['mentionUserIds' => $mentions] : []),
                 'recipientType' => config('services.zalo_bot.recipient_type'),
                 'message' => implode("\n", $lines),
             ])->throw();

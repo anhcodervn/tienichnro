@@ -70,7 +70,7 @@ test('god item includes location without congratulations when unregistered', fun
     Http::fake(['zalo.example/*' => Http::response()]);
     $service = app(ZaloBotNotificationService::class);
     $service->sendNotiZalo($service->parse('empobaono vừa nhặt được Giầy Thần Linh tại Hang băng khu 5'), 1, 'Vũ trụ 1');
-    Http::assertSent(fn (Request $request): bool => $request['mentionUserIds'] === []
+    Http::assertSent(fn (Request $request): bool => ! array_key_exists('mentionUserIds', $request->data())
         && ! str_contains($request['message'], 'Chúc mừng:')
         && str_contains($request['message'], '[ ĐỒ THẦN LINH ]')
         && str_contains($request['message'], 'GIẦY THẦN LINH')
@@ -82,10 +82,10 @@ test('unregistered set is sent and registered god item mentions its receiver', f
     Http::fake(['zalo.example/*' => Http::response()]);
     $service = app(ZaloBotNotificationService::class);
     $service->sendNotiZalo($service->parse('player vừa đánh quái may mắn nhận được 1 trang bị Set kích hoạt'), 1, 'Vũ trụ 1');
-    Http::assertSent(fn (Request $request): bool => $request['mentionUserIds'] === [] && ! str_contains($request['message'], 'Chúc mừng:'));
+    Http::assertSent(fn (Request $request): bool => ! array_key_exists('mentionUserIds', $request->data()) && ! str_contains($request['message'], 'Chúc mừng:'));
     ZaloReceiveNotification::factory()->create(['char_name' => 'player', 'char_server' => 1, 'zalo_id' => '000123']);
     $service->sendNotiZalo($service->parse('player vừa nhặt được Giày Thần Linh tại Hang băng khu 5'), 1, 'Vũ trụ 1');
-    Http::assertSent(fn (Request $request): bool => $request['mentionUserIds'] === ['000123'] && str_contains($request['message'], 'GIÀY THẦN LINH'));
+    Http::assertSent(fn (Request $request): bool => ($request['mentionUserIds'] ?? []) === ['000123'] && str_contains($request['message'], 'GIÀY THẦN LINH'));
     Http::assertSentCount(2);
 });
 
