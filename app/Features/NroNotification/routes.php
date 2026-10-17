@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Route;
 Route::post('nro/internal/zalo-receivers', InternalZaloReceiveNotificationController::class)
     ->middleware('throttle:60,1')->name('nro.internal.zalo-receivers.store');
 
+Route::get('nro/internal/servers', [ServerController::class, 'internalIndex'])
+    ->middleware('throttle:60,1')->name('nro.internal.servers.index');
+
 Route::post('nro/cron/prune-notifies', NotificationPruneController::class)
     ->middleware('throttle:6,1')->name('nro.notifies.prune');
 

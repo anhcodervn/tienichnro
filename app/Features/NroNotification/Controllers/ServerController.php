@@ -9,6 +9,12 @@ use Illuminate\Http\JsonResponse;
 
 class ServerController extends Controller
 {
+    public function internalIndex(): JsonResponse
+    {
+        return response()->json(NroServer::query()->where('is_active', true)
+            ->orderBy('sort_order')->orderBy('server_code')->get(['id', 'name', 'code', 'server_code']));
+    }
+
     public function index(): JsonResponse
     {
         return response()->json(['data' => NroServer::query()->orderBy('sort_order')->orderBy('server_code')->get()]);
