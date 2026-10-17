@@ -89,6 +89,21 @@ test('unregistered set is sent and registered god item mentions its receiver', f
     Http::assertSentCount(2);
 });
 
+test('equipment messages use single newlines without blank lines', function (string $content, bool $registered): void {
+    Http::fake(['zalo.example/*' => Http::response()]);
+    if ($registered) {
+        ZaloReceiveNotification::factory()->create(['char_name' => 'player', 'char_server' => 1, 'zalo_id' => '000123']);
+    }
+    $service = app(ZaloBotNotificationService::class);
+    $service->sendNotiZalo($service->parse($content), 1, 'Vũ trụ 1');
+    Http::assertSent(fn (Request $request): bool => str_contains($request['message'], "\n")
+        && ! str_contains($request['message'], "\n\n")
+        && trim($request['message']) === $request['message']);
+})->with([
+    'set' => 'player vừa đánh quái may mắn nhận được 1 trang bị Set kích hoạt',
+    'god item' => 'player vừa nhặt được Giày Thần Linh tại Hang băng khu 5',
+])->with([true, false]);
+
 test('unrelated messages are ignored', function (string $text): void {
     expect(app(ZaloBotNotificationService::class)->parse($text))->toBeNull();
 })->with(['Broly vừa xuất hiện tại Hang băng khu 5', 'empobaono vừa nhặt được Giầy lưỡng long tại Hang băng khu 5', 'Set kích hoạt', 'empobaono vừa nhặt được đá thần linh giả tại Hang băng khu 5']);

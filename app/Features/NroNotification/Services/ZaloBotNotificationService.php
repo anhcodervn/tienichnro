@@ -35,20 +35,19 @@ class ZaloBotNotificationService
         $mentions = ZaloReceiveNotification::query()->where('char_server', $serverCode)
             ->whereRaw('LOWER(char_name) = ?', [$equipment['char_name']])->pluck('zalo_id')->unique()->values()->all();
         $title = $equipment['kind'] === 'set' ? 'SÉT KÍCH HOẠT' : 'ĐỒ THẦN LINH';
-        $lines = ['🐉✨ [ '.$title.' ] ✨🐉', ''];
+        $lines = ['🐉✨ [ '.$title.' ] ✨🐉'];
         if ($mentions !== []) {
             $lines[] = '🎉 Chúc mừng: '.implode(', ', $mentions);
         }
         $lines[] = '👑 Nhân vật: '.$equipment['char_name'];
         $lines[] = '🌍 Máy chủ: '.$serverName;
-        $lines[] = '';
         $lines[] = $equipment['kind'] === 'set' ? '⚔️ Đánh quái may mắn nhận được:' : '⚔️ Trang bị nhặt được:';
         $item = $equipment['kind'] === 'set' ? preg_replace('/\A1 /u', '01 ', $equipment['item']) : $equipment['item'];
         $lines[] = '🎁🔥 '.mb_strtoupper($item, 'UTF-8').' 🔥🎁';
         if ($equipment['location'] !== null) {
             $lines[] = '📍 Vị trí: '.mb_convert_case($equipment['location'], MB_CASE_TITLE, 'UTF-8');
         }
-        array_push($lines, '', '━━━━━━━━━━━━━━━━', '', '🍀✨ Nhân phẩm bùng nổ! 💎🎊');
+        array_push($lines, '━━━━━━━━━━━━━━━━', '🍀✨ Nhân phẩm bùng nổ! 💎🎊');
         Http::withHeaders(['Authorization' => $authorization])->acceptJson()->asJson()
             ->withOptions(['allow_redirects' => false])->connectTimeout(5)->timeout(15)
             ->post(config('services.zalo_bot.messages_url'), [
