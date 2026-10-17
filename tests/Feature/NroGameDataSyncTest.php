@@ -32,6 +32,7 @@ function gameDataRun(int $id): NroGameDataSync
 }
 
 beforeEach(function (): void {
+    config()->set('queue.default', 'database');
     Queue::fake();
     $this->travelTo(now()->startOfSecond());
     $admin = User::factory()->create(['role' => 'admin']);
@@ -71,13 +72,21 @@ test('large submissions create bounded chunks on the dedicated asynchronous queu
     $payload = ['data' => array_map(fn (int $id): array => ['mapId' => $id, 'mapName' => 'Map '.$id], range(0, 120))];
     $id = gameDataSubmit('maps', $payload);
     Queue::assertPushed(SyncGameDataChunk::class, 3);
-    Queue::assertPushed(SyncGameDataChunk::class, fn ($job): bool => $job->queue === 'game-data' && $job->afterCommit && count($job->rows) === 50);
+    Queue::assertPushed(SyncGameDataChunk::class, fn ($job): bool => $job->connection === 'database' && $job->queue === 'game-data' && $job->afterCommit && count($job->rows) === 50);
     expect(NroMap::query()->count())->toBe(0);
     $sync = gameDataRun($id);
     expect($sync->processed)->toBe(121)->and($sync->created)->toBe(121)->and($sync->status)->toBe('completed');
     gameDataRun($id);
     expect($sync->fresh()->processed)->toBe(121)->and(NroMap::query()->count())->toBe(121);
 });
+
+test('non-asynchronous queue drivers never execute catalog updates in the HTTP request', function (string $connection, string $driver): void {
+    config()->set('queue.default', $connection);
+    config()->set('queue.connections.'.$connection.'.driver', $driver);
+    $this->postJson('/api/admin-api/nro/game-data/maps', gameDataFixture('Maps'))->assertStatus(503);
+    expect(NroMap::query()->count())->toBe(0)->and(NroGameDataSync::query()->count())->toBe(0);
+    Queue::assertNothingPushed();
+})->with([['sync', 'sync'], ['discard', 'null']]);
 
 test('unchanged records do not write timestamps and manual assets survive later updates', function (): void {
     $payload = gameDataFixture('Maps');

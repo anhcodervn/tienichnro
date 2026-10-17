@@ -1,9 +1,10 @@
-import { initializeClientCatalogModals } from './client-catalog-modals';
 import { initializeClientAuth } from './client-auth';
+import { initializeClientCatalogModals } from './client-catalog-modals';
+import { initializeGameDataPage } from './client-game-data';
 import { initializeClientNotifications } from './client-notifications';
 import { initializePotentialCalculator } from './client-potential';
-import { initializeClientTheme } from './client-theme';
 import { initializeNotificationSubscriptions } from './client-subscriptions';
+import { initializeClientTheme } from './client-theme';
 import { initializeNroAccess } from './nro-access';
 import { initializeNroNotifications } from './nro-notifications';
 
@@ -15,6 +16,7 @@ initializeNroAccess();
 
 initializeClientCatalogModals();
 initializeNotificationSubscriptions();
+initializeGameDataPage();
 
 const imageViewerContainers = Array.from(document.querySelectorAll('[data-client-image-viewer]')).filter(
     (container) => container instanceof HTMLElement && container.querySelector('img[src]'),

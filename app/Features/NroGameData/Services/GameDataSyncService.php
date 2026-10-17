@@ -13,10 +13,14 @@ class GameDataSyncService
     /** @param array<string, mixed> $payload */
     public function enqueue(string $dataset, array $payload): NroGameDataSync
     {
+        $connection = (string) config('queue.default');
+        $driver = config('queue.connections.'.$connection.'.driver');
+        abort_unless(in_array($driver, ['database', 'redis', 'beanstalkd', 'sqs'], true), 503,
+            'Game data synchronization requires an asynchronous queue connection.');
         $rows = $this->catalog->normalize($dataset, $payload['data']);
         $chunks = array_chunk($rows, 50);
 
-        return DB::transaction(function () use ($dataset, $payload, $rows, $chunks): NroGameDataSync {
+        return DB::transaction(function () use ($dataset, $payload, $rows, $chunks, $connection): NroGameDataSync {
             $sync = NroGameDataSync::query()->create([
                 'dataset' => $dataset, 'status' => $chunks === [] ? 'completed' : 'queued',
                 'account_id' => $payload['accountId'] ?? null, 'server_code' => $payload['serverCode'] ?? null,
@@ -24,7 +28,7 @@ class GameDataSyncService
                 'total' => count($rows), 'total_chunks' => count($chunks), 'completed_chunks' => [],
             ]);
             foreach ($chunks as $index => $chunk) {
-                SyncGameDataChunk::dispatch($sync->id, $index, $chunk)->onQueue('game-data')->afterCommit();
+                SyncGameDataChunk::dispatch($sync->id, $index, $chunk)->onConnection($connection)->onQueue('game-data')->afterCommit();
             }
 
             return $sync->refresh();

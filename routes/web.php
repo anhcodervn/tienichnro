@@ -5,6 +5,8 @@ use App\Features\Auth\Controllers\AuthController;
 use App\Features\Client\Profile\Controllers\ProfilePageController;
 use App\Features\Client\Subscription\Controllers\NotificationSubscriptionController;
 use App\Features\Client\Wallet\Controllers\WalletPageController;
+use App\Features\NroGameData\Controllers\GameDataPageController;
+use App\Features\NroGameData\Services\GameDataCatalogService;
 use App\Features\NroNotification\Controllers\NotifyController;
 use App\Features\NroNotification\Middleware\LimitNotificationTraffic;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
@@ -26,6 +28,10 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/thong-bao-game', [NotifyController::class, 'page'])->middleware(LimitNotificationTraffic::class)->name('nro.notifies.page');
+Route::get('/data-game', [GameDataPageController::class, 'index'])->middleware('throttle:120,1')->name('nro.game-data.index');
+Route::get('/data-game/{dataset}/{record}', [GameDataPageController::class, 'show'])
+    ->whereIn('dataset', array_keys(GameDataCatalogService::DATASETS))->whereNumber('record')
+    ->middleware('throttle:120,1')->name('nro.game-data.show');
 Route::post('/thong-bao-game/xac-minh', [NotifyController::class, 'verify'])->middleware(['auth', LimitNotificationTraffic::class.':verify'])->name('nro.notifies.verify');
 
 Route::get('/bao-tri', MaintenanceController::class)->name('maintenance');
