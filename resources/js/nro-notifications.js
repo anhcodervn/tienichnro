@@ -1,6 +1,7 @@
 import DOMPurify from 'dompurify';
 import Swal from 'sweetalert2';
 import { createNroGuestReminders } from './nro-guest-reminders.js';
+import { initializeNroServerSelect } from './nro-server-select.js';
 
 export function formatNroRelativeTime(timestamp, currentTime) {
     const seconds = Math.floor((currentTime - Date.parse(timestamp)) / 1000);
@@ -45,6 +46,7 @@ export function initializeNroNotifications(alerts = Swal) {
     const root = document.querySelector('[data-nro-clock]');
     if (!(root instanceof HTMLElement)) return;
     const synchronizeFilters = initializeNroFilters(root);
+    const synchronizeServer = initializeNroServerSelect(root);
 
     const list = root.querySelector('[data-nro-list]');
     const status = root.querySelector('[data-nro-status]');
@@ -249,6 +251,7 @@ export function initializeNroNotifications(alerts = Swal) {
             input.value = value;
         }
         synchronizeFilters?.();
+        synchronizeServer?.();
     };
     const loadPage = async (url, pushHistory = true, scrollToList = false) => {
         if (maintenance) return;

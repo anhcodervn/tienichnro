@@ -1,9 +1,34 @@
 <?php
 
 use App\Features\NroNotification\Services\NroNotificationFeedService;
+use App\Features\NroNotification\Services\ServerHeartbeatService;
 use App\Models\Boss;
+use App\Models\NroServer;
 use App\Models\User;
 use Database\Seeders\NroNotificationSeeder;
+
+test('public server filter shows bot connection labels and expires after missed heartbeats', function (): void {
+    $this->travelTo(now()->startOfSecond());
+    config()->set('services.nro_bot.heartbeat_interval_seconds', 30);
+    config()->set('services.nro_bot.missed_heartbeats', 5);
+    $online = NroServer::factory()->create(['name' => 'Clone online']);
+    NroServer::factory()->create(['name' => 'Clone offline']);
+    NroServer::factory()->create(['name' => 'Hidden server', 'is_active' => false]);
+    app(ServerHeartbeatService::class)->ping($online->server_code);
+
+    $this->get('/thong-bao-game?server_code='.$online->server_code)->assertOk()
+        ->assertSeeText('Clone online (Hoạt động)')
+        ->assertSeeText('Clone offline (Không hoạt động)')
+        ->assertSee('role="listbox"', false)
+        ->assertSee('data-status="online"', false)
+        ->assertSee('data-status="offline"', false)
+        ->assertSee('bg-emerald-500', false)
+        ->assertSee('bg-rose-500', false)
+        ->assertDontSeeText('Hidden server');
+
+    $this->travel(150)->seconds();
+    $this->get('/thong-bao-game')->assertOk()->assertSeeText('Clone online (Không hoạt động)');
+});
 
 test('notification state colors and readable labels survive page ajax and realtime snapshots', function (): void {
     $this->seed(NroNotificationSeeder::class);

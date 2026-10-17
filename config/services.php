@@ -67,6 +67,12 @@ return [
         ],
     ],
 
+    'nro_bot' => [
+        'heartbeat_key' => env('NRO_BOT_HEARTBEAT_KEY'),
+        'heartbeat_interval_seconds' => (int) env('NRO_BOT_HEARTBEAT_INTERVAL_SECONDS', 30),
+        'missed_heartbeats' => (int) env('NRO_BOT_MISSED_HEARTBEATS', 5),
+    ],
+
     'zalo_bot' => [
         'enabled' => env('ZALO_BOT_ENABLED', false),
         'messages_url' => env('ZALO_BOT_MESSAGES_URL', 'https://zalo.tienichnro.com/api/messages'),

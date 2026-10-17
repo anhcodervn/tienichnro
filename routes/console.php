@@ -12,6 +12,8 @@ $heartbeatChannel = app()->environment('production') ? 'ops' : 'staging';
 
 Schedule::command('nro:retry-webhooks')->everyMinute()->withoutOverlapping();
 
+Schedule::command('nro:expire-server-connections')->everyMinute()->withoutOverlapping();
+
 Schedule::command(sprintf('monitor:discord-heartbeat --channel=%s', $heartbeatChannel))
     ->everyTenMinutes()
     ->withoutOverlapping()

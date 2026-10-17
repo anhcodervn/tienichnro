@@ -2,6 +2,7 @@
 import Breadcrumb from '@/components/MasterLayouts/Breadcrumb/index.vue';
 import { nroNotificationService, type NroServer } from '@/services/nro-notification.service';
 import { handleErrorResponse } from '@/utils/response';
+import { useIntervalFn } from '@vueuse/core';
 import Swal from 'sweetalert2';
 import { computed, onMounted, reactive, ref } from 'vue';
 
@@ -53,14 +54,14 @@ const replaceServer = (server: NroServer) => {
         (a, b) => a.sort_order - b.sort_order || a.server_code - b.server_code,
     );
 };
-const load = async () => {
-    loading.value = true;
+const load = async (silent = false) => {
+    if (!silent) loading.value = true;
     loadFailed.value = false;
     try {
         servers.value = await nroNotificationService.servers();
     } catch (error) {
         loadFailed.value = true;
-        handleErrorResponse(error);
+        if (!silent) handleErrorResponse(error);
     } finally {
         loading.value = false;
     }
@@ -101,7 +102,10 @@ const toggle = async (server: NroServer) => {
         togglingId.value = null;
     }
 };
-onMounted(load);
+useIntervalFn(() => {
+    if (!document.hidden && !busy.value && !loading.value) void load(true);
+}, 30000);
+onMounted(() => load());
 </script>
 
 <template>
@@ -215,7 +219,7 @@ onMounted(load);
                         type="button"
                         :disabled="loading || busy"
                         class="rounded-[10px] border border-slate-300 px-3 py-2 text-sm text-slate-600 disabled:opacity-50 dark:border-slate-600 dark:text-slate-300"
-                        @click="load"
+                        @click="load()"
                     >
                         {{ loading ? 'Đang tải…' : 'Tải lại' }}
                     </button>
@@ -250,6 +254,7 @@ onMounted(load);
                                 <th scope="col" class="px-4 py-3">Mã / Code</th>
                                 <th scope="col" class="px-4 py-3">Tên server</th>
                                 <th scope="col" class="px-4 py-3">Trạng thái</th>
+                                <th scope="col" class="px-4 py-3">Kết nối bot</th>
                                 <th scope="col" class="px-4 py-3 text-right">Thao tác</th>
                             </tr>
                         </thead>
@@ -277,6 +282,20 @@ onMounted(load);
                                     >
                                 </td>
                                 <td class="px-4 py-4">
+                                    <span
+                                        class="whitespace-nowrap rounded-[10px] border px-2.5 py-1 text-xs font-medium"
+                                        :class="
+                                            server.connection
+                                                ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
+                                                : 'border-slate-300 bg-slate-100 text-slate-600 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-300'
+                                        "
+                                        >{{ server.connection ? 'Online' : 'Offline' }}</span
+                                    >
+                                    <span class="mt-2 block whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
+                                        {{ server.last_ping_at ? new Date(server.last_ping_at).toLocaleString('vi-VN') : 'Chưa nhận ping' }}
+                                    </span>
+                                </td>
+                                <td class="px-4 py-4">
                                     <div class="flex justify-end gap-2">
                                         <button
                                             type="button"
@@ -299,7 +318,7 @@ onMounted(load);
                                 </td>
                             </tr>
                             <tr v-if="visibleServers.length === 0">
-                                <td colspan="5" class="p-10 text-center text-slate-500">
+                                <td colspan="6" class="p-10 text-center text-slate-500">
                                     {{
                                         servers.length
                                             ? 'Không có server phù hợp bộ lọc.'

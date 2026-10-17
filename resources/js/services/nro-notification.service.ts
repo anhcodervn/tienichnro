@@ -1,8 +1,25 @@
 import api from '@/config/axios';
-export type NroBoss = { id: number; code: string; name: string; game_names: string[] | null; respawn_seconds: number | null; is_active: boolean; sort_order: number };
+export type NroBoss = {
+    id: number;
+    code: string;
+    name: string;
+    game_names: string[] | null;
+    respawn_seconds: number | null;
+    is_active: boolean;
+    sort_order: number;
+};
 export type NroBossPayload = Omit<NroBoss, 'id' | 'game_names'> & { game_names?: string | string[] };
-export type NroServer = { id: number; server_code: number; code: string | null; name: string; is_active: boolean; sort_order: number };
-export type NroServerPayload = Omit<NroServer, 'id'>;
+export type NroServer = {
+    id: number;
+    server_code: number;
+    code: string | null;
+    name: string;
+    is_active: boolean;
+    sort_order: number;
+    connection: boolean;
+    last_ping_at: string | null;
+};
+export type NroServerPayload = Omit<NroServer, 'id' | 'connection' | 'last_ping_at'>;
 export type NroNotificationGroup = { id: number; code: string; name: string };
 export type NroNotificationType = {
     id: number;
