@@ -1,0 +1,56 @@
+{
+  "accountId": 10,
+  "serverCode": 12,
+  "updatedAt": "2026-10-17T12:06:08.3715684+00:00",
+  "version": 23,
+  "data": [
+    {
+      "id": 0,
+      "type": 0,
+      "gender": 0,
+      "name": "Áo vải 3 lỗ",
+      "description": "Giúp giảm sát thương",
+      "level": 1,
+      "strRequire": 1200,
+      "iconID": 390,
+      "part": 14,
+      "isUpToUp": false
+    },
+    {
+      "id": 2102,
+      "type": 27,
+      "gender": 3,
+      "name": "Set kích hoạt Beerus 1 món tự chọn",
+      "description": "Vật phẩm sự kiện",
+      "level": 1,
+      "strRequire": 0,
+      "iconID": 17710,
+      "part": -1,
+      "isUpToUp": false
+    },
+    {
+      "id": 76,
+      "type": 9,
+      "gender": 3,
+      "name": "Vàng",
+      "description": "",
+      "level": 1,
+      "strRequire": 0,
+      "iconID": 927,
+      "part": -1,
+      "isUpToUp": false
+    },
+    {
+      "id": 12,
+      "type": 4,
+      "gender": 3,
+      "name": "Rada cấp 1",
+      "description": "Giúp tăng Chí Mạng",
+      "level": 1,
+      "strRequire": 1300,
+      "iconID": 1089,
+      "part": -1,
+      "isUpToUp": false
+    }
+  ]
+}

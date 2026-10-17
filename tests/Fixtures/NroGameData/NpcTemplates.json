@@ -1,0 +1,56 @@
+{
+  "accountId": 10,
+  "serverCode": 12,
+  "updatedAt": "2026-10-17T12:06:08.2639949+00:00",
+  "version": 64,
+  "data": [
+    {
+      "npcTemplateId": 0,
+      "name": "Ông Gôhan",
+      "headId": 18,
+      "bodyId": 19,
+      "legId": 20,
+      "menu": [
+        [
+          "Nói chuyện"
+        ]
+      ]
+    },
+    {
+      "npcTemplateId": 87,
+      "name": "Mai Đào",
+      "headId": 1957,
+      "bodyId": 1958,
+      "legId": 1959,
+      "menu": [
+        [
+          "Nói chuyện"
+        ]
+      ]
+    },
+    {
+      "npcTemplateId": 41,
+      "name": "",
+      "headId": 1858,
+      "bodyId": 1859,
+      "legId": 1860,
+      "menu": [
+        [
+          "Nói chuyện"
+        ]
+      ]
+    },
+    {
+      "npcTemplateId": 6,
+      "name": "Khu vực",
+      "headId": -1,
+      "bodyId": -1,
+      "legId": -1,
+      "menu": [
+        [
+          "Nói chuyện"
+        ]
+      ]
+    }
+  ]
+}

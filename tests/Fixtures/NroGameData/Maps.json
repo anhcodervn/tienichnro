@@ -1,0 +1,16 @@
+{
+  "accountId": 10,
+  "serverCode": 12,
+  "updatedAt": "2026-10-17T12:06:08.2630924+00:00",
+  "version": 64,
+  "data": [
+    {
+      "mapId": 0,
+      "mapName": "Làng Aru"
+    },
+    {
+      "mapId": 186,
+      "mapName": "Đấu trường thành cổ"
+    }
+  ]
+}

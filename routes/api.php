@@ -46,6 +46,8 @@ if (file_exists(base_path('app/Features/NroNotification/routes.php'))) {
     require base_path('app/Features/NroNotification/routes.php');
 }
 
+require base_path('app/Features/NroGameData/routes.php');
+
 if (file_exists(base_path('app/Features/Admin/Wallet/routes.php'))) {
     require base_path('app/Features/Admin/Wallet/routes.php');
 }
