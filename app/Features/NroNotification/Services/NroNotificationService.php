@@ -53,10 +53,14 @@ class NroNotificationService
         $eventId = $payload['event_id'] ?? null;
         unset($payload['event_id']);
         ksort($payload);
-        $payloadHash = hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
+        $zalo = app(ZaloBotNotificationService::class);
+        $equipment = $zalo->parse($payload['content']);
+        $payloadHash = $equipment !== null
+            ? $zalo->fingerprint($equipment, $payload['server_id'])
+            : hash('sha256', json_encode($payload, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
         $eventKey = $eventId !== null ? hash('sha256', 'event:'.$eventId) : hash('sha256', 'message:'.$payloadHash);
 
-        return DB::transaction(function () use ($payload, $time, $eventKey, $payloadHash): array {
+        return DB::transaction(function () use ($payload, $time, $eventKey, $payloadHash, $equipment): array {
             NroServer::query()->where('is_active', true)->lockForUpdate()->findOrFail($payload['server_id']);
             $receipt = NroEventReceipt::query()->where('server_id', $payload['server_id'])->where('event_key', $eventKey)->first();
             if ($receipt) {
@@ -163,11 +167,8 @@ class NroNotificationService
             ]);
 
             $notify?->load(['boss', 'server', 'code']);
-            if ($notify !== null && config('services.zalo_bot.enabled')) {
-                $equipment = app(ZaloBotNotificationService::class)->parse($payload['content']);
-                if ($equipment !== null) {
-                    SendZaloEquipmentNotification::dispatch($equipment, $notify->server->server_code, $notify->server->name)->afterCommit();
-                }
+            if ($notify !== null && $equipment !== null && config('services.zalo_bot.enabled')) {
+                SendZaloEquipmentNotification::dispatch($equipment, $notify->server->server_code, $notify->server->name)->afterCommit();
             }
             $deliveryKey = hash('sha256', $payload['server_id'].':'.$eventKey);
             app(NotificationWebhookService::class)->capture($deliveryKey, [

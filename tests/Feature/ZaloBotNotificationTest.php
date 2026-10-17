@@ -3,8 +3,10 @@
 use App\Features\NroNotification\Jobs\SendZaloEquipmentNotification;
 use App\Features\NroNotification\Services\NroNotificationService;
 use App\Features\NroNotification\Services\ZaloBotNotificationService;
+use App\Models\NroZaloEquipmentSend;
 use App\Models\ZaloReceiveNotification;
 use Database\Seeders\NroNotificationSeeder;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\Client\RequestException;
 use Illuminate\Support\Facades\Http;
@@ -108,7 +110,7 @@ test('unrelated messages are ignored', function (string $text): void {
     expect(app(ZaloBotNotificationService::class)->parse($text))->toBeNull();
 })->with(['Broly vừa xuất hiện tại Hang băng khu 5', 'empobaono vừa nhặt được Giầy lưỡng long tại Hang băng khu 5', 'Set kích hoạt', 'empobaono vừa nhặt được đá thần linh giả tại Hang băng khu 5']);
 
-test('disabled bot sends nothing and HTTP failures propagate for job retry', function (): void {
+test('disabled bot sends nothing and failed attempts cannot resend the same message', function (): void {
     $service = app(ZaloBotNotificationService::class);
     $equipment = $service->parse('empobaono vừa nhặt được Áo Thần Linh tại Hang băng khu 5');
     config()->set('services.zalo_bot.enabled', false);
@@ -117,6 +119,73 @@ test('disabled bot sends nothing and HTTP failures propagate for job retry', fun
     config()->set('services.zalo_bot.enabled', true);
     Http::fake(['zalo.example/*' => Http::response([], 503)]);
     expect(fn () => (new SendZaloEquipmentNotification($equipment, 1, 'Vũ trụ 1'))->handle($service))->toThrow(RequestException::class);
+    expect(NroZaloEquipmentSend::query()->sole()->status)->toBe('failed');
+    (new SendZaloEquipmentNotification($equipment, 1, 'Vũ trụ 1'))->handle($service);
+    Http::assertSentCount(1);
+});
+
+test('collector timestamps metadata casing and event IDs cannot duplicate equipment content', function (string $content): void {
+    Queue::fake();
+    $service = app(NroNotificationService::class);
+    $payload = ['server_code' => 3, 'code' => 'OTHER', 'content' => $content, 'occurred_at' => now()->toISOString(), 'event_id' => 'clone-1', 'metadata' => ['clone' => 1]];
+    $first = $service->ingest($payload);
+    foreach (range(2, 4) as $clone) {
+        $result = $service->ingest([
+            ...$payload, 'event_id' => 'clone-'.$clone, 'occurred_at' => now()->addSeconds($clone)->toISOString(),
+            'content' => '  '.str_replace(' ', '  ', mb_strtoupper($content)).'  ',
+            'metadata' => ['clone' => $clone], 'char_name' => 'messdy', 'code' => 'SET_ACTIVATION',
+        ]);
+        expect($result['duplicate'])->toBeTrue()->and($result['notify']->id)->toBe($first['notify']->id);
+    }
+    $this->assertDatabaseCount('notifies', 1);
+    Queue::assertPushed(SendZaloEquipmentNotification::class, 1);
+    $first['notify']->forceDelete();
+    expect($service->ingest([...$payload, 'event_id' => 'after-prune', 'occurred_at' => now()->addDay()->toISOString()])['duplicate'])->toBeTrue();
+    Queue::assertPushed(SendZaloEquipmentNotification::class, 1);
+})->with([
+    'set activation' => 'messdy vừa đánh quái may mắn nhận được 1 trang bị Set kích hoạt Set Cadic M',
+    'god item' => 'messdy vừa nhặt được Giày Thần Linh tại Hang băng khu 5',
+]);
+
+test('same equipment on another server and different equipment on the same server remain distinct', function (): void {
+    Queue::fake();
+    $service = app(NroNotificationService::class);
+    $payload = ['server_code' => 1, 'code' => 'OTHER', 'content' => 'player vừa đánh quái may mắn nhận được 1 trang bị Set kích hoạt Gohan', 'occurred_at' => now()->toISOString()];
+    expect($service->ingest($payload)['duplicate'])->toBeFalse();
+    expect($service->ingest([...$payload, 'server_code' => 2])['duplicate'])->toBeFalse();
+    expect($service->ingest([...$payload, 'content' => 'player vừa đánh quái may mắn nhận được 1 trang bị Set kích hoạt Set Cadic M'])['duplicate'])->toBeFalse();
+    $this->assertDatabaseCount('notifies', 3);
+    Queue::assertPushed(SendZaloEquipmentNotification::class, 3);
+});
+
+test('duplicate queued jobs are blocked during sending and after successful delivery', function (): void {
+    $service = app(ZaloBotNotificationService::class);
+    $equipment = $service->parse('messdy vừa đánh quái may mắn nhận được 1 trang bị Set kích hoạt Set Cadic M');
+    Http::fake(function () use ($service, $equipment) {
+        expect(NroZaloEquipmentSend::query()->sole()->status)->toBe('sending');
+        (new SendZaloEquipmentNotification($equipment, 3, 'Vũ trụ 3'))->handle($service);
+
+        return Http::response();
+    });
+    (new SendZaloEquipmentNotification($equipment, 3, 'Vũ trụ 3'))->handle($service);
+    (new SendZaloEquipmentNotification($equipment, 3, 'Vũ trụ 3'))->handle($service);
+    Http::assertSentCount(1);
+    expect(NroZaloEquipmentSend::query()->sole()->status)->toBe('sent')
+        ->and(NroZaloEquipmentSend::query()->sole()->sent_at)->not->toBeNull();
+    $this->travel(365)->days();
+    (new SendZaloEquipmentNotification($equipment, 3, 'Vũ trụ 3'))->handle($service);
+    Http::assertSentCount(1);
+});
+
+test('ambiguous connection failures are retained and never automatically resent', function (): void {
+    $service = app(ZaloBotNotificationService::class);
+    $equipment = $service->parse('player vừa nhặt được Giày Thần Linh tại Hang băng khu 5');
+    Http::fake(fn () => throw new ConnectionException('Connection interrupted after sending'));
+    expect(fn () => $service->sendNotiZalo($equipment, 1, 'Vũ trụ 1'))->toThrow(ConnectionException::class);
+    expect(NroZaloEquipmentSend::query()->sole()->status)->toBe('uncertain');
+    Http::fake(['zalo.example/*' => Http::response()]);
+    $service->sendNotiZalo($equipment, 1, 'Vũ trụ 1');
+    Http::assertNothingSent();
 });
 
 test('ingestion queues each equipment event once after commit', function (): void {

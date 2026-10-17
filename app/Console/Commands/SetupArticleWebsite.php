@@ -43,6 +43,7 @@ class SetupArticleWebsite extends Command
             '2026_10_08_151439_add_is_boss_to_notifies_table.php',
             '2026_10_08_153412_add_sort_order_to_bosses_table.php',
             '2026_10_17_093202_add_connection_to_servers_table.php',
+            '2026_10_17_095349_create_nro_zalo_equipment_sends_table.php',
         ] as $migration) {
             $result = $this->call('migrate', [
                 '--database' => $connection,

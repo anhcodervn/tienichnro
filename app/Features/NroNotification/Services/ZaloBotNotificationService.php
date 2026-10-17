@@ -2,8 +2,11 @@
 
 namespace App\Features\NroNotification\Services;
 
+use App\Models\NroZaloEquipmentSend;
 use App\Models\ZaloReceiveNotification;
+use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\Http;
+use Throwable;
 
 class ZaloBotNotificationService
 {
@@ -19,6 +22,17 @@ class ZaloBotNotificationService
         }
 
         return null;
+    }
+
+    /** @param array{kind: string, char_name: string, item: string, location: string|null} $equipment */
+    public function fingerprint(array $equipment, int $serverIdentifier): string
+    {
+        return hash('sha256', json_encode([
+            $serverIdentifier, $equipment['kind'],
+            NotificationTypeClassifierService::normalizeText($equipment['char_name']),
+            NotificationTypeClassifierService::normalizeText($equipment['item']),
+            NotificationTypeClassifierService::normalizeText($equipment['location'] ?? ''),
+        ], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE));
     }
 
     /** @param array{kind: string, char_name: string, item: string, location: string|null} $equipment */
@@ -48,14 +62,29 @@ class ZaloBotNotificationService
             $lines[] = '📍 Vị trí: '.mb_convert_case($equipment['location'], MB_CASE_TITLE, 'UTF-8');
         }
         array_push($lines, '━━━━━━━━━━━━━━━━', '🍀✨ Nhân phẩm bùng nổ! 💎🎊');
-        Http::withHeaders(['Authorization' => $authorization])->acceptJson()->asJson()
-            ->withOptions(['allow_redirects' => false])->connectTimeout(5)->timeout(15)
-            ->post(config('services.zalo_bot.messages_url'), [
-                'accountId' => (int) config('services.zalo_bot.account_id'),
-                'recipientId' => $boxId,
-                ...($mentions !== [] ? ['mentionUserIds' => $mentions] : []),
-                'recipientType' => config('services.zalo_bot.recipient_type'),
-                'message' => implode("\n", $lines),
-            ])->throw();
+        $fingerprint = $this->fingerprint($equipment, $serverCode);
+        $claimed = NroZaloEquipmentSend::query()->insertOrIgnore([
+            'fingerprint' => $fingerprint, 'status' => 'sending', 'created_at' => now(), 'updated_at' => now(),
+        ]);
+        if (! $claimed) {
+            return;
+        }
+        try {
+            Http::withHeaders(['Authorization' => $authorization])->acceptJson()->asJson()
+                ->withOptions(['allow_redirects' => false])->connectTimeout(5)->timeout(15)
+                ->post(config('services.zalo_bot.messages_url'), [
+                    'accountId' => (int) config('services.zalo_bot.account_id'),
+                    'recipientId' => $boxId,
+                    ...($mentions !== [] ? ['mentionUserIds' => $mentions] : []),
+                    'recipientType' => config('services.zalo_bot.recipient_type'),
+                    'message' => implode("\n", $lines),
+                ])->throw();
+            NroZaloEquipmentSend::query()->whereKey($fingerprint)->update(['status' => 'sent', 'sent_at' => now()]);
+        } catch (Throwable $exception) {
+            NroZaloEquipmentSend::query()->whereKey($fingerprint)->update([
+                'status' => $exception instanceof ConnectionException ? 'uncertain' : 'failed',
+            ]);
+            throw $exception;
+        }
     }
 }

@@ -12,18 +12,12 @@ class SendZaloEquipmentNotification implements ShouldQueue
 {
     use Queueable;
 
-    public int $tries = 3;
+    public int $tries = 1;
 
     public int $timeout = 25;
 
     /** @param array{kind: string, char_name: string, item: string, location: string|null} $equipment */
     public function __construct(public array $equipment, public int $serverCode, public string $serverName) {}
-
-    /** @return list<int> */
-    public function backoff(): array
-    {
-        return [10, 60];
-    }
 
     public function handle(ZaloBotNotificationService $service): void
     {
