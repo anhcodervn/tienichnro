@@ -5,7 +5,7 @@ use App\Features\NroGameData\Services\GameDataCatalogService;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('admin-api/nro/game-data')->name('admin.nro.game-data.')
-    ->middleware(['auth:sanctum', 'admin', 'platform.admin', 'throttle:120,1'])->group(function (): void {
+    ->middleware(['auth:sanctum', 'admin', 'platform.admin'])->group(function (): void {
         Route::get('/syncs/{sync}', [GameDataController::class, 'showSync'])->whereNumber('sync')->name('syncs.show');
         Route::get('/{dataset}', [GameDataController::class, 'index'])->whereIn('dataset', array_keys(GameDataCatalogService::DATASETS))->name('index');
         Route::post('/{dataset}', [GameDataController::class, 'store'])->whereIn('dataset', array_keys(GameDataCatalogService::DATASETS))->name('store');

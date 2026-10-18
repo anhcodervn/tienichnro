@@ -11,19 +11,19 @@ use App\Features\NroNotification\Middleware\LimitNotificationTraffic;
 use Illuminate\Support\Facades\Route;
 
 Route::post('nro/internal/zalo-receivers', InternalZaloReceiveNotificationController::class)
-    ->middleware('throttle:60,1')->name('nro.internal.zalo-receivers.store');
+    ->name('nro.internal.zalo-receivers.store');
 
 Route::get('nro/internal/zalo-receivers', [InternalZaloReceiveNotificationController::class, 'index'])
-    ->middleware('throttle:60,1')->name('nro.internal.zalo-receivers.index');
+    ->name('nro.internal.zalo-receivers.index');
 
 Route::delete('nro/internal/zalo-receivers', [InternalZaloReceiveNotificationController::class, 'destroy'])
-    ->middleware('throttle:60,1')->name('nro.internal.zalo-receivers.destroy');
+    ->name('nro.internal.zalo-receivers.destroy');
 
 Route::get('nro/internal/servers', [ServerController::class, 'internalIndex'])
-    ->middleware('throttle:60,1')->name('nro.internal.servers.index');
+    ->name('nro.internal.servers.index');
 
 Route::post('nro/internal/servers/ping', [ServerController::class, 'ping'])
-    ->middleware('throttle:120,1')->name('nro.internal.servers.ping');
+    ->name('nro.internal.servers.ping');
 
 Route::post('nro/cron/prune-notifies', NotificationPruneController::class)
     ->middleware('throttle:6,1')->name('nro.notifies.prune');

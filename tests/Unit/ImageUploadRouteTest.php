@@ -18,7 +18,8 @@ test('image upload route is registered for authenticated admins', function (): v
     expect($route)->not->toBeNull()
         ->and($route?->uri())->toBe('api/uploads/image')
         ->and($route?->methods())->toContain('POST')
-        ->and($route?->gatherMiddleware())->toContain('auth:sanctum', 'admin', 'throttle:30,1');
+        ->and($route?->gatherMiddleware())->toContain('auth:sanctum', 'admin')
+        ->not->toContain('throttle:admin-image-uploads');
 
     $this->postJson('/api/uploads/image')->assertUnauthorized();
 
@@ -28,7 +29,8 @@ test('image upload route is registered for authenticated admins', function (): v
     expect($importRoute)->not->toBeNull()
         ->and($importRoute?->uri())->toBe('api/uploads/image/import')
         ->and($importRoute?->methods())->toContain('POST')
-        ->and($importRoute?->gatherMiddleware())->toContain('auth:sanctum', 'admin', 'throttle:30,1');
+        ->and($importRoute?->gatherMiddleware())->toContain('auth:sanctum', 'admin')
+        ->not->toContain('throttle:admin-image-uploads');
 
     $this->postJson('/api/uploads/image/import', [
         'url' => 'https://cdn.example.com/photo.webp',

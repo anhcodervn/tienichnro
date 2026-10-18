@@ -3,7 +3,7 @@
 use App\Features\Admin\Upload\Controllers\ImageUploadController;
 use Illuminate\Support\Facades\Route;
 
-Route::middleware(['auth:sanctum', 'admin', 'throttle:30,1'])
+Route::middleware(['auth:sanctum', 'admin'])
     ->prefix('uploads')
     ->name('admin.uploads.')
     ->controller(ImageUploadController::class)

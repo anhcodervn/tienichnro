@@ -10,6 +10,8 @@ use Database\Seeders\NroNotificationSeeder;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Request;
 use Illuminate\Http\Client\RequestException;
+use Illuminate\Routing\Middleware\ThrottleRequests;
+use Illuminate\Routing\Middleware\ThrottleRequestsWithRedis;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Queue;
 
@@ -48,10 +50,56 @@ test('registration validates and saves character server and string IDs idempoten
     $this->assertDatabaseCount('zalo_receive_notifications', 2);
 });
 
+test('internal registration persists box ID in the database response and user listing', function (string $format): void {
+    $identity = ['zalo_id' => '000123', 'char_name' => 'player', 'char_server' => 1];
+    $this->withToken('registration-secret')->postJson('/api/nro/internal/zalo-receivers', $identity)
+        ->assertCreated()->assertJsonPath('data.box_zalo_id', null);
+
+    $payload = [...$identity, 'box_zalo_id' => ' 0008033125305662128843 '];
+    $response = $format === 'json'
+        ? $this->postJson('/api/nro/internal/zalo-receivers', $payload)
+        : $this->withHeader('Accept', 'application/json')->post('/api/nro/internal/zalo-receivers', $payload);
+    $id = $response->assertCreated()->assertJsonPath('data.box_zalo_id', '0008033125305662128843')->json('data.id');
+    $this->assertDatabaseHas('zalo_receive_notifications', [
+        'id' => $id, ...$identity, 'box_zalo_id' => '0008033125305662128843',
+    ]);
+    $this->getJson('/api/nro/internal/zalo-receivers?zalo_id=000123')
+        ->assertOk()->assertJsonCount(2, 'data')
+        ->assertJsonPath('data.0.id', $id)->assertJsonPath('data.0.box_zalo_id', '0008033125305662128843')
+        ->assertJsonPath('data.1.box_zalo_id', null);
+    $this->postJson('/api/nro/internal/zalo-receivers', $payload)
+        ->assertOk()->assertJsonPath('data.id', $id)->assertJsonPath('data.box_zalo_id', '0008033125305662128843');
+    $this->assertDatabaseCount('zalo_receive_notifications', 2);
+})->with(['json', 'form']);
+
 test('parser handles uppercase whitespace and all set suffixes', function (string $item): void {
     $equipment = app(ZaloBotNotificationService::class)->parse(' EmPoBaoNo VỪA ĐÁNH QUÁI MAY MẮN NHẬN ĐƯỢC  '.$item.' ');
     expect($equipment)->toMatchArray(['char_name' => 'empobaono', 'item' => mb_strtolower($item), 'kind' => 'set']);
 })->with(['1 trang bị Set kích hoạt', '1 trang bị Set kích hoạt Gohan', '1 trang bị Set kích hoạt Set Thần Vũ Trụ Kaio']);
+
+test('internal APIs have no resolved throttle middleware', function (string $name): void {
+    $router = app('router');
+    $route = $router->getRoutes()->getByName($name);
+    expect($route)->not->toBeNull();
+    foreach ($router->gatherRouteMiddleware($route) as $middleware) {
+        expect($middleware)->not->toStartWith(ThrottleRequests::class)
+            ->not->toStartWith(ThrottleRequestsWithRedis::class);
+    }
+})->with([
+    'nro.internal.zalo-receivers.store', 'nro.internal.zalo-receivers.index',
+    'nro.internal.zalo-receivers.destroy', 'nro.internal.servers.index', 'nro.internal.servers.ping',
+]);
+
+test('internal Zalo APIs accept more than sixty calls without throttling', function (): void {
+    $payload = ['zalo_id' => '000123', 'char_name' => 'player', 'char_server' => 1, 'box_zalo_id' => '000box'];
+    $this->withToken('registration-secret');
+    foreach (range(1, 65) as $attempt) {
+        $this->postJson('/api/nro/internal/zalo-receivers', $payload)->assertCreated();
+        $this->getJson('/api/nro/internal/zalo-receivers?zalo_id=000123')->assertOk()->assertJsonPath('exists', true);
+        $this->deleteJson('/api/nro/internal/zalo-receivers', $payload)->assertNoContent();
+    }
+    $this->assertDatabaseCount('zalo_receive_notifications', 0);
+});
 
 test('receiver lookup requires the registration key', function (): void {
     $this->getJson('/api/nro/internal/zalo-receivers?zalo_id=000123')->assertForbidden();
