@@ -96,6 +96,51 @@
                     </div>
                 </div>
             </div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h2 class="text-base font-semibold text-slate-900">ads.txt và robots.txt</h2>
+                <p class="mt-1 text-sm text-slate-500">Nhập nội dung rồi bấm Lưu thay đổi để cập nhật file công khai.</p>
+                <div class="mt-4 grid gap-4">
+                    <div class="space-y-2">
+                        <label for="seo-ads-txt" class="text-sm font-medium text-slate-700">Nội dung ads.txt</label>
+                        <textarea
+                            id="seo-ads-txt"
+                            v-model="formData.ads_txt"
+                            rows="6"
+                            maxlength="100000"
+                            spellcheck="false"
+                            class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs outline-none focus:border-slate-900"
+                            placeholder="google.com, pub-1234567890123456, DIRECT, f08c47fec0942fa0"
+                        />
+                        <p class="text-xs text-slate-500">Dán nội dung từ tài khoản AdSense, giữ lại các dòng quảng cáo khác nếu có.</p>
+                        <a
+                            href="/ads.txt"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-block text-sm font-medium text-emerald-700 underline"
+                            >Xem ads.txt</a
+                        >
+                    </div>
+                    <div class="space-y-2">
+                        <label for="seo-robots-txt" class="text-sm font-medium text-slate-700">Nội dung robots.txt</label>
+                        <textarea
+                            id="seo-robots-txt"
+                            v-model="formData.robots_txt"
+                            rows="8"
+                            maxlength="20000"
+                            spellcheck="false"
+                            class="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-xs outline-none focus:border-slate-900"
+                        />
+                        <p class="text-xs text-slate-500">Sitemap phải dùng URL đầy đủ, bao gồm https:// và domain của website.</p>
+                        <a
+                            href="/robots.txt"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            class="inline-block text-sm font-medium text-emerald-700 underline"
+                            >Xem robots.txt</a
+                        >
+                    </div>
+                </div>
+            </div>
         </section>
 
         <aside class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -129,6 +174,8 @@ const formData = ref<SeoSettingType>({
     meta_title: '',
     meta_description: '',
     robots: 'index,follow',
+    robots_txt: '',
+    ads_txt: '',
     gtm_id: '',
     meta_pixel_id: '',
     custom_head_tags: '',

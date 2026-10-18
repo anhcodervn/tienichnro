@@ -2,14 +2,14 @@
 
 test('admin seo settings expose robots and ads editors', function (): void {
     $projectRoot = dirname(__DIR__, 2);
-    $page = file_get_contents($projectRoot.'/resources/js/pages/admin/settings/index.vue');
+    $page = file_get_contents($projectRoot.'/resources/js/pages/admin/settings/SeoTrackingSettings.vue');
     $types = file_get_contents($projectRoot.'/resources/js/types/setting.type.ts');
     $sitemapPage = file_get_contents($projectRoot.'/resources/js/pages/admin/seo/sitemaps/index.vue');
     $seoService = file_get_contents($projectRoot.'/app/Features/Admin/Seo/Services/SeoService.php');
 
     expect($page)
-        ->toContain('v-model="seoForm.robots_txt"')
-        ->toContain('v-model="seoForm.ads_txt"')
+        ->toContain('v-model="formData.robots_txt"')
+        ->toContain('v-model="formData.ads_txt"')
         ->toContain('href="/robots.txt"')
         ->toContain('href="/ads.txt"')
         ->toContain('Sitemap phải dùng URL đầy đủ')
@@ -19,9 +19,9 @@ test('admin seo settings expose robots and ads editors', function (): void {
         ->and($sitemapPage)
         ->toContain('Sitemap chỉ chứa URL public, index/follow và trùng với canonical.')
         ->and($seoService)
-        ->toContain("'sitemap_files' => 5")
+        ->toContain("'sitemap_files' => 4")
         ->toContain('/sitemap-articles.xml')
         ->toContain('/sitemap-categories.xml')
         ->toContain('/sitemap-pages.xml')
-        ->toContain('/sitemap-games.xml');
+        ->not->toContain('/sitemap-games.xml');
 });
