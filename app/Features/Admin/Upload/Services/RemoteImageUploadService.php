@@ -20,7 +20,7 @@ class RemoteImageUploadService
     public function __construct(private ImageUploadService $imageUploadService) {}
 
     /** @return array{path: string, url: string, mime_type: string, extension: string, size: int} */
-    public function store(string $url): array
+    public function store(string $url, ?string $name = null): array
     {
         $temporaryPath = tempnam(sys_get_temp_dir(), 'remote-image-');
 
@@ -34,7 +34,7 @@ class RemoteImageUploadService
             $originalName = $this->originalName($finalUrl, $extension);
             $uploadedFile = new UploadedFile($temporaryPath, $originalName, $mimeType, null, true);
 
-            return $this->imageUploadService->store($uploadedFile, pathinfo($originalName, PATHINFO_FILENAME));
+            return $this->imageUploadService->store($uploadedFile, $name ?? pathinfo($originalName, PATHINFO_FILENAME));
         } finally {
             @unlink($temporaryPath);
         }

@@ -88,11 +88,10 @@ test('non-asynchronous queue drivers never execute catalog updates in the HTTP r
     Queue::assertNothingPushed();
 })->with([['sync', 'sync'], ['discard', 'null']]);
 
-test('unchanged records do not write timestamps and manual assets survive later updates', function (): void {
+test('unchanged records do not write timestamps and missing assets reset existing references to null', function (): void {
     $payload = gameDataFixture('Maps');
     gameDataRun(gameDataSubmit('maps', $payload));
     $map = NroMap::query()->where('id_map', $payload['data'][0]['mapId'])->firstOrFail();
-    $map->update(['icon' => '/icons/manual.png', 'image' => '/maps/manual.png']);
     $timestamp = $map->fresh()->updated_at->toISOString();
     $this->travel(10)->seconds();
     $payload['data'] = array_map(fn (array $row): array => array_reverse($row, true), $payload['data']);
@@ -100,11 +99,12 @@ test('unchanged records do not write timestamps and manual assets survive later 
     $sync = gameDataRun(gameDataSubmit('maps', $payload));
     expect($sync->unchanged)->toBe(count($payload['data']))->and($sync->updated)->toBe(0)
         ->and($map->fresh()->updated_at->toISOString())->toBe($timestamp);
+    $map->update(['icon' => '/icons/manual.png', 'image' => '/maps/manual.png']);
     $payload['data'][0]['mapName'] = 'Updated map';
     $sync = gameDataRun(gameDataSubmit('maps', $payload));
     expect($sync->updated)->toBe(1)->and($sync->unchanged)->toBe(count($payload['data']) - 1)
         ->and($map->fresh()->name)->toBe('Updated map')
-        ->and($map->fresh()->icon)->toBe('/icons/manual.png')->and($map->fresh()->image)->toBe('/maps/manual.png');
+        ->and($map->fresh()->icon)->toBeNull()->and($map->fresh()->image)->toBeNull();
 });
 
 test('option IDs are separate for item and skill option namespaces', function (): void {
@@ -188,7 +188,7 @@ test('chunk failures roll back partial changes and failed jobs expose status', f
 
 test('invalid or duplicate game rows are rejected before queueing', function (): void {
     foreach ([
-        ['data' => [['mapId' => 0, 'mapName' => 'Name', 'icon' => '/overwrite.png']]],
+        ['data' => [['mapId' => 0, 'mapName' => 'Name', 'icon' => ['invalid']]]],
         ['data' => [['mapId' => -1, 'mapName' => 'Name']]],
         ['data' => [['mapId' => 0]]],
         ['data' => [['mapId' => 0, 'mapName' => 'Name'], ['mapId' => '0', 'mapName' => 'Duplicate']]],
@@ -231,3 +231,100 @@ test('complete external game exports validate and synchronize when an export dir
         expect($sync->status)->toBe('completed')->and($sync->created)->toBe($sync->total);
     }
 });
+
+/** @param array<string, mixed> $payload
+ * @return array<string, mixed>
+ */
+function gameDataAssetPayload(array $payload, bool $include, ?string $icon = null, ?string $image = null): array
+{
+    $set = function (array $entry) use ($include, $icon, $image): array {
+        unset($entry['icon'], $entry['image']);
+        if ($include) {
+            $entry['icon'] = $icon;
+            $entry['image'] = $image;
+        }
+
+        return $entry;
+    };
+    foreach ($payload['data'] as &$entry) {
+        if (isset($entry['skills'])) {
+            $entry['skills'] = array_map($set, $entry['skills']);
+        } else {
+            $entry = $set($entry);
+        }
+    }
+    unset($entry);
+
+    return $payload;
+}
+
+test('every hook dataset accepts image and icon and clears them when omitted', function (string $dataset, string $fixture): void {
+    $payload = gameDataAssetPayload(gameDataFixture($fixture), true, '/storage/uploads/2026-10-18/image/icon.webp', 'https://cdn.example.com/image.png');
+    gameDataRun(gameDataSubmit($dataset, $payload));
+    $catalog = app(GameDataCatalogService::class);
+    $record = $catalog->query($dataset)->firstOrFail();
+    expect($record->icon)->toBe('/storage/uploads/2026-10-18/image/icon.webp')
+        ->and($record->image)->toBe('https://cdn.example.com/image.png')
+        ->and($record->source['icon'])->toBe($record->icon)
+        ->and($record->source['image'])->toBe($record->image);
+    $this->getJson('/api/admin-api/nro/game-data/'.$dataset)->assertOk()
+        ->assertJsonPath('data.0.icon', $record->icon)->assertJsonPath('data.0.image', $record->image);
+    $this->postJson('/api/admin-api/nro/game-data/'.$dataset.'/compare', $payload)
+        ->assertOk()->assertJsonPath('data.0.needs_update', false);
+
+    if ($dataset === 'classes-and-skills') {
+        $payload['data'][0]['skills'][0]['image'] = '/storage/new-skill-image.webp';
+    } else {
+        $payload['data'][0]['image'] = '/storage/new-image.webp';
+    }
+    $this->postJson('/api/admin-api/nro/game-data/'.$dataset.'/compare', $payload)
+        ->assertOk()->assertJsonPath('data.0.needs_update', true);
+    $sync = gameDataRun(gameDataSubmit($dataset, $payload));
+    expect($sync->updated)->toBe(1);
+
+    $omitted = gameDataAssetPayload($payload, false);
+    $this->postJson('/api/admin-api/nro/game-data/'.$dataset.'/compare', $omitted)
+        ->assertOk()->assertJsonPath('data.0.needs_update', true);
+    $sync = gameDataRun(gameDataSubmit($dataset, $omitted));
+    expect($sync->updated)->toBe($sync->total);
+    foreach ($catalog->query($dataset)->get() as $row) {
+        expect($row->icon)->toBeNull()->and($row->image)->toBeNull()
+            ->and($row->source)->toHaveKeys(['icon', 'image'])
+            ->and($row->source['icon'])->toBeNull()->and($row->source['image'])->toBeNull();
+    }
+    $explicitNull = gameDataAssetPayload($omitted, true);
+    $this->postJson('/api/admin-api/nro/game-data/'.$dataset.'/compare', $explicitNull)
+        ->assertOk()->assertJsonPath('data.0.needs_update', false);
+})->with([
+    ['maps', 'Maps'], ['npcs', 'NpcTemplates'], ['mobs', 'MobTemplates'], ['items', 'ItemTemplates'],
+    ['item-options', 'ItemOptions'], ['skill-options', 'SkillOptions'], ['classes-and-skills', 'ClassesAndSkills'],
+]);
+
+test('compare detects manual asset drift even when the source hash is unchanged', function (): void {
+    $payload = ['data' => [['mapId' => 0, 'mapName' => 'Map zero']]];
+    gameDataRun(gameDataSubmit('maps', $payload));
+    $map = NroMap::query()->firstOrFail();
+    $hash = $map->content_hash;
+    $map->update(['icon' => '/manual/icon.png', 'image' => '/manual/image.png']);
+    $this->postJson('/api/admin-api/nro/game-data/maps/compare', $payload)->assertOk()
+        ->assertJsonPath('data.0.content_hash', $hash)->assertJsonPath('data.0.needs_update', true);
+    $sync = gameDataRun(gameDataSubmit('maps', $payload));
+    expect($sync->updated)->toBe(1)->and($map->fresh()->icon)->toBeNull()->and($map->fresh()->image)->toBeNull();
+});
+
+test('explicit null and empty asset references clear stored images', function (?string $value): void {
+    $payload = ['data' => [['mapId' => 0, 'mapName' => 'Map zero', 'icon' => '/icon.png', 'image' => '/image.png']]];
+    gameDataRun(gameDataSubmit('maps', $payload));
+    $payload['data'][0]['icon'] = $value;
+    $payload['data'][0]['image'] = $value;
+    $sync = gameDataRun(gameDataSubmit('maps', $payload));
+    expect($sync->updated)->toBe(1)->and(NroMap::query()->firstOrFail()->icon)->toBeNull()
+        ->and(NroMap::query()->firstOrFail()->image)->toBeNull();
+})->with([null, '', '   ']);
+
+test('hook asset fields reject non strings and oversized references', function (mixed $value): void {
+    $payload = ['data' => [['mapId' => 0, 'mapName' => 'Map zero', 'image' => $value]]];
+    $this->postJson('/api/admin-api/nro/game-data/maps', $payload)->assertUnprocessable();
+    $this->postJson('/api/admin-api/nro/game-data/maps/compare', $payload)->assertUnprocessable();
+    Queue::assertNothingPushed();
+})->with([[['invalid']], [123], [true], [str_repeat('x', 2049)]]);

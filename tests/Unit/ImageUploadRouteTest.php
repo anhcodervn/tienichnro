@@ -53,7 +53,7 @@ test('remote image import stores a public image with a relative napcarot url', f
     Storage::fake('public');
     Http::preventStrayRequests();
 
-    $webpBinary = base64_decode('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEALmk0mk0iIiIiIgBoSygABc6zbAAA', true);
+    $webpBinary = base64_decode('UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoIAAgAAUAmJaQAA3AA/v02aAA=', true);
     Http::fake([
         'https://cdn.example.com/photo.webp' => Http::response($webpBinary, 200, ['Content-Type' => 'image/webp']),
     ]);
@@ -124,7 +124,7 @@ test('image upload route accepts a multipart webp image from an admin', function
     $temporaryWebpPath = tempnam(sys_get_temp_dir(), 'editor-webp-');
     file_put_contents(
         $temporaryWebpPath,
-        base64_decode('UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEALmk0mk0iIiIiIgBoSygABc6zbAAA', true),
+        base64_decode('UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoIAAgAAUAmJaQAA3AA/v02aAA=', true),
     );
 
     $admin = new User;

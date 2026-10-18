@@ -3,6 +3,7 @@
 namespace App\Features\Admin\Upload\Requests;
 
 use App\Exceptions\ApiException;
+use App\Features\Admin\Upload\Services\Base64ImageUploadService;
 use App\Models\User;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -23,7 +24,10 @@ class StoreImageUploadRequest extends FormRequest
     {
         return [
             'image' => [
-                'required',
+                'bail',
+                'required_without_all:base64,url',
+                'prohibits:base64,url',
+                'nullable',
                 'image',
                 'mimes:jpg,jpeg,png,webp',
                 'mimetypes:image/jpeg,image/png,image/webp',
@@ -31,6 +35,8 @@ class StoreImageUploadRequest extends FormRequest
                 'max:10240',
                 'dimensions:max_width=8000,max_height=8000',
             ],
+            'base64' => ['bail', 'required_without_all:image,url', 'prohibits:image,url', 'nullable', 'string', 'max:'.Base64ImageUploadService::MAX_ENCODED_LENGTH],
+            'url' => ['bail', 'required_without_all:image,base64', 'prohibits:image,base64', 'nullable', 'string', 'max:2048', 'url:http,https'],
             'name' => [
                 'nullable',
                 'string',
@@ -43,7 +49,9 @@ class StoreImageUploadRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'image.required' => 'Ảnh tải lên là bắt buộc.',
+            'required_without_all' => 'Cần gửi một trong ba nguồn ảnh: image, base64 hoặc url.',
+            'prohibits' => 'Chỉ được gửi một nguồn ảnh: image, base64 hoặc url.',
+            'base64.max' => 'Ảnh base64 không được vượt quá 10 MB sau giải mã.',
             'image.extensions' => 'Ảnh tải lên phải có định dạng JPG, PNG hoặc WebP.',
             'name.max' => 'Tên ảnh không được vượt quá 120 ký tự.',
         ];
@@ -54,6 +62,8 @@ class StoreImageUploadRequest extends FormRequest
     {
         return [
             'image' => 'ảnh tải lên',
+            'base64' => 'ảnh base64',
+            'url' => 'URL ảnh',
             'name' => 'tên ảnh',
         ];
     }

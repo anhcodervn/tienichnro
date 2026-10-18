@@ -13,65 +13,61 @@ class ImageUploadService
 
     private const WEBP_QUALITY = 82;
 
-    /**
-     * @return array{path: string, url: string, mime_type: string, extension: string, size: int}
-     */
+    public function __construct(private readonly ImageWatermarkService $watermark = new ImageWatermarkService) {}
+
+    /** @return array{path: string, url: string, mime_type: string, extension: string, size: int} */
     public function store(UploadedFile $file, ?string $name = null): array
     {
-        if (! $this->supportsServerSideWebpConversion()) {
-            if ($this->isWebpUpload($file)) {
-                return $this->storeExistingWebp($file, $name);
+        if (! $this->supportsImageProcessing()) {
+            throw new RuntimeException('Máy chủ cần bật PHP GD để gắn watermark tienichnro.com vào ảnh.', 503);
+        }
+        $imageResource = $this->createImageResource($file);
+        $canvas = null;
+        try {
+            [$targetWidth, $targetHeight] = $this->calculateDimensions(imagesx($imageResource), imagesy($imageResource));
+            $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
+            if ($canvas === false) {
+                throw new RuntimeException('Không thể khởi tạo bộ nhớ xử lý ảnh.');
+            }
+            imagealphablending($canvas, false);
+            imagesavealpha($canvas, true);
+            imagefill($canvas, 0, 0, imagecolorallocatealpha($canvas, 0, 0, 0, 127));
+            imagecopyresampled($canvas, $imageResource, 0, 0, 0, 0, $targetWidth, $targetHeight, imagesx($imageResource), imagesy($imageResource));
+            $this->watermark->apply($canvas);
+            $mimeType = $this->supportsServerSideWebpConversion() ? 'image/webp' : $file->getMimeType();
+            $extension = match ($mimeType) {
+                'image/jpeg' => 'jpg',
+                'image/png' => 'png',
+                'image/webp' => 'webp',
+                default => throw new RuntimeException('Định dạng ảnh không được hỗ trợ.'),
+            };
+            ob_start();
+            try {
+                $encoded = match ($mimeType) {
+                    'image/jpeg' => imagejpeg($canvas, null, self::WEBP_QUALITY),
+                    'image/png' => imagepng($canvas),
+                    'image/webp' => imagewebp($canvas, null, self::WEBP_QUALITY),
+                };
+                $binary = ob_get_contents();
+            } finally {
+                ob_end_clean();
+            }
+            if (! $encoded || ! is_string($binary) || $binary === '') {
+                throw new RuntimeException('Không thể mã hóa ảnh sau khi gắn watermark.');
             }
 
-            return $this->storeOriginalImage($file, $name);
-        }
-
-        $imageResource = $this->createImageResource($file);
-
-        [$targetWidth, $targetHeight] = $this->calculateDimensions(
-            imagesx($imageResource),
-            imagesy($imageResource),
-        );
-
-        $canvas = imagecreatetruecolor($targetWidth, $targetHeight);
-
-        if ($canvas === false) {
+            return $this->persistBinary($binary, $file, $name, $mimeType, $extension);
+        } finally {
             imagedestroy($imageResource);
-
-            throw new RuntimeException('Không thể khởi tạo bộ nhớ xử lý ảnh.');
+            if ($canvas instanceof \GdImage) {
+                imagedestroy($canvas);
+            }
         }
+    }
 
-        imagealphablending($canvas, false);
-        imagesavealpha($canvas, true);
-
-        $transparent = imagecolorallocatealpha($canvas, 0, 0, 0, 127);
-        imagefill($canvas, 0, 0, $transparent);
-
-        imagecopyresampled(
-            $canvas,
-            $imageResource,
-            0,
-            0,
-            0,
-            0,
-            $targetWidth,
-            $targetHeight,
-            imagesx($imageResource),
-            imagesy($imageResource),
-        );
-
-        ob_start();
-        imagewebp($canvas, null, self::WEBP_QUALITY);
-        $binary = ob_get_clean();
-
-        imagedestroy($canvas);
-        imagedestroy($imageResource);
-
-        if (! is_string($binary) || $binary === '') {
-            throw new RuntimeException('Không thể chuyển đổi ảnh sang WebP.');
-        }
-
-        return $this->persistBinary($binary, $file, $name, 'image/webp', 'webp');
+    protected function supportsImageProcessing(): bool
+    {
+        return function_exists('imagecreatefromstring') && function_exists('imagecreatetruecolor') && function_exists('imagestring');
     }
 
     protected function supportsServerSideWebpConversion(): bool
@@ -84,48 +80,7 @@ class ImageUploadService
 
     protected function publicUploadRelativePath(string $filename): string
     {
-        return 'uploads/image/'.now()->format('Y/m/d').'/'.$filename;
-    }
-
-    private function isWebpUpload(UploadedFile $file): bool
-    {
-        return Str::lower((string) $file->getClientOriginalExtension()) === 'webp'
-            || Str::lower((string) $file->getMimeType()) === 'image/webp';
-    }
-
-    /**
-     * @return array{path: string, url: string, mime_type: string, extension: string, size: int}
-     */
-    private function storeExistingWebp(UploadedFile $file, ?string $name = null): array
-    {
-        $binary = file_get_contents($file->getRealPath());
-
-        if (! is_string($binary) || $binary === '') {
-            throw new RuntimeException('Không thể đọc nội dung ảnh tải lên.');
-        }
-
-        return $this->persistBinary($binary, $file, $name, 'image/webp', 'webp');
-    }
-
-    /**
-     * @return array{path: string, url: string, mime_type: string, extension: string, size: int}
-     */
-    private function storeOriginalImage(UploadedFile $file, ?string $name = null): array
-    {
-        $binary = file_get_contents($file->getRealPath());
-
-        if (! is_string($binary) || $binary === '') {
-            throw new RuntimeException('Không thể đọc nội dung ảnh tải lên.');
-        }
-
-        $mimeType = Str::lower((string) $file->getMimeType());
-        $extension = match ($mimeType) {
-            'image/jpeg' => 'jpg',
-            'image/png' => 'png',
-            default => throw new RuntimeException('Định dạng ảnh không được hỗ trợ.'),
-        };
-
-        return $this->persistBinary($binary, $file, $name, $mimeType, $extension);
+        return 'uploads/'.now()->format('Y-m-d').'/image/'.$filename;
     }
 
     /**
@@ -177,7 +132,7 @@ class ImageUploadService
             throw new RuntimeException('Không thể đọc nội dung ảnh tải lên.');
         }
 
-        $resource = imagecreatefromstring($imageContent);
+        $resource = @imagecreatefromstring($imageContent);
 
         if ($resource === false) {
             throw new RuntimeException('Định dạng ảnh không được hỗ trợ.');

@@ -43,6 +43,7 @@ test('supervisor worker processes every application queue', function () {
             'topup',
             'mails',
             'user-logs',
+            'game-data',
             'default',
         ]);
 });
@@ -83,4 +84,15 @@ test('supervisor keeps scheduler and reverb on explicit production commands', fu
         ->toContain('stdout_logfile=/var/www/napcarot.vn/laravel-app/storage/logs/scheduler.log')
         ->toContain('command=/usr/bin/php8.2 /var/www/napcarot.vn/laravel-app/artisan reverb:start --host=127.0.0.1 --port=8082 --no-interaction')
         ->toContain('stdout_logfile=/var/www/napcarot.vn/laravel-app/storage/logs/reverb.log');
+});
+
+test('development queue listener also consumes game data chunks', function (): void {
+    $composer = json_decode(file_get_contents(dirname(__DIR__, 2).'/composer.json'), true, 512, JSON_THROW_ON_ERROR);
+    $command = collect($composer['scripts']['dev'])->first(fn (string $command): bool => str_contains($command, 'queue:listen'));
+
+    expect($command)->not->toBeNull();
+    preg_match('/queue:listen[^"\r\n]*--queue=([^\s"]+)/', $command, $matches);
+
+    expect($matches)->toHaveKey(1)
+        ->and(explode(',', $matches[1]))->toContain('mails', 'user-logs', 'game-data', 'default');
 });

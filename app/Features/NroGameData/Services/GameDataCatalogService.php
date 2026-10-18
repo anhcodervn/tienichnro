@@ -2,6 +2,7 @@
 
 namespace App\Features\NroGameData\Services;
 
+use App\Models\NroGameDataRecord;
 use App\Models\NroItem;
 use App\Models\NroMap;
 use App\Models\NroMob;
@@ -93,7 +94,13 @@ class GameDataCatalogService
     /** @return array<string, mixed> */
     public function definition(string $dataset): array
     {
-        return self::DATASETS[$dataset];
+        $definition = self::DATASETS[$dataset];
+        $definition['fields'] += [
+            'icon' => ['column' => 'icon', 'type' => 'asset'],
+            'image' => ['column' => 'image', 'type' => 'asset'],
+        ];
+
+        return $definition;
     }
 
     public function query(string $dataset): Builder
@@ -146,12 +153,12 @@ class GameDataCatalogService
         $idColumn = $columns[array_key_last($columns)];
         $key = fn (array $row): string => implode(':', array_map(fn (string $column): string => (string) $row[$column], $columns));
         $existing = $this->query($dataset)->whereIn($idColumn, array_column($rows, $idColumn))
-            ->get([...$columns, 'content_hash'])->keyBy(fn ($record): string => $key($record->getAttributes()));
+            ->get([...$columns, 'content_hash', 'icon', 'image'])->keyBy(fn ($record): string => $key($record->getAttributes()));
 
         return array_map(fn (array $row): array => [
             'identity' => array_intersect_key($row, array_flip($columns)),
             'content_hash' => $row['content_hash'],
-            'needs_update' => $existing->get($key($row))?->content_hash !== $row['content_hash'],
+            'needs_update' => ! $this->matchesRecord($existing->get($key($row)), $row),
         ], $rows);
     }
 
@@ -164,7 +171,10 @@ class GameDataCatalogService
         $source = $class;
         $row = [];
         foreach ($this->definition($dataset)['fields'] as $key => $field) {
-            $value = $entry[$key];
+            $value = $field['type'] === 'asset' ? ($entry[$key] ?? null) : $entry[$key];
+            if ($field['type'] === 'asset' && is_string($value) && trim($value) === '') {
+                $value = null;
+            }
             if (in_array($field['type'], ['id', 'int', 'big'], true)) {
                 $value = (int) $value;
             } elseif ($field['type'] === 'bool') {
@@ -195,6 +205,15 @@ class GameDataCatalogService
         $row['content_hash'] = hash('sha256', json_encode($source, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         return $row;
+    }
+
+    /** @param array<string, mixed> $row */
+    public function matchesRecord(?NroGameDataRecord $record, array $row): bool
+    {
+        return $record !== null
+            && hash_equals($record->content_hash, $row['content_hash'])
+            && $record->icon === ($row['icon'] ?? null)
+            && $record->image === ($row['image'] ?? null);
     }
 
     private function canonicalize(mixed $value): mixed

@@ -54,11 +54,12 @@ class GameDataSyncService
             $counts = ['created' => 0, 'updated' => 0, 'unchanged' => 0];
             foreach ($rows as $row) {
                 $record = $existing->get($this->identityKey($row, $identityColumns));
-                if ($record !== null && hash_equals($record->content_hash, $row['content_hash'])) {
+                if ($this->catalog->matchesRecord($record, $row)) {
                     $counts['unchanged']++;
 
                     continue;
                 }
+                $row += ['icon' => null, 'image' => null];
                 $identity = array_intersect_key($row, array_flip($identityColumns));
                 $this->catalog->query($sync->dataset)->updateOrCreate($identity, $row);
                 $counts[$record === null ? 'created' : 'updated']++;

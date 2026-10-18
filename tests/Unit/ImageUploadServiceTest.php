@@ -11,7 +11,7 @@ test('image upload service stores an existing webp on the public disk', function
     Storage::fake('public');
 
     $temporaryWebpPath = tempnam(sys_get_temp_dir(), 'webp-test-');
-    file_put_contents($temporaryWebpPath, 'RIFFxxxxWEBPVP8 ');
+    file_put_contents($temporaryWebpPath, base64_decode('UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoIAAgAAUAmJaQAA3AA/v02aAA=', true));
 
     $uploadedFile = new UploadedFile(
         $temporaryWebpPath,

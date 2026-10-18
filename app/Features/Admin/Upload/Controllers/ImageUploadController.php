@@ -5,6 +5,7 @@ namespace App\Features\Admin\Upload\Controllers;
 use App\Exceptions\ApiException;
 use App\Features\Admin\Upload\Requests\ImportImageUploadRequest;
 use App\Features\Admin\Upload\Requests\StoreImageUploadRequest;
+use App\Features\Admin\Upload\Services\Base64ImageUploadService;
 use App\Features\Admin\Upload\Services\ImageUploadService;
 use App\Features\Admin\Upload\Services\RemoteImageUploadService;
 use App\Http\Controllers\Controller;
@@ -18,7 +19,7 @@ class ImageUploadController extends Controller
         try {
             $uploadedImage = $remoteImageUploadService->store($request->validated('url'));
         } catch (RuntimeException $exception) {
-            throw new ApiException($exception->getMessage(), 422, previous: $exception);
+            throw new ApiException($exception->getMessage(), $exception->getCode() === 503 ? 503 : 422, previous: $exception);
         }
 
         return response()->json([
@@ -28,15 +29,21 @@ class ImageUploadController extends Controller
         ]);
     }
 
-    public function store(StoreImageUploadRequest $request, ImageUploadService $imageUploadService): JsonResponse
-    {
+    public function store(
+        StoreImageUploadRequest $request,
+        ImageUploadService $imageUploadService,
+        Base64ImageUploadService $base64ImageUploadService,
+        RemoteImageUploadService $remoteImageUploadService,
+    ): JsonResponse {
         try {
-            $uploadedImage = $imageUploadService->store(
-                $request->file('image'),
-                $request->validated('name'),
-            );
+            $name = $request->validated('name');
+            $uploadedImage = match (true) {
+                $request->hasFile('image') => $imageUploadService->store($request->file('image'), $name),
+                $request->filled('base64') => $base64ImageUploadService->store($request->validated('base64'), $name),
+                default => $remoteImageUploadService->store($request->validated('url'), $name),
+            };
         } catch (RuntimeException $exception) {
-            throw new ApiException($exception->getMessage(), 500, previous: $exception);
+            throw new ApiException($exception->getMessage(), $exception->getCode() === 503 ? 503 : ($request->hasFile('image') ? 500 : 422), previous: $exception);
         }
 
         return response()->json([

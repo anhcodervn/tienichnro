@@ -47,6 +47,7 @@ class StoreGameDataRequest extends FormRequest
         }
         foreach ($fields as $key => $field) {
             $rules[$prefix.$key] = match ($field['type']) {
+                'asset' => ['sometimes', 'nullable', 'string', 'max:2048'],
                 'id' => ['required', 'integer', 'between:0,4294967295'],
                 'int' => ['required', 'integer', 'between:-2147483648,2147483647'],
                 'big' => ['required', 'integer', 'min:0'],
