@@ -3,6 +3,7 @@
 use App\Features\NroNotification\Jobs\SendZaloEquipmentNotification;
 use App\Features\NroNotification\Services\NroNotificationService;
 use App\Features\NroNotification\Services\ZaloBotNotificationService;
+use App\Models\NroServer;
 use App\Models\NroZaloEquipmentSend;
 use App\Models\ZaloReceiveNotification;
 use Database\Seeders\NroNotificationSeeder;
@@ -51,6 +52,119 @@ test('parser handles uppercase whitespace and all set suffixes', function (strin
     $equipment = app(ZaloBotNotificationService::class)->parse(' EmPoBaoNo VỪA ĐÁNH QUÁI MAY MẮN NHẬN ĐƯỢC  '.$item.' ');
     expect($equipment)->toMatchArray(['char_name' => 'empobaono', 'item' => mb_strtolower($item), 'kind' => 'set']);
 })->with(['1 trang bị Set kích hoạt', '1 trang bị Set kích hoạt Gohan', '1 trang bị Set kích hoạt Set Thần Vũ Trụ Kaio']);
+
+test('receiver lookup requires the registration key', function (): void {
+    $this->getJson('/api/nro/internal/zalo-receivers?zalo_id=000123')->assertForbidden();
+    foreach (['wrong', 'bot-secret'] as $key) {
+        $this->withToken($key)->getJson('/api/nro/internal/zalo-receivers?zalo_id=000123')->assertForbidden();
+    }
+    config()->set('services.zalo_bot.registration_key', '');
+    $this->withToken('')->getJson('/api/nro/internal/zalo-receivers?zalo_id=000123')->assertForbidden();
+});
+
+test('receiver lookup filters exact identities and returns an explicit duplicate indicator', function (): void {
+    $identity = ['zalo_id' => '000123', 'char_name' => 'PlAyEr', 'char_server' => 1, 'box_zalo_id' => '000box'];
+    $receiver = ZaloReceiveNotification::factory()->create($identity);
+    foreach ([['zalo_id' => '000456'], ['char_name' => 'other'], ['char_server' => 2], ['box_zalo_id' => 'other-box'], ['box_zalo_id' => null]] as $extra) {
+        ZaloReceiveNotification::factory()->create([...$identity, ...$extra]);
+    }
+    $query = http_build_query([...$identity, 'char_name' => ' PLAYER ', 'zalo_id' => ' 000123 ', 'box_zalo_id' => ' 000box ']);
+    $this->withToken('registration-secret')->getJson('/api/nro/internal/zalo-receivers?'.$query)
+        ->assertOk()->assertJsonPath('exists', true)->assertJsonCount(1, 'data')
+        ->assertJsonPath('data.0.id', $receiver->id)->assertJsonPath('data.0.zalo_id', '000123');
+    $this->getJson('/api/nro/internal/zalo-receivers?zalo_id=unknown')
+        ->assertOk()->assertExactJson(['exists' => false, 'data' => []]);
+    $this->assertDatabaseCount('zalo_receive_notifications', 6);
+});
+
+test('receiver lookup supports optional filters and distinguishes omitted from empty box', function (): void {
+    NroServer::factory()->create(['server_code' => 0]);
+    $identity = ['zalo_id' => '000123', 'char_name' => 'player', 'char_server' => 0];
+    $direct = ZaloReceiveNotification::factory()->create([...$identity, 'box_zalo_id' => null]);
+    ZaloReceiveNotification::factory()->create([...$identity, 'box_zalo_id' => 'box']);
+    ZaloReceiveNotification::factory()->create([...$identity, 'char_server' => 1]);
+    $this->withToken('registration-secret')->getJson('/api/nro/internal/zalo-receivers?zalo_id=000123')
+        ->assertOk()->assertJsonCount(3, 'data');
+    $this->getJson('/api/nro/internal/zalo-receivers?zalo_id=000123&char_server=0')
+        ->assertOk()->assertJsonCount(2, 'data');
+    $this->getJson('/api/nro/internal/zalo-receivers?zalo_id=000123&char_server=0&box_zalo_id=')
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.id', $direct->id);
+});
+
+test('receiver lookup validates supplied filters', function (array $filters, string $field): void {
+    $this->withToken('registration-secret')->getJson('/api/nro/internal/zalo-receivers?'.http_build_query($filters))
+        ->assertUnprocessable()->assertJsonValidationErrors($field);
+})->with([
+    [[], 'zalo_id'], [['zalo_id' => ' '], 'zalo_id'],
+    [['zalo_id' => ['123']], 'zalo_id'], [['zalo_id' => '123', 'char_name' => ' '], 'char_name'],
+    [['zalo_id' => '123', 'char_server' => 99999], 'char_server'],
+    [['zalo_id' => '123', 'box_zalo_id' => ['box']], 'box_zalo_id'],
+]);
+
+test('unregistration requires the registration key and preserves subscriptions on rejection', function (): void {
+    $receiver = ZaloReceiveNotification::factory()->create();
+    $payload = $receiver->only(['zalo_id', 'char_name', 'char_server', 'box_zalo_id']);
+    $this->deleteJson('/api/nro/internal/zalo-receivers', $payload)->assertForbidden();
+    foreach (['wrong', 'bot-secret'] as $key) {
+        $this->withToken($key)->deleteJson('/api/nro/internal/zalo-receivers', $payload)->assertForbidden();
+    }
+    config()->set('services.zalo_bot.registration_key', '');
+    $this->withToken('')->deleteJson('/api/nro/internal/zalo-receivers', $payload)->assertForbidden();
+    $this->assertModelExists($receiver);
+});
+
+test('unregistration deletes only the matching identity including legacy mixed case duplicates', function (): void {
+    $identity = ['zalo_id' => '000123', 'char_name' => 'player', 'char_server' => 1, 'box_zalo_id' => '000box'];
+    $receiver = ZaloReceiveNotification::factory()->create($identity);
+    $duplicate = ZaloReceiveNotification::factory()->create([...$identity, 'char_name' => 'PLAYER']);
+    $others = collect([
+        ['zalo_id' => '000456'], ['char_name' => 'other'], ['char_server' => 2],
+        ['box_zalo_id' => 'other-box'], ['box_zalo_id' => null],
+    ])->map(fn (array $extra): ZaloReceiveNotification => ZaloReceiveNotification::factory()->create([...$identity, ...$extra]));
+
+    $payload = [...$identity, 'zalo_id' => ' 000123 ', 'box_zalo_id' => ' 000box ', 'char_name' => ' PlAyEr ', 'type_receive' => 'REMOVED_TYPE'];
+    $this->withToken('registration-secret')->deleteJson('/api/nro/internal/zalo-receivers', $payload)->assertNoContent();
+    $this->assertModelMissing($receiver);
+    $this->assertModelMissing($duplicate);
+    foreach ($others as $other) {
+        $this->assertModelExists($other);
+    }
+    $this->deleteJson('/api/nro/internal/zalo-receivers', $payload)->assertNoContent();
+    $this->assertDatabaseCount('zalo_receive_notifications', 5);
+});
+
+test('unregistration accepts omitted null and blank box IDs for direct registrations', function (array $box): void {
+    $identity = ['zalo_id' => '000123', 'char_name' => 'player', 'char_server' => 1];
+    $this->withToken('registration-secret')->postJson('/api/nro/internal/zalo-receivers', $identity)->assertCreated();
+    $this->deleteJson('/api/nro/internal/zalo-receivers', [...$identity, ...$box])->assertNoContent();
+    $this->assertDatabaseCount('zalo_receive_notifications', 0);
+})->with([[[]], [['box_zalo_id' => null]], [['box_zalo_id' => ' ']]]);
+
+test('unregistration rejects invalid identities without deleting data', function (array $extra, string $field): void {
+    $receiver = ZaloReceiveNotification::factory()->create(['char_server' => 1]);
+    $payload = $receiver->only(['zalo_id', 'char_name', 'char_server', 'box_zalo_id']);
+    $this->withToken('registration-secret')->deleteJson('/api/nro/internal/zalo-receivers', [...$payload, ...$extra])
+        ->assertUnprocessable()->assertJsonValidationErrors($field);
+    $this->assertModelExists($receiver);
+})->with([
+    [['zalo_id' => null], 'zalo_id'], [['zalo_id' => 123], 'zalo_id'],
+    [['char_name' => ' '], 'char_name'], [['char_server' => null], 'char_server'],
+    [['char_server' => 99999], 'char_server'], [['box_zalo_id' => []], 'box_zalo_id'],
+]);
+
+test('queued equipment notifications stop mentioning a receiver after unregistration', function (): void {
+    $identity = ['zalo_id' => '000123', 'char_name' => 'player', 'char_server' => 1];
+    $this->withToken('registration-secret')->postJson('/api/nro/internal/zalo-receivers', $identity)->assertCreated();
+    $job = new SendZaloEquipmentNotification([
+        'kind' => 'set', 'char_name' => 'player', 'item' => '1 trang bị set kích hoạt', 'location' => null,
+    ], 1, 'Vũ trụ 1');
+    $this->deleteJson('/api/nro/internal/zalo-receivers', $identity)->assertNoContent();
+    Http::fake(['zalo.example/*' => Http::response()]);
+    $job->handle(app(ZaloBotNotificationService::class));
+    Http::assertSent(fn (Request $request): bool => ! array_key_exists('mentionUserIds', $request->data())
+        && ! str_contains($request['message'], '000123'));
+    Http::assertSentCount(1);
+});
 
 test('delivery mentions only matching characters on the same server once', function (): void {
     foreach ([['EmPoBaoNo', 1, '000123'], ['empobaono', 1, '000123'], ['empobaono', 2, 'wrong-server'], ['other', 1, 'wrong-char'], ['empobaono', null, 'no-server']] as [$name, $server, $id]) {

@@ -13,6 +13,12 @@ use Illuminate\Support\Facades\Route;
 Route::post('nro/internal/zalo-receivers', InternalZaloReceiveNotificationController::class)
     ->middleware('throttle:60,1')->name('nro.internal.zalo-receivers.store');
 
+Route::get('nro/internal/zalo-receivers', [InternalZaloReceiveNotificationController::class, 'index'])
+    ->middleware('throttle:60,1')->name('nro.internal.zalo-receivers.index');
+
+Route::delete('nro/internal/zalo-receivers', [InternalZaloReceiveNotificationController::class, 'destroy'])
+    ->middleware('throttle:60,1')->name('nro.internal.zalo-receivers.destroy');
+
 Route::get('nro/internal/servers', [ServerController::class, 'internalIndex'])
     ->middleware('throttle:60,1')->name('nro.internal.servers.index');
 
