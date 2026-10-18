@@ -74,6 +74,30 @@
                     </label>
                 </div>
             </div>
+            <div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <h2 class="text-base font-semibold text-slate-900">Google AdSense</h2>
+                <p class="mt-1 text-sm text-slate-500">Nạp mã AdSense để hiển thị quảng cáo tự động trên các trang công khai.</p>
+                <div class="mt-4 grid gap-4">
+                    <label class="flex items-center gap-3 text-sm font-medium text-slate-700">
+                        <input v-model="formData.adsense_enabled" type="checkbox" class="h-4 w-4 rounded border-slate-300" />
+                        Bật Google AdSense
+                    </label>
+                    <div class="space-y-2">
+                        <label for="adsense-client-id" class="text-sm font-medium text-slate-700">Publisher ID</label>
+                        <input
+                            id="adsense-client-id"
+                            v-model="formData.adsense_client_id"
+                            type="text"
+                            maxlength="23"
+                            placeholder="ca-pub-1234567890123456"
+                            class="w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-slate-900"
+                        />
+                        <p class="text-xs text-slate-500">
+                            Nhập mã ca-pub- gồm 16 chữ số. Bật Auto ads trong tài khoản AdSense và cấu hình ads.txt tại mục SEO.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </section>
 
         <aside class="space-y-4">
@@ -113,6 +137,8 @@ const formData = ref<GeneralSettingType>({
     site_description: '',
     site_active: true,
     allow_register: false,
+    adsense_enabled: false,
+    adsense_client_id: '',
     footer_game_links: [],
 });
 

@@ -28,6 +28,8 @@ class UpdateSystemSettingRequest extends FormRequest
             'site_description' => ['nullable', 'string', 'max:2000'],
             'site_active' => ['required', 'boolean'],
             'allow_register' => ['required', 'boolean'],
+            'adsense_enabled' => ['sometimes', 'boolean'],
+            'adsense_client_id' => ['nullable', 'required_if:adsense_enabled,true', 'string', 'regex:/\Aca-pub-[0-9]{16}\z/'],
             'light_logo' => ['nullable', 'string', 'max:2048'],
             'dark_logo' => ['nullable', 'string', 'max:2048'],
             'favicon' => ['nullable', 'string', 'max:2048'],

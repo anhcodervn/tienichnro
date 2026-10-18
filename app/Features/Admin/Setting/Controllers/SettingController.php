@@ -33,6 +33,8 @@ class SettingController extends Controller
                 'site_description' => '',
                 'site_active' => true,
                 'allow_register' => false,
+                'adsense_enabled' => false,
+                'adsense_client_id' => '',
                 'footer_game_links' => [],
             ],
             'maintenance' => [
@@ -207,6 +209,8 @@ class SettingController extends Controller
                 'site_description' => 'site_description',
                 'site_active' => 'site_active',
                 'allow_register' => 'allow_register',
+                'adsense_enabled' => 'adsense_enabled',
+                'adsense_client_id' => 'adsense_client_id',
                 'footer_game_links' => 'footer_game_links',
             ],
             'maintenance' => [

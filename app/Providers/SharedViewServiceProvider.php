@@ -40,6 +40,8 @@ class SharedViewServiceProvider extends ServiceProvider
                 'color_accent' => '#2563EB',
                 'color_surface' => '#F8FAFC',
                 'gtm_id' => '',
+                'adsense_enabled' => false,
+                'adsense_client_id' => '',
                 'meta_pixel_id' => '',
                 'custom_head_tags' => '',
                 'custom_script' => '',
@@ -83,6 +85,8 @@ class SharedViewServiceProvider extends ServiceProvider
                 'js' => $storedSettings['custom_js_enabled'] === true && $storedSettings['custom_js'] !== '',
             ]);
             $view->with('clientTracking', [
+                'adsense_client_id' => $storedSettings['adsense_enabled'] === true
+                    ? $this->normalizeAdsenseClientId($storedSettings['adsense_client_id']) : '',
                 'gtm_id' => $this->normalizeGtmId($storedSettings['gtm_id']),
                 'meta_pixel_id' => $this->normalizeMetaPixelId($storedSettings['meta_pixel_id']),
             ]);
@@ -98,6 +102,13 @@ class SharedViewServiceProvider extends ServiceProvider
         $gtmId = is_string($value) ? trim($value) : '';
 
         return preg_match('/\AGTM-[A-Z0-9]+\z/', $gtmId) === 1 ? $gtmId : '';
+    }
+
+    private function normalizeAdsenseClientId(mixed $value): string
+    {
+        $clientId = is_string($value) ? trim($value) : '';
+
+        return preg_match('/\Aca-pub-[0-9]{16}\z/', $clientId) === 1 ? $clientId : '';
     }
 
     /**

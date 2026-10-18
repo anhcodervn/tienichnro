@@ -35,10 +35,15 @@
         $loadsClientTracking = ! request()->routeIs(['auth.*', 'password.*', 'verification.*']);
         $gtmId = $loadsClientTracking ? ($clientTracking['gtm_id'] ?? '') : '';
         $metaPixelId = $loadsClientTracking ? ($clientTracking['meta_pixel_id'] ?? '') : '';
+        $adsenseClientId = $loadsClientTracking ? ($clientTracking['adsense_client_id'] ?? '') : '';
         $customHeadTags = $loadsClientTracking ? ($inlineSeoCode['head'] ?? '') : '';
         $customScript = $loadsClientTracking ? ($inlineSeoCode['script'] ?? '') : '';
     @endphp
     <title>{{ $documentTitle }}</title>
+    @if ($adsenseClientId !== '')
+        <meta name="google-adsense-account" content="{{ $adsenseClientId }}">
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ $adsenseClientId }}" crossorigin="anonymous" data-site-adsense></script>
+    @endif
     <meta name="description" content="{{ $description }}">
     @if ($keywords !== '')
         <meta name="keywords" content="{{ $keywords }}">

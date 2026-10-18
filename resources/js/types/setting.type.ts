@@ -4,6 +4,8 @@ export interface SettingApiResponse<T> {
 }
 
 export interface SystemSettingType {
+    adsense_enabled?: boolean;
+    adsense_client_id?: string;
     site_name: string;
     site_domain: string;
     site_description: string;
@@ -35,6 +37,8 @@ export interface SystemSettingType {
 }
 
 export interface GeneralSettingType {
+    adsense_enabled: boolean;
+    adsense_client_id: string;
     site_name: string;
     site_domain: string;
     site_description: string;

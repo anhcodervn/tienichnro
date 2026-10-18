@@ -38,6 +38,8 @@ class UpdateTabSettingRequest extends FormRequest
                 'site_description' => ['nullable', 'string', 'max:2000'],
                 'site_active' => ['required', 'boolean'],
                 'allow_register' => ['required', 'boolean'],
+                'adsense_enabled' => ['sometimes', 'boolean'],
+                'adsense_client_id' => ['nullable', 'required_if:adsense_enabled,true', 'string', 'regex:/\Aca-pub-[0-9]{16}\z/'],
                 'footer_game_links' => ['sometimes', 'array', 'max:20'],
                 'footer_game_links.*' => ['required', 'array:label,url'],
                 'footer_game_links.*.label' => ['required', 'string', 'max:80', 'not_regex:/[\x00-\x1F\x7F]/u'],
