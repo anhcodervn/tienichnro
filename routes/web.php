@@ -111,6 +111,7 @@ Route::get('/admin/{any?}', function (Request $request, SettingStore $settingSto
 
 require base_path('app/Features/Client/Profile/web.php');
 require base_path('app/Features/Client/Potential/routes.php');
+require base_path('app/Features/Client/EquipmentUpgrade/routes.php');
 
 Route::get('/{categorySlug}/{postSlug}', [PublicSeoPageController::class, 'show'])
     ->where([
