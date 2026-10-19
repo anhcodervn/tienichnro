@@ -18,12 +18,14 @@ test('equipment calculator uses an admin definition with any code and absolute U
     expect(collect(config('tools.items'))->contains('code', 'equipment_upgrade_calculator'))->toBeFalse();
 });
 
-test('equipment tool is absent from the catalog until added in admin', function (): void {
+test('equipment page works independently before its catalog entry is added in admin', function (): void {
     app(ToolAvailabilityService::class)->delete('admin_equipment_tool');
     $this->get(route('home'))->assertOk()->assertDontSee('/tinh-chi-so-trang-bi-nang-cap');
-    $this->get(route('tools.equipment-upgrade'))->assertOk()->assertDontSee('name="current_stat"', false);
+    $this->get(route('tools.equipment-upgrade'))->assertOk()->assertSee('name="current_stat"', false)
+        ->assertDontSee('data-service-maintenance', false);
     $this->post(route('tools.equipment-upgrade.calculate'), ['current_stat' => 100, 'current_level' => 0])
-        ->assertOk()->assertViewHas('results', null);
+        ->assertOk()->assertViewHas('results', fn (array $results): bool => count($results) === 8)
+        ->assertSee('Kết quả chỉ số trang bị');
 });
 
 test('equipment calculator page is public and linked from the tool catalog', function (): void {

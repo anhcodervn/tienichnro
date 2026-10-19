@@ -65,7 +65,7 @@
                 <h2 class="text-base font-bold text-slate-900">Chi tiết nâng cấp theo công thức tham khảo</h2>
                 <p>Tỷ lệ thành công: +0 → +1: 80%; +1 → +2: 50%; +2 → +3: 20%; +3 → +4: 10%; +4 → +5: 5%; +5 → +6: 2%; +6 → +7: 1%.</p>
                 <p>Thất bại khi nâng lên +3, +5, +7: tụt lần lượt về +1, +3, +5 và giảm 1% chỉ số. Các bước còn lại không tụt cấp và chỉ số.</p>
-                <p>Kết quả tham khảo theo script được cung cấp, chưa tính các lần nâng cấp thất bại. Nguồn công thức: Văn Thái, phiên bản 1.1.1 (24/11/2021).</p>
+                <p>Kết quả tham khảo, chưa tính các lần nâng cấp thất bại.</p>
             </aside>
         @endif
     </div>

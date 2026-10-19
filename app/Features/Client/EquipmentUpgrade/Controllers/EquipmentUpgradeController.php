@@ -36,6 +36,6 @@ class EquipmentUpgradeController extends Controller
             $path = parse_url((string) ($tool['url'] ?? ''), PHP_URL_PATH);
 
             return is_string($path) && rtrim($path, '/') === '/tinh-chi-so-trang-bi-nang-cap';
-        }) ?? ['is_enabled' => false, 'maintenance_message' => 'Công cụ chưa được bật trong danh sách dịch vụ.'];
+        }) ?? ['is_enabled' => true, 'maintenance_message' => ''];
     }
 }
