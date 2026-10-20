@@ -224,9 +224,30 @@ test('delivery mentions only matching characters on the same server once', funct
     Http::assertSent(fn (Request $request): bool => $request->hasHeader('Authorization', 'Bearer bot-secret')
         && $request['accountId'] === 1 && $request['recipientId'] === '8033125305662128843'
         && $request['recipientType'] === 'group' && $request['mentionUserIds'] === ['000123']
-        && str_contains($request['message'], '🎉 Chúc mừng: 000123')
+        && str_contains($request['message'], '🎉 Chúc mừng: {mentionUserIds[0]}')
+        && ! str_contains($request['message'], '000123')
         && str_contains($request['message'], '🌍 Máy chủ: Vũ trụ 1')
         && str_contains($request['message'], '01 TRANG BỊ SET KÍCH HOẠT SET THẦN VŨ TRỤ KAIO'));
+    Http::assertSentCount(1);
+});
+
+test('delivery uses indexed placeholders for each unique mention', function (): void {
+    foreach (['000123', '000123', '3468625405580690835'] as $zaloId) {
+        ZaloReceiveNotification::factory()->create(['char_name' => 'player', 'char_server' => 1, 'zalo_id' => $zaloId]);
+    }
+    Http::fake(['zalo.example/*' => Http::response()]);
+    $service = app(ZaloBotNotificationService::class);
+    $service->sendNotiZalo($service->parse('player vừa nhặt được Giày Thần Linh tại Hang băng khu 5'), 1, 'Vũ trụ 1');
+
+    Http::assertSent(function (Request $request): bool {
+        expect($request['mentionUserIds'])->toHaveCount(2)->toBeArray();
+        expect(array_is_list($request['mentionUserIds']))->toBeTrue();
+        expect($request['mentionUserIds'])->toContain('000123', '3468625405580690835');
+        expect($request['message'])->toContain('🎉 Chúc mừng: {mentionUserIds[0]}, {mentionUserIds[1]}')
+            ->not->toContain('{mentionUserIds[2]}', '000123', '3468625405580690835');
+
+        return true;
+    });
     Http::assertSentCount(1);
 });
 
@@ -236,6 +257,7 @@ test('god item includes location without congratulations when unregistered', fun
     $service->sendNotiZalo($service->parse('empobaono vừa nhặt được Giầy Thần Linh tại Hang băng khu 5'), 1, 'Vũ trụ 1');
     Http::assertSent(fn (Request $request): bool => ! array_key_exists('mentionUserIds', $request->data())
         && ! str_contains($request['message'], 'Chúc mừng:')
+        && ! str_contains($request['message'], '{mentionUserIds[')
         && str_contains($request['message'], '[ ĐỒ THẦN LINH ]')
         && str_contains($request['message'], 'GIẦY THẦN LINH')
         && str_contains($request['message'], '📍 Vị trí: Hang Băng Khu 5')

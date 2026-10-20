@@ -51,7 +51,8 @@ class ZaloBotNotificationService
         $title = $equipment['kind'] === 'set' ? 'SÉT KÍCH HOẠT' : 'ĐỒ THẦN LINH';
         $lines = ['🐉✨ [ '.$title.' ] ✨🐉'];
         if ($mentions !== []) {
-            $lines[] = '🎉 Chúc mừng: '.implode(', ', $mentions);
+            $mentionPlaceholders = array_map(fn (int $index): string => '{mentionUserIds['.$index.']}', array_keys($mentions));
+            $lines[] = '🎉 Chúc mừng: '.implode(', ', $mentionPlaceholders);
         }
         $lines[] = '👑 Nhân vật: '.$equipment['char_name'];
         $lines[] = '🌍 Máy chủ: '.$serverName;
