@@ -10,6 +10,7 @@ use Illuminate\Support\Facades\Storage;
 
 beforeEach(function (): void {
     Storage::fake('local');
+    Storage::fake('public');
     $this->admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 });
 
@@ -26,6 +27,48 @@ function productReleaseData(array $extra = []): array
         'heartbeat_interval' => 20, 'lease_duration' => 60, 'transfer_cooldown' => 1800,
         'max_active_devices' => 1, 'offline_grace' => 0, ...$extra];
 }
+
+function productReleaseImage(int $width = 1, int $height = 1): string
+{
+    $chunk = fn (string $type, string $data): string => pack('N', strlen($data)).$type.$data.pack('N', crc32($type.$data));
+
+    return "\x89PNG\r\n\x1a\n".$chunk('IHDR', pack('NNCCCCC', $width, $height, 8, 6, 0, 0, 0))
+        .$chunk('IDAT', gzcompress(str_repeat("\0".str_repeat("\xff\0\0\xff", $width), $height))).$chunk('IEND', '');
+}
+
+test('admin attaches replaces preserves and clears a square mod image and dashboard displays it', function (): void {
+    Storage::disk('public')->put('uploads/mod.png', productReleaseImage());
+    Storage::disk('public')->put('uploads/new-mod.png', productReleaseImage(2, 2));
+    $data = productReleaseData(['image_url' => '/storage/uploads/mod.png']);
+    $id = $this->actingAs($this->admin)->postJson('/api/admin-api/license/products', $data)
+        ->assertCreated()->assertJsonPath('data.image_url', $data['image_url'])->json('data.id');
+    $url = '/api/admin-api/license/products/'.$id;
+    $this->patchJson($url, productReleaseData())->assertOk()->assertJsonPath('data.image_url', $data['image_url']);
+    $this->patchJson($url, [...$data, 'image_url' => '/storage/uploads/new-mod.png'])->assertOk()
+        ->assertJsonPath('data.image_url', '/storage/uploads/new-mod.png');
+    $owner = User::factory()->create();
+    License::factory()->create(['product_id' => $id, 'user_id' => $owner->id]);
+    $this->actingAs($owner)->get(route('account.profile.dashboard'))->assertOk()->assertSee('/storage/uploads/new-mod.png');
+
+    $this->actingAs($this->admin)->patchJson($url, [...$data, 'image_url' => null])->assertOk()->assertJsonPath('data.image_url', null);
+    Storage::disk('public')->assertExists(['uploads/mod.png', 'uploads/new-mod.png']);
+});
+
+test('mod image rejects non square files remote urls traversal missing files and invalid image content', function (string $kind): void {
+    Storage::disk('public')->put('uploads/landscape.png', productReleaseImage(2, 1));
+    Storage::disk('public')->put('uploads/bogus.png', 'not an image');
+    $value = match ($kind) {
+        'landscape' => '/storage/uploads/landscape.png',
+        'remote' => 'https://example.com/mod.png',
+        'traversal' => '/storage/uploads/../mod.png',
+        'svg' => '/storage/uploads/mod.svg',
+        'invalid' => '/storage/uploads/bogus.png',
+        default => '/storage/uploads/missing.png',
+    };
+    $this->actingAs($this->admin)->postJson('/api/admin-api/license/products', productReleaseData(['image_url' => $value]))
+        ->assertUnprocessable()->assertJsonValidationErrors('image_url');
+    $this->assertDatabaseCount('license_products', 0);
+})->with(['landscape', 'remote', 'traversal', 'svg', 'invalid', 'missing']);
 
 test('admin uploads private tool and update ZIP files with editable latest version', function (): void {
     $response = $this->actingAs($this->admin)->post('/api/admin-api/license/products', productReleaseData([

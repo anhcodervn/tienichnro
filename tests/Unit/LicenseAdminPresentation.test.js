@@ -24,6 +24,12 @@ function compilePage(source = pageSource, row = { id: 1, status: 'unused' }) {
     new Function('require', 'exports', pageCode)((name) => {
         if (name === '@/services/admin-license.service') return { adminLicense: {} };
         if (name === '@/utils/response') return { handleErrorResponse() {} };
+        if (name === '@/components/shared/UpladImage/index.vue') {
+            return { default: {
+                props: ['squareSize', 'imageSrc', 'disabled'],
+                setup: (props) => () => h('div', { 'data-square-size': props.squareSize, 'data-image-src': props.imageSrc }),
+            } };
+        }
         if (name === './presentation') return presentation;
         if (name === '@headlessui/vue') {
             const panel = {
@@ -65,6 +71,16 @@ function compilePage(source = pageSource, row = { id: 1, status: 'unused' }) {
     return pageModule.default;
 }
 const pageModule = { default: compilePage() };
+
+test('product form reuses square image uploader and blocks save while an image uploads', async () => {
+    const source = pageSource
+        .replace(/const modal = ref<[^\n]+>\(null\);/, "const modal = ref('product');")
+        .replace('ref<{ loading: boolean } | null>(null)', 'ref({ loading: true })');
+    const html = await renderToString(createSSRApp(compilePage(source), { section: 'products' }));
+    assert.ok(html.includes('Ảnh bản mod (1:1)'));
+    assert.ok(html.includes('data-square-size="512"'));
+    assert.match(html, /type="submit"[^>]*disabled/);
+});
 
 for (const section of ['products', 'plans']) {
     test(`${section} offers create edit and delete controls`, async () => {

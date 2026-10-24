@@ -12,7 +12,7 @@ class LicenseProduct extends Model
 
     protected $table = 'license_products';
 
-    protected $fillable = ['name', 'product_code', 'description', 'minimum_version', 'is_active', 'heartbeat_interval', 'lease_duration', 'transfer_cooldown', 'max_active_devices', 'offline_grace'];
+    protected $fillable = ['name', 'product_code', 'description', 'image_url', 'minimum_version', 'is_active', 'heartbeat_interval', 'lease_duration', 'transfer_cooldown', 'max_active_devices', 'offline_grace'];
 
     protected $hidden = ['tool_zip_path', 'update_zip_path'];
 

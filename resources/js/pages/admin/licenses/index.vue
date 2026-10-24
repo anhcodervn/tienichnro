@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import DataTable from '@/components/shared/DataTable/index.vue';
+import UploadImage from '@/components/shared/UpladImage/index.vue';
 import { adminLicense, type LicenseKey, type LicensePlan, type LicenseProduct } from '@/services/admin-license.service';
 import { handleErrorResponse } from '@/utils/response';
 import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui/vue';
@@ -67,6 +68,8 @@ const loading = ref(true);
 const loadingKeys = ref(true);
 const failed = ref(false);
 const saving = ref(false);
+const productImageUpload = ref<{ loading: boolean } | null>(null);
+const busy = computed(() => saving.value || !!productImageUpload.value?.loading);
 const inspectingId = ref<number | null>(null);
 const page = ref(1);
 const lastPage = ref(1);
@@ -90,6 +93,7 @@ const product = reactive<Omit<LicenseProduct, 'id'>>({
     name: '',
     product_code: '',
     description: '',
+    image_url: null,
     minimum_version: '1.0.0',
     latest_version: '1.0.0',
     is_active: true,
@@ -196,7 +200,7 @@ const canCreate = computed(
 const dangerousAction = computed(() => ['revoke', 'reset-device', 'rotate'].includes(action.action));
 const canSave = computed(
     () =>
-        !saving.value &&
+        !busy.value &&
         (!['delete', 'catalog-delete'].includes(modal.value || '') || revokeConfirmed.value) &&
         (modal.value !== 'issue' || availablePlans.value.some((item) => item.id === issue.plan_id)) &&
         (modal.value !== 'manage' || (availableActions.value.includes(action.action) && (action.action !== 'revoke' || revokeConfirmed.value))),
@@ -279,7 +283,7 @@ function openModal(value: typeof modal.value) {
 }
 function editProduct(item?: LicenseProduct) {
     Object.assign(productFiles, { tool: null, update: null });
-    Object.assign(product, { latest_version: '', tool_zip_name: null, update_zip_name: null });
+    Object.assign(product, { latest_version: '', tool_zip_name: null, update_zip_name: null, image_url: null });
     editingId.value = item?.id ?? null;
     Object.assign(
         product,
@@ -378,7 +382,7 @@ async function toggleRowKey(item: LicenseKey) {
     }
 }
 function close() {
-    if (canCloseLicenseDialog(saving.value, modal.value, keysSaved.value)) {
+    if (canCloseLicenseDialog(busy.value, modal.value, keysSaved.value)) {
         modal.value = null;
         issued.value = [];
         formErrors.value = [];
@@ -691,7 +695,13 @@ onMounted(load);
                     empty-text="Chưa có dữ liệu phù hợp với bộ lọc."
                 >
                     <template #name="{ row }"
-                        ><p class="font-medium text-slate-900 dark:text-slate-100">{{ row.name }}</p>
+                        ><img
+                            v-if="section === 'products' && row.image_url"
+                            :src="row.image_url"
+                            alt=""
+                            class="mb-2 h-12 w-12 rounded-lg object-cover"
+                        />
+                        <p class="font-medium text-slate-900 dark:text-slate-100">{{ row.name }}</p>
                         <p v-if="section === 'products'" class="mt-1 max-w-xs text-xs text-slate-500 dark:text-slate-400">
                             {{ row.description || 'Chưa có mô tả' }}
                         </p></template
@@ -750,7 +760,7 @@ onMounted(load);
                             </div>
                             <button
                                 class="grid size-9 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 disabled:opacity-30 dark:hover:bg-slate-800"
-                                :disabled="!canCloseLicenseDialog(saving, modal, keysSaved)"
+                                :disabled="!canCloseLicenseDialog(busy, modal, keysSaved)"
                                 aria-label="Đóng cửa sổ"
                                 @click="close"
                             >
@@ -802,6 +812,30 @@ onMounted(load);
                                     <label class="grid gap-1.5 text-sm font-medium sm:col-span-2"
                                         >Mô tả<textarea v-model="product.description" :class="inputClass" />
                                     </label>
+                                    <div class="grid gap-3 rounded-lg border border-slate-200 p-4 dark:border-slate-700 sm:col-span-2">
+                                        <h3 class="text-sm font-semibold">Ảnh bản mod (1:1)</h3>
+                                        <p class="text-xs text-slate-500 dark:text-slate-400">
+                                            Ảnh được cắt giữa thành hình vuông 512×512 và chuyển sang WebP. Lưu sản phẩm để gắn ảnh.
+                                        </p>
+                                        <UploadImage
+                                            ref="productImageUpload"
+                                            :accept="['image/jpeg', 'image/png', 'image/webp']"
+                                            :square-size="512"
+                                            :image-src="product.image_url"
+                                            :name-image="`mod-${product.product_code}`"
+                                            :disabled="saving"
+                                            @uploaded="product.image_url = $event"
+                                        />
+                                        <button
+                                            v-if="product.image_url"
+                                            type="button"
+                                            :class="buttonClass"
+                                            :disabled="busy"
+                                            @click="product.image_url = null"
+                                        >
+                                            Bỏ ảnh
+                                        </button>
+                                    </div>
                                     <label class="grid gap-1.5 text-sm font-medium"
                                         >Phiên bản tối thiểu<input v-model="product.minimum_version" required :class="inputClass"
                                     /></label>
@@ -1300,7 +1334,7 @@ onMounted(load);
                                 }}
                             </p>
                             <div class="ml-auto flex flex-wrap justify-end gap-2">
-                                <button :class="buttonClass" :disabled="!canCloseLicenseDialog(saving, modal, keysSaved)" @click="close">
+                                <button :class="buttonClass" :disabled="!canCloseLicenseDialog(busy, modal, keysSaved)" @click="close">
                                     {{ modal === 'issued' || modal === 'detail' ? 'Đóng' : 'Hủy' }}</button
                                 ><button
                                     v-if="['product', 'plan', 'issue', 'manage', 'edit', 'delete', 'catalog-delete'].includes(modal || '')"

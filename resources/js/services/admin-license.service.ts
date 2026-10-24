@@ -4,6 +4,7 @@ export type LicenseProduct = {
     name: string;
     product_code: string;
     description: string | null;
+    image_url?: string | null;
     minimum_version: string;
     latest_version?: string | null;
     tool_zip_name?: string | null;
@@ -66,6 +67,7 @@ export const adminLicense = {
             'name',
             'product_code',
             'description',
+            'image_url',
             'minimum_version',
             'latest_version',
             'is_active',

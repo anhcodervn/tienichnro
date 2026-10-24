@@ -19,13 +19,14 @@ test('product upload sends multipart POST with PATCH override and both ZIP files
     const { service, calls } = uploadService();
     const tool = new File(['tool'], 'tool.zip', { type: 'application/zip' });
     const update = new File(['update'], 'update.zip', { type: 'application/zip' });
-    await service.saveProduct({ name: 'My tool', latest_version: '2.0.0', is_active: false, tool_zip_path: 'untrusted-path' }, 17, { tool, update });
+    await service.saveProduct({ name: 'My tool', image_url: '/storage/uploads/mod.webp', latest_version: '2.0.0', is_active: false, tool_zip_path: 'untrusted-path' }, 17, { tool, update });
     const [url, body] = calls[0];
     assert.equal(url, '/api/admin-api/license/products/17');
     assert.ok(body instanceof FormData);
     assert.equal(body.get('_method'), 'PATCH');
     assert.equal(body.get('is_active'), '0');
     assert.equal(body.get('latest_version'), '2.0.0');
+    assert.equal(body.get('image_url'), '/storage/uploads/mod.webp');
     assert.equal(body.get('tool_zip').name, 'tool.zip');
     assert.equal(body.get('update_zip').name, 'update.zip');
     assert.equal(body.has('tool_zip_path'), false);

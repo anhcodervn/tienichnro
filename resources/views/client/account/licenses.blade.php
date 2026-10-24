@@ -28,6 +28,9 @@
             @endphp
             <article class="grid min-w-0 gap-3 rounded-[5px] border border-slate-200 bg-white p-3 sm:p-4" data-license-card>
                 <div class="flex flex-wrap items-start justify-between gap-2">
+                    @if ($license->product?->image_url)
+                        <img src="{{ $license->product->image_url }}" alt="{{ $license->product->name }}" width="48" height="48" loading="lazy" class="h-12 w-12 rounded-[5px] object-cover">
+                    @endif
                     <div class="min-w-0">
                         <h2 class="break-words font-extrabold text-slate-950">{{ $license->product?->name ?? 'Sản phẩm không còn khả dụng' }}</h2>
                         <p class="mt-1 text-sm text-slate-500">{{ $license->plan?->name }} · #{{ $license->id }}</p>
