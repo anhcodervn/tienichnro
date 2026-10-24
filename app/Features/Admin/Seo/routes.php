@@ -21,6 +21,8 @@ Route::middleware(['auth:sanctum', 'admin', 'platform.admin'])
         Route::get('/post-options', [SeoController::class, 'postOptions'])->name('posts.options');
         Route::post('/posts', [SeoController::class, 'storePost'])->name('posts.store');
         Route::get('/posts/{seoPost}', [SeoController::class, 'showPost'])->name('posts.show');
+        Route::get('/posts/{seoPost}/revisions', [SeoController::class, 'revisions'])->name('posts.revisions.index');
+        Route::get('/posts/{seoPost}/revisions/{revision}', [SeoController::class, 'revision'])->whereNumber('revision')->name('posts.revisions.show');
         Route::patch('/posts/{seoPost}', [SeoController::class, 'updatePost'])->name('posts.update');
         Route::delete('/posts/{seoPost}', [SeoController::class, 'destroyPost'])->name('posts.destroy');
 

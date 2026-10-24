@@ -2,19 +2,16 @@
 
 namespace App\Features\NroNotification\Controllers;
 
-use App\Features\Admin\Setting\Services\ToolAvailabilityService;
 use App\Features\NroNotification\Requests\IngestNotifyRequest;
 use App\Features\NroNotification\Requests\NotifyIndexRequest;
 use App\Features\NroNotification\Requests\VerifyNotificationAccessRequest;
 use App\Features\NroNotification\Resources\NotifyResource;
 use App\Features\NroNotification\Services\NotificationAccessService;
+use App\Features\NroNotification\Services\NotificationReadCacheService;
 use App\Features\NroNotification\Services\NotificationStreamSlotsService;
 use App\Features\NroNotification\Services\NroNotificationFeedService;
 use App\Features\NroNotification\Services\NroNotificationService;
 use App\Http\Controllers\Controller;
-use App\Models\Boss;
-use App\Models\CodeNotify;
-use App\Models\NroServer;
 use Generator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Exceptions\HttpResponseException;
@@ -26,7 +23,7 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class NotifyController extends Controller
 {
-    public function __construct(private readonly ToolAvailabilityService $services, private readonly NotificationAccessService $access) {}
+    public function __construct(private readonly NotificationReadCacheService $readCache, private readonly NotificationAccessService $access) {}
 
     public function index(NotifyIndexRequest $request, NroNotificationService $service): AnonymousResourceCollection
     {
@@ -50,7 +47,7 @@ class NotifyController extends Controller
         $visibleFilters = Arr::except($filters, ['_preview_cutoff', '_preview_since']);
         $realtime = $this->access->realtime($request);
         $guestExpiresAt = $this->access->guestExpiresAt($request);
-        $tool = $this->services->interaction('game_notifications');
+        $tool = $this->readCache->availability();
         if ($request->expectsJson()) {
             $this->ensureAvailable();
         }
@@ -61,12 +58,9 @@ class NotifyController extends Controller
                 'guest' => ! $request->user(), 'guest_expires_at' => $guestExpiresAt === null ? null : $guestExpiresAt * 1000]);
         }
 
-        return view('pages.nro.notifies', ['snapshot' => $snapshot, 'filters' => $visibleFilters, 'service' => $tool,
+        return view('pages.nro.notifies', [...$this->readCache->catalog(), 'snapshot' => $snapshot, 'filters' => $visibleFilters, 'service' => $tool,
             'realtime' => $realtime, 'guestExpiresAt' => $guestExpiresAt,
-            'limit' => $filters['limit'],
-            'notificationTypes' => CodeNotify::query()->orderBy('id')->get(),
-            'servers' => NroServer::query()->where('is_active', true)->orderBy('sort_order')->orderBy('server_code')->get(),
-            'bosses' => Boss::query()->where('is_active', true)->orderBy('sort_order')->orderBy('name')->orderBy('id')->get()]);
+            'limit' => $filters['limit']]);
     }
 
     public function stream(NotifyIndexRequest $request, NroNotificationFeedService $feed, NotificationStreamSlotsService $slots): StreamedResponse
@@ -106,12 +100,12 @@ class NotifyController extends Controller
 
     public function options(): JsonResponse
     {
-        return response()->json(['data' => ['servers' => NroServer::query()->where('is_active', true)->orderBy('sort_order')->orderBy('server_code')->get()]]);
+        return response()->json(['data' => ['servers' => $this->readCache->catalog()['servers']]]);
     }
 
     private function ensureAvailable(): void
     {
-        $tool = $this->services->interaction('game_notifications');
+        $tool = $this->readCache->availability();
         if (! $tool['is_enabled']) {
             throw new HttpResponseException(response()->json([
                 'message' => $tool['maintenance_message'], 'service_maintenance' => true,

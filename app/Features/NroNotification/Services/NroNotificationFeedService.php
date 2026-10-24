@@ -2,7 +2,6 @@
 
 namespace App\Features\NroNotification\Services;
 
-use App\Features\Admin\Setting\Services\ToolAvailabilityService;
 use Generator;
 use Illuminate\Http\StreamedEvent;
 use Illuminate\Support\Arr;
@@ -10,7 +9,7 @@ use Throwable;
 
 class NroNotificationFeedService
 {
-    public function __construct(private readonly NroNotificationService $notifications, private readonly ToolAvailabilityService $services) {}
+    public function __construct(private readonly NroNotificationService $notifications, private readonly NotificationReadCacheService $readCache) {}
 
     /**
      * @param  array<string, mixed>  $filters
@@ -45,7 +44,7 @@ class NroNotificationFeedService
                 if (connection_aborted()) {
                     return;
                 }
-                $tool = $this->services->interaction('game_notifications');
+                $tool = $this->readCache->availability();
                 if (! $tool['is_enabled']) {
                     yield new StreamedEvent('maintenance', ['message' => $tool['maintenance_message']]);
 

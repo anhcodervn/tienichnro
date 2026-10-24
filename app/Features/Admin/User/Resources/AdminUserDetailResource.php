@@ -17,6 +17,8 @@ class AdminUserDetailResource extends JsonResource
         return [
             'id' => $user->id,
             'name' => $user->name,
+            'full_name' => $user->full_name,
+            'wallet_balance' => $this->resource['wallet_balance'],
             'username' => $user->username,
             'email' => $user->email,
             'email_verified_at' => $user->email_verified_at?->toISOString(),

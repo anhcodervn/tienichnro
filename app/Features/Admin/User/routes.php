@@ -10,6 +10,7 @@ Route::middleware(['auth:sanctum', 'admin'])
     ->group(function (): void {
         Route::get('/', 'index')->name('index');
         Route::get('{user}', 'show')->name('show');
+        Route::patch('{user}', 'update')->name('update');
         Route::patch('{user}/status', 'updateStatus')->name('status.update');
         Route::post('{user}/reset-password', 'resetPassword')->name('password.reset');
         Route::get('{user}/logs', 'logs')->name('logs.index');

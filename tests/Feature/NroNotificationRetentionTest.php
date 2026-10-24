@@ -66,7 +66,7 @@ test('boss flags and legacy names use 24 hours even when assigned a general noti
     $this->assertDatabaseHas('notifies', ['id' => $fresh->id]);
 });
 
-test('notification deletion preserves event receipts so replay cannot recreate purged history', function (): void {
+test('notification deletion preserves fresh event receipts so immediate replay cannot recreate purged history', function (): void {
     $payload = ['server_code' => 1, 'content' => 'Expired event', 'code' => 'OTHER', 'event_id' => 'retention-event',
         'occurred_at' => now()->subMonthsNoOverflow(2)->toISOString()];
     app(NroNotificationService::class)->ingest($payload);
@@ -74,6 +74,39 @@ test('notification deletion preserves event receipts so replay cannot recreate p
     expect(NroEventReceipt::query()->sole()->notify_id)->toBeNull();
     expect(app(NroNotificationService::class)->ingest($payload)['duplicate'])->toBeTrue();
     $this->assertDatabaseCount('notifies', 0);
+});
+
+test('cron prunes receipts older than 24 hours by creation time in batches without deleting their notifications', function (): void {
+    $notify = retentionNotify('OTHER', CarbonImmutable::now()->subHours(25));
+    $boundary = CarbonImmutable::now()->subHours(24);
+    $rows = [];
+    for ($index = 0; $index < 1001; $index++) {
+        $rows[] = [
+            'server_id' => 1, 'event_key' => hash('sha256', 'expired-'.$index),
+            'payload_hash' => hash('sha256', 'payload-'.$index), 'notify_id' => $notify->id,
+            'status' => 'created', 'content' => 'Expired receipt',
+            'occurred_at' => now(), 'created_at' => $boundary->subSecond(), 'updated_at' => now(),
+        ];
+    }
+    foreach (array_chunk($rows, 100) as $batch) {
+        NroEventReceipt::query()->insert($batch);
+    }
+    foreach ([$boundary, $boundary->addSecond(), CarbonImmutable::now()] as $index => $createdAt) {
+        NroEventReceipt::query()->create([
+            'server_id' => 1, 'event_key' => hash('sha256', 'fresh-'.$index),
+            'payload_hash' => hash('sha256', 'fresh-payload-'.$index), 'notify_id' => $notify->id,
+            'status' => 'created', 'content' => 'Delayed event',
+            'occurred_at' => now()->subDays(3), 'created_at' => $createdAt,
+        ]);
+    }
+
+    $this->withHeader('X-Cron-Key', 'private-cron-key')->postJson(route('nro.notifies.prune'))->assertOk()
+        ->assertJsonPath('data.receipts_deleted', 1001)->assertJsonPath('data.total_deleted', 0)
+        ->assertJsonPath('data.receipts_cutoff', $boundary->toIso8601String());
+    $this->assertDatabaseCount('nro_event_receipts', 3);
+    $this->assertDatabaseHas('notifies', ['id' => $notify->id]);
+
+    $this->postJson(route('nro.notifies.prune'))->assertOk()->assertJsonPath('data.receipts_deleted', 0);
 });
 
 test('cron rejects missing incorrect and query string credentials before deleting', function (?string $key): void {

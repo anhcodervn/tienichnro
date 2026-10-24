@@ -1,10 +1,12 @@
 @extends('client.layouts.app')
 @section('title', $pageMetaTitle)
+@section('document_title', $pageMetaTitle)
 @section('description', $pageMetaDescription)
 @section('keywords'){{ $post->meta_keywords ?: $post->focus_keyword }}@endsection
 @section('canonical', $pageMetaCanonical)
 @section('robots', $post->robots)
 @section('image'){{ $pageMetaImage }}@endsection
+@section('image_alt'){{ $post->cover_alt }}@endsection
 @section('og_type', $pageOgType)
 
 @push('head')
@@ -40,8 +42,10 @@
             @else
                 <span class="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-slate-600"><i class="bx bx-file text-base" aria-hidden="true"></i>Hướng dẫn</span>
             @endif
-            <h1 class="mt-4 break-words text-3xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">{{ $post->title }}</h1>
-            @if ($post->excerpt)
+            @if (! $contentHasH1)
+                <h1 class="mt-4 break-words text-3xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">{{ $post->title }}</h1>
+            @endif
+            @if (! $contentHasH1 && $post->excerpt)
                 <p class="mx-auto mt-5 max-w-3xl text-base leading-7 text-slate-600 sm:text-lg">{{ $post->excerpt }}</p>
             @endif
             <div class="mt-5 flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-sm font-medium text-slate-500">
@@ -64,7 +68,7 @@
 <section class="client-container py-8 sm:py-10">
     <div class="grid min-w-0 gap-7 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <main class="min-w-0">
-            <div class="article-content client-card min-w-0 max-w-full break-words p-5 sm:p-8 lg:p-10" data-client-image-viewer>{!! $contentHtml !!}</div>
+            <div class="article-content client-card min-w-0 max-w-full break-words p-5 sm:p-8 lg:p-10" lang="{{ $post->language }}" data-client-image-viewer>{!! $contentHtml !!}</div>
 
             @if ($faq->isNotEmpty())
                 <section class="client-card mt-5 p-5 sm:p-8" aria-labelledby="seo-faq-title">

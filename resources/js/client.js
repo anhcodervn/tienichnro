@@ -1,6 +1,7 @@
 import { initializeClientAuth } from './client-auth';
 import { initializeClientCatalogModals } from './client-catalog-modals';
 import { initializeGameDataPage } from './client-game-data';
+import { initializeLicenseRotation } from './client-license-rotation';
 import { initializeClientNotifications } from './client-notifications';
 import { initializePotentialCalculator } from './client-potential';
 import { initializeNotificationSubscriptions } from './client-subscriptions';
@@ -17,6 +18,35 @@ initializeNroAccess();
 initializeClientCatalogModals();
 initializeNotificationSubscriptions();
 initializeGameDataPage();
+initializeLicenseRotation();
+
+document.querySelectorAll('[data-license-toggle]').forEach((button) => {
+    button.addEventListener('click', () => {
+        const panel = document.getElementById(button.dataset.licenseToggle);
+        if (!panel) return;
+
+        panel.hidden = !panel.hidden;
+        button.setAttribute('aria-expanded', String(!panel.hidden));
+        button.querySelector('i')?.classList.toggle('rotate-180', !panel.hidden);
+    });
+});
+
+document.querySelectorAll('[data-license-copy]').forEach((button) => {
+    button.addEventListener('click', async () => {
+        const input = document.getElementById(button.dataset.licenseCopy);
+        const status = document.querySelector('[data-license-copy-status]');
+        if (!(input instanceof HTMLInputElement) || !status) return;
+
+        try {
+            await navigator.clipboard.writeText(input.value);
+            status.textContent = 'Đã sao chép license key.';
+        } catch {
+            input.focus();
+            input.select();
+            status.textContent = 'Hãy nhấn Ctrl+C hoặc giữ để sao chép key đã chọn.';
+        }
+    });
+});
 
 const imageViewerContainers = Array.from(document.querySelectorAll('[data-client-image-viewer]')).filter(
     (container) => container instanceof HTMLElement && container.querySelector('img[src]'),

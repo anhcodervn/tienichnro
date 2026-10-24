@@ -17,9 +17,11 @@ test('only admins can manage seo posts', function (): void {
 
 test('admin can save a dedicated cover image and custom canonical for an seo post', function (): void {
     $admin = User::factory()->create(['role' => 'admin']);
+    $category = SeoCategory::query()->create(['name' => 'Hướng dẫn', 'slug' => 'huong-dan', 'robots' => 'index,follow', 'is_active' => true]);
 
     $this->actingAs($admin)
         ->postJson('/api/admin-api/seo/posts', [
+            'seo_category_id' => $category->id,
             'title' => 'Hướng dẫn nạp Ngọc Rồng Online',
             'slug' => 'huong-dan-nap-ngoc-rong-online',
             'excerpt' => 'Hướng dẫn nạp game nhanh chóng.',
@@ -403,7 +405,7 @@ test('admin rejects reserved category slugs and requires a category for publishe
         ->assertUnprocessable();
 });
 
-test('scheduled seo posts require a future schedule time', function (?string $scheduledAt, bool $valid): void {
+test('saving publishes immediately regardless of an old schedule', function (?string $scheduledAt, bool $valid): void {
     $admin = User::factory()->create(['role' => 'admin']);
     $category = SeoCategory::query()->create([
         'name' => 'Tin game '.uniqid(),
@@ -421,13 +423,8 @@ test('scheduled seo posts require a future schedule time', function (?string $sc
         'scheduled_at' => $scheduledAt,
     ]);
 
-    if ($valid) {
-        $response->assertCreated();
-
-        return;
-    }
-
-    $response->assertUnprocessable();
+    $response->assertCreated()->assertJsonPath('data.status', 'published')->assertJsonPath('data.scheduled_at', null);
+    expect(SeoPost::query()->findOrFail($response->json('data.id'))->published_at->lte(now()))->toBeTrue();
 })->with([
     'missing date' => [null, false],
     'past date' => [now()->subHour()->toISOString(), false],

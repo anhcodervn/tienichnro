@@ -32,6 +32,30 @@ class EditorContentRenderer
     /**
      * @param  array<int, mixed>  $nodes
      */
+    public function firstContentText(array $nodes, string $type, ?int $level = null): ?string
+    {
+        foreach ($nodes as $node) {
+            if (! is_array($node)) {
+                continue;
+            }
+            if (($node['type'] ?? null) === $type && ($level === null || (int) ($node['level'] ?? 2) === $level)) {
+                $text = html_entity_decode($this->extractText([$node]), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                if ($text !== '') {
+                    return $text;
+                }
+            }
+            if (($node['type'] ?? null) === 'container' && is_array($node['children'] ?? null)) {
+                $text = $this->firstContentText($node['children'], $type, $level);
+                if ($text !== null) {
+                    return $text;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /** @param array<int, mixed> $nodes */
     public function estimateReadingMinutes(array $nodes, int $wordsPerMinute = 220): int
     {
         $plainText = $this->extractText($nodes);

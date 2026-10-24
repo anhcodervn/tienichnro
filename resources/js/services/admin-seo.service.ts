@@ -7,6 +7,7 @@ import type {
     AdminSeoPostItem,
     AdminSeoPostPayload,
     AdminSeoSitemapEntry,
+    SeoPostRevisionSummary,
     SeoServiceOption,
 } from '@/types/admin-seo.type';
 
@@ -85,6 +86,14 @@ export const adminSeoService = {
 
     async removePost(id: number | string) {
         return api.delete(`/api/admin-api/seo/posts/${id}`);
+    },
+
+    async revisions(id: number): Promise<SeoPostRevisionSummary[]> {
+        return (await api.get(`/api/admin-api/seo/posts/${id}/revisions`)).data.data;
+    },
+
+    async revision(id: number, revisionId: number): Promise<{ snapshot: Partial<AdminSeoPostPayload> }> {
+        return (await api.get(`/api/admin-api/seo/posts/${id}/revisions/${revisionId}`)).data.data;
     },
 
     async sitemaps(): Promise<AdminSeoSitemapEntry[]> {

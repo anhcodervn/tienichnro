@@ -3,13 +3,17 @@
 namespace App\Features\NroNotification\Services;
 
 use App\Models\Notify;
+use App\Models\NroEventReceipt;
 use Carbon\CarbonImmutable;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Facades\DB;
 
 class NotificationRetentionService
 {
+    public function __construct(private readonly NotificationReadCacheService $readCache) {}
+
     /**
-     * @return array{deleted: array<string, int>, total_deleted: int, cutoffs: array<string, string>, processed_at: string}
+     * @return array{deleted: array<string, int>, total_deleted: int, cutoffs: array<string, string>, receipts_deleted: int, receipts_cutoff: string, processed_at: string}
      */
     public function prune(): array
     {
@@ -36,9 +40,21 @@ class NotificationRetentionService
                     ->whereHas('code', fn (Builder $types): Builder => $this->type($types, $code));
             }
             $deleted[$code] = $query->delete();
+            if ($deleted[$code] > 0) {
+                DB::afterCommit(fn () => $this->readCache->invalidate('data'));
+            }
         }
 
+        $receiptCutoff = $now->subHours(24);
+        $receiptsDeleted = 0;
+        NroEventReceipt::query()->where('created_at', '<', $receiptCutoff->toDateTimeString())
+            ->select('id')->chunkById(1000, function ($receipts) use (&$receiptsDeleted, $receiptCutoff): void {
+                $receiptsDeleted += NroEventReceipt::query()->whereKey($receipts->modelKeys())
+                    ->where('created_at', '<', $receiptCutoff->toDateTimeString())->delete();
+            });
+
         return ['deleted' => $deleted, 'total_deleted' => array_sum($deleted),
+            'receipts_deleted' => $receiptsDeleted, 'receipts_cutoff' => $receiptCutoff->toIso8601String(),
             'cutoffs' => array_map(fn (CarbonImmutable $cutoff): string => $cutoff->toIso8601String(), $cutoffs),
             'processed_at' => $now->toIso8601String()];
     }

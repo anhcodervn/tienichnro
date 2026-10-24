@@ -32,11 +32,13 @@ class UpsertSeoPostRequest extends FormRequest
             'type' => ['required', Rule::in(['knowledge', 'guide'])],
             'service_id' => ['prohibited'],
             'seo_category_id' => [
-                Rule::requiredIf(in_array($this->input('status'), ['published', 'scheduled'], true)),
+                'required',
                 'nullable',
                 'exists:seo_categories,id',
             ],
-            'title' => ['required', 'string', 'max:255'],
+            'title' => ['nullable', 'string', 'max:255'],
+            'language' => ['sometimes', 'required', 'string', 'max:35', 'regex:/^[a-z]{2,3}(?:-[a-zA-Z0-9]{2,8})*$/'],
+            'expected_version' => ['sometimes', 'integer', 'min:0'],
             'slug' => [
                 'required',
                 'string',
@@ -59,9 +61,6 @@ class UpsertSeoPostRequest extends FormRequest
             'cover_alt' => [Rule::requiredIf($this->filled('cover_image')), 'nullable', 'string', 'max:255'],
             'article_schema' => ['sometimes', 'boolean'],
             'breadcrumb_schema' => ['sometimes', 'boolean'],
-            'status' => ['required', Rule::in(['draft', 'published', 'scheduled'])],
-            'published_at' => ['nullable', 'date'],
-            'scheduled_at' => [Rule::requiredIf($this->input('status') === 'scheduled'), 'nullable', 'date', 'after:now'],
         ];
     }
 

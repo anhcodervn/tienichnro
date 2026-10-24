@@ -10,6 +10,7 @@
         <div><p class="text-sm font-bold text-emerald-700">Tiện ích Ngọc Rồng Online</p><h1 class="mt-2 text-3xl font-extrabold text-slate-900">Thông báo game</h1><p class="mt-2 text-slate-600">Theo dõi vòng đời Boss và các thông báo trong game. Giờ hiển thị: Việt Nam (UTC+7).</p></div>
         @if($service['is_enabled'])<a data-nro-refresh class="inline-flex min-h-11 items-center justify-center rounded-[10px] border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2" href="{{ route('nro.notifies.page', $filters) }}">Làm mới</a>@endif
     </div>
+    <a class="client-button mb-6 w-full text-center" href="https://zalo.me/g/k0dn4sno8cwi9qjqhgan">Nhận thông báo SKH qua zalo</a>
     @if(!$service['is_enabled'])
         <x-client.service-maintenance :message="$service['maintenance_message']" />
     @else

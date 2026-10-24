@@ -33,7 +33,7 @@ Route::prefix('nro')->name('nro.')->middleware('web')->group(function (): void {
     Route::get('/notifies/stream', [NotifyController::class, 'stream'])->middleware(LimitNotificationTraffic::class.':stream')->name('notifies.stream');
     Route::get('/options', [NotifyController::class, 'options'])->middleware(LimitNotificationTraffic::class)->name('options');
 });
-Route::prefix('admin-api/nro')->name('admin.nro.')->middleware(['auth:sanctum', 'admin', 'platform.admin', 'throttle:120,1'])->group(function (): void {
+Route::prefix('admin-api/nro')->name('admin.nro.')->middleware(['auth:sanctum', 'admin', 'platform.admin', 'throttle:nro-notifications'])->group(function (): void {
     Route::get('/zalo-receivers', [ZaloReceiveNotificationController::class, 'index'])->name('zalo-receivers.index');
     Route::post('/zalo-receivers', [ZaloReceiveNotificationController::class, 'store'])->name('zalo-receivers.store');
     Route::patch('/zalo-receivers/{receiver}', [ZaloReceiveNotificationController::class, 'update'])->whereNumber('receiver')->name('zalo-receivers.update');

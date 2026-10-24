@@ -864,7 +864,7 @@ onMounted(load);
                                         </select></label
                                     >
                                     <label class="grid gap-1.5 text-sm font-medium"
-                                        >ID chủ sở hữu (tùy chọn)<input
+                                        >ID người dùng nhận license (tùy chọn)<input
                                             :value="issue.user_id"
                                             type="number"
                                             min="1"
@@ -874,7 +874,11 @@ onMounted(load);
                                                     ? Number(($event.target as HTMLInputElement).value)
                                                     : null
                                             "
-                                    /></label>
+                                        /><span class="text-xs font-normal text-slate-500"
+                                            >Nhập ID từ menu Người dùng. License sẽ hiển thị trong Dashboard của tài khoản này. Để trống để tạo key
+                                            chưa gán.</span
+                                        ></label
+                                    >
                                     <label class="grid gap-1.5 text-sm font-medium"
                                         >Số lượng (1–100)<input
                                             v-model.number="issue.quantity"

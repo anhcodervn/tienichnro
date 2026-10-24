@@ -259,7 +259,8 @@ class PublicSeoPageController extends Controller
             ->get();
 
         $systemSettings = $this->systemSettings($settingStore);
-        $content = $this->normalizeContentHeadings(is_array($post->content) ? $post->content : []);
+        $content = is_array($post->content) ? $post->content : [];
+        $contentHasH1 = $this->contentRenderer->firstContentText($content, 'heading', 1) !== null;
         $contentHtml = $this->contentRenderer->renderNodes($content);
         $coverImage = $post->cover_image ?: $this->contentRenderer->firstImage($content);
         $headingIndex = $this->contentRenderer->headingIndex($content);
@@ -271,6 +272,7 @@ class PublicSeoPageController extends Controller
         $pageSchema = $post->article_schema ? array_filter([
             '@context' => 'https://schema.org',
             '@type' => 'Article',
+            'inLanguage' => $post->language,
             'headline' => $post->title,
             'description' => $post->seo_description ?: $post->excerpt,
             'image' => $absoluteCoverImage,
@@ -287,6 +289,7 @@ class PublicSeoPageController extends Controller
             'systemSettings' => $systemSettings,
             'post' => $post,
             'contentHtml' => $contentHtml,
+            'contentHasH1' => $contentHasH1,
             'coverImage' => $coverImage,
             'readingMinutes' => $this->contentRenderer->estimateReadingMinutes($content),
             'headingIndex' => $headingIndex,
@@ -434,30 +437,5 @@ class PublicSeoPageController extends Controller
             : 301;
 
         return redirect()->to(url($redirect->to_path), $statusCode);
-    }
-
-    /**
-     * @param  array<int, mixed>  $nodes
-     * @return array<int, mixed>
-     */
-    private function normalizeContentHeadings(array $nodes): array
-    {
-        return collect($nodes)
-            ->map(function (mixed $node): mixed {
-                if (! is_array($node)) {
-                    return $node;
-                }
-
-                if (($node['type'] ?? null) === 'heading') {
-                    $node['level'] = max(2, (int) ($node['level'] ?? 2));
-                }
-
-                if (($node['type'] ?? null) === 'container' && is_array($node['children'] ?? null)) {
-                    $node['children'] = $this->normalizeContentHeadings($node['children']);
-                }
-
-                return $node;
-            })
-            ->all();
     }
 }

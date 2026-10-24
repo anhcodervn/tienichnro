@@ -2,17 +2,17 @@
 
 namespace App\Features\Admin\User\Actions;
 
-use App\Features\Client\Profile\Actions\LogoutOtherDevicesAction;
-use App\Features\Client\Profile\Actions\RecordUserLogAction;
+use App\Actions\RecordUserLogAction;
 use App\Models\User;
 use App\Support\MailQueue;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Str;
 
 class ResetAdminUserPasswordAction
 {
     public function __construct(
-        private readonly LogoutOtherDevicesAction $logoutOtherDevicesAction,
         private readonly RecordUserLogAction $recordUserLogAction,
         private readonly MailQueue $mailQueue,
     ) {}
@@ -22,11 +22,16 @@ class ResetAdminUserPasswordAction
      */
     public function handle(User $user, array $payload, User $actor, Request $request): void
     {
-        $user->forceFill([
-            'password' => Hash::make($payload['password']),
-        ])->save();
-
-        $this->logoutOtherDevicesAction->revokeOtherAccess($user, $request);
+        DB::transaction(function () use ($user, $payload): void {
+            $user = User::query()->whereKey($user->id)->lockForUpdate()->firstOrFail();
+            $user->forceFill(['password' => $payload['password'], 'remember_token' => Str::random(60)])->save();
+            $user->tokens()->delete();
+            $user->userSessions()->delete();
+            Password::broker()->deleteToken($user);
+            if (config('session.driver') === 'database') {
+                DB::connection(config('session.connection'))->table(config('session.table', 'sessions'))->where('user_id', $user->id)->delete();
+            }
+        }, 3);
 
         $actorLabel = $actor->email ?: $actor->username ?: sprintf('admin #%d', $actor->id);
 

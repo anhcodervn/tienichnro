@@ -40,6 +40,21 @@ test('spawn and death produce one lifecycle with fixed respawn and raw messages'
         ->and($notify->map_name)->toBe('Rừng Bamboo')->and($notify->respawn_at->toISOString())->toBe('2026-10-06T02:48:00.000000Z');
 });
 
+test('notification page shows a full width Zalo button beneath the page heading', function (): void {
+    $response = $this->get('/thong-bao-game')->assertOk();
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+    $xpath = new DOMXPath($document);
+    $links = $xpath->query('//h1/parent::div/parent::div/following-sibling::*[1][self::a]');
+
+    expect($links->length)->toBe(1);
+    $link = $links->item(0);
+    expect(trim($link->textContent))->toBe('Nhận thông báo SKH qua zalo')
+        ->and($link->getAttribute('href'))->toBe('https://zalo.me/g/k0dn4sno8cwi9qjqhgan')
+        ->and($link->getAttribute('class'))->toContain('w-full', 'text-center', 'client-button')
+        ->and($link->hasAttribute('target'))->toBeFalse();
+});
+
 test('unknown respawn interval remains null and is rendered clearly', function (): void {
     $this->boss->update(['respawn_seconds' => null]);
     nroSend(nroSpawn())->assertCreated();

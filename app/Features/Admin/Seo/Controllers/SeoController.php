@@ -167,6 +167,20 @@ class SeoController extends Controller
         ]);
     }
 
+    public function revisions(SeoPost $seoPost): JsonResponse
+    {
+        return response()->json(['status' => true, 'data' => $seoPost->revisions()->latest('id')->limit(10)->get([
+            'id', 'published_at', 'created_at', 'snapshot->seo_title as seo_title', 'snapshot->seo_description as seo_description',
+            'snapshot->title as title', 'snapshot->slug as slug',
+        ])])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function revision(SeoPost $seoPost, string $revision): JsonResponse
+    {
+        return response()->json(['status' => true, 'data' => $seoPost->revisions()->findOrFail($revision)])
+            ->header('Cache-Control', 'no-store, private');
+    }
+
     public function sitemaps(): JsonResponse
     {
         return response()->json([

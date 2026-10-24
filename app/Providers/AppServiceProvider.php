@@ -2,14 +2,23 @@
 
 namespace App\Providers;
 
+use App\Features\NroNotification\Observers\NotificationReadCacheObserver;
+use App\Models\Boss;
+use App\Models\CodeNotify;
+use App\Models\Notify;
+use App\Models\NroServer;
 use App\Models\QueueLog;
+use App\Models\Setting;
 use App\Utils\SendMessage;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Queue\Events\JobFailed;
 use Illuminate\Queue\Events\JobProcessed;
 use Illuminate\Queue\Events\JobProcessing;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\App;
 use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\ServiceProvider;
 use Throwable;
@@ -23,6 +32,20 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        foreach ([Notify::class, Boss::class, CodeNotify::class, NroServer::class, Setting::class] as $model) {
+            $model::observe(NotificationReadCacheObserver::class);
+        }
+        foreach ([
+            'nro-game-data-catalog' => 'catalog',
+            'nro-game-data-poll' => 'poll',
+            'admin-image-uploads' => 'uploads',
+            'nro-notifications' => 'notifications',
+        ] as $limiter => $setting) {
+            RateLimiter::for($limiter, fn (Request $request): Limit => Limit::perMinute(
+                max(1, (int) config('services.nro_api_rate_limits.'.$setting)),
+            )->by('admin:'.($request->user()?->getAuthIdentifier() ?? $request->ip())));
+        }
+
         App::setLocale('vi');
         config(['app.locale' => 'vi']);
         Queue::before(function (JobProcessing $event): void {

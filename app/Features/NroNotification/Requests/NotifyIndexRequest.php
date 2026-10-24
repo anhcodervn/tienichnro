@@ -2,7 +2,7 @@
 
 namespace App\Features\NroNotification\Requests;
 
-use App\Models\CodeNotify;
+use App\Features\NroNotification\Services\NotificationReadCacheService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -15,12 +15,14 @@ class NotifyIndexRequest extends FormRequest
 
     public function rules(): array
     {
+        $options = app(NotificationReadCacheService::class)->validationOptions();
+
         return [
             'limit' => ['nullable', 'integer', 'between:1,100'],
             'q' => ['nullable', 'string', 'max:200'],
-            'server_code' => ['nullable', 'integer', 'exists:servers,server_code'],
-            'server_id' => ['nullable', 'integer', 'exists:servers,id'], 'boss_id' => ['nullable', 'integer', 'exists:bosses,id'],
-            'code' => ['nullable', 'string', 'exists:code_notifies,code'],
+            'server_code' => ['nullable', 'integer', Rule::in($options['server_codes'])],
+            'server_id' => ['nullable', 'integer', Rule::in($options['server_ids'])], 'boss_id' => ['nullable', 'integer', Rule::in($options['boss_ids'])],
+            'code' => ['nullable', 'string', Rule::in($options['codes'])],
             'state' => ['nullable', Rule::in(['living', 'respawning', 'history'])],
             'per_page' => ['nullable', 'integer', 'between:1,100'], 'page' => ['nullable', 'integer', 'min:1'],
         ];
@@ -42,10 +44,11 @@ class NotifyIndexRequest extends FormRequest
         $filters = $this->validated();
         $filters['limit'] = $filters['limit'] ?? $filters['per_page'] ?? 10;
         unset($filters['per_page']);
+        $types = app(NotificationReadCacheService::class)->catalog()['notificationTypes'];
         if (empty($filters['code']) && (! empty($filters['boss_id']) || ! empty($filters['state']))) {
-            $filters['code'] = CodeNotify::query()->where('system_key', 'BOSS')->value('code') ?? 'BOSS';
+            $filters['code'] = $types->firstWhere('system_key', 'BOSS')?->code ?? 'BOSS';
         }
-        $additional = isset($filters['code']) ? (CodeNotify::query()->where('code', $filters['code'])->first()?->additional_filters ?? []) : [];
+        $additional = isset($filters['code']) ? ($types->firstWhere('code', $filters['code'])?->additional_filters ?? []) : [];
         if (! in_array('boss', $additional, true)) {
             unset($filters['boss_id']);
         }

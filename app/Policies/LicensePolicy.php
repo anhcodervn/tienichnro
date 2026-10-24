@@ -21,4 +21,9 @@ class LicensePolicy
     {
         return $license->user_id === $user->id && $user->hasVerifiedEmail();
     }
+
+    public function rotate(User $user, License $license): bool
+    {
+        return $license->user_id === $user->id && $license->status !== 'revoked';
+    }
 }

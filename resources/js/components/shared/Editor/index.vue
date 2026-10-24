@@ -41,7 +41,7 @@
 <script lang="ts">
 import { importEditorImageUrl, normalizeNapcarotImageUrl, uploadEditorImageFile } from '@/utils/editor-image-upload';
 import Swal from 'sweetalert2';
-import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
 
 type EditorInlineNode = {
     text?: string;
@@ -140,12 +140,14 @@ export default {
             expose,
         }: {
             emit: (event: 'update:value' | 'update:modelValue', value: EditorValue) => void;
-            expose: (exposed: { flush: () => EditorValue }) => void;
+            expose: (exposed: { flush: () => EditorValue; isUploadingImage: { value: boolean } }) => void;
         },
     ) {
         const editorContainer = ref<HTMLElement | null>(null);
         const imageInput = ref<HTMLInputElement | null>(null);
         const isUploadingImage = ref(false);
+        const pendingImageUploads = ref(0);
+        const hasPendingImageUploads = computed(() => isUploadingImage.value || pendingImageUploads.value > 0);
         const useFallback = ref(false);
         const fallbackContent = ref('');
         let editorInstance: TinyMceEditorInstance | null = null;
@@ -231,6 +233,7 @@ export default {
                 }
 
                 image.dataset.imageImporting = 'true';
+                pendingImageUploads.value++;
                 const upload = remoteImageUploads.get(source) ?? importEditorImageUrl(source);
                 remoteImageUploads.set(source, upload);
 
@@ -244,6 +247,7 @@ export default {
                         void Swal.fire('', error instanceof Error ? error.message : 'Không thể tải ảnh từ URL về máy chủ.', 'error');
                     })
                     .finally(() => {
+                        pendingImageUploads.value--;
                         delete image.dataset.imageImporting;
                         remoteImageUploads.delete(source);
                         syncUploadedImageContent();
@@ -294,12 +298,16 @@ export default {
             failure: (message: string) => void,
             progress?: (percent: number) => void,
         ): void => {
+            pendingImageUploads.value++;
             uploadEditorImageFile(blobInfo.blob(), blobInfo.filename(), progress)
                 .then((uploadedUrl) => {
                     commitUploadedImage(uploadedUrl, success);
                 })
                 .catch((error: unknown) => {
                     failure(error instanceof Error ? error.message : 'Không thể tải ảnh lên. Vui lòng thử lại.');
+                })
+                .finally(() => {
+                    pendingImageUploads.value--;
                 });
         };
 
@@ -315,6 +323,7 @@ export default {
                     return;
                 }
 
+                pendingImageUploads.value++;
                 uploadEditorImageFile(file, file.name)
                     .then((uploadedUrl) => {
                         commitUploadedImage(uploadedUrl, callback, {
@@ -323,6 +332,9 @@ export default {
                     })
                     .catch((error: unknown) => {
                         void Swal.fire('', error instanceof Error ? error.message : 'Không thể tải ảnh lên. Vui lòng thử lại.', 'error');
+                    })
+                    .finally(() => {
+                        pendingImageUploads.value--;
                     });
             });
 
@@ -422,7 +434,7 @@ export default {
             return value;
         };
 
-        expose({ flush });
+        expose({ flush, isUploadingImage: hasPendingImageUploads });
 
         function htmlToJson(html: string): EditorContentNode[] {
             const root = document.createElement('div');

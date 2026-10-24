@@ -3,107 +3,52 @@ import Breadcrumb from '@/components/MasterLayouts/Breadcrumb/index.vue';
 import Editor from '@/components/shared/Editor/index.vue';
 import UploadImage from '@/components/shared/UpladImage/index.vue';
 import { adminSeoService } from '@/services/admin-seo.service';
-import type { AdminSeoPostPayload, SeoPostStatus, SeoRobotsValue } from '@/types/admin-seo.type';
+import type { AdminSeoPostItem, AdminSeoPostPayload, SeoPostRevisionSummary } from '@/types/admin-seo.type';
 import { uploadEditorImages } from '@/utils/editor-image-upload';
-import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
-import { ArrowLeft, CheckCircle2, CircleAlert, ExternalLink, Eye, ImageIcon, Link2, Plus, Save, Search, Trash2 } from 'lucide-vue-next';
-import { computed, nextTick, onMounted, reactive, ref } from 'vue';
+import { handleSuccessResponse } from '@/utils/response';
+import { Dialog, DialogDescription, DialogPanel, DialogTitle } from '@headlessui/vue';
+import { computed, nextTick, reactive, ref, watch } from 'vue';
 import { RouterLink, useRoute, useRouter } from 'vue-router';
+import { newSeoPostForm, seoPostFormFromSnapshot } from './form';
 
 const route = useRoute();
 const router = useRouter();
+const editingId = computed(() => Number(route.params.seo_post_id) || null);
 const saving = ref(false);
 const loading = ref(false);
+const failed = ref(false);
+const restoring = ref(false);
+const errorMessage = ref('');
+const notice = ref('');
+const currentVersion = ref(0);
+const editorKey = ref(0);
+const coverKey = ref(0);
 const slugManuallyEdited = ref(false);
 const canonicalMode = ref<'auto' | 'custom'>('auto');
-const contentEditor = ref<{ flush: () => unknown[] | string } | null>(null);
+const contentEditor = ref<{ flush: () => unknown[] | string; isUploadingImage: boolean } | null>(null);
+const coverUploader = ref<{ loading: boolean } | null>(null);
 const categories = ref<Array<{ id: number; name: string; slug: string }>>([]);
-
-const editingId = computed(() => {
-    const raw = Number(route.params.seo_post_id);
-    return Number.isInteger(raw) && raw > 0 ? raw : null;
-});
-
-const form = reactive<AdminSeoPostPayload>({
-    type: 'knowledge',
-    service_id: null,
-    title: '',
-    slug: '',
-    seo_category_id: null,
-    excerpt: '',
-    content: [],
-    faq: [],
-    cover_image: null,
-    cover_alt: '',
-    seo_title: '',
-    seo_description: '',
-    meta_keywords: '',
-    canonical_url: null,
-    robots: 'index,follow',
-    focus_keyword: '',
-    article_schema: true,
-    breadcrumb_schema: true,
-    status: 'draft',
-    published_at: null,
-    scheduled_at: null,
-});
-
+const form = reactive<AdminSeoPostPayload>(newSeoPostForm());
+const historyOpen = ref(false);
+const historyLoading = ref(false);
+const historyError = ref('');
+const revisions = ref<SeoPostRevisionSummary[]>([]);
+const busy = computed(
+    () => saving.value || loading.value || restoring.value || Boolean(contentEditor.value?.isUploadingImage) || Boolean(coverUploader.value?.loading),
+);
 const pageTitle = computed(() => (editingId.value ? 'Cập nhật bài viết SEO' : 'Tạo bài viết SEO'));
-const selectedCategorySlug = computed(() => categories.value.find((category) => category.id === form.seo_category_id)?.slug ?? null);
-const publicUrl = computed(() => {
-    const slug = form.slug.trim() || 'duong-dan-bai-viet';
-    const path = selectedCategorySlug.value ? `/${selectedCategorySlug.value}/${slug}` : `/bai-viet/${slug}`;
-
-    return `${window.location.origin}${path}`;
-});
+const selectedCategorySlug = computed(() => categories.value.find((category) => category.id === form.seo_category_id)?.slug);
+const publicUrl = computed(() => `${window.location.origin}/${selectedCategorySlug.value || 'bai-viet'}/${form.slug || 'duong-dan-bai-viet'}`);
 const generatedCanonicalUrl = computed(() => publicUrl.value);
-const effectiveCanonicalUrl = computed(() =>
-    canonicalMode.value === 'custom' && form.canonical_url?.trim() ? form.canonical_url.trim() : generatedCanonicalUrl.value,
-);
-const seoTitlePreview = computed(() => form.seo_title?.trim() || form.title.trim() || 'Tiêu đề bài viết');
-const seoDescriptionPreview = computed(
-    () => form.seo_description?.trim() || form.excerpt?.trim() || 'Mô tả bài viết sẽ xuất hiện trên kết quả tìm kiếm.',
-);
-const canonicalUsesExternalDomain = computed(() => {
-    if (canonicalMode.value !== 'custom' || !form.canonical_url?.trim()) {
-        return false;
-    }
-
-    try {
-        return new URL(form.canonical_url).origin !== window.location.origin;
-    } catch {
-        return false;
-    }
-});
-
-const seoChecks = computed(() => [
-    {
-        label: 'SEO title từ 30–65 ký tự',
-        passed: seoTitlePreview.value.length >= 30 && seoTitlePreview.value.length <= 65,
-    },
-    {
-        label: 'SEO description từ 120–160 ký tự',
-        passed: seoDescriptionPreview.value.length >= 120 && seoDescriptionPreview.value.length <= 160,
-    },
-    {
-        label: 'Có focus keyword',
-        passed: Boolean(form.focus_keyword?.trim()),
-    },
-    {
-        label: 'Ảnh đại diện có alt text',
-        passed: Boolean(form.cover_image && form.cover_alt?.trim()),
-    },
-    {
-        label: 'Nội dung bài viết đã được soạn',
-        passed: Array.isArray(form.content) && form.content.length > 0,
-    },
-    {
-        label: 'Canonical hợp lệ',
-        passed: Boolean(effectiveCanonicalUrl.value),
-    },
-]);
-const passedSeoChecks = computed(() => seoChecks.value.filter((item) => item.passed).length);
-
+const seoTitlePreview = computed(() => form.seo_title?.trim() || form.title || 'Tiêu đề bài viết');
+const seoDescriptionPreview = computed(() => form.seo_description?.trim() || form.excerpt || 'Mô tả bài viết trên kết quả tìm kiếm.');
+const inputClass =
+    'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100 dark:focus:ring-emerald-900';
+const cardClass = 'min-w-0 rounded-xl border border-slate-200 bg-white p-4 sm:p-5 dark:border-slate-700 dark:bg-slate-900';
+const errorText = (error: unknown): string => {
+    const value = error as { response?: { data?: { message?: string } }; message?: string };
+    return value.response?.data?.message || value.message || 'Không thể thực hiện thao tác. Vui lòng thử lại.';
+};
 const slugify = (value: string): string =>
     value
         .normalize('NFD')
@@ -113,579 +58,377 @@ const slugify = (value: string): string =>
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
-
 const handleTitleInput = (): void => {
-    if (!editingId.value && !slugManuallyEdited.value) {
-        form.slug = slugify(form.title);
-    }
+    if (!editingId.value && !slugManuallyEdited.value) form.slug = slugify(form.seo_title || '');
 };
-
-const markSlugAsEdited = (): void => {
+const applySnapshot = (snapshot: Partial<AdminSeoPostPayload>): void => {
+    Object.assign(form, seoPostFormFromSnapshot(snapshot));
+    canonicalMode.value = form.canonical_url ? 'custom' : 'auto';
     slugManuallyEdited.value = true;
-    form.slug = slugify(form.slug);
+    editorKey.value++;
+    coverKey.value++;
 };
-
-const toLocalDatetime = (value: string | null): string | null => {
-    if (!value) {
-        return null;
-    }
-
-    const date = new Date(value);
-    const offset = date.getTimezoneOffset() * 60_000;
-    return new Date(date.getTime() - offset).toISOString().slice(0, 16);
-};
-
-const fetchMeta = async (): Promise<void> => {
-    const response = await adminSeoService.postOptions();
-    categories.value = response.categories;
-};
-
-const fetchPost = async (): Promise<void> => {
-    if (!editingId.value) {
-        return;
-    }
-
-    const post = await adminSeoService.getPost(editingId.value);
-
-    form.title = post.title;
-    form.type = post.type === 'guide' ? 'guide' : 'knowledge';
-    form.service_id = null;
-    form.slug = post.slug;
-    form.seo_category_id = post.seo_category_id;
-    form.excerpt = post.excerpt ?? '';
-    form.content = Array.isArray(post.content) ? post.content : [];
-    form.faq = Array.isArray(post.faq) ? post.faq : [];
-    form.cover_image = post.cover_image ?? null;
-    form.cover_alt = post.cover_alt ?? '';
-    form.seo_title = post.seo_title ?? '';
-    form.seo_description = post.seo_description ?? '';
-    form.meta_keywords = post.meta_keywords ?? '';
-    form.canonical_url = post.canonical_url ?? null;
-    form.robots = post.robots as SeoRobotsValue;
-    form.focus_keyword = post.focus_keyword ?? '';
-    form.article_schema = post.article_schema;
-    form.breadcrumb_schema = post.breadcrumb_schema;
-    form.status = post.status as SeoPostStatus;
-    form.published_at = toLocalDatetime(post.published_at);
-    form.scheduled_at = toLocalDatetime(post.scheduled_at);
-    canonicalMode.value = post.canonical_url ? 'custom' : 'auto';
-    slugManuallyEdited.value = true;
-};
-
-const clearCoverImage = (): void => {
-    form.cover_image = null;
-    form.cover_alt = '';
-};
-
-const addFaq = (): void => {
-    form.faq ??= [];
-    form.faq.push({ question: '', answer: '' });
-};
-
-const removeFaq = (index: number): void => {
-    form.faq?.splice(index, 1);
-};
-
-const handleSave = async (): Promise<void> => {
-    saving.value = true;
-
+let loadSequence = 0;
+const load = async (): Promise<void> => {
+    const sequence = ++loadSequence;
+    const id = editingId.value;
+    loading.value = true;
+    failed.value = false;
+    errorMessage.value = '';
+    notice.value = '';
+    historyOpen.value = false;
     try {
-        const latestContent = contentEditor.value?.flush();
-        if (Array.isArray(latestContent)) {
-            form.content = latestContent;
-        }
-        await nextTick();
-
-        form.content = await uploadEditorImages(form.content ?? []);
-
-        const payload: AdminSeoPostPayload = {
-            ...form,
-            title: form.title.trim(),
-            slug: slugify(form.slug),
-            excerpt: form.excerpt?.trim() ?? '',
-            cover_alt: form.cover_alt?.trim() ?? '',
-            seo_title: form.seo_title?.trim() ?? '',
-            seo_description: form.seo_description?.trim() ?? '',
-            meta_keywords: form.meta_keywords?.trim() ?? '',
-            focus_keyword: form.focus_keyword?.trim() ?? '',
-            canonical_url: canonicalMode.value === 'custom' ? form.canonical_url?.trim() || null : null,
-            content: form.content ?? [],
-            service_id: null,
-            faq: (form.faq ?? [])
-                .map((item) => ({ question: item.question.trim(), answer: item.answer.trim() }))
-                .filter((item) => item.question || item.answer),
-            published_at: form.status === 'published' ? form.published_at : null,
-            scheduled_at: form.status === 'scheduled' ? form.scheduled_at : null,
-        };
-
-        const response = editingId.value ? await adminSeoService.updatePost(editingId.value, payload) : await adminSeoService.createPost(payload);
-
-        handleSuccessResponse(response);
-
-        if (!editingId.value) {
-            await router.push('/admin/seo/posts');
+        const [options, post] = await Promise.all([adminSeoService.postOptions(), id ? adminSeoService.getPost(id) : Promise.resolve(null)]);
+        if (sequence !== loadSequence) return;
+        categories.value = options.categories;
+        if (post) {
+            applySnapshot(post);
+            currentVersion.value = post.lock_version;
+        } else {
+            Object.assign(form, newSeoPostForm());
+            currentVersion.value = 0;
+            canonicalMode.value = 'auto';
+            slugManuallyEdited.value = false;
+            editorKey.value++;
+            coverKey.value++;
         }
     } catch (error) {
-        handleErrorResponse(error);
+        if (sequence !== loadSequence) return;
+        failed.value = true;
+        errorMessage.value = errorText(error);
+    } finally {
+        if (sequence === loadSequence) loading.value = false;
+    }
+};
+const handleSave = async (): Promise<void> => {
+    if (busy.value || failed.value) return;
+    saving.value = true;
+    errorMessage.value = '';
+    try {
+        const latestContent = contentEditor.value?.flush();
+        if (Array.isArray(latestContent)) form.content = latestContent;
+        await nextTick();
+        form.content = await uploadEditorImages(form.content ?? []);
+        const payload: AdminSeoPostPayload = {
+            ...form,
+            slug: slugify(form.slug),
+            canonical_url: canonicalMode.value === 'custom' ? form.canonical_url?.trim() || null : null,
+            status: 'published',
+            published_at: null,
+            scheduled_at: null,
+            faq:
+                form.faq === null
+                    ? null
+                    : (form.faq ?? [])
+                          .map((item) => ({ question: item.question.trim(), answer: item.answer.trim() }))
+                          .filter((item) => item.question || item.answer),
+            ...(editingId.value ? { expected_version: currentVersion.value } : {}),
+        };
+        const response = editingId.value ? await adminSeoService.updatePost(editingId.value, payload) : await adminSeoService.createPost(payload);
+        const post = response.data.data as AdminSeoPostItem;
+        applySnapshot(post);
+        currentVersion.value = post.lock_version;
+        notice.value = '';
+        handleSuccessResponse(response);
+        if (!editingId.value) await router.replace(`/admin/seo/posts/${post.id}/edit`);
+    } catch (error) {
+        errorMessage.value = errorText(error);
     } finally {
         saving.value = false;
     }
 };
-
-onMounted(async () => {
+const loadHistory = async (): Promise<void> => {
+    if (busy.value) return;
+    historyOpen.value = true;
+    historyLoading.value = true;
+    historyError.value = '';
+    revisions.value = [];
     try {
-        loading.value = true;
-        await Promise.all([fetchMeta(), fetchPost()]);
+        if (editingId.value) revisions.value = await adminSeoService.revisions(editingId.value);
     } catch (error) {
-        handleErrorResponse(error);
+        historyError.value = errorText(error);
     } finally {
-        loading.value = false;
+        historyLoading.value = false;
     }
-});
+};
+const restoreRevision = async (revisionId: number): Promise<void> => {
+    if (!editingId.value || busy.value || historyLoading.value) return;
+    restoring.value = true;
+    historyError.value = '';
+    try {
+        const revision = await adminSeoService.revision(editingId.value, revisionId);
+        applySnapshot(revision.snapshot);
+        notice.value = 'Đã lấy dữ liệu SEO cũ vào form. Bạn có thể chỉnh sửa tiếp; cần bấm Lưu bài viết để xuất bản.';
+        errorMessage.value = '';
+        historyOpen.value = false;
+    } catch (error) {
+        historyError.value = errorText(error);
+    } finally {
+        restoring.value = false;
+    }
+};
+const closeHistory = (): void => {
+    if (!restoring.value) historyOpen.value = false;
+};
+const clearCoverImage = (): void => {
+    form.cover_image = null;
+    form.cover_alt = null;
+    coverKey.value++;
+};
+const addFaq = (): void => {
+    form.faq ??= [];
+    form.faq.push({ question: '', answer: '' });
+};
+const date = (value: string): string => new Date(value).toLocaleString('vi-VN');
+watch(editingId, load, { immediate: true });
 </script>
 
 <template>
-    <div class="space-y-4">
-        <Breadcrumb :title="pageTitle" description="Quản lý nội dung, ảnh đại diện, hiển thị tìm kiếm và thiết lập xuất bản trong một luồng rõ ràng.">
-            <template #actions>
-                <div class="flex flex-wrap gap-2">
-                    <RouterLink
-                        to="/admin/seo/posts"
-                        class="inline-flex items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                    >
-                        <ArrowLeft class="h-4 w-4" />
-                        Danh sách
-                    </RouterLink>
-                    <a
-                        v-if="editingId && form.slug"
-                        :href="publicUrl"
-                        target="_blank"
-                        rel="noreferrer"
-                        class="inline-flex items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
-                    >
-                        <Eye class="h-4 w-4" />
-                        Xem bài viết
-                    </a>
-                    <button
-                        type="button"
-                        class="inline-flex items-center gap-2 rounded-[10px] bg-violet-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-violet-500 disabled:cursor-not-allowed disabled:opacity-60"
-                        :disabled="saving || loading"
-                        @click="handleSave"
-                    >
-                        <Save class="h-4 w-4" />
-                        {{ saving ? 'Đang lưu...' : editingId ? 'Lưu thay đổi' : 'Tạo bài viết' }}
-                    </button>
-                </div>
-            </template>
+    <div class="grid gap-4 text-slate-900 dark:text-slate-100">
+        <button
+            type="button"
+            class="min-h-11 w-fit rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold disabled:opacity-50 dark:border-slate-600 dark:bg-slate-900"
+            :disabled="busy"
+            @click="loadHistory"
+        >
+            Bản SEO cũ
+        </button>
+        <Breadcrumb :title="pageTitle" description="Soạn nội dung và lưu để xuất bản ngay.">
+            <template #actions
+                ><div class="flex gap-2">
+                    <RouterLink class="text-sm font-semibold text-emerald-700 dark:text-emerald-400" to="/admin/seo/posts">Danh sách</RouterLink
+                    ><a v-if="editingId" class="text-sm text-slate-500" :href="publicUrl" target="_blank" rel="noreferrer">Xem bài viết</a>
+                </div></template
+            >
         </Breadcrumb>
-
-        <div class="grid items-start gap-4 xl:grid-cols-[minmax(0,1fr)_390px]">
-            <section class="grid min-w-0 gap-4">
-                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="border-b border-slate-100 pb-4">
-                        <h2 class="text-lg font-semibold text-slate-950">Nội dung bài viết</h2>
-                        <p class="mt-1 text-sm text-slate-500">Nhập tiêu đề trước, slug sẽ được tạo tự động và vẫn có thể chỉnh tay.</p>
-                    </div>
-
-                    <div class="grid gap-4 pt-5 md:grid-cols-2">
-                        <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Loại page SEO <span class="text-rose-500">*</span></span>
-                            <select
-                                v-model="form.type"
-                                class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+        <p v-if="loading" role="status" :class="cardClass">Đang tải bài viết…</p>
+        <p
+            v-if="notice"
+            role="status"
+            class="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800 dark:border-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+        >
+            {{ notice }}
+        </p>
+        <div
+            v-if="errorMessage"
+            role="alert"
+            class="rounded-lg border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300"
+        >
+            <p>{{ errorMessage }}</p>
+            <button v-if="failed" type="button" class="mt-2 min-h-11 font-bold underline" @click="load">Tải lại</button>
+        </div>
+        <form v-if="!loading && !failed" @submit.prevent="handleSave">
+            <fieldset :disabled="busy" :inert="busy ? true : undefined" class="grid min-w-0 items-start gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
+                <section class="grid min-w-0 gap-4" aria-label="Soạn bài SEO">
+                    <article :class="cardClass">
+                        <h2 class="mb-4 text-base font-bold">Thông tin bài viết</h2>
+                        <div class="grid gap-4">
+                            <label class="grid gap-2 text-sm font-semibold"
+                                >SEO title<input v-model="form.seo_title" :class="inputClass" maxlength="255" @input="handleTitleInput"
+                            /></label>
+                            <label class="grid gap-2 text-sm font-semibold"
+                                >SEO description<textarea v-model="form.seo_description" :class="inputClass" rows="3" maxlength="320"></textarea>
+                            </label>
+                            <div class="grid gap-3 sm:grid-cols-2">
+                                <label class="grid gap-2 text-sm font-semibold"
+                                    >Keyword<input v-model="form.focus_keyword" :class="inputClass" maxlength="255" /></label
+                                ><label class="grid gap-2 text-sm font-semibold"
+                                    >Meta keywords<input v-model="form.meta_keywords" :class="inputClass" maxlength="1000"
+                                /></label>
+                            </div>
+                            <label class="grid gap-2 text-sm font-semibold"
+                                >Đường dẫn bài viết (slug)<input
+                                    v-model="form.slug"
+                                    :class="inputClass"
+                                    required
+                                    maxlength="255"
+                                    pattern="[a-z0-9]+(-[a-z0-9]+)*"
+                                    @input="slugManuallyEdited = true"
+                                /><span class="break-all text-xs font-normal text-slate-500">Preview URL: {{ publicUrl }}</span></label
                             >
-                                <option value="knowledge">Knowledge — Kiến thức</option>
-                                <option value="guide">Guide — Hướng dẫn</option>
-                            </select>
-                        </label>
-
-                        <label class="grid gap-2 md:col-span-2">
-                            <span class="text-sm font-semibold text-slate-700">Tiêu đề bài viết <span class="text-rose-500">*</span></span>
-                            <input
-                                v-model="form.title"
-                                type="text"
-                                maxlength="255"
-                                class="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                                placeholder="Ví dụ: Hướng dẫn nạp Ngọc Rồng Online nhanh và an toàn"
-                                @input="handleTitleInput"
-                            />
-                        </label>
-
-                        <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Slug URL <span class="text-rose-500">*</span></span>
-                            <input
-                                v-model="form.slug"
-                                type="text"
-                                maxlength="255"
-                                class="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 font-mono text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                                placeholder="huong-dan-nap-ngoc-rong"
-                                @change="markSlugAsEdited"
-                            />
-                            <span class="truncate text-xs text-slate-400">
-                                {{
-                                    selectedCategorySlug
-                                        ? `/${selectedCategorySlug}/${form.slug || 'duong-dan-bai-viet'}`
-                                        : `/bai-viet/${form.slug || 'duong-dan-bai-viet'}`
-                                }}
-                            </span>
-                            <a
-                                :href="publicUrl"
-                                target="_blank"
-                                rel="noreferrer"
-                                class="truncate text-xs font-semibold text-violet-700 hover:underline"
+                            <div class="grid gap-4 sm:grid-cols-2">
+                                <label class="grid gap-2 text-sm font-semibold"
+                                    >Danh mục<select v-model="form.seo_category_id" :class="inputClass" required>
+                                        <option :value="null" disabled>Chọn danh mục</option>
+                                        <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
+                                    </select></label
+                                >
+                                <label class="grid gap-2 text-sm font-semibold"
+                                    >Ngôn ngữ bài viết<input
+                                        v-model="form.language"
+                                        :class="inputClass"
+                                        required
+                                        maxlength="35"
+                                        list="seo-languages"
+                                        placeholder="vi hoặc en"
+                                    /><datalist id="seo-languages">
+                                        <option value="vi">Tiếng Việt</option>
+                                        <option value="en">English</option>
+                                    </datalist></label
+                                >
+                            </div>
+                            <label class="grid gap-2 text-sm font-semibold"
+                                >Loại bài viết<select v-model="form.type" :class="inputClass">
+                                    <option value="knowledge">Kiến thức</option>
+                                    <option value="guide">Hướng dẫn</option>
+                                </select></label
                             >
-                                Preview URL: {{ publicUrl }}
-                            </a>
-                        </label>
-
-                        <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700"
-                                >Danh mục <span v-if="form.status !== 'draft'" class="text-rose-500">*</span></span
-                            >
-                            <select
-                                v-model="form.seo_category_id"
-                                class="w-full rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                            >
-                                <option :value="null">Không gắn danh mục (chỉ bản nháp)</option>
-                                <option v-for="category in categories" :key="category.id" :value="category.id">{{ category.name }}</option>
-                            </select>
-                        </label>
-
-                        <label class="grid gap-2 md:col-span-2">
-                            <span class="flex items-center justify-between gap-3 text-sm font-semibold text-slate-700">
-                                <span>Nội dung mở đầu (intro)</span>
-                                <span class="text-xs font-normal text-slate-400">{{ (form.excerpt ?? '').length }} ký tự</span>
-                            </span>
-                            <textarea
-                                v-model="form.excerpt"
-                                rows="3"
-                                class="w-full resize-y rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                                placeholder="Đoạn giới thiệu hiển thị đầu page và dùng làm mô tả mặc định..."
-                            />
-                        </label>
-                    </div>
-                </article>
-
-                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
-                        <div>
-                            <h2 class="flex items-center gap-2 text-lg font-semibold text-slate-950">
-                                <ImageIcon class="h-5 w-5 text-violet-600" />
-                                Ảnh đại diện
-                            </h2>
-                            <p class="mt-1 text-sm text-slate-500">
-                                Upload trực tiếp, hệ thống tối ưu WebP và dùng ảnh này cho trang bài viết lẫn chia sẻ mạng xã hội.
-                            </p>
                         </div>
-                        <button
-                            v-if="form.cover_image"
-                            type="button"
-                            class="inline-flex items-center gap-2 rounded-[8px] border border-rose-200 px-3 py-2 text-xs font-semibold text-rose-700 transition hover:bg-rose-50"
-                            @click="clearCoverImage"
-                        >
-                            <Trash2 class="h-3.5 w-3.5" />
-                            Xóa ảnh
-                        </button>
-                    </div>
-
-                    <div class="grid gap-4 pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(260px,0.8fr)]">
+                    </article>
+                    <article :class="cardClass" aria-labelledby="seo-content-title">
+                        <h2 id="seo-content-title" class="text-base font-bold">Nội dung bài viết</h2>
+                        <p class="mb-4 mt-2 text-sm text-slate-500">Viết H1 và đoạn giới thiệu trực tiếp trong nội dung bên dưới.</p>
+                        <Editor :key="editorKey" ref="contentEditor" :model-value="form.content ?? []" @update:model-value="form.content = $event" />
+                    </article>
+                    <article :class="cardClass" aria-labelledby="seo-faq-title">
+                        <h2 id="seo-faq-title" class="text-base font-bold">Câu hỏi thường gặp (FAQ)</h2>
+                        <div class="mt-4 grid gap-3">
+                            <div
+                                v-for="(item, index) in form.faq ?? []"
+                                :key="index"
+                                class="grid gap-2 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                            >
+                                <label class="grid gap-1 text-sm">Câu hỏi<input v-model="item.question" :class="inputClass" maxlength="255" /></label
+                                ><label class="grid gap-1 text-sm"
+                                    >Trả lời<textarea v-model="item.answer" :class="inputClass" rows="2" maxlength="2000"></textarea></label
+                                ><button type="button" class="min-h-11 text-sm text-rose-600" @click="form.faq?.splice(index, 1)">Xóa câu hỏi</button>
+                            </div>
+                            <button
+                                type="button"
+                                class="min-h-11 text-sm font-semibold text-emerald-700 dark:text-emerald-400"
+                                :disabled="(form.faq?.length ?? 0) >= 20"
+                                @click="addFaq"
+                            >
+                                Thêm câu hỏi
+                            </button>
+                        </div>
+                    </article>
+                </section>
+                <aside class="grid min-w-0 gap-4" aria-label="SEO và ảnh đại diện">
+                    <article :class="cardClass">
+                        <h2 class="mb-4 text-base font-bold">Hiển thị trên Google</h2>
+                        <div class="mb-4 min-w-0 rounded-lg border border-slate-200 p-3 dark:border-slate-700" aria-label="Xem trước kết quả Google">
+                            <p class="break-all text-xs text-slate-500">{{ publicUrl }}</p>
+                            <p class="mt-2 break-words text-lg text-blue-700 dark:text-blue-400">{{ seoTitlePreview }}</p>
+                            <p class="mt-1 break-words text-sm text-slate-600 dark:text-slate-300">{{ seoDescriptionPreview }}</p>
+                        </div>
+                        <div class="grid gap-4">
+                            <label class="grid gap-2 text-sm font-semibold"
+                                >Canonical URL<select v-model="canonicalMode" :class="inputClass">
+                                    <option value="auto">Canonical tự động</option>
+                                    <option value="custom">Canonical tùy chỉnh</option>
+                                </select></label
+                            >
+                            <p
+                                v-if="canonicalMode === 'auto'"
+                                class="break-all rounded-lg bg-slate-50 p-3 text-xs text-slate-600 dark:bg-slate-800 dark:text-slate-300"
+                            >
+                                {{ generatedCanonicalUrl }}
+                            </p>
+                            <label v-else class="grid gap-2 text-sm"
+                                >URL canonical tùy chỉnh<input
+                                    v-model="form.canonical_url"
+                                    type="url"
+                                    :class="inputClass"
+                                    maxlength="2048"
+                                    placeholder="https://..."
+                            /></label>
+                            <label class="grid gap-2 text-sm font-semibold"
+                                >Cho phép lập chỉ mục<select v-model="form.robots" :class="inputClass">
+                                    <option value="index,follow">index,follow</option>
+                                    <option value="noindex,follow">noindex,follow</option>
+                                </select></label
+                            >
+                            <label class="flex items-center gap-2 text-sm"
+                                ><input v-model="form.article_schema" type="checkbox" class="rounded border-slate-300 text-emerald-600" />Schema
+                                Article</label
+                            >
+                            <label class="flex items-center gap-2 text-sm"
+                                ><input v-model="form.breadcrumb_schema" type="checkbox" class="rounded border-slate-300 text-emerald-600" />Schema
+                                Breadcrumb</label
+                            >
+                            <button
+                                type="submit"
+                                :disabled="busy"
+                                class="min-h-11 w-full rounded-lg bg-emerald-700 px-4 py-3 text-sm font-bold text-white disabled:opacity-50"
+                            >
+                                {{ saving ? 'Đang lưu…' : 'Lưu bài viết' }}
+                            </button>
+                            <p class="text-xs text-slate-500">Lưu để xuất bản ngay. noindex chỉ tắt lập chỉ mục tìm kiếm.</p>
+                        </div>
+                    </article>
+                    <article :class="cardClass">
+                        <h2 class="mb-4 text-base font-bold">Ảnh đại diện SEO</h2>
                         <UploadImage
-                            :accept="['image/jpeg', 'image/png', 'image/webp']"
-                            :compress="true"
+                            :key="coverKey"
+                            ref="coverUploader"
                             :image-src="form.cover_image"
-                            name-image="seo-post-cover"
+                            :disabled="busy"
+                            :compress="true"
                             @uploaded="form.cover_image = $event"
                         />
-                        <label class="grid content-start gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Alt text ảnh {{ form.cover_image ? '*' : '' }}</span>
-                            <textarea
-                                v-model="form.cover_alt"
-                                rows="4"
-                                maxlength="255"
-                                class="w-full rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none transition focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                                placeholder="Mô tả chính xác nội dung ảnh cho Google và người dùng trình đọc màn hình"
-                            />
-                            <span class="text-xs leading-5 text-slate-500">Không nhồi từ khóa; mô tả đúng hình ảnh trong một câu ngắn.</span>
-                        </label>
-                    </div>
-                </article>
-
-                <article class="min-w-0 rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="border-b border-slate-100 pb-4">
-                        <h2 class="text-lg font-semibold text-slate-950">Nội dung chính</h2>
-                        <p class="mt-1 text-sm text-slate-500">
-                            Có thể kéo-thả ảnh trực tiếp vào trình soạn thảo; ảnh sẽ được upload và chuyển WebP.
-                        </p>
-                    </div>
-                    <div class="min-w-0 pt-5">
-                        <Editor ref="contentEditor" v-model="form.content" />
-                    </div>
-                </article>
-
-                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="flex flex-wrap items-start justify-between gap-3 border-b border-slate-100 pb-4">
-                        <div>
-                            <h2 class="text-lg font-semibold text-slate-950">Câu hỏi thường gặp (FAQ)</h2>
-                            <p class="mt-1 text-sm text-slate-500">FAQ được hiển thị trên page và tự động tạo schema FAQPage.</p>
-                        </div>
-                        <button
-                            type="button"
-                            class="inline-flex items-center gap-2 rounded-[8px] border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 transition hover:bg-violet-50"
-                            @click="addFaq"
-                        >
-                            <Plus class="h-3.5 w-3.5" /> Thêm câu hỏi
+                        <button v-if="form.cover_image" type="button" class="mt-2 min-h-11 text-sm text-rose-600" @click="clearCoverImage">
+                            Xóa ảnh
                         </button>
-                    </div>
-                    <div v-if="form.faq?.length" class="grid gap-4 pt-5">
-                        <div v-for="(item, index) in form.faq" :key="index" class="rounded-[10px] border border-slate-200 p-4">
-                            <div class="mb-3 flex items-center justify-between gap-3">
-                                <span class="text-sm font-bold text-slate-700">FAQ {{ index + 1 }}</span>
-                                <button type="button" class="text-rose-600 hover:text-rose-700" aria-label="Xóa câu hỏi" @click="removeFaq(index)">
-                                    <Trash2 class="h-4 w-4" />
-                                </button>
-                            </div>
-                            <div class="grid gap-3">
-                                <input
-                                    v-model="item.question"
-                                    type="text"
-                                    maxlength="255"
-                                    class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                    placeholder="Câu hỏi"
-                                />
-                                <textarea
-                                    v-model="item.answer"
-                                    rows="3"
-                                    maxlength="2000"
-                                    class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                    placeholder="Câu trả lời"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                    <p v-else class="pt-5 text-sm text-slate-500">Chưa có câu hỏi thường gặp.</p>
-                </article>
-            </section>
-
-            <aside class="grid gap-4 xl:sticky xl:top-24">
-                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 class="text-base font-semibold text-slate-950">Xuất bản</h2>
-                    <div class="mt-4 grid gap-4">
-                        <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Trạng thái</span>
-                            <select
-                                v-model="form.status"
-                                class="rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                            >
-                                <option value="draft">Bản nháp</option>
-                                <option value="published">Xuất bản</option>
-                                <option value="scheduled">Hẹn lịch</option>
-                            </select>
-                        </label>
-                        <label v-if="form.status === 'published'" class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Thời gian xuất bản</span>
-                            <input
-                                v-model="form.published_at"
-                                type="datetime-local"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                            />
-                            <span class="text-xs text-slate-500">Để trống để xuất bản ngay khi lưu.</span>
-                        </label>
-                        <label v-if="form.status === 'scheduled'" class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Thời gian hẹn lịch <span class="text-rose-500">*</span></span>
-                            <input
-                                v-model="form.scheduled_at"
-                                type="datetime-local"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                            />
-                        </label>
-                    </div>
-                </article>
-
-                <article class="overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-sm">
-                    <div class="border-b border-slate-100 px-5 py-4">
-                        <h2 class="flex items-center gap-2 text-base font-semibold text-slate-950">
-                            <Search class="h-4 w-4 text-violet-600" />
-                            Xem trước kết quả Google
-                        </h2>
-                    </div>
-                    <div class="p-5">
-                        <p class="truncate text-xs text-emerald-700">{{ effectiveCanonicalUrl }}</p>
-                        <p class="mt-1 line-clamp-2 text-xl font-medium leading-7 text-[#1a0dab]">{{ seoTitlePreview }}</p>
-                        <p class="mt-1 line-clamp-3 text-sm leading-5 text-slate-600">{{ seoDescriptionPreview }}</p>
-                    </div>
-                </article>
-
-                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 class="text-base font-semibold text-slate-950">Thông tin tìm kiếm</h2>
-                    <div class="mt-4 grid gap-4">
-                        <label class="grid gap-2">
-                            <span class="flex items-center justify-between gap-2 text-sm font-semibold text-slate-700">
-                                <span>SEO title</span>
-                                <span :class="seoTitlePreview.length > 65 ? 'text-rose-600' : 'text-slate-400'" class="text-xs font-normal"
-                                    >{{ seoTitlePreview.length }}/65</span
-                                >
-                            </span>
-                            <input
-                                v-model="form.seo_title"
-                                type="text"
-                                maxlength="255"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                placeholder="Để trống sẽ dùng tiêu đề bài viết"
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <span class="flex items-center justify-between gap-2 text-sm font-semibold text-slate-700">
-                                <span>SEO description</span>
-                                <span :class="seoDescriptionPreview.length > 160 ? 'text-rose-600' : 'text-slate-400'" class="text-xs font-normal"
-                                    >{{ seoDescriptionPreview.length }}/160</span
-                                >
-                            </span>
-                            <textarea
-                                v-model="form.seo_description"
-                                rows="4"
-                                maxlength="320"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                placeholder="Để trống sẽ dùng mô tả ngắn"
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Focus keyword</span>
-                            <input
-                                v-model="form.focus_keyword"
-                                type="text"
-                                maxlength="255"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                placeholder="nạp ngọc rồng online"
-                            />
-                            <span class="text-xs leading-5 text-slate-500">Một từ khóa chính dùng để kiểm tra mức độ tối ưu của bài.</span>
-                        </label>
-                        <label class="grid gap-2">
-                            <span class="flex items-center justify-between gap-2 text-sm font-semibold text-slate-700">
-                                <span>Meta keywords</span>
-                                <span class="text-xs font-normal text-slate-400">{{ form.meta_keywords?.length ?? 0 }}/1000</span>
-                            </span>
-                            <textarea
-                                v-model="form.meta_keywords"
-                                rows="3"
-                                maxlength="1000"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                placeholder="nạp ngọc rồng online, bảng giá nạp game, nạp game teamobi"
-                            />
-                            <span class="text-xs leading-5 text-slate-500">Danh sách từ khóa đưa vào thẻ meta, cách nhau bằng dấu phẩy.</span>
-                        </label>
-                    </div>
-                </article>
-
-                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 class="flex items-center gap-2 text-base font-semibold text-slate-950">
-                        <Link2 class="h-4 w-4 text-violet-600" /> Canonical
-                    </h2>
-                    <p class="mt-1 text-xs leading-5 text-slate-500">Canonical cho Google biết URL chính thức cần được index.</p>
-
-                    <div class="mt-4 grid grid-cols-2 gap-2 rounded-[10px] bg-slate-100 p-1">
-                        <button
-                            type="button"
-                            class="rounded-[8px] px-3 py-2 text-xs font-semibold transition"
-                            :class="canonicalMode === 'auto' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
-                            @click="canonicalMode = 'auto'"
-                        >
-                            Canonical tự động
-                        </button>
-                        <button
-                            type="button"
-                            class="rounded-[8px] px-3 py-2 text-xs font-semibold transition"
-                            :class="canonicalMode === 'custom' ? 'bg-white text-violet-700 shadow-sm' : 'text-slate-500 hover:text-slate-700'"
-                            @click="canonicalMode = 'custom'"
-                        >
-                            Canonical tùy chỉnh
-                        </button>
-                    </div>
-
-                    <div class="mt-4">
-                        <div v-if="canonicalMode === 'auto'" class="rounded-[10px] border border-emerald-200 bg-emerald-50 p-3">
-                            <p class="text-xs font-semibold text-emerald-700">Tự động theo slug</p>
-                            <p class="mt-1 break-all text-xs leading-5 text-emerald-800">{{ generatedCanonicalUrl }}</p>
-                        </div>
-                        <label v-else class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">URL canonical đầy đủ</span>
-                            <input
-                                v-model="form.canonical_url"
-                                type="url"
-                                maxlength="2048"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                placeholder="https://napcarot.com/danh-muc/duong-dan-chinh"
-                            />
-                            <span
-                                v-if="canonicalUsesExternalDomain"
-                                class="flex gap-2 rounded-[8px] bg-amber-50 p-2 text-xs leading-5 text-amber-700"
-                            >
-                                <CircleAlert class="mt-0.5 h-4 w-4 shrink-0" /> URL này thuộc domain khác; bài có thể nhường tín hiệu index cho
-                                website đó.
-                            </span>
-                        </label>
-                    </div>
-
-                    <a
-                        :href="effectiveCanonicalUrl"
-                        target="_blank"
-                        rel="noreferrer"
-                        class="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-violet-700 hover:underline"
+                        <label class="mt-4 grid gap-2 text-sm font-semibold"
+                            >Mô tả ảnh (alt)<input v-model="form.cover_alt" :class="inputClass" :required="Boolean(form.cover_image)" maxlength="255"
+                        /></label>
+                    </article>
+                </aside>
+            </fieldset>
+        </form>
+        <Dialog :open="historyOpen" class="relative z-[70]" @close="closeHistory">
+            <div class="fixed inset-0 bg-slate-950/60" aria-hidden="true"></div>
+            <div class="fixed inset-0 overflow-y-auto">
+                <div class="flex min-h-full items-center justify-center p-3 sm:p-6">
+                    <DialogPanel
+                        class="w-full max-w-3xl rounded-xl bg-white p-4 text-slate-900 shadow-xl dark:bg-slate-900 dark:text-slate-100 sm:p-6"
                     >
-                        Mở canonical <ExternalLink class="h-3.5 w-3.5" />
-                    </a>
-                </article>
-
-                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <h2 class="text-base font-semibold text-slate-950">Thiết lập nâng cao</h2>
-                    <div class="mt-4 grid gap-3">
-                        <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Robots</span>
-                            <select
-                                v-model="form.robots"
-                                class="rounded-[10px] border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-400"
+                        <header class="flex items-start justify-between gap-4">
+                            <div>
+                                <DialogTitle class="text-lg font-bold">Bản SEO cũ</DialogTitle
+                                ><DialogDescription class="mt-1 text-sm text-slate-500"
+                                    >Tối đa 10 phiên bản đã xuất bản trước bản hiện tại. Lấy dữ liệu chỉ điền vào form.</DialogDescription
+                                >
+                            </div>
+                            <button
+                                type="button"
+                                class="min-h-11 shrink-0 px-3 text-sm font-semibold disabled:opacity-50"
+                                :disabled="restoring"
+                                @click="closeHistory"
                             >
-                                <option value="index,follow">Index và theo dõi liên kết</option>
-                                <option value="noindex,follow">Không index, vẫn theo dõi liên kết</option>
-                            </select>
-                        </label>
-                        <label class="flex items-center justify-between gap-3 rounded-[10px] border border-slate-200 px-3 py-3">
-                            <span
-                                ><span class="block text-sm font-semibold text-slate-800">Article / WebPage schema</span
-                                ><span class="text-xs text-slate-500">Tự chọn schema phù hợp với loại page.</span></span
+                                Đóng
+                            </button>
+                        </header>
+                        <p v-if="historyLoading" class="py-8 text-sm" role="status">Đang tải lịch sử…</p>
+                        <div v-else-if="historyError" class="py-4 text-sm text-rose-600" role="alert">
+                            <p>{{ historyError }}</p>
+                            <button type="button" class="min-h-11 font-bold underline" :disabled="restoring" @click="loadHistory">Thử lại</button>
+                        </div>
+                        <p v-else-if="!revisions.length" class="py-8 text-center text-sm text-slate-500">Chưa có bản SEO cũ.</p>
+                        <div v-else class="mt-4 grid max-h-[65vh] gap-3 overflow-y-auto">
+                            <article
+                                v-for="revision in revisions"
+                                :key="revision.id"
+                                class="grid gap-2 rounded-lg border border-slate-200 p-4 dark:border-slate-700"
                             >
-                            <input v-model="form.article_schema" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-violet-600" />
-                        </label>
-                        <label class="flex items-center justify-between gap-3 rounded-[10px] border border-slate-200 px-3 py-3">
-                            <span
-                                ><span class="block text-sm font-semibold text-slate-800">Breadcrumb schema</span
-                                ><span class="text-xs text-slate-500">Mô tả phân cấp danh mục và bài viết.</span></span
-                            >
-                            <input v-model="form.breadcrumb_schema" type="checkbox" class="h-4 w-4 rounded border-slate-300 text-violet-600" />
-                        </label>
-                    </div>
-                </article>
-
-                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="flex items-center justify-between gap-3">
-                        <h2 class="text-base font-semibold text-slate-950">Checklist SEO</h2>
-                        <span class="rounded-full bg-violet-50 px-2.5 py-1 text-xs font-bold text-violet-700"
-                            >{{ passedSeoChecks }}/{{ seoChecks.length }}</span
-                        >
-                    </div>
-                    <ul class="mt-4 grid gap-2.5">
-                        <li
-                            v-for="item in seoChecks"
-                            :key="item.label"
-                            class="flex items-start gap-2 text-xs leading-5"
-                            :class="item.passed ? 'text-emerald-700' : 'text-slate-500'"
-                        >
-                            <CheckCircle2 v-if="item.passed" class="mt-0.5 h-4 w-4 shrink-0" />
-                            <CircleAlert v-else class="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
-                            <span>{{ item.label }}</span>
-                        </li>
-                    </ul>
-                </article>
-            </aside>
-        </div>
+                                <time class="text-xs text-slate-500">{{ date(revision.published_at || revision.created_at) }}</time>
+                                <h3 class="break-words text-sm font-bold">{{ revision.seo_title || revision.title || 'Chưa có SEO title' }}</h3>
+                                <p class="break-words text-sm text-slate-500">{{ revision.seo_description || 'Chưa có mô tả SEO' }}</p>
+                                <p class="break-all text-xs text-slate-500">Slug: {{ revision.slug }}</p>
+                                <button
+                                    type="button"
+                                    class="min-h-11 w-fit rounded-lg bg-emerald-700 px-4 text-sm font-semibold text-white disabled:opacity-50"
+                                    :disabled="busy"
+                                    @click="restoreRevision(revision.id)"
+                                >
+                                    {{ restoring ? 'Đang lấy dữ liệu…' : 'Lấy dữ liệu' }}
+                                </button>
+                            </article>
+                        </div>
+                    </DialogPanel>
+                </div>
+            </div>
+        </Dialog>
     </div>
 </template>

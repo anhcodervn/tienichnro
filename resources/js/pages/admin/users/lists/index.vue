@@ -33,7 +33,7 @@ onMounted(load);
 </script>
 
 <template>
-    <section class="rounded-xl border border-slate-200 bg-white p-5">
+    <section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100">
         <h1 class="text-2xl font-bold">Người dùng</h1>
         <form class="my-5 flex gap-3" @submit.prevent="searchUsers">
             <input
@@ -57,11 +57,37 @@ onMounted(load);
                 </thead>
                 <tbody>
                     <tr v-for="user in users" :key="user.id" class="border-t">
-                        <td class="p-3">{{ user.name || user.username }}</td>
+                        <td class="p-3">
+                            <strong>{{ user.name || user.username }}</strong>
+                            <p class="mt-1 text-xs text-slate-500">#{{ user.id }} · {{ user.username }}</p>
+                        </td>
                         <td class="p-3">{{ user.email }}</td>
                         <td class="p-3">{{ user.role === 'admin' ? 'Quản trị viên' : 'Thành viên' }}</td>
                         <td class="p-3">{{ user.status }}</td>
-                        <td class="p-3"><RouterLink class="text-emerald-700" :to="`/admin/users/${user.id}`">Chi tiết</RouterLink></td>
+                        <td class="p-3">
+                            <div class="flex flex-wrap gap-2">
+                                <RouterLink
+                                    class="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold dark:border-slate-600"
+                                    :to="`/admin/users/${user.id}`"
+                                    >Thông tin user</RouterLink
+                                >
+                                <RouterLink
+                                    class="inline-flex min-h-10 items-center rounded-lg bg-emerald-50 px-3 text-xs font-semibold text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+                                    :to="{ path: `/admin/users/${user.id}`, query: { tab: 'wallet', direction: 'credit' } }"
+                                    >Cộng tiền</RouterLink
+                                >
+                                <RouterLink
+                                    class="inline-flex min-h-10 items-center rounded-lg bg-rose-50 px-3 text-xs font-semibold text-rose-700 dark:bg-rose-950 dark:text-rose-400"
+                                    :to="{ path: `/admin/users/${user.id}`, query: { tab: 'wallet', direction: 'debit' } }"
+                                    >Trừ tiền</RouterLink
+                                >
+                                <RouterLink
+                                    class="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold dark:border-slate-600"
+                                    :to="{ path: `/admin/users/${user.id}`, query: { tab: 'password' } }"
+                                    >Lấy lại mật khẩu</RouterLink
+                                >
+                            </div>
+                        </td>
                     </tr>
                 </tbody>
             </table>

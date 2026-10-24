@@ -14,13 +14,14 @@ use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Pagination\Paginator;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class NroNotificationService
 {
-    public function __construct(private readonly BossMessageParserService $parser, private readonly NotificationTypeClassifierService $classifier) {}
+    public function __construct(private readonly BossMessageParserService $parser, private readonly NotificationTypeClassifierService $classifier, private readonly NotificationReadCacheService $readCache) {}
 
     /** @param array<string, mixed> $payload
      * @return array{status: string, duplicate: bool, notify: Notify|null}
@@ -242,19 +243,53 @@ class NroNotificationService
     /** @param array<string, mixed> $filters */
     public function paginate(array $filters): LengthAwarePaginator
     {
-        $query = $this->filteredQuery($filters)
-            ->when(($filters['state'] ?? '') === 'respawning', fn (Builder $query): Builder => $query->orderBy('respawn_at'))
-            ->orderByDesc('time_start')->orderByDesc('id');
-        if (isset($filters['_preview_since'])) {
-            $rows = $query->limit(30)->get();
-            $limit = min((int) ($filters['limit'] ?? 10), 10);
-            $page = (int) ($filters['page'] ?? 1);
+        $paginationFilters = Arr::except($filters, ['_preview_since', '_preview_cutoff']);
+        $limit = max(1, min(100, (int) ($filters['per_page'] ?? $filters['limit'] ?? 20)));
+        $page = max(1, (int) ($filters['page'] ?? Paginator::resolveCurrentPage()));
+        $filters = array_filter(Arr::only($filters, ['server_id', 'server_code', 'boss_id', 'code', 'state', 'q', '_preview_since']), fn ($value): bool => $value !== null && $value !== '');
+        foreach (['server_id', 'server_code', 'boss_id'] as $field) {
+            if (isset($filters[$field])) {
+                $filters[$field] = (int) $filters[$field];
+            }
+        }
+        $since = isset($filters['_preview_since']) ? CarbonImmutable::parse($filters['_preview_since']) : null;
+        unset($filters['_preview_since']);
+        if (($filters['state'] ?? '') === 'respawning') {
+            $rows = $this->readCache->remember('data', ['kind' => 'respawning', ...$filters], fn () => $this->orderedQuery($filters)->get());
+            $rows = $rows->filter(fn (Notify $notify): bool => $notify->respawn_at?->gt(now()) && ($since === null || $notify->time_start->gte($since)))->values();
+            if ($since !== null) {
+                $rows = $rows->take(30);
+                $limit = min($limit, 10);
+            }
+
+            return (new \Illuminate\Pagination\LengthAwarePaginator($rows->slice(($page - 1) * $limit, $limit)->values(), $rows->count(), $limit, $page,
+                ['path' => Paginator::resolveCurrentPath()]))->appends($paginationFilters);
+        }
+        if ($since !== null) {
+            $rows = $this->readCache->remember('data', ['audience' => 'guest', ...$filters], fn () => $this->orderedQuery($filters)->limit(30)->get());
+            $rows = $rows->filter(fn (Notify $notify): bool => $notify->time_start->gte($since))->values();
+            $limit = min($limit, 10);
 
             return new \Illuminate\Pagination\LengthAwarePaginator($rows->slice(($page - 1) * $limit, $limit)->values(), $rows->count(), $limit, $page,
                 ['path' => Paginator::resolveCurrentPath()]);
         }
 
-        return $query->paginate($filters['per_page'] ?? $filters['limit'] ?? 20, ['*'], 'page', $filters['page'] ?? null)->appends($filters);
+        $data = $this->readCache->remember('data', ['audience' => 'member', 'limit' => $limit, 'page' => $page, ...$filters], function () use ($filters, $limit, $page): array {
+            $query = $this->orderedQuery($filters);
+            $rows = $query->paginate($limit, ['*'], 'page', $page);
+
+            return ['items' => $rows->getCollection(), 'total' => $rows->total()];
+        });
+
+        return (new \Illuminate\Pagination\LengthAwarePaginator($data['items'], $data['total'], $limit, $page, ['path' => Paginator::resolveCurrentPath()]))->appends($paginationFilters);
+    }
+
+    /** @param array<string, mixed> $filters */
+    private function orderedQuery(array $filters): Builder
+    {
+        return $this->filteredQuery($filters)
+            ->when(($filters['state'] ?? '') === 'respawning', fn (Builder $query): Builder => $query->orderBy('respawn_at'))
+            ->orderByDesc('time_start')->orderByDesc('id');
     }
 
     /** @param array<string, mixed> $filters

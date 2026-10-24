@@ -17,12 +17,14 @@ test('tinymce cancels stale updates and flushes the latest content before saving
     $editorPath = dirname(__DIR__, 2).'/resources/js/components/shared/Editor/index.vue';
     $source = file_get_contents($editorPath);
     $applyEditorValue = substr($source, strpos($source, 'function applyEditorValue'), strpos($source, 'function renderNode') - strpos($source, 'function applyEditorValue'));
-    $flush = substr($source, strpos($source, 'const flush ='), strpos($source, 'expose({ flush });') - strpos($source, 'const flush ='));
+    $flush = substr($source, strpos($source, 'const flush ='), strpos($source, 'expose({ flush, isUploadingImage: hasPendingImageUploads });') - strpos($source, 'const flush ='));
 
     expect($source)
         ->toContain('const clearSaveTimer = (): void =>')
         ->toContain('saveTimer = null;')
-        ->toContain('expose({ flush });')
+        ->toContain('expose({ flush, isUploadingImage: hasPendingImageUploads });')
+        ->toContain('pendingImageUploads.value++')
+        ->toContain('pendingImageUploads.value--')
         ->and($applyEditorValue)->toContain('clearSaveTimer();')
         ->and($flush)
         ->toContain('clearSaveTimer();')
@@ -169,7 +171,7 @@ test('client blade pages apply article typography to rendered editor content', f
         ->toContain('data-client-image-viewer')
         ->and($contentPage)->toContain('class="article-content mt-8')
         ->toContain('data-client-image-viewer')
-        ->and($homePage)->toContain('article-content text-sm leading-7 text-slate-700')
+        ->and($homePage)->toContain('article-content mt-4')
         ->toContain('data-client-image-viewer');
 });
 
@@ -177,7 +179,7 @@ test('client rich text images open in an accessible lightbox with zoom controls'
     $projectRoot = dirname(__DIR__, 2);
     $clientScript = file_get_contents($projectRoot.'/resources/js/client.js');
     $clientCss = file_get_contents($projectRoot.'/resources/css/client.css');
-    $gamePage = file_get_contents($projectRoot.'/resources/views/client/topup/game.blade.php');
+    $homePage = file_get_contents($projectRoot.'/resources/views/client/home/index.blade.php');
 
     expect($clientScript)
         ->toContain("document.querySelectorAll('[data-client-image-viewer]')")
@@ -188,5 +190,5 @@ test('client rich text images open in an accessible lightbox with zoom controls'
         ->toContain("event.key === 'ArrowRight'")
         ->and($clientCss)->toContain('.client-image-lightbox')
         ->toContain('cursor-zoom-in')
-        ->and($gamePage)->toContain('data-client-image-viewer');
+        ->and($homePage)->toContain('data-client-image-viewer');
 });

@@ -5,6 +5,7 @@ namespace App\Features\Admin\User\Services;
 use App\Features\Admin\User\Resources\AdminUserResource;
 use App\Models\User;
 use App\Models\UserLog;
+use App\Models\Wallet;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Pagination\LengthAwarePaginator;
 
@@ -41,6 +42,7 @@ class AdminUserService
     {
         return [
             'user' => $user,
+            'wallet_balance' => (int) Wallet::query()->where('user_id', $user->id)->value('balance'),
             'latest_login' => [
                 'at' => $user->last_login_at?->toISOString(),
                 'ip' => $user->last_login_ip,

@@ -67,10 +67,22 @@ return [
         ],
     ],
 
+    'nro_api_rate_limits' => [
+        'catalog' => (int) env('NRO_GAME_DATA_REQUESTS_PER_MINUTE', 600),
+        'poll' => (int) env('NRO_GAME_DATA_POLLS_PER_MINUTE', 3600),
+        'uploads' => (int) env('NRO_IMAGE_UPLOADS_PER_MINUTE', 120),
+        'notifications' => (int) env('NRO_NOTIFICATIONS_PER_MINUTE', 600),
+    ],
+
     'nro_bot' => [
         'heartbeat_key' => env('NRO_BOT_HEARTBEAT_KEY'),
         'heartbeat_interval_seconds' => (int) env('NRO_BOT_HEARTBEAT_INTERVAL_SECONDS', 30),
         'missed_heartbeats' => (int) env('NRO_BOT_MISSED_HEARTBEATS', 5),
+    ],
+
+    'nro_notifications' => [
+        'cache_store' => env('NRO_NOTIFICATION_CACHE_STORE'),
+        'catalog_cache_ttl_seconds' => (int) env('NRO_NOTIFICATION_CATALOG_CACHE_TTL_SECONDS', 60),
     ],
 
     'zalo_bot' => [

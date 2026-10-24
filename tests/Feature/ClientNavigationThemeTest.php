@@ -8,7 +8,7 @@ beforeEach(function (): void {
     config(['license.services_visible' => true]);
 });
 
-test('header shows only the authenticated users current wallet balance beneath the account profile', function (): void {
+test('header shows only the authenticated users current wallet balance in the account controls', function (): void {
     $user = User::factory()->create();
     $wallet = Wallet::factory()->create(['user_id' => $user->id, 'balance' => 1250000]);
     Wallet::factory()->create(['balance' => 9999999]);
@@ -25,6 +25,25 @@ test('header shows only the authenticated users current wallet balance beneath t
     $wallet->update(['balance' => 1200000]);
     $this->get('/')->assertOk()->assertSee('1.200.000 đ')->assertDontSee('1.250.000 đ');
 });
+
+test('mobile account control displays wallet balance and dropdown while hiding the avatar', function (?string $avatar): void {
+    $user = User::factory()->create(['avatar' => $avatar]);
+    Wallet::factory()->create(['user_id' => $user->id, 'balance' => 1250000]);
+    $response = $this->actingAs($user)->get('/')->assertOk();
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+    $xpath = new DOMXPath($document);
+    $summary = $xpath->query('//header//details[@data-client-menu]/summary')->item(0);
+    $avatarNode = $xpath->query('.//*[@data-header-avatar]', $summary)->item(0);
+    $balance = $xpath->query('.//*[@data-header-wallet-balance="mobile"]', $summary)->item(0);
+
+    expect($avatarNode->getAttribute('class'))->toContain('hidden', 'sm:grid')
+        ->and($balance->getAttribute('class'))->toContain('sm:hidden', 'whitespace-nowrap')
+        ->and(trim($balance->textContent))->toBe('1.250.000 đ')
+        ->and($xpath->query('following-sibling::*[1][self::i[contains(@class, "bx-chevron-down")]]', $balance)->length)->toBe(1)
+        ->and($summary->getAttribute('class'))->not->toContain('flex-col')
+        ->and($summary->getAttribute('aria-label'))->toBe('Menu tài khoản');
+})->with([null, 'https://example.com/avatar.png']);
 
 test('header shows zero for accounts without wallets without creating one and hides balance for guests', function (): void {
     $this->get('/')->assertOk()->assertDontSee('data-header-wallet-balance', false);

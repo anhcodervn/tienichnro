@@ -47,6 +47,7 @@ const props = defineProps<{
     nameImage?: string;
     squareSize?: number;
     uploadUrl?: string;
+    disabled?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -57,6 +58,7 @@ const fileInput = ref<HTMLInputElement | null>(null);
 const preview = ref<string | null>(null);
 const file = ref<File | null>(null);
 const loading = ref(false);
+defineExpose({ loading });
 const imageName = ref('');
 const progress = ref(0);
 let progressInterval: ReturnType<typeof setInterval> | null = null;
@@ -76,7 +78,7 @@ watch(
 const acceptString = computed(() => props.accept?.join(',') || 'image/*');
 
 const triggerFile = (): void => {
-    if (!loading.value) {
+    if (!loading.value && !props.disabled) {
         fileInput.value?.click();
     }
 };
@@ -267,6 +269,7 @@ const upload = async (): Promise<void> => {
 };
 
 const processFile = async (selectedFile: File): Promise<void> => {
+    if (loading.value || props.disabled) return;
     if (!selectedFile.type.startsWith('image/')) {
         await Swal.fire('Không hợp lệ', 'Chỉ được chọn file ảnh.', 'warning');
         return;

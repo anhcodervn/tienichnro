@@ -260,7 +260,25 @@ function gameDataAssetPayload(array $payload, bool $include, ?string $icon = nul
 
 test('every hook dataset accepts image and icon and clears them when omitted', function (string $dataset, string $fixture): void {
     $payload = gameDataAssetPayload(gameDataFixture($fixture), true, '/storage/uploads/2026-10-18/image/icon.webp', 'https://cdn.example.com/image.png');
-    gameDataRun(gameDataSubmit($dataset, $payload));
+    $withoutAssets = gameDataAssetPayload($payload, false);
+    $original = gameDataRun(gameDataSubmit($dataset, $withoutAssets));
+    $catalog = app(GameDataCatalogService::class);
+    $originalIds = $catalog->query($dataset)->orderBy('id')->pluck('id')->all();
+    foreach ($catalog->query($dataset)->get() as $row) {
+        expect($row->image)->toBeNull()->and($row->icon)->toBeNull();
+    }
+    $comparison = $this->postJson('/api/admin-api/nro/game-data/'.$dataset.'/compare', $payload)->assertOk();
+    foreach ($comparison->json('data') as $decision) {
+        expect($decision['needs_update'])->toBeTrue();
+    }
+    $filled = gameDataRun(gameDataSubmit($dataset, $payload));
+    expect($filled->status)->toBe('completed')->and($filled->created)->toBe(0)
+        ->and($filled->updated)->toBe($original->total)
+        ->and($catalog->query($dataset)->orderBy('id')->pluck('id')->all())->toBe($originalIds);
+    foreach ($catalog->query($dataset)->get() as $row) {
+        expect($row->icon)->toBe('/storage/uploads/2026-10-18/image/icon.webp')
+            ->and($row->image)->toBe('https://cdn.example.com/image.png');
+    }
     $catalog = app(GameDataCatalogService::class);
     $record = $catalog->query($dataset)->firstOrFail();
     expect($record->icon)->toBe('/storage/uploads/2026-10-18/image/icon.webp')

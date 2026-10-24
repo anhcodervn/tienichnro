@@ -33,6 +33,8 @@ export type AdminUserListResponse = {
 export type AdminUserDetailResponse = {
     id: number;
     name: string | null;
+    full_name: string | null;
+    wallet_balance: number;
     username: string | null;
     email: string | null;
     phone: string | null;
@@ -80,6 +82,18 @@ export type AdminUserListParams = {
     page?: number;
 };
 
+export type AdminUserProfilePayload = { username: string; email: string; full_name: string | null; phone: string | null; avatar: string | null };
+export type AdminUserWalletTransaction = {
+    id: number;
+    direction: 'credit' | 'debit';
+    amount: number;
+    balance_before: number;
+    balance_after: number;
+    description: string;
+    actor_id: number | null;
+    created_at: string;
+};
+
 export const adminUserService = {
     async list(params: AdminUserListParams = {}): Promise<AdminUserListResponse> {
         const response = await api.get('/api/admin-api/users', { params });
@@ -101,6 +115,21 @@ export const adminUserService = {
 
     async updateStatus(userId: number | string, status: 'active' | 'blocked'): Promise<void> {
         await api.patch(`/api/admin-api/users/${userId}/status`, { status });
+    },
+
+    async update(userId: number | string, payload: AdminUserProfilePayload): Promise<AdminUserDetailResponse> {
+        return (await api.patch(`/api/admin-api/users/${userId}`, payload)).data.data;
+    },
+
+    async adjustWallet(
+        userId: number | string,
+        payload: { direction: 'credit' | 'debit'; amount: number; description: string; request_id: string },
+    ): Promise<{ balance: number }> {
+        return (await api.post(`/api/admin-api/wallets/${userId}/adjust`, payload)).data;
+    },
+
+    async walletHistory(userId: number | string, page = 1): Promise<{ data: AdminUserWalletTransaction[]; current_page: number; last_page: number }> {
+        return (await api.get(`/api/admin-api/wallets/${userId}/transactions`, { params: { page } })).data;
     },
 
     async resetPassword(

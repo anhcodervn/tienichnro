@@ -56,6 +56,8 @@ export interface AdminSeoCategoryItem {
 
 export interface AdminSeoPostItem {
     id: number;
+    language: string;
+    lock_version: number;
     seo_category_id: number | null;
     type: SeoPageType;
     service_id: number | null;
@@ -96,25 +98,37 @@ export interface AdminSeoCategoryPayload {
 }
 
 export interface AdminSeoPostPayload {
+    language?: string;
+    expected_version?: number;
     seo_category_id?: number | null;
     type: SeoPageType;
     service_id?: number | null;
     title: string;
     slug: string;
-    excerpt?: string;
+    excerpt?: string | null;
     content?: unknown[];
-    faq?: SeoFaqItem[];
+    faq?: SeoFaqItem[] | null;
     cover_image?: string | null;
-    seo_title?: string;
-    seo_description?: string;
-    meta_keywords?: string;
+    seo_title?: string | null;
+    seo_description?: string | null;
+    meta_keywords?: string | null;
     canonical_url?: string | null;
     robots: SeoRobotsValue;
-    focus_keyword?: string;
-    cover_alt?: string;
+    focus_keyword?: string | null;
+    cover_alt?: string | null;
     article_schema?: boolean;
     breadcrumb_schema?: boolean;
     status: SeoPostStatus;
     published_at?: string | null;
     scheduled_at?: string | null;
+}
+
+export interface SeoPostRevisionSummary {
+    id: number;
+    published_at: string | null;
+    created_at: string;
+    seo_title: string | null;
+    seo_description: string | null;
+    title: string;
+    slug: string;
 }

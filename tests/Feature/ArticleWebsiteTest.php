@@ -51,7 +51,7 @@ test('legacy commercial endpoints are not available', function (string $method, 
     $admin = User::factory()->create(['role' => 'admin']);
     expect($this->actingAs($admin)->json($method, $uri)->status())->toBeIn([404, 405]);
 })->with([
-    ['GET', '/dashboard'], ['GET', '/dashboard/don-hang'], ['GET', '/cong-tac-vien'],
+    ['GET', '/dashboard/don-hang'], ['GET', '/cong-tac-vien'],
     ['GET', '/bang-gia'], ['GET', '/nap-game-teamobi'], ['GET', '/tai-khoan/so-du'], ['GET', '/tai-khoan/dong-tien'],
     ['GET', '/tai-khoan/api-key'], ['POST', '/api/orders'], ['POST', '/api/recharge/webhook'],
     ['GET', '/api/admin-api/topup/orders'], ['POST', '/api/admin-api/users/1/wallet-adjust'],
@@ -107,6 +107,7 @@ test('article bootstrap creates missing editorial tables without a commerce cata
     $migration = require database_path('migrations/2026_10_06_093807_prepare_article_website_tables.php');
     $migration->up();
     $migration->up();
+    (require database_path('migrations/2026_10_24_102752_add_language_and_lock_version_to_seo_posts_table.php'))->up();
     expect(Schema::hasColumns('seo_posts', ['type', 'faq', 'cover_image', 'meta_keywords']))->toBeTrue();
     $post = articleWebsitePost();
     $this->get('/')->assertOk()->assertSee($post->title);

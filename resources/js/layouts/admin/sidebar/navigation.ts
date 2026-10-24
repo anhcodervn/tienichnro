@@ -1,4 +1,4 @@
-import { BookMarked, Globe2, Layers3, ListChecks, Mail, MessagesSquare, ScrollText, Settings, Users, type LucideIcon } from 'lucide-vue-next';
+import { Globe2, Layers3, ListChecks, Mail, MessagesSquare, ScrollText, Settings, Users, type LucideIcon } from 'lucide-vue-next';
 
 export type AdminMenuChild = {
     label: string;
@@ -37,10 +37,17 @@ export const adminMenuGroups: AdminMenuGroup[] = [
             { label: 'Zalo nhận thông báo', href: '/admin/nro/zalo-receivers' },
         ],
     },
-    { key: 'posts', label: 'Bài viết', icon: BookMarked, href: '/admin/seo/posts' },
-    { key: 'categories', label: 'Danh mục', icon: Layers3, href: '/admin/seo/categories' },
-    { key: 'seo-home', label: 'SEO trang chủ', icon: Globe2, href: '/admin/seo/home' },
-    { key: 'sitemaps', label: 'Sitemap & index', icon: ListChecks, href: '/admin/seo/sitemaps' },
+    {
+        key: 'seo',
+        label: 'SEO',
+        icon: Globe2,
+        children: [
+            { label: 'Bài viết', href: '/admin/seo/posts' },
+            { label: 'Danh mục', href: '/admin/seo/categories' },
+            { label: 'SEO trang chủ', href: '/admin/seo/home' },
+            { label: 'Sitemap & index', href: '/admin/seo/sitemaps' },
+        ],
+    },
     {
         key: 'users',
         label: 'Người dùng',

@@ -6,11 +6,13 @@ use App\Features\Admin\User\Actions\ListAdminUsersAction;
 use App\Features\Admin\User\Actions\ListUserLogsAction;
 use App\Features\Admin\User\Actions\ResetAdminUserPasswordAction;
 use App\Features\Admin\User\Actions\ShowAdminUserAction;
+use App\Features\Admin\User\Actions\UpdateAdminUserAction;
 use App\Features\Admin\User\Actions\UpdateAdminUserStatusAction;
 use App\Features\Admin\User\Requests\AdminResetUserPasswordRequest;
 use App\Features\Admin\User\Requests\AdminUserIndexRequest;
 use App\Features\Admin\User\Requests\AdminUserRelatedListRequest;
 use App\Features\Admin\User\Requests\AdminUserStatusRequest;
+use App\Features\Admin\User\Requests\UpdateAdminUserRequest;
 use App\Features\Admin\User\Resources\AdminUserDetailResource;
 use App\Features\Admin\User\Resources\AdminUserResource;
 use App\Http\Controllers\Controller;
@@ -42,6 +44,13 @@ class UserController extends Controller
             'Cập nhật trạng thái người dùng thành công.',
             ['user' => AdminUserResource::make($updatedUser)->resolve()],
         ));
+    }
+
+    public function update(UpdateAdminUserRequest $request, User $user, UpdateAdminUserAction $action, ShowAdminUserAction $show): JsonResponse
+    {
+        $user = $action->handle($user, $request->validated(), $request);
+
+        return response()->json(ApiResponse::success('Đã cập nhật thông tin người dùng.', AdminUserDetailResource::make($show->handle($user))->resolve()));
     }
 
     public function resetPassword(

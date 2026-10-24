@@ -1,12 +1,13 @@
 @extends('client.layouts.app')
 
-@section('title', 'Quản lý tài khoản')
+@section('title', $activeTab === 'dashboard' ? 'Dashboard license' : 'Quản lý tài khoản')
 @section('robots', 'noindex,nofollow')
 
 @section('content')
 @php
     $avatarUrl = old('avatar', $user->avatar);
     $tabs = [
+        ['key' => 'dashboard', 'route' => 'account.profile.dashboard', 'icon' => 'bx-dashboard', 'title' => 'Dashboard', 'description' => 'Quản lý license được cấp'],
         ['key' => 'profile', 'route' => 'account.index', 'icon' => 'bx-user-circle', 'title' => 'Thông tin user', 'description' => 'Hồ sơ và trạng thái tài khoản'],
         ['key' => 'password', 'route' => 'account.profile.password', 'icon' => 'bx-key', 'title' => 'Đổi mật khẩu', 'description' => 'Bảo mật phiên đăng nhập'],
         ['key' => 'logs', 'route' => 'account.profile.logs', 'icon' => 'bx-history', 'title' => 'Lịch sử người dùng', 'description' => 'Nhật ký thao tác tài khoản'],
@@ -53,7 +54,9 @@
         </nav>
 
         <div class="min-w-0 p-3 sm:p-4">
-            @if ($activeTab === 'profile')
+            @if ($activeTab === 'dashboard')
+                @include('client.account.licenses')
+            @elseif ($activeTab === 'profile')
                 <div class="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
                     <form class="min-w-0 rounded-[5px] border border-slate-200 bg-white p-4 sm:p-5" method="POST" action="{{ route('account.profile.update') }}">
                         @csrf

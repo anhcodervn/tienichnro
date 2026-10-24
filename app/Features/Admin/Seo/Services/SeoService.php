@@ -2,18 +2,23 @@
 
 namespace App\Features\Admin\Seo\Services;
 
+use App\Exceptions\ApiException;
 use App\Models\SeoCategory;
 use App\Models\SeoPost;
+use App\Support\EditorContentRenderer;
 use App\Support\SettingStore;
 use App\Support\SitemapUrlService;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class SeoService
 {
     public function __construct(
         protected SitemapUrlService $sitemapUrlService,
         protected SettingStore $settingStore,
+        protected EditorContentRenderer $contentRenderer,
     ) {}
 
     public function overview(): array
@@ -117,39 +122,39 @@ class SeoService
 
     public function upsertPost(array $payload, ?SeoPost $post = null): SeoPost
     {
-        $post ??= new SeoPost;
+        return DB::transaction(function () use ($payload, $post): SeoPost {
+            $post = $post?->exists
+                ? SeoPost::query()->whereKey($post->id)->lockForUpdate()->firstOrFail()
+                : new SeoPost;
 
-        $post->fill([
-            'seo_category_id' => $payload['seo_category_id'] ?? null,
-            'type' => $payload['type'],
-            'service_id' => null,
-            'title' => $payload['title'],
-            'slug' => $payload['slug'],
-            'excerpt' => $payload['excerpt'] ?? null,
-            'content' => $payload['content'] ?? [],
-            'faq' => $payload['faq'] ?? [],
-            'cover_image' => $payload['cover_image'] ?? null,
-            'seo_title' => $payload['seo_title'] ?? null,
-            'seo_description' => $payload['seo_description'] ?? null,
-            'meta_keywords' => $payload['meta_keywords'] ?? null,
-            'canonical_url' => $payload['canonical_url'] ?? null,
-            'robots' => $payload['robots'],
-            'focus_keyword' => $payload['focus_keyword'] ?? null,
-            'cover_alt' => $payload['cover_alt'] ?? null,
-            'article_schema' => $payload['article_schema'] ?? true,
-            'breadcrumb_schema' => $payload['breadcrumb_schema'] ?? true,
-            'status' => $payload['status'],
-            'published_at' => $payload['status'] === 'published'
-                ? ($payload['published_at'] ?? now())
-                : ($payload['published_at'] ?? null),
-            'scheduled_at' => $payload['status'] === 'scheduled'
-                ? ($payload['scheduled_at'] ?? null)
-                : null,
-        ]);
+            if (array_key_exists('expected_version', $payload) && $post->lock_version !== (int) $payload['expected_version']) {
+                throw new ApiException('Bài viết đã được cập nhật ở phiên khác. Hãy tải lại trước khi lưu để tránh ghi đè dữ liệu.', 409);
+            }
 
-        $post->save();
+            if ($post->exists && $post->status === 'published' && (! $post->published_at || $post->published_at->lte(now()))) {
+                $post->revisions()->create([
+                    'snapshot' => $post->only($post->getFillable()),
+                    'published_at' => $post->published_at,
+                ]);
+            }
 
-        return $post->fresh()->load('category:id,name');
+            $post->fill(Arr::only($payload, $post->getFillable()));
+            $content = is_array($post->content) ? $post->content : [];
+            $post->title = Str::limit($this->contentRenderer->firstContentText($content, 'heading', 1)
+                ?: ($payload['title'] ?? $post->seo_title ?: $post->title ?: 'Bài viết SEO'), 255, '');
+            $post->excerpt = $this->contentRenderer->firstContentText($content, 'paragraph')
+                ?? ($payload['excerpt'] ?? $post->seo_description ?? $post->excerpt);
+            $post->status = 'published';
+            $post->published_at = now();
+            $post->scheduled_at = null;
+            $post->lock_version++;
+            $post->save();
+
+            $retainedIds = $post->revisions()->latest('id')->limit(10)->pluck('id');
+            $post->revisions()->whereNotIn('id', $retainedIds)->delete();
+
+            return $post->fresh()->load('category:id,name');
+        }, 3);
     }
 
     public function postOptions(): array
