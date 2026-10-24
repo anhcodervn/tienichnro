@@ -3,6 +3,7 @@ import {
     adminUserService,
     type AdminUserDetailResponse,
     type AdminUserProfilePayload,
+    type AdminUserTool,
     type AdminUserWalletTransaction,
 } from '@/services/admin-user.service';
 import { handleErrorResponse, handleSuccessResponse } from '@/utils/response';
@@ -20,16 +21,27 @@ const errors = ref<string[]>([]);
 const profile = reactive<AdminUserProfilePayload>({ username: '', email: '', full_name: null, phone: null, avatar: null });
 const wallet = reactive({ direction: 'credit' as 'credit' | 'debit', amount: 0, description: '', request_id: '' });
 const password = reactive({ password: '', password_confirmation: '' });
+const tools = ref<AdminUserTool[]>([]);
+const selectedTools = ref<number[]>([]);
+const toolsLoading = ref(false);
+const toolsFailed = ref(false);
+const toolsLoadedFor = ref('');
+const toolSearch = ref('');
+const filteredTools = computed(() =>
+    tools.value.filter((item) => `${item.name} ${item.product_code}`.toLowerCase().includes(toolSearch.value.toLowerCase())),
+);
+let toolRequest = 0;
 const transactions = ref<AdminUserWalletTransaction[]>([]);
 const historyLoading = ref(false);
 const historyFailed = ref(false);
 const historyPage = ref(1);
 const historyLastPage = ref(1);
-const tab = computed(() => (route.query.tab === 'wallet' || route.query.tab === 'password' ? route.query.tab : 'profile'));
+const tab = computed(() => (['wallet', 'password', 'tools'].includes(String(route.query.tab)) ? String(route.query.tab) : 'profile'));
 const tabs = [
     { key: 'profile', label: 'Thông tin user' },
     { key: 'wallet', label: 'Cộng / trừ tiền' },
-    { key: 'password', label: 'Lấy lại mật khẩu' },
+    { key: 'password', label: 'Đổi mật khẩu' },
+    { key: 'tools', label: 'Quyền tool' },
 ];
 const inputClass =
     'min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-600 dark:bg-slate-800 dark:text-white';
@@ -69,6 +81,12 @@ const load = async (): Promise<void> => {
     loading.value = true;
     failed.value = false;
     user.value = null;
+    toolRequest++;
+    toolsLoadedFor.value = '';
+    toolsLoading.value = false;
+    tools.value = [];
+    selectedTools.value = [];
+    toolSearch.value = '';
     try {
         const result = await adminUserService.show(userId);
         if (String(route.params.user_id) !== userId) return;
@@ -81,11 +99,44 @@ const load = async (): Promise<void> => {
             avatar: result.avatar,
         });
         if (tab.value === 'wallet') void historyLoad();
+        if (tab.value === 'tools') await loadTools();
     } catch (error) {
         failed.value = true;
         handleErrorResponse({ message: error instanceof Error ? error.message : 'Không tải được thông tin người dùng.' });
     } finally {
         loading.value = false;
+    }
+};
+const loadTools = async (): Promise<void> => {
+    const userId = String(route.params.user_id);
+    const request = ++toolRequest;
+    toolsLoading.value = true;
+    toolsFailed.value = false;
+    toolsLoadedFor.value = '';
+    try {
+        const result = await adminUserService.tools(userId);
+        if (request !== toolRequest || String(route.params.user_id) !== userId) return;
+        tools.value = result.tools;
+        selectedTools.value = [...result.product_ids];
+        toolsLoadedFor.value = userId;
+    } catch {
+        if (request === toolRequest) toolsFailed.value = true;
+    } finally {
+        if (request === toolRequest) toolsLoading.value = false;
+    }
+};
+const saveTools = async (): Promise<void> => {
+    if (!user.value || busy.value || toolsLoading.value || toolsFailed.value || toolsLoadedFor.value !== String(user.value.id)) return;
+    const userId = user.value.id;
+    busy.value = true;
+    errors.value = [];
+    try {
+        await adminUserService.updateTools(userId, [...selectedTools.value]);
+        if (user.value?.id === userId) success('Đã cập nhật quyền sử dụng tool.');
+    } catch (error) {
+        reportError(error);
+    } finally {
+        busy.value = false;
     }
 };
 const saveProfile = async (): Promise<void> => {
@@ -181,6 +232,7 @@ watch(
         wallet.direction = route.query.direction === 'debit' ? 'debit' : 'credit';
         wallet.request_id = '';
         if (user.value && tab.value === 'wallet') void historyLoad();
+        if (user.value && tab.value === 'tools') void loadTools();
     },
     { immediate: true },
 );
@@ -372,11 +424,58 @@ watch(
                 </section>
             </template>
             <form
-                v-else
+                v-else-if="tab === 'tools'"
+                class="grid gap-4 rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"
+                @submit.prevent="saveTools"
+            >
+                <div>
+                    <h2 class="font-bold">Cấp quyền sử dụng tool</h2>
+                    <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                        Chọn tool được phép dùng rồi lưu. Bỏ chọn để thu hồi quyền. Tool đang tắt sẽ không xuất hiện trong API của user.
+                    </p>
+                </div>
+                <p v-if="toolsLoading" role="status" class="text-sm text-slate-500">Đang tải danh sách tool…</p>
+                <button v-else-if="toolsFailed" type="button" class="min-h-11 text-left text-sm text-rose-600" :disabled="busy" @click="loadTools">
+                    Không tải được quyền tool. Bấm để thử lại.
+                </button>
+                <template v-else>
+                    <label class="grid gap-2 text-sm"
+                        >Tìm tool<input v-model="toolSearch" type="search" :class="inputClass" placeholder="Tên hoặc mã tool"
+                    /></label>
+                    <fieldset :disabled="busy" class="grid gap-3 sm:grid-cols-2">
+                        <label
+                            v-for="tool in filteredTools"
+                            :key="tool.id"
+                            class="flex items-start gap-3 rounded-lg border border-slate-200 p-3 dark:border-slate-700"
+                        >
+                            <input v-model="selectedTools" type="checkbox" :value="tool.id" class="mt-1 h-4 w-4 rounded" />
+                            <img v-if="tool.image_url" :src="tool.image_url" alt="" class="h-12 w-12 shrink-0 rounded-lg object-cover" />
+                            <span class="grid min-w-0 gap-1 text-sm">
+                                <strong class="break-words">{{ tool.name }}</strong>
+                                <span class="break-all text-xs text-slate-500 dark:text-slate-400"
+                                    >{{ tool.product_code }} · {{ tool.latest_version || 'Chưa có version' }}</span
+                                >
+                                <span v-if="!tool.is_active" class="text-xs text-amber-700 dark:text-amber-400">Tool đang tắt</span>
+                            </span>
+                        </label>
+                    </fieldset>
+                    <p v-if="!filteredTools.length" class="text-sm text-slate-500">
+                        {{ tools.length ? 'Không tìm thấy tool phù hợp.' : 'Chưa có sản phẩm/tool. Hãy tạo trong phần Sản phẩm / tool.' }}
+                    </p>
+                    <div class="flex flex-wrap items-center gap-3">
+                        <button type="submit" :class="buttonClass" :disabled="busy || toolsLoadedFor !== String(user.id)">
+                            {{ busy ? 'Đang lưu…' : 'Lưu quyền tool' }}
+                        </button>
+                        <span class="text-sm text-slate-500 dark:text-slate-400">Đã chọn {{ selectedTools.length }} tool</span>
+                    </div>
+                </template>
+            </form>
+            <form
+                v-else-if="tab === 'password'"
                 class="max-w-xl rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900"
                 @submit.prevent="resetPassword"
             >
-                <h2 class="mb-2 font-bold">Lấy lại mật khẩu</h2>
+                <h2 class="mb-2 font-bold">Đổi mật khẩu</h2>
                 <p class="mb-4 text-sm text-slate-500">
                     Đặt mật khẩu mới cho tài khoản. Các phiên đăng nhập và token hiện có sẽ bị thu hồi; user nhận email thông báo, không kèm mật khẩu.
                 </p>

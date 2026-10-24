@@ -1,6 +1,7 @@
 <?php
 
 use App\Features\Admin\User\Controllers\UserController;
+use App\Features\Admin\User\Controllers\UserToolController;
 use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth:sanctum', 'admin'])
@@ -14,4 +15,6 @@ Route::middleware(['auth:sanctum', 'admin'])
         Route::patch('{user}/status', 'updateStatus')->name('status.update');
         Route::post('{user}/reset-password', 'resetPassword')->name('password.reset');
         Route::get('{user}/logs', 'logs')->name('logs.index');
+        Route::get('{user}/tools', [UserToolController::class, 'index'])->name('tools.index');
+        Route::patch('{user}/tools', [UserToolController::class, 'update'])->name('tools.update');
     });

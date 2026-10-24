@@ -83,6 +83,16 @@ export type AdminUserListParams = {
 };
 
 export type AdminUserProfilePayload = { username: string; email: string; full_name: string | null; phone: string | null; avatar: string | null };
+export type AdminUserTool = {
+    id: number;
+    name: string;
+    product_code: string;
+    description: string | null;
+    image_url: string | null;
+    latest_version: string | null;
+    is_active: boolean;
+};
+export type AdminUserToolsResponse = { tools: AdminUserTool[]; product_ids: number[] };
 export type AdminUserWalletTransaction = {
     id: number;
     direction: 'credit' | 'debit';
@@ -95,6 +105,13 @@ export type AdminUserWalletTransaction = {
 };
 
 export const adminUserService = {
+    async tools(userId: number | string): Promise<AdminUserToolsResponse> {
+        return (await api.get(`/api/admin-api/users/${userId}/tools`)).data.data;
+    },
+
+    async updateTools(userId: number | string, productIds: number[]): Promise<{ product_ids: number[] }> {
+        return (await api.patch(`/api/admin-api/users/${userId}/tools`, { product_ids: productIds })).data.data;
+    },
     async list(params: AdminUserListParams = {}): Promise<AdminUserListResponse> {
         const response = await api.get('/api/admin-api/users', { params });
 

@@ -86,6 +86,11 @@ onMounted(load);
                                     :to="{ path: `/admin/users/${user.id}`, query: { tab: 'password' } }"
                                     >Lấy lại mật khẩu</RouterLink
                                 >
+                                <RouterLink
+                                    class="inline-flex min-h-10 items-center rounded-lg border border-slate-300 px-3 text-xs font-semibold dark:border-slate-600"
+                                    :to="{ path: `/admin/users/${user.id}`, query: { tab: 'tools' } }"
+                                    >Quyền tool</RouterLink
+                                >
                             </div>
                         </td>
                     </tr>

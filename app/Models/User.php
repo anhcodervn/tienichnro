@@ -9,6 +9,7 @@ use Illuminate\Auth\Passwords\CanResetPassword as CanResetPasswordTrait;
 use Illuminate\Contracts\Auth\CanResetPassword;
 use Illuminate\Contracts\Auth\MustVerifyEmail as MustVerifyEmailContract;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
@@ -85,6 +86,11 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
     public function userSessions(): HasMany
     {
         return $this->hasMany(UserSession::class);
+    }
+
+    public function permittedTools(): BelongsToMany
+    {
+        return $this->belongsToMany(LicenseProduct::class, 'license_product_user')->withTimestamps();
     }
 
     public function adminAuditLogs(): HasMany

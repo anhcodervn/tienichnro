@@ -21,6 +21,7 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
+use Laravel\Sanctum\PersonalAccessToken;
 use Throwable;
 
 class AuthController extends Controller
@@ -84,6 +85,9 @@ class AuthController extends Controller
             ]);
         }
 
+        if ($user->status !== 'active') {
+            throw new ApiException('Tài khoản đã bị khóa.', 403);
+        }
         $request->clearRateLimit();
         $this->touchLastLogin($user, $request);
         $this->recordUserLogAction->handle($user, 'api_login', 'Đăng nhập API', $request);
@@ -96,7 +100,28 @@ class AuthController extends Controller
             'token_type' => 'Bearer',
             'access_token' => $token,
             'user' => $this->userPayload($user),
-        ]);
+        ])->header('Cache-Control', 'no-store, private');
+    }
+
+    public function apiSession(Request $request): JsonResponse
+    {
+        abort_unless($request->user()->status === 'active', 403, 'Tài khoản đã bị khóa.');
+
+        return response()->json(['status' => true, 'user' => $this->userPayload($request->user())]);
+    }
+
+    public function apiLogout(Request $request): JsonResponse
+    {
+        $token = $request->user()->currentAccessToken();
+        if ($token instanceof PersonalAccessToken) {
+            $token->delete();
+        } elseif ($request->hasSession()) {
+            Auth::guard('web')->logout();
+            $request->session()->invalidate();
+            $request->session()->regenerateToken();
+        }
+
+        return response()->json(['status' => true, 'message' => 'Đã đăng xuất phiên hiện tại.']);
     }
 
     public function register(RegisterRequest $request): JsonResponse|RedirectResponse

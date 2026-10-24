@@ -17,6 +17,8 @@ function environment(query = {}, overrides = {}) {
         show: async () => ({ ...account }),
         list: async () => ({ data: [{ ...account }], meta: { last_page: 1 } }),
         walletHistory: async () => ({ data: [], current_page: 1, last_page: 1 }),
+        tools: async () => ({ tools: [{ id: 1, name: 'Mod tool', product_code: 'MOD_TOOL', image_url: '/storage/uploads/mod.webp', latest_version: '2.0.0', is_active: true }, { id: 2, name: 'Disabled tool', product_code: 'DISABLED', is_active: false }], product_ids: [2] }),
+        updateTools: async (id, productIds) => { calls.push(['tools', id, [...productIds]]); return { product_ids: productIds }; },
         update: async (id, payload) => { calls.push(['profile', id, { ...payload }]); return { ...account, ...payload }; },
         adjustWallet: async (id, payload) => { calls.push(['wallet', id, { ...payload }]); return { balance: 130000 }; },
         resetPassword: async (id, payload) => { calls.push(['password', id, { ...payload }]); },
@@ -43,7 +45,7 @@ function environment(query = {}, overrides = {}) {
         }, module);
         return module.default;
     }
-    const detail = () => compile('info', 'load, historyLoad, saveProfile, adjustWallet, resetPassword, user, profile, wallet, password, busy, errors');
+    const detail = () => compile('info', 'load, historyLoad, loadTools, saveTools, tools, selectedTools, toolsFailed, toolsLoading, toolsLoadedFor, saveProfile, adjustWallet, resetPassword, user, profile, wallet, password, busy, errors');
     return {
         calls, alerts, popup,
         async actions() {
@@ -70,6 +72,7 @@ test('user list exposes information credit debit and password actions for each u
     for (const label of ['Thông tin user', 'Cộng tiền', 'Trừ tiền', 'Lấy lại mật khẩu']) assert.ok(html.includes(label));
     assert.ok(html.includes('/admin/users/7?tab=wallet&amp;direction=debit'));
     assert.ok(html.includes('/admin/users/7?tab=password'));
+    assert.ok(html.includes('/admin/users/7?tab=tools'));
 });
 
 test('detail tabs render editable profile wallet history and password forms', async () => {
@@ -93,6 +96,30 @@ test('saving information targets the selected account', async () => {
     assert.equal(env.calls[0][0], 'profile');
     assert.equal(env.calls[0][1], 7);
     assert.equal(env.calls[0][2].full_name, 'Updated Name');
+});
+
+test('tools tab shows image name version and currently granted disabled tools', async () => {
+    const html = await environment({ tab: 'tools' }).render();
+    for (const text of ['Cấp quyền sử dụng tool', 'Mod tool', '2.0.0', '/storage/uploads/mod.webp', 'Tool đang tắt', 'Lưu quyền tool']) assert.ok(html.includes(text));
+    assert.match(html, /type="checkbox" value="2"[^>]*checked/);
+});
+
+test('tool selection only saves on submit and targets the selected user', async () => {
+    const env = environment({ tab: 'tools' });
+    const state = await env.actions();
+    assert.deepEqual(state.selectedTools.value, [2]);
+    state.selectedTools.value = [1];
+    assert.equal(env.calls.length, 0);
+    await state.saveTools();
+    assert.deepEqual(env.calls[0], ['tools', 7, [1]]);
+});
+
+test('failed tool permission load blocks submitting an empty permission list', async () => {
+    const env = environment({ tab: 'tools' }, { tools: async () => { throw new Error('Network unavailable'); } });
+    const state = await env.actions();
+    assert.equal(state.toolsFailed.value, true);
+    await state.saveTools();
+    assert.equal(env.calls.length, 0);
 });
 
 test('wallet and password changes require confirmation before calling their APIs', async () => {

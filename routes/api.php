@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Route;
 Route::post('/auth/login', [AuthController::class, 'apiLogin'])->middleware('throttle:10,1')->name('api.auth.login');
 
 Route::middleware('auth:sanctum')->group(function (): void {
+    Route::get('/auth/session', [AuthController::class, 'apiSession'])->middleware('cache.headers:no_store;private')->name('api.auth.session');
+    Route::post('/auth/logout', [AuthController::class, 'apiLogout'])->middleware('cache.headers:no_store;private')->name('api.auth.logout');
     Route::get('/system-settings', function (SettingStore $settingStore) {
         return response()->json(['status' => true, 'data' => ['settings' => $settingStore->getMany([
             'site_name' => config('app.name', 'Tiện ích NRO'), 'site_description' => '', 'support_email' => '',
@@ -47,6 +49,7 @@ if (file_exists(base_path('app/Features/NroNotification/routes.php'))) {
 }
 
 require base_path('app/Features/NroGameData/routes.php');
+require base_path('app/Features/Client/Profile/api.php');
 
 if (file_exists(base_path('app/Features/Admin/Wallet/routes.php'))) {
     require base_path('app/Features/Admin/Wallet/routes.php');
