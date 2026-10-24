@@ -6,6 +6,7 @@ use App\Features\Admin\License\Requests\ManageLicenseRequest;
 use App\Features\Admin\License\Requests\SaveLicenseCatalogRequest;
 use App\Features\Admin\License\Resources\LicenseResource;
 use App\Features\Admin\License\Services\LicenseAdminService;
+use App\Features\Admin\License\Services\ProductReleaseService;
 use App\Http\Controllers\Controller;
 use App\Models\License;
 use App\Models\LicensePlan;
@@ -25,16 +26,14 @@ class LicenseController extends Controller
         return response()->json(['data' => LicenseProduct::query()->latest('id')->get()]);
     }
 
-    public function storeProduct(SaveLicenseCatalogRequest $request): JsonResponse
+    public function storeProduct(SaveLicenseCatalogRequest $request, ProductReleaseService $releases): JsonResponse
     {
-        return response()->json(['data' => LicenseProduct::query()->create($request->validated())], 201);
+        return response()->json(['data' => $releases->save($request->validated())], 201);
     }
 
-    public function updateProduct(SaveLicenseCatalogRequest $request, LicenseProduct $product): JsonResponse
+    public function updateProduct(SaveLicenseCatalogRequest $request, LicenseProduct $product, ProductReleaseService $releases): JsonResponse
     {
-        $product->update($request->validated());
-
-        return response()->json(['data' => $product->refresh()]);
+        return response()->json(['data' => $releases->save($request->validated(), $product)]);
     }
 
     public function plans(): JsonResponse

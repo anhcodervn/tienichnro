@@ -24,6 +24,12 @@ class SaveLicenseCatalogRequest extends FormRequest
             return [...$rules, 'product_id' => ['required', 'integer', Rule::exists('license_products', 'id')], 'duration_days' => ['present', 'nullable', 'integer', 'min:1', 'max:36500'], 'price' => ['required', 'integer', 'min:0', 'max:100000000000']];
         }
 
-        return [...$rules, 'product_code' => ['required', 'string', 'max:64', 'regex:/\A[A-Z0-9_]+\z/', Rule::unique('license_products', 'product_code')->ignore($this->route('product')?->id)], 'description' => ['nullable', 'string', 'max:2000'], 'minimum_version' => ['required', 'string', 'max:32', 'regex:/\A\d+\.\d+\.\d+(?:\.\d+)?\z/'], 'heartbeat_interval' => ['required', 'integer', 'min:5', 'max:300'], 'lease_duration' => ['required', 'integer', 'gt:heartbeat_interval', 'max:900'], 'offline_grace' => ['required', 'integer', 'in:0']];
+        return [...$rules,
+            'latest_version' => ['nullable', 'string', 'max:32', 'regex:/\A\d+\.\d+\.\d+(?:\.\d+)?\z/', 'required_with:tool_zip,update_zip',
+                Rule::requiredIf(fn (): bool => $this->exists('latest_version') && ($this->route('product')?->tool_zip_path || $this->route('product')?->update_zip_path)),
+            ],
+            'tool_zip' => ['nullable', 'file', 'mimes:zip', 'extensions:zip', 'max:102400'],
+            'update_zip' => ['nullable', 'file', 'mimes:zip', 'extensions:zip', 'max:102400'],
+            'product_code' => ['required', 'string', 'max:64', 'regex:/\A[A-Z0-9_]+\z/', Rule::unique('license_products', 'product_code')->ignore($this->route('product')?->id)], 'description' => ['nullable', 'string', 'max:2000'], 'minimum_version' => ['required', 'string', 'max:32', 'regex:/\A\d+\.\d+\.\d+(?:\.\d+)?\z/'], 'heartbeat_interval' => ['required', 'integer', 'min:5', 'max:300'], 'lease_duration' => ['required', 'integer', 'gt:heartbeat_interval', 'max:900'], 'offline_grace' => ['required', 'integer', 'in:0']];
     }
 }

@@ -26,4 +26,12 @@ class LicensePolicy
     {
         return $license->user_id === $user->id && $license->status !== 'revoked';
     }
+
+    public function download(User $user, License $license): bool
+    {
+        return $license->user_id === $user->id
+            && in_array($license->status, ['unused', 'active'], true)
+            && (! $license->expires_at || $license->expires_at->isFuture())
+            && (bool) $license->product?->is_active;
+    }
 }

@@ -131,9 +131,9 @@ test('revoked key rows retain detail and deletion without edit or rotation', asy
 });
 
 for (const [section, title, column] of [
-    ['keys', 'License keys', 'Trạng thái key'],
     ['products', 'Sản phẩm / tool', 'Heartbeat'],
     ['plans', 'Gói license', 'Giá'],
+    ['keys', 'License keys', 'Trạng thái key'],
 ]) {
     test(`${section} submenu renders its own title and DataTable without catalog tabs or item cards`, async () => {
         const html = await renderToString(createSSRApp(pageModule.default, { section }));

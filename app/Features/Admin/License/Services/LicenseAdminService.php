@@ -10,6 +10,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 class LicenseAdminService
@@ -23,7 +24,11 @@ class LicenseAdminService
             if ($product->plans()->exists() || $product->licenses()->exists()) {
                 throw ValidationException::withMessages(['product' => 'Sản phẩm đang có gói license hoặc key. Xóa các gói chưa sử dụng trước, hoặc tắt sản phẩm để ngừng cấp key.']);
             }
+            $paths = array_filter([$product->tool_zip_path, $product->update_zip_path]);
             $product->delete();
+            if ($paths !== []) {
+                DB::afterCommit(fn () => rescue(fn () => Storage::disk('local')->delete($paths)));
+            }
         }, 3);
     }
 

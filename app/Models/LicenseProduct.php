@@ -14,7 +14,7 @@ class LicenseProduct extends Model
 
     protected $fillable = ['name', 'product_code', 'description', 'minimum_version', 'is_active', 'heartbeat_interval', 'lease_duration', 'transfer_cooldown', 'max_active_devices', 'offline_grace'];
 
-    protected $hidden = [];
+    protected $hidden = ['tool_zip_path', 'update_zip_path'];
 
     protected function casts(): array
     {

@@ -5,6 +5,11 @@ export type LicenseProduct = {
     product_code: string;
     description: string | null;
     minimum_version: string;
+    latest_version?: string | null;
+    tool_zip_name?: string | null;
+    update_zip_name?: string | null;
+    tool_zip_size?: number | null;
+    update_zip_size?: number | null;
     is_active: boolean;
     heartbeat_interval: number;
     lease_duration: number;
@@ -51,8 +56,33 @@ export const adminLicense = {
     async plans(): Promise<LicensePlan[]> {
         return (await api.get(`${endpoint}/plans`)).data.data;
     },
-    async saveProduct(value: Omit<LicenseProduct, 'id'>, id: number | null) {
-        return id ? api.patch(`${endpoint}/products/${id}`, value) : api.post(`${endpoint}/products`, value);
+    async saveProduct(
+        value: Omit<LicenseProduct, 'id'>,
+        id: number | null,
+        files: { tool: File | null; update: File | null } = { tool: null, update: null },
+    ) {
+        const body = new FormData();
+        const fields = [
+            'name',
+            'product_code',
+            'description',
+            'minimum_version',
+            'latest_version',
+            'is_active',
+            'heartbeat_interval',
+            'lease_duration',
+            'transfer_cooldown',
+            'max_active_devices',
+            'offline_grace',
+        ] as const;
+        fields.forEach((field) => {
+            const item = value[field];
+            body.append(field, typeof item === 'boolean' ? (item ? '1' : '0') : String(item ?? ''));
+        });
+        if (files.tool) body.append('tool_zip', files.tool);
+        if (files.update) body.append('update_zip', files.update);
+        if (id) body.append('_method', 'PATCH');
+        return api.post(id ? `${endpoint}/products/${id}` : `${endpoint}/products`, body);
     },
     async savePlan(value: Omit<LicensePlan, 'id'>, id: number | null) {
         return id ? api.patch(`${endpoint}/plans/${id}`, value) : api.post(`${endpoint}/plans`, value);

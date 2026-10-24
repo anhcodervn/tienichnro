@@ -58,6 +58,22 @@
                     </button>
                 </div>
                 <div id="license-details-{{ $license->id }}" hidden>
+                    @if ($license->product?->latest_version)
+                        <div class="grid gap-2 border-t border-slate-100 py-3">
+                            <p class="text-sm text-slate-500">Phiên bản mới nhất: <strong class="text-slate-900">{{ $license->product->latest_version }}</strong></p>
+                            @can('download', $license)
+                                <div class="flex flex-wrap gap-2">
+                                    @foreach (['tool' => 'Tải tool ZIP', 'update' => 'Tải ZIP cập nhật'] as $kind => $label)
+                                        @if ($license->product->{$kind.'_zip_path'})
+                                            <a class="client-button-secondary text-xs" href="{{ route('account.profile.licenses.download', ['license' => $license, 'kind' => $kind]) }}">{{ $label }}</a>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @else
+                                <p class="text-xs text-slate-500">Cần license còn hiệu lực để tải tool và bản cập nhật.</p>
+                            @endcan
+                        </div>
+                    @endif
                     <dl class="grid gap-3 border-t border-slate-100 pt-3 text-sm sm:grid-cols-2">
                         <div><dt class="text-slate-500">Ngày cấp</dt><dd class="mt-1 font-semibold">{{ $license->created_at?->format('d/m/Y H:i') }}</dd></div>
                         <div><dt class="text-slate-500">Kích hoạt</dt><dd class="mt-1 font-semibold">{{ $license->activated_at?->format('d/m/Y H:i') ?? 'Chưa kích hoạt' }}</dd></div>

@@ -91,6 +91,7 @@ const product = reactive<Omit<LicenseProduct, 'id'>>({
     product_code: '',
     description: '',
     minimum_version: '1.0.0',
+    latest_version: '1.0.0',
     is_active: true,
     heartbeat_interval: 20,
     lease_duration: 60,
@@ -98,6 +99,18 @@ const product = reactive<Omit<LicenseProduct, 'id'>>({
     max_active_devices: 1,
     offline_grace: 0,
 });
+const productFiles = reactive<{ tool: File | null; update: File | null }>({ tool: null, update: null });
+function selectProductZip(event: Event, kind: 'tool' | 'update') {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0] ?? null;
+    if (file && (!file.name.toLowerCase().endsWith('.zip') || file.size > 100 * 1024 * 1024)) {
+        formErrors.value = ['Chọn file ZIP tối đa 100 MB.'];
+        input.value = '';
+        productFiles[kind] = null;
+        return;
+    }
+    productFiles[kind] = file;
+}
 const plan = reactive<Omit<LicensePlan, 'id'>>({
     product_id: 0,
     name: '',
@@ -202,6 +215,7 @@ const productColumns = [
     { accessorKey: 'product_code', header: 'Mã sản phẩm' },
     { accessorKey: 'is_active', header: 'Trạng thái' },
     { accessorKey: 'minimum_version', header: 'Phiên bản tối thiểu' },
+    { accessorKey: 'latest_version', header: 'Phiên bản mới nhất' },
     { accessorKey: 'heartbeat_interval', header: 'Heartbeat' },
     { accessorKey: 'lease_duration', header: 'Lease' },
     { accessorKey: 'transfer_cooldown', header: 'Chờ chuyển máy' },
@@ -264,6 +278,8 @@ function openModal(value: typeof modal.value) {
     modal.value = value;
 }
 function editProduct(item?: LicenseProduct) {
+    Object.assign(productFiles, { tool: null, update: null });
+    Object.assign(product, { latest_version: '', tool_zip_name: null, update_zip_name: null });
     editingId.value = item?.id ?? null;
     Object.assign(
         product,
@@ -272,6 +288,7 @@ function editProduct(item?: LicenseProduct) {
             product_code: '',
             description: '',
             minimum_version: '1.0.0',
+            latest_version: '1.0.0',
             is_active: true,
             heartbeat_interval: 20,
             lease_duration: 60,
@@ -376,7 +393,7 @@ async function save() {
     saving.value = true;
     formErrors.value = [];
     try {
-        if (modal.value === 'product') await adminLicense.saveProduct(product, editingId.value);
+        if (modal.value === 'product') await adminLicense.saveProduct(product, editingId.value, productFiles);
         if (modal.value === 'plan') await adminLicense.savePlan(plan, editingId.value);
         if (modal.value === 'catalog-delete' && catalogDeletion.value) {
             const item = catalogDeletion.value;
@@ -788,6 +805,53 @@ onMounted(load);
                                     <label class="grid gap-1.5 text-sm font-medium"
                                         >Phiên bản tối thiểu<input v-model="product.minimum_version" required :class="inputClass"
                                     /></label>
+                                    <label class="grid gap-1.5 text-sm font-medium">
+                                        Phiên bản mới nhất
+                                        <input
+                                            v-model="product.latest_version"
+                                            placeholder="1.0.0"
+                                            :required="!!(productFiles.tool || productFiles.update)"
+                                            :disabled="saving"
+                                            :class="inputClass"
+                                        />
+                                    </label>
+                                    <fieldset
+                                        class="grid gap-3 rounded-lg border border-slate-200 p-4 dark:border-slate-700 sm:col-span-2"
+                                        :disabled="saving"
+                                    >
+                                        <legend class="px-1 text-sm font-semibold">File tải về</legend>
+                                        <p class="text-sm text-slate-500 dark:text-slate-400">
+                                            Mỗi file ZIP tối đa 100 MB. Không chọn file mới sẽ giữ file hiện tại. Tải lên các file tương ứng khi đổi
+                                            phiên bản.
+                                        </p>
+                                        <label class="grid gap-1.5 text-sm font-medium">
+                                            ZIP cài tool
+                                            <input
+                                                type="file"
+                                                accept=".zip,application/zip"
+                                                :class="inputClass"
+                                                @change="selectProductZip($event, 'tool')"
+                                            />
+                                            <span class="break-all text-xs font-normal text-slate-500 dark:text-slate-400">{{
+                                                productFiles.tool?.name || product.tool_zip_name || 'Chưa có file'
+                                            }}</span>
+                                        </label>
+                                        <label class="grid gap-1.5 text-sm font-medium">
+                                            ZIP cập nhật
+                                            <input
+                                                type="file"
+                                                accept=".zip,application/zip"
+                                                :class="inputClass"
+                                                @change="selectProductZip($event, 'update')"
+                                            />
+                                            <span class="break-all text-xs font-normal text-slate-500 dark:text-slate-400">{{
+                                                productFiles.update?.name || product.update_zip_name || 'Chưa có file'
+                                            }}</span>
+                                        </label>
+                                        <p v-if="saving" role="status" class="text-sm text-blue-600 dark:text-blue-400">
+                                            Đang tải file và lưu sản phẩm…
+                                        </p>
+                                    </fieldset>
                                     <label class="grid gap-1.5 text-sm font-medium"
                                         >Heartbeat (giây)<input
                                             v-model.number="product.heartbeat_interval"

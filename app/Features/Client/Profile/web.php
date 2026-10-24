@@ -1,5 +1,6 @@
 <?php
 
+use App\Features\Client\Profile\Controllers\DownloadLicenseProductController;
 use App\Features\Client\Profile\Controllers\PasswordUpdateController;
 use App\Features\Client\Profile\Controllers\ProfilePageController;
 use App\Features\Client\Profile\Controllers\ProfileUpdateController;
@@ -15,6 +16,9 @@ Route::middleware('auth')->prefix('tai-khoan')->name('account.profile.')->group(
 
     Route::post('/licenses/{license}/rotate', RotateLicenseController::class)
         ->whereNumber('license')->middleware('throttle:5,1')->name('licenses.rotate');
+
+    Route::get('/licenses/{license}/download/{kind}', DownloadLicenseProductController::class)
+        ->whereNumber('license')->whereIn('kind', ['tool', 'update'])->middleware('throttle:20,1')->name('licenses.download');
 
     Route::get('/thong-tin', ProfilePageController::class)->defaults('tab', 'profile')->name('edit');
     Route::patch('/thong-tin', ProfileUpdateController::class)->name('update');
