@@ -1,20 +1,13 @@
 <?php
 
 use App\Features\License\Services\ClientGameReleaseService;
-use App\Models\License;
-use App\Models\LicenseDevice;
-use App\Models\LicenseSession;
 use App\Models\Setting;
 use App\Models\User;
 use App\Support\SettingStore;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
-use Illuminate\Testing\TestResponse;
-use Tests\TestCase;
 
 beforeEach(function (): void {
-    config(['license.cache_store' => 'array']);
     Storage::fake('local');
     $this->admin = User::factory()->create(['role' => User::ROLE_ADMIN]);
 });
@@ -24,125 +17,78 @@ function clientGameZip(string $name = 'game.zip'): UploadedFile
     return UploadedFile::fake()->createWithContent($name, base64_decode('UEsDBBQAAAAAAAJlWF1ijVP/DAAAAAwAAAAIAAAAdG9vbC50eHR0b29sIHJlbGVhc2VQSwECFAAUAAAAAAACZVhdYo1T/wwAAAAMAAAACAAAAAAAAAAAAAAAgAEAAAAAdG9vbC50eHRQSwUGAAAAAAEAAQA2AAAAMgAAAAAA'));
 }
 
-/** @return array{session: LicenseSession, token: string} */
-function clientGameLicenseSession(TestCase $case): array
-{
-    $case->privateKey = openssl_pkey_get_private(file_get_contents(base_path('tests/Fixtures/license-device-test.pem')));
-    $pem = openssl_pkey_get_details($case->privateKey)['key'];
-    $publicKey = str_replace(['-----BEGIN PUBLIC KEY-----', '-----END PUBLIC KEY-----', "\n", "\r"], '', $pem);
-    $uuid = (string) Str::uuid();
-    $license = License::factory()->create(['status' => 'active', 'generation' => 1, 'current_device_uuid' => $uuid, 'expires_at' => now()->addDays(30)]);
-    $device = LicenseDevice::factory()->create(['license_id' => $license->id, 'device_uuid' => $uuid, 'public_key' => $publicKey, 'client_version' => '1.0.0']);
-    $token = bin2hex(random_bytes(32));
-    $session = LicenseSession::factory()->create(['device_id' => $device->id, 'license_id' => $license->id, 'token_hash' => hash('sha256', $token)]);
-
-    return ['session' => $session, 'token' => $token];
-}
-
-/**
- * @param  array{session: LicenseSession, token: string}  $auth
- * @param  array<string, mixed>  $extra
- */
-function signedClientGameRequest(TestCase $case, string $path, array $auth, array $extra = [], bool $badSignature = false): TestResponse
-{
-    $session = $auth['session'];
-    $payload = [
-        'product_code' => $session->license->product->product_code,
-        'device_uuid' => $session->device->device_uuid,
-        'session_id' => $session->id,
-        'generation' => $session->generation,
-        'timestamp' => now()->timestamp,
-        'nonce' => bin2hex(random_bytes(32)),
-        ...$extra,
-    ];
-    $path .= '?'.http_build_query($payload);
-    $message = implode("\n", ['GET', $path, hash('sha256', ''), (string) $payload['timestamp'], $payload['nonce'], $payload['session_id']]);
-    openssl_sign($message, $signature, $case->privateKey, OPENSSL_ALGO_SHA256);
-
-    return $case->call('GET', $path, [], [], [], [
-        'HTTP_ACCEPT' => 'application/json',
-        'HTTP_AUTHORIZATION' => 'Bearer '.$auth['token'],
-        'HTTP_X_LICENSE_SIGNATURE' => $badSignature ? base64_encode('wrong') : base64_encode($signature),
-    ], '');
-}
-
-test('client game uses signed license session for metadata and both archives without extending the lease', function (): void {
-    $auth = clientGameLicenseSession($this);
-    $expiry = $auth['session']->lease_expires_at;
-    signedClientGameRequest($this, '/api/v1/licenses/client-game', $auth)->assertOk()
+test('client game accepts account login bearer token without license device or signature', function (): void {
+    $member = User::factory()->create(['role' => User::ROLE_USER, 'password' => 'Client-password-123', 'status' => 'active']);
+    $token = $this->postJson('/api/auth/login', ['login' => $member->email, 'password' => 'Client-password-123'])
+        ->assertOk()->assertJsonPath('token_type', 'Bearer')->json('access_token');
+    auth()->forgetGuards();
+    $this->withToken($token)->getJson('/api/v1/licenses/client-game')->assertOk()
         ->assertExactJson(['success' => true, 'data' => ['original' => null, 'update' => null]]);
     foreach (['original', 'update'] as $kind) {
         $file = clientGameZip();
         $contents = file_get_contents($file->getRealPath());
         app(ClientGameReleaseService::class)->save($kind, '1.2.0', $file);
-        signedClientGameRequest($this, '/api/v1/licenses/client-game/'.$kind.'/download', $auth)->assertOk()
+        auth()->forgetGuards();
+        $this->get('/api/v1/licenses/client-game/'.$kind.'/download', ['Accept' => 'application/json'])->assertOk()
             ->assertDownload('client-game-'.$kind.'-1.2.0.zip')->assertStreamedContent($contents)
             ->assertHeader('Cache-Control', 'no-store, private');
     }
-    signedClientGameRequest($this, '/api/v1/licenses/client-game', $auth)->assertOk()->assertJsonPath('success', true)
+    auth()->forgetGuards();
+    $this->getJson('/api/v1/licenses/client-game')->assertOk()->assertJsonPath('success', true)
         ->assertJsonPath('data.original.download_url', '/api/v1/licenses/client-game/original/download')->assertJsonMissingPath('data.original.path');
-    expect($auth['session']->fresh()->lease_expires_at->equalTo($expiry))->toBeTrue();
+    $this->assertDatabaseCount('licenses', 0);
+    $this->assertDatabaseCount('license_devices', 0);
+    $this->assertDatabaseCount('license_sessions', 0);
 });
 
-test('client game rejects invalid license sessions on metadata and download', function (string $condition, string $code, string $endpoint): void {
-    $auth = clientGameLicenseSession($this);
+test('client game rejects missing invalid revoked expired tokens and blocked accounts', function (string $condition, string $endpoint): void {
     app(ClientGameReleaseService::class)->save('original', '1.0.0', clientGameZip());
-    $session = $auth['session'];
-    $extra = [];
-    if ($condition === 'token') {
-        $auth['token'] = 'wrong';
-    } elseif ($condition === 'missing-token') {
-        $auth['token'] = '';
-    } elseif ($condition === 'expired-session') {
-        $session->update(['lease_expires_at' => now()->subSecond()]);
-    } elseif ($condition === 'revoked-session') {
-        $session->update(['status' => 'revoked']);
-    } elseif ($condition === 'replaced') {
-        $session->license->update(['generation' => 2]);
-    } elseif ($condition === 'disabled-product') {
-        $session->license->product->update(['is_active' => false]);
-    } elseif ($condition === 'old-client') {
-        $session->license->product->update(['minimum_version' => '2.0.0']);
-    } elseif (in_array($condition, ['suspended', 'revoked', 'expired'], true)) {
-        $session->license->update(['status' => $condition]);
-    } elseif ($condition === 'past-expiry') {
-        $session->license->update(['expires_at' => now()->subSecond()]);
-    } elseif ($condition === 'device') {
-        $extra['device_uuid'] = (string) Str::uuid();
-    } elseif ($condition === 'product') {
-        $extra['product_code'] = 'OTHER';
-    } elseif ($condition === 'timestamp') {
-        $extra['timestamp'] = now()->timestamp - 100;
+    app(ClientGameReleaseService::class)->save('update', '1.0.0', clientGameZip());
+    $member = User::factory()->create(['status' => $condition === 'blocked' ? 'banned' : 'active']);
+    $token = $member->createToken('launcher', ['*'], $condition === 'expired' ? now()->subMinute() : null);
+    $value = $token->plainTextToken;
+    if ($condition === 'invalid' || $condition === 'license-token') {
+        $value = $condition === 'invalid' ? 'invalid-token' : bin2hex(random_bytes(32));
+    } elseif ($condition === 'revoked') {
+        $token->accessToken->delete();
     }
-    signedClientGameRequest($this, '/api/v1/licenses/client-game'.$endpoint, $auth, $extra, $condition === 'signature')
-        ->assertJsonPath('success', false)->assertJsonPath('code', $code)->assertJsonMissingPath('data')
-        ->assertHeader('Cache-Control', 'no-store, private');
-})->with([
-    ['token', 'INVALID_SESSION'], ['missing-token', 'INVALID_SESSION'], ['signature', 'INVALID_SIGNATURE'],
-    ['timestamp', 'INVALID_SIGNATURE'], ['expired-session', 'SESSION_EXPIRED'], ['revoked-session', 'SESSION_REVOKED'],
-    ['replaced', 'SESSION_REPLACED'], ['disabled-product', 'INVALID_LICENSE'], ['product', 'INVALID_LICENSE'],
-    ['device', 'DEVICE_MISMATCH'], ['suspended', 'LICENSE_SUSPENDED'], ['revoked', 'LICENSE_REVOKED'],
-    ['expired', 'LICENSE_EXPIRED'], ['past-expiry', 'LICENSE_EXPIRED'], ['old-client', 'CLIENT_VERSION_UNSUPPORTED'],
-])->with(['', '/original/download']);
+    if ($condition !== 'missing') {
+        $this->withToken($value);
+    }
+    $response = $this->getJson('/api/v1/licenses/client-game'.$endpoint);
+    if ($condition === 'blocked') {
+        $response->assertForbidden();
+    } else {
+        $response->assertUnauthorized();
+    }
+})->with(['missing', 'invalid', 'revoked', 'expired', 'blocked', 'license-token'])->with(['', '/original/download', '/update/download']);
 
-test('client game rejects replay of a signed request', function (): void {
-    $auth = clientGameLicenseSession($this);
-    $extra = ['nonce' => bin2hex(random_bytes(32))];
-    signedClientGameRequest($this, '/api/v1/licenses/client-game', $auth, $extra)->assertOk();
-    signedClientGameRequest($this, '/api/v1/licenses/client-game', $auth, $extra)->assertConflict()->assertJsonPath('code', 'REPLAY_DETECTED');
+test('client game downloads remain usable until the account bearer token is logged out', function (): void {
+    app(ClientGameReleaseService::class)->save('original', '1.0.0', clientGameZip());
+    $member = User::factory()->create(['status' => 'active']);
+    $token = $member->createToken('launcher')->plainTextToken;
+    for ($i = 0; $i < 2; $i++) {
+        auth()->forgetGuards();
+        $this->withToken($token)->get('/api/v1/licenses/client-game/original/download', ['Accept' => 'application/json'])->assertOk();
+    }
+    auth()->forgetGuards();
+    $this->withToken($token)->postJson('/api/auth/logout')->assertOk();
+    auth()->forgetGuards();
+    $this->withToken($token)->getJson('/api/v1/licenses/client-game/original/download')->assertUnauthorized();
 });
 
-test('authenticated client game missing archive returns license protocol error', function (): void {
-    $auth = clientGameLicenseSession($this);
-    signedClientGameRequest($this, '/api/v1/licenses/client-game/original/download', $auth)
+test('account authenticated client game missing archive returns a not found response', function (): void {
+    $member = User::factory()->create(['status' => 'active']);
+    $token = $member->createToken('launcher')->plainTextToken;
+    $this->withToken($token)->getJson('/api/v1/licenses/client-game/original/download')
         ->assertNotFound()->assertJsonPath('success', false)->assertJsonPath('code', 'FILE_NOT_FOUND');
 });
 
-test('old public client game endpoints are removed and website login does not bypass license authentication', function (): void {
+test('old public client game endpoints remain removed and website authentication follows sanctum', function (): void {
     $this->getJson('/api/v1/client-game')->assertNotFound();
     $this->getJson('/api/v1/client-game/original/download')->assertNotFound();
     $this->getJson('/api/v1/client-game/update/download')->assertNotFound();
-    $this->actingAs($this->admin)->getJson('/api/v1/licenses/client-game')->assertUnprocessable()->assertJsonPath('code', 'INVALID_REQUEST');
+    $this->actingAs($this->admin)->getJson('/api/v1/licenses/client-game')->assertOk();
 });
 
 test('admin uploads independent original and update releases and downloads exact archives', function (): void {

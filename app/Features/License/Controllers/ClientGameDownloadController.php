@@ -2,34 +2,30 @@
 
 namespace App\Features\License\Controllers;
 
-use App\Features\License\Requests\LicenseProtocolRequest;
 use App\Features\License\Services\ClientGameReleaseService;
-use App\Features\License\Services\LicenseFailure;
-use App\Features\License\Services\LicenseSessionService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
 
 class ClientGameDownloadController extends Controller
 {
-    public function __construct(private readonly LicenseSessionService $sessions) {}
-
-    public function index(LicenseProtocolRequest $request, ClientGameReleaseService $releases): JsonResponse
+    public function index(Request $request, ClientGameReleaseService $releases): JsonResponse
     {
-        $this->sessions->sessionRequest($request, 'status');
+        abort_unless($request->user()->status === 'active', 403);
 
         return response()->json(['success' => true, 'data' => $releases->catalog()]);
     }
 
-    public function download(LicenseProtocolRequest $request, string $kind, ClientGameReleaseService $releases): StreamedResponse
+    public function download(Request $request, string $kind, ClientGameReleaseService $releases): StreamedResponse|JsonResponse
     {
-        $this->sessions->sessionRequest($request, 'status');
+        abort_unless($request->user()->status === 'active', 403);
 
         try {
             return $releases->download($kind);
         } catch (NotFoundHttpException) {
-            throw new LicenseFailure('FILE_NOT_FOUND', 404);
+            return response()->json(['success' => false, 'code' => 'FILE_NOT_FOUND', 'message' => 'FILE_NOT_FOUND'], 404);
         }
     }
 }

@@ -151,9 +151,8 @@ onMounted(load);
         <section class="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
             <h2 class="font-semibold">API cho launcher / client</h2>
             <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                Dùng phiên license đã kích hoạt: Authorization: Bearer SESSION_TOKEN và X-License-Signature (RSA). Mỗi GET cần query product_code,
-                device_uuid, session_id, generation, timestamp và nonce mới. Ký toàn bộ path + query, giống API license /status. File chưa upload trả
-                về 404.
+                Đăng nhập qua POST /api/auth/login, sau đó gửi Authorization: Bearer ACCESS_TOKEN khi gọi API. Chỉ cần tài khoản đang hoạt động; không
+                cần license, chữ ký RSA hoặc thông tin thiết bị. File chưa upload trả về 404.
             </p>
             <ul class="mt-4 space-y-2 break-all font-mono text-xs">
                 <li>GET /api/v1/licenses/client-game</li>
