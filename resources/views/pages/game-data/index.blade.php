@@ -52,7 +52,11 @@
                                 <button type="button" data-game-data-copy-id="{{ $card['game_id'] }}" aria-label="Sao chép ID {{ $card['game_id'] }}" class="inline-flex min-h-8 shrink-0 items-center gap-1 rounded-md bg-cyan-50 px-2 text-[11px] font-bold tabular-nums text-cyan-800 transition hover:bg-cyan-100"><span>ID: {{ $card['game_id'] }}</span><i class="bx bx-copy-alt" aria-hidden="true"></i></button>
                             </div>
                             <div class="flex min-w-0 items-start gap-3">
-                                <span class="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 text-2xl text-slate-400"><i class="bx {{ $card['icon'] }}" aria-hidden="true"></i>@if($card['media'])<img src="{{ $card['media'] }}" alt="" width="48" height="48" loading="lazy" decoding="async" data-game-data-image class="absolute inset-0 size-full object-contain p-1">@endif</span>
+                                @if($card['effect'])
+                                    <x-game-effect :effect="$card['effect']" :name="$card['name']" class="w-24" />
+                                @else
+                                    <span class="relative grid size-12 shrink-0 place-items-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 text-2xl text-slate-400"><i class="bx {{ $card['icon'] }}" aria-hidden="true"></i>@if($card['media'])<img src="{{ $card['media'] }}" alt="" width="48" height="48" loading="lazy" decoding="async" data-game-data-image class="absolute inset-0 size-full object-contain p-1">@endif</span>
+                                @endif
                                 <div class="min-w-0"><h3 class="break-words text-base font-extrabold leading-6 text-slate-900">{{ $card['name'] }}</h3>@if($card['description'] !== '')<p class="mt-1 line-clamp-2 break-words text-xs leading-5 text-slate-500">{{ $card['description'] }}</p>@endif</div>
                             </div>
                             <dl class="mt-auto grid grid-cols-2 gap-3 pb-3 pt-5">@foreach($card['stats'] as $label => $value)<div class="min-w-0"><dt class="text-[10px] font-medium text-slate-500">{{ $label }}</dt><dd class="mt-1 break-words text-xs font-bold tabular-nums text-slate-800">{{ $value }}</dd></div>@endforeach</dl>

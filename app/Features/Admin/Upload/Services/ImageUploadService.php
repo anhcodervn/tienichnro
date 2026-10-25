@@ -18,6 +18,11 @@ class ImageUploadService
     /** @return array{path: string, url: string, mime_type: string, extension: string, size: int} */
     public function store(UploadedFile $file, ?string $name = null): array
     {
+        $effectName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
+        $pattern = '/\Ares_x1_effectdata_(\d{1,5})_img(?:\.png)?\z/';
+        if (preg_match($pattern, $effectName, $match) || ($name !== null && preg_match($pattern, $name, $match))) {
+            return $this->storeSpriteSheet($file, (int) $match[1]);
+        }
         if (! $this->supportsImageProcessing()) {
             throw new RuntimeException('Máy chủ cần bật PHP GD để gắn watermark tienichnro.com vào ảnh.', 503);
         }
@@ -63,6 +68,24 @@ class ImageUploadService
                 imagedestroy($canvas);
             }
         }
+    }
+
+    /** @return array<string, mixed> */
+    private function storeSpriteSheet(UploadedFile $file, int $effectId): array
+    {
+        $bytes = $file->getContent();
+        $image = @getimagesizefromstring($bytes);
+        if (! $image || $image[2] !== IMAGETYPE_PNG || $image[0] > 2048 || $image[1] > 2048
+            || ($effectId === 17 && ($image[0] !== 167 || $image[1] !== 168))) {
+            throw new RuntimeException('Invalid original effect PNG dimensions.');
+        }
+        $path = 'game-effects/raw/'.$effectId.'/'.hash('sha256', $bytes).'.png';
+        if (! Storage::disk('public')->put($path, $bytes)) {
+            throw new RuntimeException('Cannot store original effect PNG.');
+        }
+
+        return ['path' => $path, 'url' => $this->rootRelativeUrl(Storage::disk('public')->url($path)),
+            'mime_type' => 'image/png', 'extension' => 'png', 'size' => strlen($bytes), 'effect_id' => $effectId, 'requires_animation' => true];
     }
 
     protected function supportsImageProcessing(): bool

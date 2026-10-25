@@ -6,6 +6,7 @@ import { initializeClientNotifications } from './client-notifications';
 import { initializePotentialCalculator } from './client-potential';
 import { initializeNotificationSubscriptions } from './client-subscriptions';
 import { initializeClientTheme } from './client-theme';
+import { initializeGameEffects } from './game-effect-renderer';
 import { initializeNroAccess } from './nro-access';
 import { initializeNroNotifications } from './nro-notifications';
 
@@ -18,6 +19,7 @@ initializeNroAccess();
 initializeClientCatalogModals();
 initializeNotificationSubscriptions();
 initializeGameDataPage();
+initializeGameEffects();
 initializeLicenseRotation();
 
 document.querySelectorAll('[data-license-toggle]').forEach((button) => {
