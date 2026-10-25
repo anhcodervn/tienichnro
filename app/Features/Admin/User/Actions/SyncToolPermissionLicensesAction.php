@@ -26,6 +26,10 @@ class SyncToolPermissionLicensesAction
 
         $products = LicenseProduct::query()->whereIn('id', $productIds)->orderBy('id')->lockForUpdate()->get();
         foreach ($products as $product) {
+            if ($user->role === User::ROLE_USER && License::query()->where('user_id', $user->id)
+                ->where('product_id', $product->id)->where('status', '!=', 'revoked')->exists()) {
+                continue;
+            }
             $existing = License::query()->where('user_id', $user->id)->where('product_id', $product->id)
                 ->where('is_permission_grant', true)->latest('id')->lockForUpdate()->first();
             if ($existing && (! in_array($product->id, $attachedIds, true) || $existing->status !== 'revoked')) {

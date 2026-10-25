@@ -188,7 +188,7 @@ test('admin can issue batch inspect extend suspend reset and permanently revoke'
     $session = activateTestLicense($this);
     $admin = User::factory()->create(['role' => 'admin']);
     $this->actingAs($admin);
-    $issued = $this->postJson('/api/admin-api/license/keys', ['plan_id' => $this->plan->id, 'quantity' => 2, 'user_id' => $this->owner->id])->assertCreated()->json('data');
+    $issued = $this->postJson('/api/admin-api/license/keys', ['plan_id' => $this->plan->id, 'quantity' => 2, 'user_id' => $admin->id])->assertCreated()->json('data');
     expect($issued[0]['key'])->not->toBe($issued[1]['key']);
     $this->getJson('/api/admin-api/license/keys')->assertOk()->assertJsonMissingPath('data.0.key_hash')->assertJsonMissingPath('data.0.key');
     $this->getJson('/api/admin-api/license/keys/'.$this->license->id)->assertOk()->assertJsonMissingPath('data.devices.0.public_key')->assertJsonMissingPath('data.sessions.0.token_hash');

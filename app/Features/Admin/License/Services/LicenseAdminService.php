@@ -49,10 +49,12 @@ class LicenseAdminService
     public function issue(array $data, Request $request): array
     {
         return DB::transaction(function () use ($data, $request): array {
+            $owner = empty($data['user_id']) ? null : User::query()->lockForUpdate()->findOrFail($data['user_id']);
             $plan = LicensePlan::query()->with('product')->whereKey($data['plan_id'])->lockForUpdate()->firstOrFail();
             if (! $plan->is_active || ! $plan->product->is_active) {
                 throw ValidationException::withMessages(['plan_id' => 'Sản phẩm hoặc gói đã tắt.']);
             }
+            $this->assertUserLicenseLimit($owner, $plan->product_id, (int) $data['quantity']);
             $result = [];
             for ($i = 0; $i < $data['quantity']; $i++) {
                 $license = $this->issueLicense($plan, $data['user_id'] ?? null, $request);
@@ -65,11 +67,26 @@ class LicenseAdminService
 
     public function issueForToolPermission(LicenseProduct $product, User $user, Request $request): License
     {
+        $this->assertUserLicenseLimit($user, $product->id, 1);
         $plan = $product->plans()->firstOrCreate(['name' => 'Quyền tool (tự cấp)', 'duration_days' => null], [
             'price' => 0, 'max_active_devices' => 1, 'transfer_cooldown' => $product->transfer_cooldown, 'is_active' => false,
         ]);
 
         return $this->issueLicense($plan, $user->id, $request, true);
+    }
+
+    private function assertUserLicenseLimit(?User $user, int $productId, int $quantity, ?int $exceptLicenseId = null): void
+    {
+        if (! $user || $user->role !== User::ROLE_USER) {
+            return;
+        }
+        $existing = License::query()->where('user_id', $user->id)->where('product_id', $productId)->where('status', '!=', 'revoked');
+        if ($exceptLicenseId !== null) {
+            $existing->whereKeyNot($exceptLicenseId);
+        }
+        if ($quantity > 1 || $existing->exists()) {
+            throw ValidationException::withMessages(['user_id' => 'Tài khoản role user chỉ được cấp một license cho mỗi tool. Hãy quản lý hoặc gia hạn license hiện có.']);
+        }
     }
 
     private function issueLicense(LicensePlan $plan, ?int $userId, Request $request, bool $permissionGrant = false): License
@@ -90,12 +107,15 @@ class LicenseAdminService
     public function manage(License $license, array $data, Request $request): License
     {
         return DB::transaction(function () use ($license, $data, $request): License {
+            $owner = $data['action'] === 'edit' && $data['user_id'] !== null
+                ? User::query()->lockForUpdate()->findOrFail($data['user_id']) : null;
             $license = License::query()->whereKey($license->id)->lockForUpdate()->firstOrFail();
             $action = $data['action'];
             if ($license->status === 'revoked') {
                 throw ValidationException::withMessages(['action' => 'Key đã thu hồi vĩnh viễn.']);
             }
             if ($action === 'edit') {
+                $this->assertUserLicenseLimit($owner, $license->product_id, 1, $license->id);
                 if (! $license->activated_at && $data['expires_at'] !== null) {
                     throw ValidationException::withMessages(['expires_at' => 'Key chưa kích hoạt chỉ được đặt thời hạn theo ngày.']);
                 }

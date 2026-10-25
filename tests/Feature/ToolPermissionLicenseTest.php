@@ -73,11 +73,11 @@ test('granting again after removal creates a new key and keeps the old key revok
         ->and($new->encrypted_key)->not->toBe($old->encrypted_key);
 });
 
-test('saving legacy permissions creates missing licenses without changing manual licenses', function (): void {
+test('saving legacy permissions reuses the existing user license without changing its restrictions', function (): void {
     $this->member->permittedTools()->attach($this->product);
     $manual = License::factory()->create(['user_id' => $this->member->id, 'product_id' => $this->product->id, 'status' => 'suspended']);
     $this->actingAs($this->admin)->patchJson($this->url, ['product_ids' => [$this->product->id]])->assertOk();
-    expect(License::query()->where('is_permission_grant', true)->count())->toBe(1)
+    expect(License::query()->where('is_permission_grant', true)->count())->toBe(0)
         ->and($manual->fresh()->status)->toBe('suspended');
 });
 
@@ -106,7 +106,7 @@ test('managed perpetual plan is isolated from ordinary license issuance', functi
     $this->actingAs($this->admin)->patchJson($this->url, ['product_ids' => [$this->product->id]])->assertOk();
     $managed = License::query()->sole();
     expect($managed->plan_id)->not->toBe($paid->id)->and($managed->plan->is_active)->toBeFalse();
-    $this->postJson('/api/admin-api/license/keys', ['plan_id' => $paid->id, 'quantity' => 1, 'user_id' => $this->member->id])->assertCreated();
+    $this->postJson('/api/admin-api/license/keys', ['plan_id' => $paid->id, 'quantity' => 1, 'user_id' => $this->admin->id])->assertCreated();
     expect(License::query()->where('is_permission_grant', false)->sole()->duration_days)->toBe(30);
 });
 
