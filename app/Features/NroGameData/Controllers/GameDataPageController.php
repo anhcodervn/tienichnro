@@ -23,7 +23,7 @@ class GameDataPageController extends Controller
         $entry = $catalog->query($dataset)->findOrFail($record);
         $data = [...$entry->source, 'icon' => $entry->icon, 'image' => $entry->image];
         $idColumn = $catalog->identityColumns($dataset);
-        $effect = $effects->forRecord($dataset, (int) $entry->{$idColumn[array_key_last($idColumn)]});
+        $effect = $effects->forRecord($dataset, (int) $entry->{$idColumn[array_key_last($idColumn)]}, $entry->image, $entry->icon);
         if ($effect) {
             $data['effect'] = $effect;
         }

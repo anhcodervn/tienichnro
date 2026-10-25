@@ -88,7 +88,7 @@ class GameDataBrowseService
             default => ['Mã game' => $record->{$idColumn}],
         };
 
-        $effect = $this->effects->forRecord($dataset, (int) $record->{$idColumn});
+        $effect = $this->effects->forRecord($dataset, (int) $record->{$idColumn}, $record->image, $record->icon);
 
         return [
             'name' => $record->name !== '' ? $record->name : 'Chưa có tên', 'game_id' => $record->{$idColumn},

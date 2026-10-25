@@ -16,8 +16,29 @@ class GameEffectService
     public function __construct(private readonly SettingStore $settings, private readonly GameEffectDecoderService $decoder) {}
 
     /** @return array<string, mixed>|null */
-    public function forRecord(string $dataset, int $id): ?array
+    public function forRecord(string $dataset, int $id, ?string $image = null, ?string $icon = null): ?array
     {
+        foreach ([$image, $icon] as $reference) {
+            $asset = GameEffectAssetNameService::identify($reference);
+            if ($asset === null) {
+                continue;
+            }
+            $installed = $asset['effectId'] !== null ? $this->settings->getArray('game_effect_'.$asset['effectId']) : [];
+            if ($installed === []) {
+                $installed = $this->settings->getArray('game_effect_name_'.hash('sha256', $asset['name']));
+            }
+            if ($installed === [] && $asset['sha256']) {
+                $installed = $this->settings->getArray('game_effect_sheet_'.$asset['sha256']);
+                if ($installed['ambiguous'] ?? false) {
+                    $installed = [];
+                }
+            }
+            if ($asset['effectId'] !== null && isset($installed['effectId']) && $installed['effectId'] !== $asset['effectId']) {
+                $installed = [];
+            }
+
+            return ['effectId' => $asset['effectId'], 'assetName' => $asset['name'], ...$installed];
+        }
         $effectId = $dataset === 'npcs' && $id === 24 ? 17 : null;
         if ($effectId === null) {
             return null;
@@ -65,7 +86,14 @@ class GameEffectService
             }
             $descriptor = ['sheetUrl' => $disk->url($directory.'/sheet.png'), 'dataUrl' => $disk->url($directory.'/animation.json'),
                 'sheetSha256' => hash('sha256', $files['sheet.png']), 'width' => $data['width'], 'height' => $data['height'], 'tickRate' => $tickRate];
-            $this->settings->putArray('game_effect_'.$effectId, $descriptor);
+            $indexed = ['effectId' => $effectId, ...$descriptor];
+            $previousSheet = $this->settings->getArray('game_effect_sheet_'.$descriptor['sheetSha256']);
+            $sheetIndex = ($previousSheet !== [] && ($previousSheet['effectId'] ?? null) !== $effectId) ? ['ambiguous' => true] : $indexed;
+            $this->settings->putMany([
+                'game_effect_'.$effectId => $descriptor,
+                'game_effect_sheet_'.$descriptor['sheetSha256'] => $sheetIndex,
+                'game_effect_name_'.hash('sha256', GameEffectAssetNameService::basename($sheet->getClientOriginalName())) => $indexed,
+            ]);
 
             return ['effectId' => $effectId, ...$descriptor];
         } catch (Throwable $exception) {

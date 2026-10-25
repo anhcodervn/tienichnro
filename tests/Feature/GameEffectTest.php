@@ -1,6 +1,8 @@
 <?php
 
+use App\Features\NroGameData\Services\GameEffectAssetNameService;
 use App\Features\NroGameData\Services\GameEffectDecoderService;
+use App\Features\NroGameData\Services\GameEffectService;
 use App\Models\NroNpc;
 use App\Models\User;
 use App\Support\SettingStore;
@@ -142,4 +144,60 @@ test('a mismatched JSON cannot be published alongside the original binary', func
         'binary' => UploadedFile::fake()->createWithContent('effect.bin', effectTestBinary()),
     ], ['Accept' => 'application/json'])->assertUnprocessable()->assertJsonValidationErrors('animation');
     expect(app(SettingStore::class)->getArray('game_effect_17'))->toBe([]);
+});
+
+test('all filenames containing effectdata are detected without requiring the original naming convention', function (string $name, ?int $id): void {
+    $asset = GameEffectAssetNameService::identify($name);
+    expect($asset)->not->toBeNull()->and($asset['effectId'])->toBe($id);
+    $response = $this->actingAs($this->admin)->post('/api/uploads/image', [
+        'image' => UploadedFile::fake()->createWithContent($name, effectTestPng()),
+    ], ['Accept' => 'application/json'])->assertOk()->assertJsonPath('data.effect_id', $id)->assertJsonPath('data.requires_animation', true);
+    expect(Storage::disk('public')->get($response->json('data.path')))->toBe(effectTestPng());
+    expect(GameEffectAssetNameService::identify($response->json('data.url')))->not->toBeNull();
+})->with([
+    ['custom_EFFECTDATA-25-dragon.png', 25], ['effectdata17.png', 17], ['prefix-effectdata_dragon.png', null],
+    ['res_x2_effectdata_17_img.png', 17], ['my-effectdata-sparks.png', null],
+]);
+
+test('effectdata images automatically select animation for ordinary records beyond NPC 24', function (): void {
+    $this->actingAs($this->admin)->post('/api/admin-api/nro/game-data/effects/25', [
+        'sheet' => UploadedFile::fake()->createWithContent('custom-effectdata-25.png', effectTestPng()),
+        'binary' => UploadedFile::fake()->createWithContent('effect.bin', effectTestBinary()),
+    ], ['Accept' => 'application/json'])->assertCreated();
+    $effect = app(GameEffectService::class)->forRecord('mobs', 500, 'https://cdn.example.com/custom-EFFECTDATA-25.png');
+    expect($effect['effectId'])->toBe(25)->and($effect['dataUrl'])->toContain('animation.json');
+    $npc = NroNpc::query()->create(['id_npc' => 99, 'name' => 'Other effect', 'head_id' => 103, 'body_id' => -1, 'leg_id' => -1,
+        'menu' => [], 'source' => [], 'content_hash' => str_repeat('c', 64), 'image' => '/custom-effectdata-25.png']);
+    $this->get('/data-game?type=npcs')->assertOk()->assertSee('data-game-effect', false)->assertDontSee('src="/custom-effectdata-25.png"', false);
+    $this->getJson('/data-game/npcs/'.$npc->id)->assertOk()->assertJsonPath('data.effect.effectId', 25);
+});
+
+test('unidentified effectdata names use the registered filename or raw content hash without guessing a frame layout', function (): void {
+    $name = 'my-effectdata-dragon.png';
+    $service = app(GameEffectService::class);
+    $pending = $service->forRecord('items', 1, '/'.$name);
+    expect($pending['effectId'])->toBeNull()->and($pending)->not->toHaveKey('dataUrl');
+    $response = $this->actingAs($this->admin)->post('/api/uploads/image', [
+        'image' => UploadedFile::fake()->createWithContent($name, effectTestPng()),
+    ], ['Accept' => 'application/json'])->assertOk();
+    $raw = $response->json('data.url');
+    $this->post('/api/admin-api/nro/game-data/effects/25', [
+        'sheet' => UploadedFile::fake()->createWithContent($name, effectTestPng()),
+        'binary' => UploadedFile::fake()->createWithContent('effect.bin', effectTestBinary()),
+    ], ['Accept' => 'application/json'])->assertCreated();
+    expect($service->forRecord('items', 1, '/'.$name)['effectId'])->toBe(25)
+        ->and($service->forRecord('items', 1, $raw)['effectId'])->toBe(25);
+    expect(GameEffectAssetNameService::identify('/normal.png?name=effectdata_17'))->toBeNull();
+});
+
+test('a shared sheet cannot choose an arbitrary animation when multiple effects use its pixels', function (): void {
+    $service = app(GameEffectService::class);
+    foreach ([25 => 'effectdata_dragon.png', 26 => 'effectdata_flame.png'] as $id => $name) {
+        $service->install($id, UploadedFile::fake()->createWithContent($name, effectTestPng()), null,
+            UploadedFile::fake()->createWithContent('effect.bin', effectTestBinary()), 30);
+    }
+    expect($service->forRecord('items', 1, '/effectdata_dragon.png')['effectId'])->toBe(25)
+        ->and($service->forRecord('items', 1, '/effectdata_flame.png')['effectId'])->toBe(26);
+    $ambiguous = '/storage/game-effects/raw/unknown/effectdata_unknown_'.hash('sha256', effectTestPng()).'.png';
+    expect($service->forRecord('items', 1, $ambiguous))->not->toHaveKey('dataUrl');
 });

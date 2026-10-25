@@ -2,6 +2,7 @@
 
 namespace App\Features\Admin\Upload\Services;
 
+use App\Features\NroGameData\Services\GameEffectAssetNameService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -18,10 +19,9 @@ class ImageUploadService
     /** @return array{path: string, url: string, mime_type: string, extension: string, size: int} */
     public function store(UploadedFile $file, ?string $name = null): array
     {
-        $effectName = pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME);
-        $pattern = '/\Ares_x1_effectdata_(\d{1,5})_img(?:\.png)?\z/';
-        if (preg_match($pattern, $effectName, $match) || ($name !== null && preg_match($pattern, $name, $match))) {
-            return $this->storeSpriteSheet($file, (int) $match[1]);
+        $effect = GameEffectAssetNameService::identify($file->getClientOriginalName()) ?? GameEffectAssetNameService::identify($name);
+        if ($effect !== null) {
+            return $this->storeSpriteSheet($file, $effect['effectId']);
         }
         if (! $this->supportsImageProcessing()) {
             throw new RuntimeException('Máy chủ cần bật PHP GD để gắn watermark tienichnro.com vào ảnh.', 503);
@@ -71,15 +71,15 @@ class ImageUploadService
     }
 
     /** @return array<string, mixed> */
-    private function storeSpriteSheet(UploadedFile $file, int $effectId): array
+    private function storeSpriteSheet(UploadedFile $file, ?int $effectId): array
     {
         $bytes = $file->getContent();
         $image = @getimagesizefromstring($bytes);
-        if (! $image || $image[2] !== IMAGETYPE_PNG || $image[0] > 2048 || $image[1] > 2048
-            || ($effectId === 17 && ($image[0] !== 167 || $image[1] !== 168))) {
+        if (! $image || $image[2] !== IMAGETYPE_PNG || $image[0] > 2048 || $image[1] > 2048) {
             throw new RuntimeException('Invalid original effect PNG dimensions.');
         }
-        $path = 'game-effects/raw/'.$effectId.'/'.hash('sha256', $bytes).'.png';
+        $id = $effectId ?? 'unknown';
+        $path = 'game-effects/raw/'.$id.'/effectdata_'.$id.'_'.hash('sha256', $bytes).'.png';
         if (! Storage::disk('public')->put($path, $bytes)) {
             throw new RuntimeException('Cannot store original effect PNG.');
         }
