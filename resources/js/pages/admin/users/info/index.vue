@@ -431,7 +431,8 @@ watch(
                 <div>
                     <h2 class="font-bold">Cấp quyền sử dụng tool</h2>
                     <p class="mt-2 text-sm text-slate-500 dark:text-slate-400">
-                        Chọn tool được phép dùng rồi lưu. Bỏ chọn để thu hồi quyền. Tool đang tắt sẽ không xuất hiện trong API của user.
+                        Chọn tool rồi lưu để tự cấp license vĩnh viễn trong dashboard của user. Bỏ chọn sẽ thu hồi license tự cấp và ngắt phiên đang
+                        dùng. Tool đang tắt sẽ không xuất hiện trong API của user. Lưu lại quyền cũ để bổ sung license còn thiếu.
                     </p>
                 </div>
                 <p v-if="toolsLoading" role="status" class="text-sm text-slate-500">Đang tải danh sách tool…</p>

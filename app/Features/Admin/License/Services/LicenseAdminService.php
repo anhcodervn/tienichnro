@@ -6,6 +6,7 @@ use App\Features\License\Services\LicenseSessionService;
 use App\Models\License;
 use App\Models\LicensePlan;
 use App\Models\LicenseProduct;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -54,14 +55,35 @@ class LicenseAdminService
             }
             $result = [];
             for ($i = 0; $i < $data['quantity']; $i++) {
-                $key = implode('-', str_split(strtoupper(bin2hex(random_bytes(16))), 4));
-                $license = License::query()->create(['product_id' => $plan->product_id, 'plan_id' => $plan->id, 'user_id' => $data['user_id'] ?? null, 'key_hash' => LicenseSessionService::hashKey($key), 'encrypted_key' => $key, 'key_prefix' => substr($key, 0, 9), 'status' => 'unused', 'duration_days' => $plan->duration_days, 'max_active_devices' => 1, 'transfer_cooldown' => $plan->transfer_cooldown]);
-                $this->sessions->event($license, 'issued', $request);
-                $result[] = ['id' => $license->id, 'key' => $key];
+                $license = $this->issueLicense($plan, $data['user_id'] ?? null, $request);
+                $result[] = ['id' => $license->id, 'key' => $license->encrypted_key];
             }
 
             return $result;
         }, 3);
+    }
+
+    public function issueForToolPermission(LicenseProduct $product, User $user, Request $request): License
+    {
+        $plan = $product->plans()->firstOrCreate(['name' => 'Quyền tool (tự cấp)', 'duration_days' => null], [
+            'price' => 0, 'max_active_devices' => 1, 'transfer_cooldown' => $product->transfer_cooldown, 'is_active' => false,
+        ]);
+
+        return $this->issueLicense($plan, $user->id, $request, true);
+    }
+
+    private function issueLicense(LicensePlan $plan, ?int $userId, Request $request, bool $permissionGrant = false): License
+    {
+        $key = implode('-', str_split(strtoupper(bin2hex(random_bytes(16))), 4));
+        $license = License::query()->create([
+            'product_id' => $plan->product_id, 'plan_id' => $plan->id, 'user_id' => $userId,
+            'key_hash' => LicenseSessionService::hashKey($key), 'encrypted_key' => $key, 'key_prefix' => substr($key, 0, 9),
+            'status' => 'unused', 'duration_days' => $plan->duration_days, 'max_active_devices' => 1,
+            'transfer_cooldown' => $plan->transfer_cooldown, 'is_permission_grant' => $permissionGrant,
+        ]);
+        $this->sessions->event($license, $permissionGrant ? 'tool_permission_granted' : 'issued', $request);
+
+        return $license;
     }
 
     /** @param array<string, mixed> $data */
