@@ -21,6 +21,7 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         icon: Layers3,
         children: [
             { label: 'License keys', href: '/admin/licenses' },
+            { label: 'Client Game', href: '/admin/licenses/client-game' },
             { label: 'Sản phẩm / tool', href: '/admin/licenses/products' },
             { label: 'Gói license', href: '/admin/licenses/plans' },
         ],

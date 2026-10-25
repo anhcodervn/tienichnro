@@ -5,6 +5,7 @@ import adminRouter from './modules/admin';
 const routes: RouteRecordRaw[] = [adminRouter];
 
 const routeTitles: Record<string, string> = {
+    'admin.licenses.client-game': 'Client Game',
     'admin.licenses': 'License keys',
     'admin.licenses.products': 'Sản phẩm / tool',
     'admin.licenses.plans': 'Gói license',

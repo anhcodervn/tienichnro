@@ -2,6 +2,7 @@ export default {
     path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),
     children: [
+        { path: 'licenses/client-game', name: 'admin.licenses.client-game', component: () => import('@/pages/admin/licenses/client-game.vue') },
         { path: 'licenses', name: 'admin.licenses', component: () => import('@/pages/admin/licenses/index.vue') },
         {
             path: 'licenses/products',

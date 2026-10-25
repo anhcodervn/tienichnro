@@ -1,7 +1,14 @@
 <?php
 
+use App\Features\Admin\License\Controllers\ClientGameController;
 use App\Features\Admin\License\Controllers\LicenseController;
 use Illuminate\Support\Facades\Route;
+
+Route::middleware(['auth:sanctum', 'admin', 'throttle:120,1'])->prefix('admin-api/license/client-game')->name('admin-api.license.client-game.')->group(function (): void {
+    Route::get('/', [ClientGameController::class, 'index'])->name('index');
+    Route::get('{kind}/download', [ClientGameController::class, 'download'])->whereIn('kind', ['original', 'update'])->name('download');
+    Route::post('{kind}', [ClientGameController::class, 'store'])->whereIn('kind', ['original', 'update'])->name('store');
+});
 
 Route::middleware(['auth:sanctum', 'admin', 'throttle:120,1'])->prefix('admin-api/license')->name('admin-api.license.')->controller(LicenseController::class)->group(function (): void {
     Route::get('products', 'products')->name('products.index');
