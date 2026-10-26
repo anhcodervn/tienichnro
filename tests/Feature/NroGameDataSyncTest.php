@@ -88,7 +88,7 @@ test('non-asynchronous queue drivers never execute catalog updates in the HTTP r
     Queue::assertNothingPushed();
 })->with([['sync', 'sync'], ['discard', 'null']]);
 
-test('unchanged records do not write timestamps and missing assets reset existing references to null', function (): void {
+test('unchanged records do not write timestamps and missing assets preserve existing references', function (): void {
     $payload = gameDataFixture('Maps');
     gameDataRun(gameDataSubmit('maps', $payload));
     $map = NroMap::query()->where('id_map', $payload['data'][0]['mapId'])->firstOrFail();
@@ -104,7 +104,7 @@ test('unchanged records do not write timestamps and missing assets reset existin
     $sync = gameDataRun(gameDataSubmit('maps', $payload));
     expect($sync->updated)->toBe(1)->and($sync->unchanged)->toBe(count($payload['data']) - 1)
         ->and($map->fresh()->name)->toBe('Updated map')
-        ->and($map->fresh()->icon)->toBeNull()->and($map->fresh()->image)->toBeNull();
+        ->and($map->fresh()->icon)->toBe('/icons/manual.png')->and($map->fresh()->image)->toBe('/maps/manual.png');
 });
 
 test('option IDs are separate for item and skill option namespaces', function (): void {
@@ -258,7 +258,7 @@ function gameDataAssetPayload(array $payload, bool $include, ?string $icon = nul
     return $payload;
 }
 
-test('every hook dataset accepts image and icon and clears them when omitted', function (string $dataset, string $fixture): void {
+test('every hook dataset accepts image and icon and preserves them when omitted', function (string $dataset, string $fixture): void {
     $payload = gameDataAssetPayload(gameDataFixture($fixture), true, '/storage/uploads/2026-10-18/image/icon.webp', 'https://cdn.example.com/image.png');
     $withoutAssets = gameDataAssetPayload($payload, false);
     $original = gameDataRun(gameDataSubmit($dataset, $withoutAssets));
@@ -296,19 +296,21 @@ test('every hook dataset accepts image and icon and clears them when omitted', f
         $payload['data'][0]['image'] = '/storage/new-image.webp';
     }
     $this->postJson('/api/admin-api/nro/game-data/'.$dataset.'/compare', $payload)
-        ->assertOk()->assertJsonPath('data.0.needs_update', true);
+        ->assertOk()->assertJsonPath('data.0.needs_update', false);
     $sync = gameDataRun(gameDataSubmit($dataset, $payload));
-    expect($sync->updated)->toBe(1);
+    expect($sync->updated)->toBe(0)->and($sync->unchanged)->toBe($sync->total);
+    expect($record->fresh()->image)->toBe('https://cdn.example.com/image.png')
+        ->and($record->fresh()->content_hash)->toBe($record->content_hash);
 
     $omitted = gameDataAssetPayload($payload, false);
     $this->postJson('/api/admin-api/nro/game-data/'.$dataset.'/compare', $omitted)
-        ->assertOk()->assertJsonPath('data.0.needs_update', true);
+        ->assertOk()->assertJsonPath('data.0.needs_update', false);
     $sync = gameDataRun(gameDataSubmit($dataset, $omitted));
-    expect($sync->updated)->toBe($sync->total);
+    expect($sync->updated)->toBe(0)->and($sync->unchanged)->toBe($sync->total);
     foreach ($catalog->query($dataset)->get() as $row) {
-        expect($row->icon)->toBeNull()->and($row->image)->toBeNull()
+        expect($row->icon)->not->toBeNull()->and($row->image)->not->toBeNull()
             ->and($row->source)->toHaveKeys(['icon', 'image'])
-            ->and($row->source['icon'])->toBeNull()->and($row->source['image'])->toBeNull();
+            ->and($row->source['icon'])->toBe($row->icon)->and($row->source['image'])->toBe($row->image);
     }
     $explicitNull = gameDataAssetPayload($omitted, true);
     $this->postJson('/api/admin-api/nro/game-data/'.$dataset.'/compare', $explicitNull)
@@ -325,20 +327,70 @@ test('compare detects manual asset drift even when the source hash is unchanged'
     $hash = $map->content_hash;
     $map->update(['icon' => '/manual/icon.png', 'image' => '/manual/image.png']);
     $this->postJson('/api/admin-api/nro/game-data/maps/compare', $payload)->assertOk()
-        ->assertJsonPath('data.0.content_hash', $hash)->assertJsonPath('data.0.needs_update', true);
+        ->assertJsonPath('data.0.needs_update', true);
     $sync = gameDataRun(gameDataSubmit('maps', $payload));
-    expect($sync->updated)->toBe(1)->and($map->fresh()->icon)->toBeNull()->and($map->fresh()->image)->toBeNull();
+    expect($sync->updated)->toBe(1)->and($map->fresh()->icon)->toBe('/manual/icon.png')->and($map->fresh()->image)->toBe('/manual/image.png')
+        ->and($map->fresh()->content_hash)->not->toBe($hash);
 });
 
-test('explicit null and empty asset references clear stored images', function (?string $value): void {
+test('explicit null and empty hook asset references cannot clear stored images', function (?string $value): void {
     $payload = ['data' => [['mapId' => 0, 'mapName' => 'Map zero', 'icon' => '/icon.png', 'image' => '/image.png']]];
     gameDataRun(gameDataSubmit('maps', $payload));
     $payload['data'][0]['icon'] = $value;
     $payload['data'][0]['image'] = $value;
     $sync = gameDataRun(gameDataSubmit('maps', $payload));
-    expect($sync->updated)->toBe(1)->and(NroMap::query()->firstOrFail()->icon)->toBeNull()
-        ->and(NroMap::query()->firstOrFail()->image)->toBeNull();
+    expect($sync->updated)->toBe(0)->and($sync->unchanged)->toBe(1)->and(NroMap::query()->firstOrFail()->icon)->toBe('/icon.png')
+        ->and(NroMap::query()->firstOrFail()->image)->toBe('/image.png');
 })->with([null, '', '   ']);
+
+test('a stale queued item snapshot cannot erase images written by an earlier client', function (): void {
+    $payload = gameDataAssetPayload(gameDataFixture('ItemTemplates'), true, '/old-icon.webp', '/old-image.webp');
+    $payload['data'] = [$payload['data'][0]];
+    gameDataRun(gameDataSubmit('items', $payload));
+    $new = gameDataAssetPayload($payload, true, '/new-icon.webp', '/new-image.webp');
+    $newId = gameDataSubmit('items', $new);
+    $stale = gameDataAssetPayload($payload, true);
+    $stale['data'][0]['name'] = 'Metadata from another client';
+    $staleId = gameDataSubmit('items', $stale);
+    gameDataRun($newId);
+    $sync = gameDataRun($staleId);
+    $record = app(GameDataCatalogService::class)->query('items')->sole();
+    expect($sync->updated)->toBe(1)->and($record->name)->toBe('Metadata from another client')
+        ->and($record->icon)->toBe('/new-icon.webp')->and($record->image)->toBe('/old-image.webp')
+        ->and($record->source['icon'])->toBe($record->icon)->and($record->source['image'])->toBe($record->image);
+    $this->postJson('/api/admin-api/nro/game-data/items/compare', $stale)->assertOk()->assertJsonPath('data.0.needs_update', false);
+    $partial = gameDataAssetPayload($stale, true, '/newest-icon.webp');
+    gameDataRun(gameDataSubmit('items', $partial));
+    expect($record->fresh()->icon)->toBe('/newest-icon.webp')->and($record->fresh()->image)->toBe('/old-image.webp');
+});
+
+test('queued image uploads only fill null images and keep stored sources hashes and public cache consistent', function (): void {
+    $payload = ['data' => [['mapId' => 0, 'mapName' => 'Map zero']]];
+    gameDataRun(gameDataSubmit('maps', $payload));
+    $firstUpload = $payload;
+    $firstUpload['data'][0]['image'] = '/first-image.png';
+    $secondUpload = $payload;
+    $secondUpload['data'][0]['image'] = '/second-image.png';
+    $firstId = gameDataSubmit('maps', $firstUpload);
+    $secondId = gameDataSubmit('maps', $secondUpload);
+    gameDataRun($firstId);
+    $record = NroMap::query()->sole();
+    $hash = $record->content_hash;
+    $updatedAt = $record->updated_at->toISOString();
+    $this->getJson('/api/nro/game-data/maps')->assertOk()->assertJsonPath('data.0.image', '/first-image.png');
+    $this->travel(10)->seconds();
+    expect(gameDataRun($secondId)->unchanged)->toBe(1);
+    expect($record->fresh()->image)->toBe('/first-image.png')
+        ->and($record->fresh()->source['image'])->toBe('/first-image.png')
+        ->and($record->fresh()->content_hash)->toBe($hash)
+        ->and($record->fresh()->updated_at->toISOString())->toBe($updatedAt);
+    $secondUpload['data'][0]['mapName'] = 'Updated metadata';
+    gameDataRun(gameDataSubmit('maps', $secondUpload));
+    $this->getJson('/api/nro/game-data/maps')->assertOk()->assertJsonPath('data.0.name', 'Updated metadata')
+        ->assertJsonPath('data.0.image', '/first-image.png')->assertJsonPath('data.0.source.image', '/first-image.png');
+    $this->postJson('/api/admin-api/nro/game-data/maps/compare', $secondUpload)->assertOk()
+        ->assertJsonPath('data.0.needs_update', false)->assertJsonPath('data.0.content_hash', $record->fresh()->content_hash);
+});
 
 test('hook asset fields reject non strings and oversized references', function (mixed $value): void {
     $payload = ['data' => [['mapId' => 0, 'mapName' => 'Map zero', 'image' => $value]]];

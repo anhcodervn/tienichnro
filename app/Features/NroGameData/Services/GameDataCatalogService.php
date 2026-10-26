@@ -155,11 +155,16 @@ class GameDataCatalogService
         $existing = $this->query($dataset)->whereIn($idColumn, array_column($rows, $idColumn))
             ->get([...$columns, 'content_hash', 'icon', 'image'])->keyBy(fn ($record): string => $key($record->getAttributes()));
 
-        return array_map(fn (array $row): array => [
-            'identity' => array_intersect_key($row, array_flip($columns)),
-            'content_hash' => $row['content_hash'],
-            'needs_update' => ! $this->matchesRecord($existing->get($key($row)), $row),
-        ], $rows);
+        return array_map(function (array $row) use ($existing, $key, $columns): array {
+            $record = $existing->get($key($row));
+            $row = $this->preserveExistingAssets($record, $row);
+
+            return [
+                'identity' => array_intersect_key($row, array_flip($columns)),
+                'content_hash' => $row['content_hash'],
+                'needs_update' => ! $this->matchesRecord($record, $row),
+            ];
+        }, $rows);
     }
 
     /** @param array<string, mixed> $entry
@@ -203,6 +208,24 @@ class GameDataCatalogService
         $source = $this->canonicalize($source);
         $row['source'] = $source;
         $row['content_hash'] = hash('sha256', json_encode($source, JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+
+        return $row;
+    }
+
+    /** @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    public function preserveExistingAssets(?NroGameDataRecord $record, array $row): array
+    {
+        foreach (['icon', 'image'] as $field) {
+            if ($record !== null && $record->{$field} !== null
+                && ($field === 'image' || (($row[$field] ?? null) === null && is_string($record->{$field}) && trim($record->{$field}) !== ''))) {
+                $row[$field] = $record->{$field};
+                $row['source'][$field] = $record->{$field};
+            }
+        }
+        $row['source'] = $this->canonicalize($row['source']);
+        $row['content_hash'] = hash('sha256', json_encode($row['source'], JSON_THROW_ON_ERROR | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
 
         return $row;
     }

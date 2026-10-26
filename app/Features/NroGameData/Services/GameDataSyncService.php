@@ -5,6 +5,7 @@ namespace App\Features\NroGameData\Services;
 use App\Features\NroGameData\Jobs\SyncGameDataChunk;
 use App\Models\NroGameDataSync;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 
 class GameDataSyncService
 {
@@ -49,11 +50,19 @@ class GameDataSyncService
             }
             $identityColumns = $this->catalog->identityColumns($sync->dataset);
             $idColumn = $identityColumns[array_key_last($identityColumns)];
-            $existing = $this->catalog->query($sync->dataset)->whereIn($idColumn, array_column($rows, $idColumn))->get()
+            $existing = $this->catalog->query($sync->dataset)->whereIn($idColumn, array_column($rows, $idColumn))->lockForUpdate()->get()
                 ->keyBy(fn ($record): string => $this->identityKey($record->getAttributes(), $identityColumns));
             $counts = ['created' => 0, 'updated' => 0, 'unchanged' => 0];
+            $preservedAssets = 0;
             foreach ($rows as $row) {
                 $record = $existing->get($this->identityKey($row, $identityColumns));
+                foreach (['icon', 'image'] as $field) {
+                    if ($record !== null && $record->{$field} !== null && ($row[$field] ?? null) !== $record->{$field}
+                        && ($field === 'image' || (($row[$field] ?? null) === null && is_string($record->{$field}) && trim($record->{$field}) !== ''))) {
+                        $preservedAssets++;
+                    }
+                }
+                $row = $this->catalog->preserveExistingAssets($record, $row);
                 if ($this->catalog->matchesRecord($record, $row)) {
                     $counts['unchanged']++;
 
@@ -71,6 +80,11 @@ class GameDataSyncService
                 'unchanged' => $sync->unchanged + $counts['unchanged'],
                 'status' => count($done) === $sync->total_chunks ? 'completed' : 'processing',
             ])->save();
+            if ($preservedAssets > 0) {
+                DB::afterCommit(fn () => Log::info('Game data retained existing image references.', [
+                    'sync_id' => $syncId, 'dataset' => $sync->dataset, 'chunk' => $chunkIndex, 'preserved_asset_fields' => $preservedAssets,
+                ]));
+            }
 
             return true;
         }, 3);
