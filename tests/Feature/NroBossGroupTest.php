@@ -29,7 +29,7 @@ test('aliases share a filter and interval but death only closes the exact alias 
     }
     $time = now()->startOfSecond();
     $death = ['server_code' => 1, 'content' => 'Player: đã tiêu diệt được fide đại ca 1 mọi người đều ngưỡng mộ.', 'occurred_at' => $time->toISOString()];
-    $this->postJson('/api/admin-api/nro/notifies', $death)->assertOk()->assertJsonPath('data.id', $ids[1][1])->assertJsonPath('data.respawn_at', $time->copy()->addSeconds(1800)->toISOString());
+    $this->postJson('/api/admin-api/nro/notifies', $death)->assertOk()->assertJsonPath('data.id', $ids[1][1])->assertJsonPath('data.respawn_at', $time->copy()->subSeconds(10)->addSeconds(1800)->toISOString());
     expect(Notify::findOrFail($ids[1][2])->death_time)->toBeNull();
     expect(Notify::findOrFail($ids[1][3])->death_time)->toBeNull();
     expect(Notify::findOrFail($ids[2][1])->death_time)->toBeNull();
@@ -37,8 +37,8 @@ test('aliases share a filter and interval but death only closes the exact alias 
     $this->getJson('/api/nro/notifies?server_code=1&code=BOSS&boss_id='.$boss->id)->assertOk()->assertJsonCount(3, 'data');
     $this->get('/thong-bao-game?server_code=1&code=BOSS&boss_id='.$boss->id)->assertOk()->assertSee('Boss: Fide Đại Ca 1')->assertSee('Boss: Fide Đại Ca 2')->assertSee('Boss: Fide Đại Ca 3')->assertSee('data-nro-respawn=', false);
     $boss->update(['respawn_seconds' => 60]);
-    $this->postJson('/api/admin-api/nro/notifies', ['server_code' => 1, 'content' => 'Player: đã tiêu diệt được Fide Đại Ca 2 mọi người đều ngưỡng mộ.', 'occurred_at' => $time->toISOString()])->assertOk()->assertJsonPath('data.id', $ids[1][2])->assertJsonPath('data.respawn_at', $time->copy()->addSeconds(60)->toISOString());
-    expect(Notify::findOrFail($ids[1][1])->respawn_at->toISOString())->toBe($time->copy()->addSeconds(1800)->toISOString());
+    $this->postJson('/api/admin-api/nro/notifies', ['server_code' => 1, 'content' => 'Player: đã tiêu diệt được Fide Đại Ca 2 mọi người đều ngưỡng mộ.', 'occurred_at' => $time->toISOString()])->assertOk()->assertJsonPath('data.id', $ids[1][2])->assertJsonPath('data.respawn_at', $time->copy()->subSeconds(10)->addSeconds(60)->toISOString());
+    expect(Notify::findOrFail($ids[1][1])->respawn_at->toISOString())->toBe($time->copy()->subSeconds(10)->addSeconds(1800)->toISOString());
 });
 
 test('unknown or ambiguous aliases never close another variant in the shared group', function (): void {

@@ -37,7 +37,9 @@ test('spawn and death produce one lifecycle with fixed respawn and raw messages'
     $this->assertDatabaseCount('notifies', 1);
     $notify = Notify::findOrFail($id);
     expect($notify->content)->toBe(nroSpawn()['content'])->and($notify->death_content)->toBe(nroDeath()['content'])
-        ->and($notify->map_name)->toBe('Rừng Bamboo')->and($notify->respawn_at->toISOString())->toBe('2026-10-06T02:48:00.000000Z');
+        ->and($notify->map_name)->toBe('Rừng Bamboo')->and($notify->respawn_at->toISOString())->toBe('2026-10-06T02:47:50.000000Z')
+        ->and($notify->time_start->toISOString())->toBe('2026-10-06T02:09:50.000000Z')
+        ->and($notify->death_time->toISOString())->toBe('2026-10-06T02:17:50.000000Z');
 });
 
 test('notification page shows a full width Zalo button beneath the page heading', function (): void {
@@ -55,6 +57,27 @@ test('notification page shows a full width Zalo button beneath the page heading'
         ->and($link->hasAttribute('target'))->toBeFalse();
 });
 
+test('ingestion compensates upload delay once across midnight and preserves audit timestamps', function (string $timeField): void {
+    $payload = [
+        'server_id' => 1, 'code' => 'OTHER', 'content' => 'Delay compensation',
+        $timeField => '2026-10-06T00:00:05.123456+07:00', 'event_id' => 'delay-compensation',
+        'expires_at' => '2026-10-06T01:00:00+07:00',
+    ];
+    $expected = '2026-10-05T16:59:55.123456Z';
+    $id = nroSend($payload)->assertCreated()->assertJsonPath('data.time_start', $expected)->json('data.id');
+    $this->travel(1)->minute();
+    nroSend($payload)->assertOk()->assertJsonPath('duplicate', true)->assertJsonPath('data.time_start', $expected);
+    nroSend([...$payload, 'event_id' => 'delay-compensation-retry'])->assertOk()
+        ->assertJsonPath('duplicate', true)->assertJsonPath('data.id', $id)->assertJsonPath('data.time_start', $expected);
+    $notify = Notify::findOrFail($id);
+    expect($notify->created_at->toISOString())->toBe('2026-10-06T02:30:00.000000Z')
+        ->and($notify->expires_at->toISOString())->toBe('2026-10-05T18:00:00.000000Z');
+    foreach (NroEventReceipt::query()->get() as $receipt) {
+        expect($receipt->occurred_at->toISOString())->toBe($expected);
+    }
+    $this->assertDatabaseCount('notifies', 1);
+})->with(['occurred_at', 'time_start']);
+
 test('unknown respawn interval remains null and is rendered clearly', function (): void {
     $this->boss->update(['respawn_seconds' => null]);
     nroSend(nroSpawn())->assertCreated();
@@ -68,12 +91,12 @@ test('the live page and SSE use vertical rows with spawn and death details', fun
         ->assertSee('role="list"', false)->assertSee('grid gap-3 transition-opacity', false)
         ->assertDontSee('md:grid-cols-2 xl:grid-cols-3', false)
         ->assertSee('Boss: Broly 3')->assertSee('Map: Rừng Bamboo')
-        ->assertSee('Thời gian xuất hiện')->assertSee('06/10/2026 - 09:10:00')
+        ->assertSee('Thời gian xuất hiện')->assertSee('06/10/2026 - 09:09:50')
         ->assertDontSee('Thời gian chết:')->assertDontSee('Người tiêu diệt:');
     expect(substr_count($living->getContent(), 'role="listitem"'))->toBe(1);
     nroSend(nroDeath())->assertOk();
     $snapshot = app(NroNotificationFeedService::class)->snapshot(['limit' => 100]);
-    expect($snapshot['html'])->toContain('data-notify-id="'.$id.'"', 'role="listitem"', 'Thời gian chết:', '06/10/2026 - 09:18:00', 'Người tiêu diệt: TunMeNRO', 'data-nro-relative="2026-10-06T02:18:00.000000Z"');
+    expect($snapshot['html'])->toContain('data-notify-id="'.$id.'"', 'role="listitem"', 'Thời gian chết:', '06/10/2026 - 09:17:50', 'Người tiêu diệt: TunMeNRO', 'data-nro-relative="2026-10-06T02:17:50.000000Z"');
     expect(substr_count($snapshot['html'], 'role="listitem"'))->toBe(1);
     $this->travel(2)->minutes();
     expect(app(NroNotificationFeedService::class)->snapshot(['limit' => 100])['signature'])->toBe($snapshot['signature']);

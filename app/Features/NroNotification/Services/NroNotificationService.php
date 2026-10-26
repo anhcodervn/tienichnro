@@ -21,6 +21,8 @@ use Illuminate\Validation\ValidationException;
 
 class NroNotificationService
 {
+    private const UPLOAD_DELAY_SECONDS = 10;
+
     public function __construct(private readonly BossMessageParserService $parser, private readonly NotificationTypeClassifierService $classifier, private readonly NotificationReadCacheService $readCache) {}
 
     /** @param array<string, mixed> $payload
@@ -47,6 +49,7 @@ class NroNotificationService
         }
         $time = CarbonImmutable::parse($payload['occurred_at'])->setTimezone(config('app.timezone'));
         $payload['occurred_at'] = $time->format('Y-m-d H:i:s.u');
+        $time = $time->subSeconds(self::UPLOAD_DELAY_SECONDS);
         $parsed = $this->parser->parse($payload['content']);
         if ($parsed) {
             $payload['code'] = 'BOSS';

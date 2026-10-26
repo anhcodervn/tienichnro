@@ -97,10 +97,14 @@ test('ingest records each unique event once and outbox snapshots survive notific
     $this->seed(NroNotificationSeeder::class);
     NotificationSubscription::factory()->create();
     $service = app(NroNotificationService::class);
-    $payload = ['server_code' => 1, 'code' => 'OTHER', 'content' => 'Custom notification', 'occurred_at' => now()->toISOString(), 'event_id' => 'event1'];
+    $occurredAt = now()->toImmutable();
+    $payload = ['server_code' => 1, 'code' => 'OTHER', 'content' => 'Custom notification', 'occurred_at' => $occurredAt->toISOString(), 'event_id' => 'event1'];
     $result = $service->ingest($payload);
     $service->ingest($payload);
     $this->assertDatabaseCount('notification_webhook_deliveries', 1);
+    $snapshot = NotificationWebhookDelivery::query()->firstOrFail()->payload;
+    expect($snapshot['occurred_at'])->toBe($occurredAt->subSeconds(10)->toIso8601String())
+        ->and($snapshot['notification']['time_start'])->toBe($occurredAt->subSeconds(10)->toISOString());
     $result['notify']->forceDelete();
     expect(NotificationWebhookDelivery::query()->first()->payload['content'])->toBe('Custom notification');
 });

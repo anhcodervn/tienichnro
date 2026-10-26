@@ -68,7 +68,7 @@ test('message keywords parse Unicode case whitespace map and textual or numeric 
     $deathTime = now()->startOfSecond()->subMinutes(5);
     $this->postJson('/api/admin-api/nro/notifies', ['server_code' => 1, 'content' => 'HoaiNamZ86: đã TIÊU DIỆT được FIDE đại CA 1 MỌI NGƯỜI ĐỀU NGƯỠNG MỘ.', 'occurred_at' => $deathTime->toIso8601String()])
         ->assertOk()->assertJsonPath('data.id', $id)->assertJsonPath('data.char_name', 'HoaiNamZ86')
-        ->assertJsonPath('data.respawn_at', $deathTime->addSeconds(1800)->toISOString());
+        ->assertJsonPath('data.respawn_at', $deathTime->subSeconds(10)->addSeconds(1800)->toISOString());
     $html = app(NroNotificationFeedService::class)->snapshot(['server_code' => 1])['html'];
     expect($html)->toContain('data-nro-respawn=', 'khu '.$zoneName);
     expect(strpos($html, 'data-nro-respawn='))->toBeLessThan(strpos($html, '<details'));
@@ -85,7 +85,7 @@ test('keyword type code drives filtering while boss configuration drives respawn
         ->assertCreated()->assertJsonPath('data.code_id', $type->id)->assertJsonPath('data.boss_id', $boss->id)->json('data.id');
     $time = now()->startOfSecond()->subMinutes(5);
     $this->postJson('/api/admin-api/nro/notifies', ['server_code' => 1, 'content' => 'Player: đã tiêu diệt được Fide Đại Ca 1 mọi người đều ngưỡng mộ.', 'occurred_at' => $time->toIso8601String()])
-        ->assertOk()->assertJsonPath('data.id', $id)->assertJsonPath('data.code', 'FIDE')->assertJsonPath('data.respawn_at', $time->addSeconds(900)->toISOString());
+        ->assertOk()->assertJsonPath('data.id', $id)->assertJsonPath('data.code', 'FIDE')->assertJsonPath('data.respawn_at', $time->subSeconds(10)->addSeconds(900)->toISOString());
     $this->getJson('/api/nro/notifies?code=FIDE&server_code=1')->assertOk()->assertJsonCount(1, 'data');
     $this->getJson('/api/nro/notifies?code=OTHER&server_code=1')->assertOk()->assertJsonCount(0, 'data');
 });
