@@ -6,9 +6,8 @@ use App\Exceptions\ApiException;
 use App\Models\User;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
-use Illuminate\Foundation\Http\FormRequest;
 
-class ImportImageUploadRequest extends FormRequest
+class ImportImageUploadRequest extends StoreImageUploadRequest
 {
     public function authorize(): bool
     {
@@ -24,6 +23,8 @@ class ImportImageUploadRequest extends FormRequest
     {
         return [
             'url' => ['required', 'string', 'max:2048', 'url:http,https'],
+            'name' => ['nullable', 'string', 'max:120'],
+            ...$this->gameAssetRules(),
         ];
     }
 

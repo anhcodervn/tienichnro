@@ -17,7 +17,8 @@ class ImageUploadController extends Controller
     public function import(ImportImageUploadRequest $request, RemoteImageUploadService $remoteImageUploadService): JsonResponse
     {
         try {
-            $uploadedImage = $remoteImageUploadService->store($request->validated('url'));
+            $gameAsset = $request->filled('category') ? $request->safe()->only(['category', 'icon_id', 'variant']) : null;
+            $uploadedImage = $remoteImageUploadService->store($request->validated('url'), $request->validated('name'), $gameAsset);
         } catch (RuntimeException $exception) {
             throw new ApiException($exception->getMessage(), $exception->getCode() === 503 ? 503 : 422, previous: $exception);
         }

@@ -114,6 +114,47 @@ test('game assets retain upload authentication and authorization', function (): 
     $this->actingAs(User::factory()->create(['role' => 'user']))->postJson('/api/uploads/image', [])->assertForbidden();
 });
 
+test('both upload endpoints reject empty or incomplete game metadata before downloading or storing', function (array $identity, string $endpoint): void {
+    Http::preventStrayRequests();
+    $source = $endpoint === '/api/uploads/image/import'
+        ? ['url' => 'https://cdn.example.com/map.png']
+        : ['base64' => base64_encode(gameAssetPngUpload()->getContent())];
+    $this->actingAs(User::factory()->create(['role' => 'admin']))
+        ->postJson($endpoint, [...$source, ...$identity])->assertUnprocessable();
+    expect(Storage::disk('public')->allFiles())->toBe([]);
+    Http::assertNothingSent();
+})->with([
+    [['category' => null, 'icon_id' => null]],
+    [['category' => '', 'icon_id' => '']],
+    [['variant' => null]],
+    [['category' => 'maps']],
+    [['icon_id' => 0]],
+    [['category' => 'maps', 'icon_id' => 0, 'variant' => '../icon']],
+])->with(['/api/uploads/image', '/api/uploads/image/import']);
+
+test('repeated URL imports overwrite only their selected game variant', function (): void {
+    $remote = new class(app(ImageUploadService::class)) extends RemoteImageUploadService
+    {
+        protected function resolveHostAddresses(string $host): array
+        {
+            return ['93.184.216.34'];
+        }
+    };
+    app()->instance(RemoteImageUploadService::class, $remote);
+    Http::preventStrayRequests();
+    Http::fake(['https://cdn.example.com/map.png' => Http::sequence()
+        ->push(gameAssetPngUpload(30, 40)->getContent())
+        ->push(gameAssetPngUpload(50, 60)->getContent())]);
+    $this->actingAs(User::factory()->create(['role' => 'admin']));
+    $payload = ['url' => 'https://cdn.example.com/map.png', 'category' => 'maps', 'icon_id' => 0, 'variant' => 'image'];
+    $first = $this->postJson('/api/uploads/image/import', $payload)->assertOk();
+    $second = $this->postJson('/api/uploads/image/import', $payload)->assertOk()
+        ->assertJsonPath('data.path', $first->json('data.path'));
+    expect(Storage::disk('public')->allFiles())->toHaveCount(1)
+        ->and($first->json('data.url'))->not->toBe($second->json('data.url'))
+        ->and(Storage::disk('public')->get($second->json('data.path')))->toBe(gameAssetPngUpload(50, 60)->getContent());
+});
+
 test('NPC detail resolves all parts independently and map detail prefers the complete uploaded map', function (): void {
     $assets = app(GameDataAssetService::class);
     $catalog = app(GameDataCatalogService::class);
@@ -149,7 +190,7 @@ test('item previews resolve icon IDs rather than item IDs', function (): void {
     $this->get('/data-game')->assertOk()->assertSee('/storage/upload/data-game/items/123.png', false);
 });
 
-test('remote game images use categorized storage through the protected downloader', function (?string $variant): void {
+test('remote game images use categorized storage through the protected downloader', function (?string $variant, string $endpoint): void {
     $service = new class(app(ImageUploadService::class)) extends RemoteImageUploadService
     {
         protected function resolveHostAddresses(string $host): array
@@ -160,10 +201,10 @@ test('remote game images use categorized storage through the protected downloade
     app()->instance(RemoteImageUploadService::class, $service);
     Http::preventStrayRequests();
     Http::fake(['https://cdn.example.com/map.png' => Http::response(gameAssetPngUpload()->getContent(), 200, ['Content-Type' => 'image/png'])]);
-    $this->actingAs(User::factory()->create(['role' => 'admin']))->postJson('/api/uploads/image', [
+    $this->actingAs(User::factory()->create(['role' => 'admin']))->postJson($endpoint, [
         'url' => 'https://cdn.example.com/map.png', 'category' => 'maps', 'icon_id' => 42, 'variant' => $variant,
     ])->assertOk()->assertJsonPath('data.path', 'upload/data-game/maps/'.($variant !== null ? $variant.'/' : '').'42.png');
-})->with([null, 'icon', 'image']);
+})->with([null, 'icon', 'image'])->with(['/api/uploads/image', '/api/uploads/image/import']);
 
 test('non PNG game images overwrite the same PNG path after conversion', function (): void {
     $this->actingAs(User::factory()->create(['role' => 'admin']));

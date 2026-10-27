@@ -39,14 +39,24 @@ class StoreImageUploadRequest extends FormRequest
             ],
             'base64' => ['bail', 'required_without_all:image,url', 'prohibits:image,url', 'nullable', 'string', 'max:'.Base64ImageUploadService::MAX_ENCODED_LENGTH],
             'url' => ['bail', 'required_without_all:image,base64', 'prohibits:image,base64', 'nullable', 'string', 'max:2048', 'url:http,https'],
-            'category' => ['nullable', 'required_with:icon_id,variant', Rule::in(GameDataAssetService::CATEGORIES)],
-            'icon_id' => ['nullable', 'required_with:category,variant', 'integer', 'min:0', 'max:4294967295'],
-            'variant' => ['nullable', Rule::in(GameDataAssetService::VARIANTS)],
+            ...$this->gameAssetRules(),
             'name' => [
                 'nullable',
                 'string',
                 'max:120',
             ],
+        ];
+    }
+
+    /** @return array<string, array<int, mixed>> */
+    protected function gameAssetRules(): array
+    {
+        $hasMetadata = $this->hasAny(['category', 'icon_id', 'variant']);
+
+        return [
+            'category' => ['nullable', Rule::requiredIf($hasMetadata), Rule::in(GameDataAssetService::CATEGORIES)],
+            'icon_id' => ['nullable', Rule::requiredIf($hasMetadata), 'integer', 'min:0', 'max:4294967295'],
+            'variant' => ['nullable', Rule::in(GameDataAssetService::VARIANTS)],
         ];
     }
 
