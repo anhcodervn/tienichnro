@@ -57,8 +57,7 @@ class GameDataSyncService
             foreach ($rows as $row) {
                 $record = $existing->get($this->identityKey($row, $identityColumns));
                 foreach (['icon', 'image'] as $field) {
-                    if ($record !== null && $record->{$field} !== null && ($row[$field] ?? null) !== $record->{$field}
-                        && ($field === 'image' || (($row[$field] ?? null) === null && is_string($record->{$field}) && trim($record->{$field}) !== ''))) {
+                    if ($record !== null && is_string($record->{$field}) && trim($record->{$field}) !== '' && ($row[$field] ?? null) !== $record->{$field}) {
                         $preservedAssets++;
                     }
                 }

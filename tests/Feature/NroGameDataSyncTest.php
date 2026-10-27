@@ -292,8 +292,10 @@ test('every hook dataset accepts image and icon and preserves them when omitted'
 
     if ($dataset === 'classes-and-skills') {
         $payload['data'][0]['skills'][0]['image'] = '/storage/new-skill-image.webp';
+        $payload['data'][0]['skills'][0]['icon'] = '/storage/new-skill-icon.webp';
     } else {
         $payload['data'][0]['image'] = '/storage/new-image.webp';
+        $payload['data'][0]['icon'] = '/storage/new-icon.webp';
     }
     $this->postJson('/api/admin-api/nro/game-data/'.$dataset.'/compare', $payload)
         ->assertOk()->assertJsonPath('data.0.needs_update', false);
@@ -356,12 +358,12 @@ test('a stale queued item snapshot cannot erase images written by an earlier cli
     $sync = gameDataRun($staleId);
     $record = app(GameDataCatalogService::class)->query('items')->sole();
     expect($sync->updated)->toBe(1)->and($record->name)->toBe('Metadata from another client')
-        ->and($record->icon)->toBe('/new-icon.webp')->and($record->image)->toBe('/old-image.webp')
+        ->and($record->icon)->toBe('/old-icon.webp')->and($record->image)->toBe('/old-image.webp')
         ->and($record->source['icon'])->toBe($record->icon)->and($record->source['image'])->toBe($record->image);
     $this->postJson('/api/admin-api/nro/game-data/items/compare', $stale)->assertOk()->assertJsonPath('data.0.needs_update', false);
     $partial = gameDataAssetPayload($stale, true, '/newest-icon.webp');
     gameDataRun(gameDataSubmit('items', $partial));
-    expect($record->fresh()->icon)->toBe('/newest-icon.webp')->and($record->fresh()->image)->toBe('/old-image.webp');
+    expect($record->fresh()->icon)->toBe('/old-icon.webp')->and($record->fresh()->image)->toBe('/old-image.webp');
 });
 
 test('queued image uploads only fill null images and keep stored sources hashes and public cache consistent', function (): void {
@@ -369,8 +371,10 @@ test('queued image uploads only fill null images and keep stored sources hashes 
     gameDataRun(gameDataSubmit('maps', $payload));
     $firstUpload = $payload;
     $firstUpload['data'][0]['image'] = '/first-image.png';
+    $firstUpload['data'][0]['icon'] = '/first-icon.png';
     $secondUpload = $payload;
     $secondUpload['data'][0]['image'] = '/second-image.png';
+    $secondUpload['data'][0]['icon'] = '/second-icon.png';
     $firstId = gameDataSubmit('maps', $firstUpload);
     $secondId = gameDataSubmit('maps', $secondUpload);
     gameDataRun($firstId);
@@ -381,6 +385,7 @@ test('queued image uploads only fill null images and keep stored sources hashes 
     $this->travel(10)->seconds();
     expect(gameDataRun($secondId)->unchanged)->toBe(1);
     expect($record->fresh()->image)->toBe('/first-image.png')
+        ->and($record->fresh()->icon)->toBe('/first-icon.png')
         ->and($record->fresh()->source['image'])->toBe('/first-image.png')
         ->and($record->fresh()->content_hash)->toBe($hash)
         ->and($record->fresh()->updated_at->toISOString())->toBe($updatedAt);

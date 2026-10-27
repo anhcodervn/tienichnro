@@ -37,10 +37,11 @@ class ImageUploadController extends Controller
     ): JsonResponse {
         try {
             $name = $request->validated('name');
+            $gameAsset = $request->filled('category') ? $request->safe()->only(['category', 'icon_id', 'variant']) : null;
             $uploadedImage = match (true) {
-                $request->hasFile('image') => $imageUploadService->store($request->file('image'), $name),
-                $request->filled('base64') => $base64ImageUploadService->store($request->validated('base64'), $name),
-                default => $remoteImageUploadService->store($request->validated('url'), $name),
+                $request->hasFile('image') => $imageUploadService->store($request->file('image'), $name, $gameAsset),
+                $request->filled('base64') => $base64ImageUploadService->store($request->validated('base64'), $name, $gameAsset),
+                default => $remoteImageUploadService->store($request->validated('url'), $name, $gameAsset),
             };
         } catch (RuntimeException $exception) {
             throw new ApiException($exception->getMessage(), $exception->getCode() === 503 ? 503 : ($request->hasFile('image') ? 500 : 422), previous: $exception);

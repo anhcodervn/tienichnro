@@ -25,7 +25,7 @@ beforeEach(function (): void {
     Http::preventStrayRequests();
 });
 
-test('watermark is a faint repeated grid across all image quadrants', function (): void {
+test('watermark is a readable subtle grid across all image quadrants', function (): void {
     $image = imagecreatetruecolor(600, 400);
     imagefill($image, 0, 0, imagecolorallocate($image, 100, 140, 180));
     app(ImageWatermarkService::class)->apply($image);
@@ -48,7 +48,7 @@ test('watermark is a faint repeated grid across all image quadrants', function (
         expect($changed)->toBeGreaterThan(100);
     }
     expect($totalDifference / (600 * 400))->toBeLessThan(8)
-        ->and($peakDifference)->toBeLessThan(45);
+        ->and($peakDifference)->toBeGreaterThanOrEqual(30)->toBeLessThan(60);
 });
 
 test('watermark preserves a transparent background outside its text', function (): void {

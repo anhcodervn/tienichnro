@@ -218,8 +218,7 @@ class GameDataCatalogService
     public function preserveExistingAssets(?NroGameDataRecord $record, array $row): array
     {
         foreach (['icon', 'image'] as $field) {
-            if ($record !== null && $record->{$field} !== null
-                && ($field === 'image' || (($row[$field] ?? null) === null && is_string($record->{$field}) && trim($record->{$field}) !== ''))) {
+            if ($record !== null && is_string($record->{$field}) && trim($record->{$field}) !== '') {
                 $row[$field] = $record->{$field};
                 $row['source'][$field] = $record->{$field};
             }

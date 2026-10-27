@@ -49,8 +49,9 @@ function loadAssets(descriptor) {
     return assets.get(key);
 }
 
-async function mountEffect(element) {
+export async function mountEffect(element) {
     const status = element.querySelector('[data-effect-status]');
+    const fallback = element.querySelector('[data-effect-fallback]');
     let observer;
     let animation = null;
     let visibilityChanged;
@@ -92,6 +93,7 @@ async function mountEffect(element) {
         canvas.height = data.height;
         drawEffectFrame(context, sheet, data, data.sequence[0]);
         canvas.hidden = false;
+        if (fallback) fallback.hidden = true;
         status.hidden = true;
         const start = performance.now();
         let lastFrame = data.sequence[0];
@@ -135,6 +137,7 @@ async function mountEffect(element) {
         observer?.disconnect();
         if (visibilityChanged) document.removeEventListener('visibilitychange', visibilityChanged);
         element.querySelector('canvas').hidden = true;
+        if (fallback && !fallback.dataset.gameDataImageFailed) fallback.hidden = false;
         status.hidden = false;
         status.textContent = 'Không tải được hiệu ứng.';
     }

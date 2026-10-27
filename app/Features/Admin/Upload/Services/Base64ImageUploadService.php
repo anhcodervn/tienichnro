@@ -15,7 +15,7 @@ class Base64ImageUploadService
     public function __construct(private readonly ImageUploadService $imageUploadService) {}
 
     /** @return array{path: string, url: string, mime_type: string, extension: string, size: int} */
-    public function store(string $encoded, ?string $name = null): array
+    public function store(string $encoded, ?string $name = null, ?array $gameAsset = null): array
     {
         if (strlen($encoded) > self::MAX_ENCODED_LENGTH) {
             throw new RuntimeException('Ảnh base64 không được vượt quá 10 MB sau giải mã.');
@@ -64,7 +64,7 @@ class Base64ImageUploadService
             }
             $file = new UploadedFile($temporaryPath, 'base64-image.'.$extension, $mime, null, true);
 
-            return $this->imageUploadService->store($file, $name);
+            return $this->imageUploadService->store($file, $name, $gameAsset);
         } finally {
             @unlink($temporaryPath);
         }

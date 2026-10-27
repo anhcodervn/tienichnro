@@ -166,7 +166,7 @@ test('base64 temporary files are cleaned up after storage failure', function ():
     {
         public ?string $temporaryPath = null;
 
-        public function store(UploadedFile $file, ?string $name = null): array
+        public function store(UploadedFile $file, ?string $name = null, ?array $gameAsset = null): array
         {
             $this->temporaryPath = $file->getRealPath();
             throw new RuntimeException('Storage unavailable');

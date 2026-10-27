@@ -3,6 +3,7 @@
 namespace App\Features\NroGameData\Controllers;
 
 use App\Features\NroGameData\Requests\BrowseGameDataRequest;
+use App\Features\NroGameData\Services\GameDataAssetService;
 use App\Features\NroGameData\Services\GameDataBrowseService;
 use App\Features\NroGameData\Services\GameDataCatalogService;
 use App\Features\NroGameData\Services\GameEffectService;
@@ -18,7 +19,7 @@ class GameDataPageController extends Controller
         return view('pages.game-data.index', $service->browse($request->validated()));
     }
 
-    public function show(Request $request, string $dataset, int $record, GameDataCatalogService $catalog, GameEffectService $effects): View|JsonResponse
+    public function show(Request $request, string $dataset, int $record, GameDataCatalogService $catalog, GameEffectService $effects, GameDataBrowseService $browse, GameDataAssetService $assets): View|JsonResponse
     {
         $entry = $catalog->query($dataset)->findOrFail($record);
         $data = [...$entry->source, 'icon' => $entry->icon, 'image' => $entry->image];
@@ -27,10 +28,17 @@ class GameDataPageController extends Controller
         if ($effect) {
             $data['effect'] = $effect;
         }
+        $preview = $assets->preview($dataset, $entry);
+        $previewMedia = $browse->mediaReferences($preview['image'] ?? ($dataset === 'maps' ? $entry->image : $entry->icon), $preview['icon'] ?? ($dataset === 'maps' ? $entry->icon : $entry->image));
+        $preview['image'] = $previewMedia[0] ?? null;
+        $preview['fallback'] = $previewMedia[1] ?? null;
         if ($request->expectsJson()) {
-            return response()->json(['data' => $data]);
+            return response()->json(['data' => $data, 'preview' => $preview]);
         }
 
-        return view('pages.game-data.show', ['data' => $data, 'dataset' => $dataset, 'effect' => $effect, 'name' => $entry->name ?: 'ID '.$record]);
+        $media = $browse->mediaReferences($entry->icon, $entry->image);
+
+        return view('pages.game-data.show', ['preview' => $preview, 'data' => $data, 'dataset' => $dataset, 'effect' => $effect, 'name' => $entry->name ?: 'ID '.$record,
+            'media' => $media[0] ?? null, 'mediaFallback' => $media[1] ?? null]);
     }
 }

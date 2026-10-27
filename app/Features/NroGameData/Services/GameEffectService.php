@@ -37,14 +37,25 @@ class GameEffectService
                 $installed = [];
             }
 
-            return ['effectId' => $asset['effectId'], 'assetName' => $asset['name'], ...$installed];
+            if ($this->canRender($installed)) {
+                return ['effectId' => $asset['effectId'], 'assetName' => $asset['name'], ...$installed];
+            }
         }
         $effectId = $dataset === 'npcs' && $id === 24 ? 17 : null;
         if ($effectId === null) {
             return null;
         }
 
-        return ['effectId' => $effectId, ...$this->settings->getArray('game_effect_'.$effectId)];
+        $installed = $this->settings->getArray('game_effect_'.$effectId);
+
+        return $this->canRender($installed) ? ['effectId' => $effectId, ...$installed] : null;
+    }
+
+    /** @param array<string, mixed> $descriptor */
+    private function canRender(array $descriptor): bool
+    {
+        return is_string($descriptor['sheetUrl'] ?? null) && trim($descriptor['sheetUrl']) !== ''
+            && is_string($descriptor['dataUrl'] ?? null) && trim($descriptor['dataUrl']) !== '';
     }
 
     /** @return array<string, mixed> */

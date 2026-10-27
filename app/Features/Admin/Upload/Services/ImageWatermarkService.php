@@ -23,8 +23,8 @@ class ImageWatermarkService
             imagesavealpha($tile, true);
             $transparent = imagecolorallocatealpha($tile, 0, 0, 0, 127);
             imagefill($tile, 0, 0, $transparent);
-            imagestring($tile, $font, 7, 7, self::TEXT, imagecolorallocatealpha($tile, 0, 0, 0, 115));
-            imagestring($tile, $font, 6, 6, self::TEXT, imagecolorallocatealpha($tile, 255, 255, 255, 108));
+            imagestring($tile, $font, 7, 7, self::TEXT, imagecolorallocatealpha($tile, 0, 0, 0, 108));
+            imagestring($tile, $font, 6, 6, self::TEXT, imagecolorallocatealpha($tile, 255, 255, 255, 96));
             $rotated = imagerotate($tile, 25, $transparent);
             if ($rotated === false) {
                 throw new RuntimeException('Không thể xoay watermark ảnh.');

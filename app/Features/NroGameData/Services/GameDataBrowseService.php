@@ -17,7 +17,7 @@ class GameDataBrowseService
         'skill-options' => ['name' => 'Option kỹ năng', 'icon' => 'bx-adjust', 'description' => 'Các thuộc tính và hiệu ứng của kỹ năng.'],
     ];
 
-    public function __construct(private readonly GameDataCatalogService $catalog, private readonly GameEffectService $effects) {}
+    public function __construct(private readonly GameDataCatalogService $catalog, private readonly GameEffectService $effects, private readonly GameDataAssetService $assets) {}
 
     /** @param array<string, mixed> $filters
      * @return array<string, mixed>
@@ -89,11 +89,12 @@ class GameDataBrowseService
         };
 
         $effect = $this->effects->forRecord($dataset, (int) $record->{$idColumn}, $record->image, $record->icon);
+        $media = $this->mediaReferences($this->assets->forRecord($dataset, $record) ?? $record->icon, $this->assets->forRecord($dataset, $record, 'image') ?? $record->image);
 
         return [
             'name' => $record->name !== '' ? $record->name : 'Chưa có tên', 'game_id' => $record->{$idColumn},
             'description' => $record->description ?? '', 'icon' => self::CATEGORIES[$dataset]['icon'],
-            'effect' => $effect, 'media' => $effect ? null : ($this->mediaUrl($record->icon) ?? $this->mediaUrl($record->image)),
+            'effect' => $effect, 'media' => $media[0] ?? null, 'mediaFallback' => $media[1] ?? null,
             'badge' => $badge, 'tone' => $tone, 'stats' => $stats,
             'url' => route('nro.game-data.show', ['dataset' => $dataset, 'record' => $record->id]),
         ];
@@ -108,6 +109,12 @@ class GameDataBrowseService
         }
 
         return (string) $number;
+    }
+
+    /** @return list<string> */
+    public function mediaReferences(?string $icon, ?string $image): array
+    {
+        return array_values(array_unique(array_filter([$this->mediaUrl($icon), $this->mediaUrl($image)])));
     }
 
     private function mediaUrl(?string $value): ?string

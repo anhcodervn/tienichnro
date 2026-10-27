@@ -4,9 +4,11 @@ namespace App\Features\Admin\Upload\Requests;
 
 use App\Exceptions\ApiException;
 use App\Features\Admin\Upload\Services\Base64ImageUploadService;
+use App\Features\NroGameData\Services\GameDataAssetService;
 use App\Models\User;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class StoreImageUploadRequest extends FormRequest
 {
@@ -37,6 +39,9 @@ class StoreImageUploadRequest extends FormRequest
             ],
             'base64' => ['bail', 'required_without_all:image,url', 'prohibits:image,url', 'nullable', 'string', 'max:'.Base64ImageUploadService::MAX_ENCODED_LENGTH],
             'url' => ['bail', 'required_without_all:image,base64', 'prohibits:image,base64', 'nullable', 'string', 'max:2048', 'url:http,https'],
+            'category' => ['nullable', 'required_with:icon_id,variant', Rule::in(GameDataAssetService::CATEGORIES)],
+            'icon_id' => ['nullable', 'required_with:category,variant', 'integer', 'min:0', 'max:4294967295'],
+            'variant' => ['nullable', Rule::in(GameDataAssetService::VARIANTS)],
             'name' => [
                 'nullable',
                 'string',

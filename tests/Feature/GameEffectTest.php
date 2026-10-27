@@ -69,7 +69,7 @@ test('admin installs original PNG BIN and JSON without GD resize or watermark an
         ->and(Storage::disk('public')->get($directory.'/source.json'))->toBe(json_encode($data));
     $npc = NroNpc::query()->create(['id_npc' => 24, 'name' => 'Dragon', 'head_id' => 103, 'body_id' => -1, 'leg_id' => -1,
         'menu' => [], 'source' => ['npcTemplateId' => 24], 'content_hash' => str_repeat('a', 64), 'icon' => '/head-103.png', 'image' => '/sheet.png']);
-    $this->get('/data-game?type=npcs')->assertOk()->assertSee('data-game-effect', false)->assertDontSee('src="/head-103.png"', false)
+    $this->get('/data-game?type=npcs')->assertOk()->assertSee('data-game-effect', false)->assertSee('src="/head-103.png"', false)->assertSee('data-effect-fallback', false)
         ->assertDontSee('src="/sheet.png"', false);
     $this->get('/data-game/npcs/'.$npc->id)->assertOk()->assertSee('data-game-effect', false);
     $this->getJson('/data-game/npcs/'.$npc->id)->assertOk()->assertJsonPath('data.effect.effectId', 17);
@@ -115,11 +115,11 @@ test('only admins may install effects and original binary must not be truncated'
     ], ['Accept' => 'application/json'])->assertUnprocessable();
 });
 
-test('NPC 24 never displays its head or raw atlas while effect resources are missing', function (): void {
+test('NPC 24 displays its saved icon while effect resources are missing', function (): void {
     NroNpc::query()->create(['id_npc' => 24, 'name' => 'Dragon', 'head_id' => 103, 'body_id' => -1, 'leg_id' => -1,
         'menu' => [], 'source' => [], 'content_hash' => str_repeat('b', 64), 'icon' => '/head.png', 'image' => '/atlas.png']);
-    $this->get('/data-game?type=npcs')->assertOk()->assertSee('data-game-effect', false)
-        ->assertDontSee('src="/head.png"', false)->assertDontSee('src="/atlas.png"', false);
+    $this->get('/data-game?type=npcs')->assertOk()->assertDontSee('data-game-effect=', false)
+        ->assertSee('src="/head.png"', false)->assertSee('data-game-data-fallback="/atlas.png"', false);
 });
 
 test('JSON only packages support non sequential region IDs and configured tick rates', function (): void {
@@ -168,7 +168,7 @@ test('effectdata images automatically select animation for ordinary records beyo
     expect($effect['effectId'])->toBe(25)->and($effect['dataUrl'])->toContain('animation.json');
     $npc = NroNpc::query()->create(['id_npc' => 99, 'name' => 'Other effect', 'head_id' => 103, 'body_id' => -1, 'leg_id' => -1,
         'menu' => [], 'source' => [], 'content_hash' => str_repeat('c', 64), 'image' => '/custom-effectdata-25.png']);
-    $this->get('/data-game?type=npcs')->assertOk()->assertSee('data-game-effect', false)->assertDontSee('src="/custom-effectdata-25.png"', false);
+    $this->get('/data-game?type=npcs')->assertOk()->assertSee('data-game-effect', false)->assertSee('src="/custom-effectdata-25.png"', false)->assertSee('data-effect-fallback', false);
     $this->getJson('/data-game/npcs/'.$npc->id)->assertOk()->assertJsonPath('data.effect.effectId', 25);
 });
 
@@ -176,7 +176,7 @@ test('unidentified effectdata names use the registered filename or raw content h
     $name = 'my-effectdata-dragon.png';
     $service = app(GameEffectService::class);
     $pending = $service->forRecord('items', 1, '/'.$name);
-    expect($pending['effectId'])->toBeNull()->and($pending)->not->toHaveKey('dataUrl');
+    expect($pending)->toBeNull();
     $response = $this->actingAs($this->admin)->post('/api/uploads/image', [
         'image' => UploadedFile::fake()->createWithContent($name, effectTestPng()),
     ], ['Accept' => 'application/json'])->assertOk();
@@ -199,5 +199,5 @@ test('a shared sheet cannot choose an arbitrary animation when multiple effects 
     expect($service->forRecord('items', 1, '/effectdata_dragon.png')['effectId'])->toBe(25)
         ->and($service->forRecord('items', 1, '/effectdata_flame.png')['effectId'])->toBe(26);
     $ambiguous = '/storage/game-effects/raw/unknown/effectdata_unknown_'.hash('sha256', effectTestPng()).'.png';
-    expect($service->forRecord('items', 1, $ambiguous))->not->toHaveKey('dataUrl');
+    expect($service->forRecord('items', 1, $ambiguous))->toBeNull();
 });

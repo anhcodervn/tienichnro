@@ -2,6 +2,7 @@
 
 namespace App\Features\Admin\Upload\Services;
 
+use App\Features\NroGameData\Services\GameDataAssetService;
 use App\Features\NroGameData\Services\GameEffectAssetNameService;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -17,8 +18,11 @@ class ImageUploadService
     public function __construct(private readonly ImageWatermarkService $watermark = new ImageWatermarkService) {}
 
     /** @return array{path: string, url: string, mime_type: string, extension: string, size: int} */
-    public function store(UploadedFile $file, ?string $name = null): array
+    public function store(UploadedFile $file, ?string $name = null, ?array $gameAsset = null): array
     {
+        if ($gameAsset !== null) {
+            return app(GameDataAssetService::class)->store($file, $gameAsset['category'], (int) $gameAsset['icon_id'], $gameAsset['variant'] ?? null);
+        }
         $effect = GameEffectAssetNameService::identify($file->getClientOriginalName()) ?? GameEffectAssetNameService::identify($name);
         if ($effect !== null) {
             return $this->storeSpriteSheet($file, $effect['effectId']);

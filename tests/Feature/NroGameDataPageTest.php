@@ -87,3 +87,25 @@ test('public browse rejects invalid datasets oversized searches and malformed fi
         $this->getJson('/data-game?'.$query)->assertUnprocessable();
     }
 });
+
+test('uploaded NPC and mob PNGs remain visible without installed animation metadata', function (string $dataset, string $fixture, int $id, bool $withIcon): void {
+    $catalog = app(GameDataCatalogService::class);
+    $payload = json_decode(file_get_contents(base_path('tests/Fixtures/NroGameData/'.$fixture.'.json')), true, 512, JSON_THROW_ON_ERROR);
+    $row = $payload['data'][0];
+    $row[$dataset === 'npcs' ? 'npcTemplateId' : 'mobTemplateId'] = $id;
+    $image = '/storage/game-effects/raw/unknown/effectdata_unknown_'.str_repeat('a', 64).'.png';
+    $icon = $withIcon ? '/uploads/effectdata-'.$dataset.'-'.$id.'-standing.png' : null;
+    $row['image'] = $image;
+    $row['icon'] = $icon;
+    $record = $catalog->query($dataset)->create($catalog->normalize($dataset, [$row])[0]);
+    $this->get('/data-game?type='.$dataset)->assertOk()->assertDontSee('data-game-effect=', false)
+        ->assertSee('src="'.($icon ?? $image).'"', false)
+        ->assertViewHas('cards', fn ($cards): bool => $cards->first()['effect'] === null && $cards->first()['media'] === ($icon ?? $image));
+    $this->get('/data-game/'.$dataset.'/'.$record->id)->assertOk()->assertSee('src="'.($icon ?? $image).'"', false);
+    $this->getJson('/data-game/'.$dataset.'/'.$record->id)->assertOk()->assertJsonMissingPath('data.effect')
+        ->assertJsonPath('data.image', $image)->assertJsonPath('data.icon', $icon);
+    expect($record->fresh()->image)->toBe($image)->and($record->fresh()->icon)->toBe($icon);
+})->with([
+    ['npcs', 'NpcTemplates', 24, true], ['npcs', 'NpcTemplates', 99, false],
+    ['mobs', 'MobTemplates', 0, true], ['mobs', 'MobTemplates', 96, false],
+]);
