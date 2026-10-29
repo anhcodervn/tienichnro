@@ -21,6 +21,8 @@ Route::middleware(['auth:sanctum', 'admin'])
         Route::delete('service-packages/{package}', [ServicePackageController::class, 'destroy'])->whereNumber('package')->name('service-packages.destroy');
         Route::get('services', [ServiceManagementController::class, 'index'])->name('services.index');
         Route::post('services', [ServiceManagementController::class, 'store'])->name('services.store');
+        Route::get('services/{code}', [ServiceManagementController::class, 'show'])->name('services.show');
+        Route::patch('services/{code}/seo', [ServiceManagementController::class, 'updateSeo'])->name('services.seo.update');
         Route::delete('services/{code}', [ServiceManagementController::class, 'destroy'])->name('services.destroy');
         Route::patch('services/{code}', [ServiceManagementController::class, 'update'])->name('services.update');
         Route::patch('system', 'updateSystem')->name('system.update');

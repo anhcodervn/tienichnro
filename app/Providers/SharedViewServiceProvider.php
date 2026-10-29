@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Features\Admin\Setting\Services\ServiceCatalogService;
 use App\Features\Admin\Setting\Services\ToolAvailabilityService;
+use App\Features\Admin\Setting\Services\ToolSeoService;
 use App\Models\SeoCategory;
 use App\Models\User;
 use App\Models\Wallet;
@@ -23,6 +24,7 @@ class SharedViewServiceProvider extends ServiceProvider
     public function boot(SettingStore $settingStore, CustomHeadTags $customHeadTags, ToolAvailabilityService $tools, ServiceCatalogService $services): void
     {
         ViewFacade::composer('client.layouts.app', function (View $view) use ($customHeadTags, $settingStore, $tools, $services): void {
+            $view->with('toolSeo', app(ToolSeoService::class)->publicPage(request()));
             $view->with('clientTools', $tools->all());
             $view->with('clientServices', $services->all());
             $storedSettings = $settingStore->getMany([

@@ -15,18 +15,18 @@
     @php
         $settings = $systemSettings ?? [];
         $siteName = trim((string) ($settings['site_name'] ?? '')) ?: config('app.name', 'Tiện ích NRO');
-        $title = trim($__env->yieldContent('title')) ?: ($settings['meta_title'] ?? $siteName);
-        $description = trim($__env->yieldContent('description')) ?: ($settings['meta_description'] ?? $settings['site_description'] ?? 'Tiện ích và hướng dẫn game Ngọc Rồng Online.');
-        $keywords = trim($__env->yieldContent('keywords'));
-        $canonical = trim($__env->yieldContent('canonical')) ?: url()->current();
+        $title = ($toolSeo['seo_title'] ?? null) ?: (($toolSeo['title'] ?? null) ?: (trim($__env->yieldContent('title')) ?: ($settings['meta_title'] ?? $siteName)));
+        $description = ($toolSeo['seo_description'] ?? null) ?: (($toolSeo['excerpt'] ?? null) ?: (trim($__env->yieldContent('description')) ?: ($settings['meta_description'] ?? $settings['site_description'] ?? 'Tiện ích và hướng dẫn game Ngọc Rồng Online.')));
+        $keywords = ($toolSeo['meta_keywords'] ?? null) ?: (($toolSeo['focus_keyword'] ?? null) ?: trim($__env->yieldContent('keywords')));
+        $canonical = ($toolSeo['canonical_url'] ?? null) ?: (trim($__env->yieldContent('canonical')) ?: url()->current());
         $favicon = trim((string) ($settings['favicon'] ?? ''));
         $headerLogo = trim((string) ($settings['dark_logo'] ?? '')) ?: trim((string) ($settings['light_logo'] ?? ''));
-        $shareImage = trim($__env->yieldContent('image')) ?: trim((string) ($settings['og_image'] ?? ''));
+        $shareImage = ($toolSeo['cover_image'] ?? null) ?: (trim($__env->yieldContent('image')) ?: trim((string) ($settings['og_image'] ?? '')));
         $shareImage = $shareImage !== '' && ! \Illuminate\Support\Str::startsWith($shareImage, ['http://', 'https://'])
             ? url($shareImage)
             : $shareImage;
-        $shareImageAlt = trim($__env->yieldContent('image_alt'));
-        $explicitDocumentTitle = trim($__env->yieldContent('document_title'));
+        $shareImageAlt = ($toolSeo['cover_alt'] ?? null) ?: trim($__env->yieldContent('image_alt'));
+        $explicitDocumentTitle = $toolSeo ? '' : trim($__env->yieldContent('document_title'));
         $documentTitle = $explicitDocumentTitle !== ''
             ? $explicitDocumentTitle
             : ($title === $siteName || \Illuminate\Support\Str::endsWith($title, ' | '.$siteName)
@@ -48,7 +48,7 @@
     @if ($keywords !== '')
         <meta name="keywords" content="{{ $keywords }}">
     @endif
-    <meta name="robots" content="@yield('robots', $settings['robots'] ?? 'index,follow')">
+    <meta name="robots" content="{{ $toolSeo['robots'] ?? trim($__env->yieldContent('robots', $settings['robots'] ?? 'index,follow')) }}">
     <link rel="canonical" href="{{ $canonical }}">
     <meta property="og:locale" content="vi_VN">
     <meta property="og:type" content="@yield('og_type', 'website')">
@@ -116,6 +116,9 @@
     @if (($customCodeAssets['css'] ?? false) && ! request()->routeIs(['auth.*', 'password.*', 'verification.*']))
         <link rel="stylesheet" href="{{ route('site_custom.css') }}" data-site-custom-css>
     @endif
+    @foreach ($toolSeo['schemas'] ?? [] as $schema)
+        <script type="application/ld+json">{!! json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
+    @endforeach
     @stack('head')
 </head>
 <body class="pb-[calc(4rem+env(safe-area-inset-bottom))] bg-gray-50 lg:pb-0" data-authenticated="{{ auth()->check() ? 'true' : 'false' }}">
@@ -203,6 +206,7 @@
     <main id="main-content" class="client-page-scale min-w-0 focus:outline-none" tabindex="-1" data-page-enter>
         @include('client.partials.flash')
         @yield('content')
+        <x-client.tool-seo :seo="$toolSeo" />
     </main>
     <footer class="mt-16 border-t border-slate-200 bg-white">
         <div class="client-container grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">

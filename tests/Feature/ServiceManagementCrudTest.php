@@ -106,10 +106,13 @@ test('new service invalid fields are rejected without leaving definitions', func
     'missing image' => [['icon_type' => 'image', 'image_url' => null], 'image_url'],
 ]);
 
-test('service management uses the shared data table and modal CRUD controls', function (): void {
+test('service management uses the shared data table and dedicated editing page', function (): void {
     $page = file_get_contents(resource_path('js/pages/admin/tools/index.vue'));
-    expect($page)->toContain('<DataTable', '<Dialog', '<DialogTitle', 'adminServiceManagement.create', 'adminServiceManagement.remove', 'v-model="draft.code"', 'v-model="draft.url"', 'v-model="query"', 'v-model="status"', 'v-model.number="perPage"', 'showCancelButton: true');
-    expect($page)->toContain('v-model.number="draft.sort_order"', "accessorKey: 'sort_order'", "ref('order_asc')");
+    $editor = file_get_contents(resource_path('js/pages/admin/tools/edit.vue'));
+    $form = file_get_contents(resource_path('js/pages/admin/tools/ToolConfigurationForm.vue'));
+    expect($page)->toContain('<DataTable', 'adminServiceManagement.remove', 'v-model="query"', 'v-model="status"', 'v-model.number="perPage"', 'showCancelButton: true', '/admin/tools/create', "accessorKey: 'sort_order'", "ref('order_asc')");
+    expect($editor)->toContain('adminServiceManagement.create', '<ToolConfigurationForm', '<ToolSeoEditor');
+    expect($form)->toContain('v-model="draft.code"', 'v-model="draft.url"', 'v-model.number="draft.sort_order"');
 });
 
 test('service display order is saved as an integer in SQL and shared by admin and client lists', function (): void {

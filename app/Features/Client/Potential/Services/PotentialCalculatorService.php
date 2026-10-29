@@ -34,6 +34,28 @@ class PotentialCalculatorService
         return ['planet' => $planet['label'], 'breakdown' => $breakdown, 'total' => $total, 'level' => $this->level($total, $stats['planet'])];
     }
 
+    /**
+     * @param  array{planet: string, current: array{hp: int|string, ki: int|string, attack: int|string, armor: int|string, critical: int|string}, target: array{hp: int|string, ki: int|string, attack: int|string, armor: int|string, critical: int|string}, available_potential?: int|string|null, current_power?: int|string|null}  $inputs
+     * @return array{breakdown: array<string, float>, total: float, remaining: float, target_power: ?float}
+     */
+    public function calculateMissing(array $inputs): array
+    {
+        $current = $this->calculate(['planet' => $inputs['planet'], ...$inputs['current']]);
+        $target = $this->calculate(['planet' => $inputs['planet'], ...$inputs['target']]);
+        $breakdown = [];
+        foreach ($current['breakdown'] as $field => $spent) {
+            $breakdown[$field] = max(0.0, $target['breakdown'][$field] - $spent);
+        }
+        $total = (float) array_sum($breakdown);
+
+        return [
+            'breakdown' => $breakdown,
+            'total' => $total,
+            'remaining' => max(0.0, $total - (float) ($inputs['available_potential'] ?? 0)),
+            'target_power' => isset($inputs['current_power']) ? (float) $inputs['current_power'] + $total : null,
+        ];
+    }
+
     private function series(int $last, int $first, int $step): float
     {
         return ($last + $first) * (($last - $first) / $step + 1) / 2;

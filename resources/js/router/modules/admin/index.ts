@@ -17,6 +17,8 @@ export default {
             props: { section: 'plans' },
         },
         { path: 'tools', name: 'admin.tools', component: () => import('@/pages/admin/tools/index.vue') },
+        { path: 'tools/create', name: 'admin.tools.create', component: () => import('@/pages/admin/tools/edit.vue') },
+        { path: 'tools/:code/edit', name: 'admin.tools.edit', component: () => import('@/pages/admin/tools/edit.vue') },
         { path: 'wallets', name: 'admin.wallets', component: () => import('@/pages/admin/wallets/index.vue') },
         { path: 'services', name: 'admin.services', component: () => import('@/pages/admin/services/index.vue') },
         { path: 'service-packages', name: 'admin.service-packages', component: () => import('@/pages/admin/service-packages/index.vue') },

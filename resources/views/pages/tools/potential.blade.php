@@ -7,7 +7,7 @@
     <div class="mx-auto max-w-2xl">
         <div class="mb-6">
             <p class="text-sm font-bold text-emerald-700">Công cụ Ngọc Rồng Online</p>
-            <h1 class="mt-2 text-3xl font-extrabold text-slate-900">Tính tiềm năng</h1>
+            <span class="mt-2 block text-3xl font-extrabold text-slate-900">Tính tiềm năng</span>
             <p class="mt-3 text-sm leading-6 text-slate-600">Nhập chỉ số gốc của nhân vật để kiểm tra tiềm năng đã nâng và cấp độ tương ứng. Dùng chỉ số chưa cộng trang bị, ngọc hoặc hiệu ứng hỗ trợ.</p>
         </div>
         @if(!$service['is_enabled'])

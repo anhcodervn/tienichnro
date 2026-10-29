@@ -1,4 +1,5 @@
 import api from '@/config/axios';
+import type { ToolSeoPayload, ToolSeoSettings } from '@/types/tool-seo.type';
 
 export type ManagedService = {
     code: string;
@@ -16,6 +17,12 @@ export type ManagedService = {
 };
 
 export const adminServiceManagement = {
+    async get(code: string): Promise<{ service: ManagedService; seo: ToolSeoSettings }> {
+        return (await api.get(`/api/admin-api/settings/services/${encodeURIComponent(code)}`)).data.data;
+    },
+    async updateSeo(code: string, payload: ToolSeoPayload): Promise<ToolSeoSettings> {
+        return (await api.patch(`/api/admin-api/settings/services/${encodeURIComponent(code)}/seo`, payload)).data.data;
+    },
     async list(): Promise<ManagedService[]> {
         return (await api.get('/api/admin-api/settings/services')).data.data;
     },

@@ -11,6 +11,8 @@ const routeTitles: Record<string, string> = {
     'admin.licenses.plans': 'Gói license',
     'admin.services': 'Cấu hình dịch vụ',
     'admin.tools': 'Cấu hình công cụ',
+    'admin.tools.create': 'Thêm công cụ',
+    'admin.tools.edit': 'Sửa công cụ',
     'admin.wallets': 'Ví & dòng tiền',
     'admin.service-packages': 'Cấu hình gói',
     'admin.nro.bosses': 'Quản lý boss',

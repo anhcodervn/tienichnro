@@ -7,7 +7,7 @@
     <div class="mx-auto grid max-w-4xl gap-6">
         <header>
             <p class="text-sm font-bold text-emerald-700">Công cụ Ngọc Rồng Online</p>
-            <h1 class="mt-2 text-3xl font-extrabold text-slate-900">Tính chỉ số trang bị nâng cấp NRO</h1>
+            <span class="mt-2 block text-3xl font-extrabold text-slate-900">Tính chỉ số trang bị nâng cấp NRO</span>
             <p class="mt-3 text-sm leading-6 text-slate-600">Nhập chỉ số trên trang bị và cấp độ hiện tại để xem chỉ số tương ứng từ +0 đến +7.</p>
         </header>
         @if(!$service['is_enabled'])

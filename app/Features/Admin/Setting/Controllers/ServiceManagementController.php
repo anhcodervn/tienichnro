@@ -4,7 +4,9 @@ namespace App\Features\Admin\Setting\Controllers;
 
 use App\Features\Admin\Setting\Requests\StoreServiceRequest;
 use App\Features\Admin\Setting\Requests\UpdateServiceRequest;
+use App\Features\Admin\Setting\Requests\UpdateToolSeoRequest;
 use App\Features\Admin\Setting\Services\ToolAvailabilityService;
+use App\Features\Admin\Setting\Services\ToolSeoService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Response;
@@ -14,6 +16,19 @@ class ServiceManagementController extends Controller
     public function index(ToolAvailabilityService $services): JsonResponse
     {
         return response()->json(['data' => $services->all()]);
+    }
+
+    public function show(string $code, ToolAvailabilityService $services, ToolSeoService $seo): JsonResponse
+    {
+        $service = $services->find($code);
+        abort_if($service === null, 404);
+
+        return response()->json(['data' => ['service' => $service, 'seo' => $seo->settings($code)]]);
+    }
+
+    public function updateSeo(UpdateToolSeoRequest $request, string $code, ToolSeoService $seo): JsonResponse
+    {
+        return response()->json(['data' => $seo->update($code, $request->validated()), 'message' => 'Đã lưu bài SEO công cụ.']);
     }
 
     public function update(UpdateServiceRequest $request, string $code, ToolAvailabilityService $services): JsonResponse
