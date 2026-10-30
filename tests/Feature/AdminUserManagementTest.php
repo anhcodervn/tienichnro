@@ -2,7 +2,6 @@
 
 use App\Jobs\SaveUserLogJob;
 use App\Jobs\SendSystemMailJob;
-use App\Models\AdminAuditLog;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Support\Facades\DB;
@@ -93,8 +92,7 @@ test('password reset revokes access and notifies without leaking plaintext', fun
     Queue::assertPushed(SaveUserLogJob::class, fn ($job) => $job->userId === $user->id && $job->action === 'admin_reset_password');
     Queue::assertPushed(SendSystemMailJob::class, fn ($job) => $job->to === $user->email && ! str_contains(json_encode($job->messageLines), 'NewPassword123'));
     expect($response->getContent())->not->toContain('NewPassword123');
-    $audit = AdminAuditLog::query()->where('path', '/api/admin-api/users/'.$user->id.'/reset-password')->firstOrFail();
-    expect(json_encode($audit->new_values))->not->toContain('NewPassword123');
+    $this->assertDatabaseCount('admin_audit_logs', 0);
 });
 
 test('invalid reset input leaves the password unchanged', function (): void {

@@ -1,6 +1,5 @@
 <?php
 
-use App\Models\AdminAuditLog;
 use App\Models\Setting;
 use App\Models\User;
 use App\Support\SettingStore;
@@ -53,14 +52,7 @@ test('admin can store and read exact custom css and javascript', function (): vo
         ->and(Setting::query()->where('key', 'custom_css_enabled')->value('type'))->toBe('boolean')
         ->and(Setting::query()->where('key', 'custom_js')->value('value'))->toBe($customJs);
 
-    $audit = AdminAuditLog::query()->where('action', 'custom_code_updated')->firstOrFail();
-
-    expect($audit->admin_id)->toBe($admin->id)
-        ->and($audit->ip)->toBe('203.0.113.10')
-        ->and($audit->user_agent)->toBe('CustomCodeSettingTest')
-        ->and($audit->new_values['custom_css_sha256'])->toBe(hash('sha256', $customCss))
-        ->and($audit->new_values['custom_js_sha256'])->toBe(hash('sha256', $customJs))
-        ->and(json_encode($audit->old_values).json_encode($audit->new_values))->not->toContain($customJs);
+    $this->assertDatabaseCount('admin_audit_logs', 0);
 });
 
 test('partial update preserves omitted custom code fields', function (): void {

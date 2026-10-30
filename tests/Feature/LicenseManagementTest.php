@@ -1,7 +1,6 @@
 <?php
 
 use App\Features\License\Services\LicenseSessionService;
-use App\Models\AdminAuditLog;
 use App\Models\License;
 use App\Models\LicensePlan;
 use App\Models\LicenseProduct;
@@ -295,14 +294,12 @@ test('raising minimum version stops an already running older client at heartbeat
     signedLicenseRequest($this, '/api/v1/licenses/heartbeat', licenseHeartbeatPayload($this, $session), $session['session_token'])->assertForbidden()->assertJsonPath('code', 'CLIENT_VERSION_UNSUPPORTED');
 });
 
-test('license administration audit redacts credentials and never records issued key plaintext', function (): void {
+test('license administration issues keys without recording admin audit logs', function (): void {
     $this->actingAs(User::factory()->create(['role' => 'admin']));
-    $issued = $this->postJson('/api/admin-api/license/keys', ['plan_id' => $this->plan->id, 'quantity' => 1, 'license_key' => 'SECRET-LICENSE', 'session_token' => 'SECRET-SESSION', 'owner_password' => 'SECRET-PASSWORD'])->assertCreated()->json('data.0.key');
-    $log = AdminAuditLog::query()->where('path', '/api/admin-api/license/keys')->firstOrFail();
-    expect(data_get($log->new_values, 'input.license_key'))->toBe('[REDACTED]');
-    expect(data_get($log->new_values, 'input.session_token'))->toBe('[REDACTED]');
-    expect(data_get($log->new_values, 'input.owner_password'))->toBe('[REDACTED]');
-    expect(json_encode($log->new_values))->not->toContain($issued);
+    $this->postJson('/api/admin-api/license/keys', ['plan_id' => $this->plan->id, 'quantity' => 1])
+        ->assertCreated()
+        ->assertJsonStructure(['data' => [['id', 'key']]]);
+    $this->assertDatabaseCount('admin_audit_logs', 0);
 });
 
 test('admin edits license ownership duration and cooldown with validated information', function (): void {

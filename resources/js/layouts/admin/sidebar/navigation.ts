@@ -1,4 +1,4 @@
-import { Globe2, Layers3, ListChecks, Mail, MessagesSquare, ScrollText, Settings, Users, type LucideIcon } from 'lucide-vue-next';
+import { Globe2, Layers3, ListChecks, Mail, MessagesSquare, Settings, Users, type LucideIcon } from 'lucide-vue-next';
 
 export type AdminMenuChild = {
     label: string;
@@ -68,7 +68,6 @@ export const adminMenuGroups: AdminMenuGroup[] = [
             { label: 'Bảo trì', href: '/admin/settings/maintenance' },
         ],
     },
-    { key: 'audit-logs', label: 'Nhật ký quản trị', icon: ScrollText, href: '/admin/audit-logs' },
     { key: 'feedbacks', label: 'Liên hệ', icon: MessagesSquare, href: '/admin/feedbacks' },
     { key: 'mail', label: 'Email', icon: Mail, href: '/admin/mail' },
     { key: 'queues', label: 'Hàng đợi', icon: ListChecks, href: '/admin/queues' },

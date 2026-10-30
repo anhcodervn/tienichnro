@@ -5,7 +5,6 @@ use App\Http\Middleware\EnsureAdminUser;
 use App\Http\Middleware\EnsurePlatformAdmin;
 use App\Http\Middleware\EnsureSiteIsActive;
 use App\Http\Middleware\EnsureUserHasRole;
-use App\Http\Middleware\RecordAdminActivity;
 use App\Models\LicenseEvent;
 use App\Support\SettingStore;
 use Illuminate\Auth\Access\AuthorizationException;
@@ -31,8 +30,6 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->appendToGroup('web', EnsureSiteIsActive::class);
-        $middleware->appendToGroup('web', RecordAdminActivity::class);
-        $middleware->appendToGroup('api', RecordAdminActivity::class);
         $middleware->statefulApi();
         $middleware->trustProxies(at: '*');
         $middleware->trimStrings(except: ['content.*', '*_content.*', 'custom_css', 'custom_js', 'custom_head_tags', 'custom_script']);

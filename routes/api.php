@@ -33,7 +33,7 @@ Route::middleware('auth:sanctum')->group(function (): void {
 });
 
 $adminFeatures = [
-    'Setting', 'Upload', 'User', 'Mail', 'Queue', 'Feedback', 'Seo', 'AuditLog',
+    'Setting', 'Upload', 'User', 'Mail', 'Queue', 'Feedback', 'Seo',
 ];
 
 foreach ($adminFeatures as $feature) {

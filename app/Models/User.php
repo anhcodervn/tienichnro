@@ -93,11 +93,6 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
         return $this->belongsToMany(LicenseProduct::class, 'license_product_user')->withTimestamps();
     }
 
-    public function adminAuditLogs(): HasMany
-    {
-        return $this->hasMany(AdminAuditLog::class, 'admin_id');
-    }
-
     public function notifications(): HasMany
     {
         return $this->hasMany(Notification::class);

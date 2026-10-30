@@ -36,11 +36,6 @@ export default {
             redirect: { name: 'admin.seo.posts' },
         },
         {
-            path: 'audit-logs',
-            name: 'admin.audit-logs.index',
-            component: () => import('@/pages/admin/audit-logs/index.vue'),
-        },
-        {
             path: 'users',
             children: [
                 {

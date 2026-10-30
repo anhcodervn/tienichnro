@@ -402,7 +402,7 @@ class SettingController extends Controller
         $validated = $request->validated();
 
         if ($tab === 'custom-code') {
-            $settings = $updateCustomCodeSettings->execute($request->user(), $validated, $request);
+            $settings = $updateCustomCodeSettings->execute($validated);
 
             return response()->json([
                 'status' => true,
