@@ -87,14 +87,15 @@ test('multipart method override replaces only the selected ZIP and preserves the
     $product = LicenseProduct::factory()->create();
     $url = '/api/admin-api/license/products/'.$product->id;
     $this->actingAs($this->admin)->post($url, productReleaseData([
-        '_method' => 'PATCH', 'tool_zip' => productReleaseZip(), 'update_zip' => productReleaseZip('update.zip'),
+        '_method' => 'PATCH', 'latest_version' => '1.0.2', 'tool_zip' => productReleaseZip(), 'update_zip' => productReleaseZip('update.zip'),
     ]), ['Accept' => 'application/json'])->assertOk();
     $oldTool = $product->refresh()->tool_zip_path;
     $oldUpdate = $product->update_zip_path;
 
     $this->post($url, productReleaseData([
-        '_method' => 'PATCH', 'latest_version' => '1.3.0', 'update_zip' => productReleaseZip('update-1.3.zip'),
-    ]), ['Accept' => 'application/json'])->assertOk()->assertJsonPath('data.latest_version', '1.3.0');
+        '_method' => 'PATCH', 'latest_version' => '1.0.3', 'update_zip' => productReleaseZip('update-1.0.3.zip'),
+    ]), ['Accept' => 'application/json'])->assertOk()->assertJsonPath('data.latest_version', '1.0.3')
+        ->assertJsonPath('data.update_zip_name', 'update-1.0.3.zip');
     expect($product->refresh()->tool_zip_path)->toBe($oldTool)
         ->and($product->update_zip_path)->not->toBe($oldUpdate);
     Storage::disk('local')->assertExists([$oldTool, $product->update_zip_path]);

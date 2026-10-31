@@ -392,6 +392,10 @@ function localDateTime(value: string) {
     const date = new Date(value);
     return new Date(date.getTime() - date.getTimezoneOffset() * 60000).toISOString().slice(0, 19);
 }
+function showInvalidField(event: Event) {
+    const input = event.target as HTMLInputElement;
+    formErrors.value = [input.validationMessage || 'Vui lòng kiểm tra lại thông tin.'];
+}
 async function save() {
     if (!canSave.value) return;
     saving.value = true;
@@ -432,11 +436,31 @@ async function save() {
         }
         await load();
     } catch (error) {
-        if (isAxiosError<{ errors?: Record<string, string[]>; message?: string }>(error) && error.response?.status === 422)
-            formErrors.value = error.response.data.errors
-                ? Object.values(error.response.data.errors).flat()
-                : [error.response.data.message || 'Vui lòng kiểm tra lại thông tin.'];
-        else handleErrorResponse(error);
+        if (isAxiosError<{ errors?: Record<string, string[]>; message?: string }>(error)) {
+            const status = error.response?.status;
+            const data = error.response?.data;
+            const messages: Record<number, string> = {
+                401: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại rồi lưu.',
+                403: 'Bạn không có quyền lưu thay đổi này.',
+                413: 'Máy chủ từ chối vì dung lượng tải lên vượt giới hạn. Vui lòng kiểm tra giới hạn upload của máy chủ.',
+                419: 'Phiên làm việc đã hết hạn. Vui lòng tải lại trang rồi thử lại.',
+                429: 'Bạn thao tác quá nhanh. Vui lòng đợi một lúc rồi thử lại.',
+            };
+            const validationErrors = status === 422 && data?.errors ? Object.values(data.errors).flat() : [];
+            formErrors.value = validationErrors.length
+                ? validationErrors
+                : [
+                      (status && messages[status]) ||
+                          (status && status >= 500
+                              ? `Máy chủ không thể lưu thay đổi (HTTP ${status}). Vui lòng thử lại hoặc kiểm tra log máy chủ.`
+                              : '') ||
+                          (!status ? 'Không kết nối được máy chủ. Vui lòng kiểm tra mạng rồi thử lại.' : '') ||
+                          data?.message ||
+                          'Không thể lưu thay đổi. Vui lòng kiểm tra lại thông tin.',
+                  ];
+        } else {
+            formErrors.value = ['Không thể lưu thay đổi. Vui lòng thử lại.'];
+        }
     } finally {
         saving.value = false;
     }
@@ -768,21 +792,12 @@ onMounted(load);
                             </button>
                         </header>
                         <div class="min-h-0 overflow-y-auto px-5 py-5 sm:px-6">
-                            <div
-                                v-if="formErrors.length"
-                                role="alert"
-                                class="mb-5 rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                            >
-                                <p class="font-semibold">Kiểm tra lại thông tin</p>
-                                <ul class="mt-2 list-inside list-disc space-y-1">
-                                    <li v-for="error in formErrors" :key="error">{{ error }}</li>
-                                </ul>
-                            </div>
                             <form
                                 v-if="['product', 'plan', 'issue', 'manage', 'edit', 'delete', 'catalog-delete'].includes(modal || '')"
                                 id="license-form"
                                 class="space-y-5"
                                 @submit.prevent="save"
+                                @invalid.capture="showInvalidField"
                             >
                                 <div v-if="modal === 'catalog-delete' && catalogDeletion" class="space-y-4">
                                     <p class="text-sm">
@@ -837,12 +852,12 @@ onMounted(load);
                                         </button>
                                     </div>
                                     <label class="grid gap-1.5 text-sm font-medium"
-                                        >Phiên bản tối thiểu<input v-model="product.minimum_version" required :class="inputClass"
+                                        >Phiên bản tối thiểu<input v-model.trim="product.minimum_version" required :class="inputClass"
                                     /></label>
                                     <label class="grid gap-1.5 text-sm font-medium">
                                         Phiên bản mới nhất
                                         <input
-                                            v-model="product.latest_version"
+                                            v-model.trim="product.latest_version"
                                             placeholder="1.0.0"
                                             :required="!!(productFiles.tool || productFiles.update)"
                                             :disabled="saving"
@@ -1324,6 +1339,16 @@ onMounted(load);
                         <footer
                             class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50 px-5 py-4 dark:border-slate-700 dark:bg-slate-800 sm:px-6"
                         >
+                            <div
+                                v-if="formErrors.length"
+                                role="alert"
+                                class="max-h-40 w-full overflow-y-auto rounded-lg border border-rose-200 bg-rose-50 p-3 text-sm text-rose-700 dark:border-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                            >
+                                <p class="font-semibold">Chưa lưu được thay đổi</p>
+                                <ul class="mt-2 list-inside list-disc space-y-1">
+                                    <li v-for="error in formErrors" :key="error">{{ error }}</li>
+                                </ul>
+                            </div>
                             <p class="text-xs text-slate-500 dark:text-slate-400">
                                 {{
                                     modal === 'issued'
