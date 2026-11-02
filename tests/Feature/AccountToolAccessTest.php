@@ -11,7 +11,7 @@ beforeEach(function (): void {
     Storage::fake('local');
     $this->admin = User::factory()->create(['role' => 'admin']);
     $this->member = User::factory()->create(['role' => 'user', 'status' => 'active', 'password' => 'Account-password-123']);
-    $this->tool = LicenseProduct::factory()->create(['name' => 'My mod', 'image_url' => '/storage/uploads/mod.webp']);
+    $this->tool = LicenseProduct::factory()->create(['name' => 'My mod', 'image_url' => '/storage/uploads/mod.webp', 'exe_filename' => 'AutoNro.exe']);
 });
 
 test('admin can read grant replace and revoke tools without affecting another account', function (): void {
@@ -62,9 +62,17 @@ test('website account logs in by username or email and returns a usable private 
     auth()->forgetGuards();
     $this->getJson('/api/account/tools')->assertOk()->assertJsonCount(1, 'data')
         ->assertJsonPath('data.0.name', 'My mod')->assertJsonPath('data.0.image_url', url('/storage/uploads/mod.webp'))
+        ->assertJsonPath('data.0.exe_filename', 'AutoNro.exe')
         ->assertJsonMissingPath('data.0.tool_zip_path')->assertJsonMissingPath('data.0.pivot')
         ->assertHeader('Cache-Control', 'no-store, private')->assertDontSee('Unassigned secret tool');
 })->with(['username', 'email']);
+
+test('tools without an executable filename expose null for older products', function (): void {
+    $this->tool->update(['exe_filename' => null]);
+    $this->member->permittedTools()->attach($this->tool);
+    $this->withToken($this->member->createToken('launcher')->plainTextToken)->getJson('/api/account/tools')
+        ->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.exe_filename', null);
+});
 
 test('wrong password and blocked accounts never receive API tokens', function (): void {
     $this->postJson('/api/auth/login', ['login' => $this->member->email, 'password' => 'wrong'])->assertUnprocessable();

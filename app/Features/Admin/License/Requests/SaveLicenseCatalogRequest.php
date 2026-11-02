@@ -27,6 +27,7 @@ class SaveLicenseCatalogRequest extends FormRequest
         }
 
         return [...$rules,
+            'exe_filename' => ['sometimes', 'nullable', 'string', 'max:255', 'regex:~\A(?![ .])(?!(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])\.exe\z)[^<>:"/\\\\|?*\x00-\x1F]+\.exe\z~iu'],
             'image_url' => ['bail', 'sometimes', 'nullable', 'string', 'max:2048', function (string $attribute, mixed $value, Closure $fail): void {
                 if (! preg_match('~\A/storage/uploads/[A-Za-z0-9/_-]+\.(?:jpe?g|png|webp)\z~', $value)) {
                     $fail('Vui lòng chọn ảnh đã tải lên máy chủ.');

@@ -94,6 +94,7 @@ const product = reactive<Omit<LicenseProduct, 'id'>>({
     product_code: '',
     description: '',
     image_url: null,
+    exe_filename: null,
     minimum_version: '1.0.0',
     latest_version: '1.0.0',
     is_active: true,
@@ -283,7 +284,7 @@ function openModal(value: typeof modal.value) {
 }
 function editProduct(item?: LicenseProduct) {
     Object.assign(productFiles, { tool: null, update: null });
-    Object.assign(product, { latest_version: '', tool_zip_name: null, update_zip_name: null, image_url: null });
+    Object.assign(product, { latest_version: '', tool_zip_name: null, update_zip_name: null, image_url: null, exe_filename: null });
     editingId.value = item?.id ?? null;
     Object.assign(
         product,
@@ -824,6 +825,13 @@ onMounted(load);
                                             :class="inputClass"
                                             placeholder="NRO_MANAGER"
                                     /></label>
+                                    <label class="grid gap-1.5 text-sm font-medium sm:col-span-2">
+                                        Tên file .exe
+                                        <input v-model.trim="product.exe_filename" maxlength="255" placeholder="AutoNro.exe" :class="inputClass" />
+                                        <span class="text-xs font-normal text-slate-500 dark:text-slate-400"
+                                            >Tên file chạy sau khi giải nén ZIP, không kèm đường dẫn. Auto Manager đọc qua API.</span
+                                        >
+                                    </label>
                                     <label class="grid gap-1.5 text-sm font-medium sm:col-span-2"
                                         >Mô tả<textarea v-model="product.description" :class="inputClass" />
                                     </label>

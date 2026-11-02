@@ -16,15 +16,18 @@ beforeEach(function (): void {
 test('launcher can log in fetch its assigned key and activate through the existing signed protocol', function (): void {
     $key = 'ABCD-1234-ABCD-1234-ABCD-1234-ABCD-1234';
     $license = License::factory()->create(['user_id' => $this->member->id, 'encrypted_key' => $key, 'key_hash' => LicenseSessionService::hashKey($key)]);
+    $license->product->update(['exe_filename' => 'AutoNro.exe']);
     $token = $this->postJson('/api/auth/login', ['login' => $this->member->email, 'password' => 'Launcher-password-123'])
         ->assertOk()->json('access_token');
     auth()->forgetGuards();
     $response = $this->withToken($token)->getJson('/api/account/licenses?product_code='.$license->product->product_code)->assertOk()
         ->assertJsonCount(1, 'data')->assertJsonPath('data.0.key', $key)->assertJsonPath('data.0.can_activate', true)
+        ->assertJsonPath('data.0.exe_filename', 'AutoNro.exe')
         ->assertHeader('Cache-Control', 'no-store, private')->assertJsonMissingPath('data.0.key_hash')
         ->assertJsonMissingPath('data.0.encrypted_key')->assertJsonMissingPath('data.0.sessions');
     auth()->forgetGuards();
     $this->getJson('/api/account/licenses/'.$license->id)->assertOk()->assertJsonPath('data.key', $key)
+        ->assertJsonPath('data.exe_filename', 'AutoNro.exe')
         ->assertHeader('Cache-Control', 'no-store, private');
     $challenge = $this->postJson('/api/v1/licenses/challenge')->assertOk()->json('data');
     $private = openssl_pkey_get_private(file_get_contents(base_path('tests/Fixtures/license-device-test.pem')));

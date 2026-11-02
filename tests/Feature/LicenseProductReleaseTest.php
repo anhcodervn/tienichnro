@@ -70,6 +70,27 @@ test('mod image rejects non square files remote urls traversal missing files and
     $this->assertDatabaseCount('license_products', 0);
 })->with(['landscape', 'remote', 'traversal', 'svg', 'invalid', 'missing']);
 
+test('admin saves replaces preserves and clears the executable filename', function (): void {
+    $id = $this->actingAs($this->admin)->postJson('/api/admin-api/license/products', productReleaseData(['exe_filename' => 'Auto Nro.exe']))
+        ->assertCreated()->assertJsonPath('data.exe_filename', 'Auto Nro.exe')->json('data.id');
+    $url = '/api/admin-api/license/products/'.$id;
+    $this->assertDatabaseHas('license_products', ['id' => $id, 'exe_filename' => 'Auto Nro.exe']);
+    $this->getJson('/api/admin-api/license/products')->assertOk()->assertJsonPath('data.0.exe_filename', 'Auto Nro.exe');
+    $this->patchJson($url, productReleaseData())->assertOk()->assertJsonPath('data.exe_filename', 'Auto Nro.exe');
+    $this->patchJson($url, productReleaseData(['exe_filename' => 'NewTool.EXE']))->assertOk()->assertJsonPath('data.exe_filename', 'NewTool.EXE');
+    $this->patchJson($url, productReleaseData(['exe_filename' => '']))->assertOk()->assertJsonPath('data.exe_filename', null);
+    expect(LicenseProduct::findOrFail($id)->exe_filename)->toBeNull();
+});
+
+test('admin rejects invalid executable filenames on create and update', function (mixed $filename): void {
+    $data = productReleaseData(['exe_filename' => $filename]);
+    $this->actingAs($this->admin)->postJson('/api/admin-api/license/products', $data)->assertUnprocessable()->assertJsonValidationErrors('exe_filename');
+    $this->assertDatabaseCount('license_products', 0);
+    $product = LicenseProduct::factory()->create(['exe_filename' => 'Original.exe']);
+    $this->patchJson('/api/admin-api/license/products/'.$product->id, $data)->assertUnprocessable()->assertJsonValidationErrors('exe_filename');
+    expect($product->fresh()->exe_filename)->toBe('Original.exe');
+})->with(['tool.zip', '../tool.exe', 'folder/tool.exe', 'C:\\tool.exe', 'tool.exe --run', 'tool?.exe', 'tool:stream.exe', 'CON.exe', '.exe', "bad\nname.exe", str_repeat('a', 252).'.exe', [['tool.exe']]]);
+
 test('admin uploads private tool and update ZIP files with editable latest version', function (): void {
     $response = $this->actingAs($this->admin)->post('/api/admin-api/license/products', productReleaseData([
         'tool_zip' => productReleaseZip(), 'update_zip' => productReleaseZip('update.zip'),

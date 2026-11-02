@@ -19,6 +19,7 @@ class AccountLicenseResource extends JsonResource
             'product_id' => $this->product_id,
             'product_code' => $this->product?->product_code,
             'product_name' => $this->product?->name,
+            'exe_filename' => $this->product?->exe_filename,
             'minimum_version' => $this->product?->minimum_version,
             'plan_name' => $this->plan?->name,
             'key_prefix' => $this->key_prefix,
