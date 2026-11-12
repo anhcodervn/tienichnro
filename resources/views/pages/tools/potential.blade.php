@@ -2,14 +2,9 @@
 @section('title', 'Tính tiềm năng Ngọc Rồng Online')
 @section('description', 'Tính tổng tiềm năng đã nâng HP, KI, sức đánh, giáp và chí mạng theo hành tinh trong Ngọc Rồng Online.')
 @section('canonical', route('tools.potential'))
+@section('tool_title', 'Tính tiềm năng')
+@section('tool_description', 'Nhập chỉ số gốc của nhân vật để kiểm tra tiềm năng đã nâng và cấp độ tương ứng. Dùng chỉ số chưa cộng trang bị, ngọc hoặc hiệu ứng hỗ trợ.')
 @section('content')
-<section class="client-container py-8 sm:py-12">
-    <div class="mx-auto max-w-2xl">
-        <div class="mb-6">
-            <p class="text-sm font-bold text-emerald-700">Công cụ Ngọc Rồng Online</p>
-            <span class="mt-2 block text-3xl font-extrabold text-slate-900">Tính tiềm năng</span>
-            <p class="mt-3 text-sm leading-6 text-slate-600">Nhập chỉ số gốc của nhân vật để kiểm tra tiềm năng đã nâng và cấp độ tương ứng. Dùng chỉ số chưa cộng trang bị, ngọc hoặc hiệu ứng hỗ trợ.</p>
-        </div>
         @if(!$service['is_enabled'])
             <x-client.service-maintenance :message="$service['maintenance_message']" />
         @else
@@ -35,6 +30,4 @@
             <noscript><p class="text-sm text-rose-700">Vui lòng bật JavaScript để kiểm tra và xem kết quả.</p></noscript>
         </form>
         @endif
-    </div>
-</section>
 @endsection

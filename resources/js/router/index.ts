@@ -5,6 +5,9 @@ import adminRouter from './modules/admin';
 const routes: RouteRecordRaw[] = [adminRouter];
 
 const routeTitles: Record<string, string> = {
+    'admin.overview': 'Tổng quan quản trị',
+    'admin.captcha.wallet': 'Ví token captcha',
+    'admin.captcha.history': 'Lịch sử giải captcha',
     'admin.licenses.client-game': 'Client Game',
     'admin.licenses': 'License keys',
     'admin.licenses.products': 'Sản phẩm / tool',

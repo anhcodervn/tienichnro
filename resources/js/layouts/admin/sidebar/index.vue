@@ -1,192 +1,194 @@
 <script setup lang="ts">
 import { useSystemSetting } from '@/composables/useSystemSetting';
-import { ChevronRight, ShieldCheck, X } from 'lucide-vue-next';
-import { computed, onMounted, reactive, watch } from 'vue';
+import { ChevronDown, ExternalLink, Search, ShieldCheck, X } from 'lucide-vue-next';
+import { computed, nextTick, onMounted, ref, watch } from 'vue';
 import { RouterLink, useRoute } from 'vue-router';
-import { adminMenuGroups, type AdminMenuGroup } from './navigation';
+import { adminMenuSections, filterAdminMenu, resolveAdminNavigation, type AdminMenuGroup } from './navigation';
 
-const props = defineProps<{
-    isOpen: boolean;
-}>();
-
-const emit = defineEmits<{
-    close: [];
-}>();
-
+const props = defineProps<{ isOpen: boolean; isMobile: boolean }>();
+const emit = defineEmits<{ close: [] }>();
 const route = useRoute();
 const { settings, fetchSettings } = useSystemSetting();
 const sidebarLogo = computed(() => settings.value.dark_logo || settings.value.light_logo);
-const visibleMenuGroups = computed(() => adminMenuGroups);
-
-onMounted(() => {
-    void fetchSettings().catch(() => {});
-});
-
-const findBestMatchingChildHref = (hrefs: string[], currentPath: string): string | null => {
-    return (
-        [...hrefs].sort((left, right) => right.length - left.length).find((href) => currentPath === href || currentPath.startsWith(`${href}/`)) ??
-        null
-    );
+const query = ref('');
+const panel = ref<HTMLElement | null>(null);
+const searchInput = ref<HTMLInputElement | null>(null);
+const expandedGroup = ref<string | null>(null);
+let returnFocus: HTMLElement | null = null;
+const visibleGroups = computed(() => filterAdminMenu(query.value));
+const sections = computed(() =>
+    adminMenuSections
+        .map((section) => ({
+            ...section,
+            groups: visibleGroups.value.filter((group) => group.section === section.key),
+        }))
+        .filter((section) => section.groups.length),
+);
+const active = computed(() => resolveAdminNavigation(route.path));
+const isGroupActive = (group: AdminMenuGroup): boolean => active.value?.group.key === group.key;
+const isExpanded = (key: string): boolean => !!query.value.trim() || expandedGroup.value === key;
+const closeOnMobile = (): void => {
+    if (props.isMobile) emit('close');
 };
-
-const expandedGroups = reactive<Record<string, boolean>>({
-    users: false,
-    products: false,
-    discounts: false,
-    settings: false,
-});
-
-const isGroupActive = (group: AdminMenuGroup): boolean => {
-    if (group.href) {
-        return route.path === group.href;
-    }
-
-    const childHrefs = group.children?.map((child) => child.href) ?? [];
-
-    return findBestMatchingChildHref(childHrefs, route.path) !== null;
-};
-
-const isChildActive = (href: string): boolean => {
-    const menuChildHrefs = visibleMenuGroups.value.flatMap((group) => group.children?.map((child) => child.href) ?? []);
-
-    return findBestMatchingChildHref(menuChildHrefs, route.path) === href;
-};
-
-const toggleGroup = (groupKey: string): void => {
-    expandedGroups[groupKey] = !expandedGroups[groupKey];
-};
-
-const closeSidebarOnMobile = (): void => {
-    if (window.innerWidth < 1024) {
-        emit('close');
+const trapFocus = (event: KeyboardEvent): void => {
+    if (!props.isMobile || event.key !== 'Tab') return;
+    const elements = panel.value?.querySelectorAll<HTMLElement>('a[href], button:not([disabled]), input:not([disabled])');
+    const focusable = Array.from(elements ?? []).filter((element) => element.getClientRects().length);
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
     }
 };
-
 watch(
     () => route.path,
     () => {
-        for (const group of visibleMenuGroups.value) {
-            if (group.children) {
-                expandedGroups[group.key] = isGroupActive(group);
-            }
-        }
+        expandedGroup.value = active.value?.group.children ? active.value.group.key : null;
+        query.value = '';
     },
     { immediate: true },
 );
+watch(
+    () => props.isOpen,
+    async (open) => {
+        if (!props.isMobile) return;
+        if (open) {
+            returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+            await nextTick();
+            searchInput.value?.focus();
+        } else {
+            returnFocus?.focus();
+        }
+    },
+);
+onMounted(() => {
+    void fetchSettings().catch(() => {});
+});
 </script>
 
 <template>
-    <Transition
-        enter-active-class="transition duration-300 ease-out"
-        enter-from-class="-translate-x-full opacity-0"
-        enter-to-class="translate-x-0 opacity-100"
-        leave-active-class="transition duration-200 ease-in"
-        leave-from-class="translate-x-0 opacity-100"
-        leave-to-class="-translate-x-full opacity-0"
+    <aside
+        v-if="isOpen"
+        id="admin-sidebar"
+        ref="panel"
+        :role="isMobile ? 'dialog' : undefined"
+        :aria-modal="isMobile ? true : undefined"
+        aria-label="Điều hướng quản trị"
+        class="fixed inset-y-0 left-0 z-50 flex h-dvh w-[264px] max-w-[calc(100vw-32px)] flex-col border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900"
+        @keydown="trapFocus"
     >
-        <aside
-            v-if="props.isOpen"
-            class="fixed inset-y-0 left-0 z-50 flex w-[290px] flex-col border-r border-slate-200 bg-white text-slate-700 shadow-[0_24px_80px_rgba(15,23,42,0.14)] lg:sticky lg:top-0 lg:shadow-none"
-        >
-            <div class="flex items-center justify-between border-b border-slate-200 px-6 py-5">
-                <RouterLink to="/admin" class="flex items-center gap-3" @click="closeSidebarOnMobile">
-                    <img
-                        v-if="sidebarLogo"
-                        :src="sidebarLogo"
-                        :alt="settings.site_name || 'Nạp Carot'"
-                        class="h-auto w-24 shrink-0 object-contain object-left"
-                    />
-                    <div
-                        v-else
-                        class="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-cyan-400 text-white shadow-[0_12px_28px_rgba(6,182,212,0.24)]"
-                    >
-                        <ShieldCheck class="h-5 w-5" />
-                    </div>
-                    <div>
-                        <p class="text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-600">
-                            {{ settings.site_name || 'Nạp Carot' }}
-                        </p>
-                        <h1 class="text-lg font-black tracking-tight text-slate-950">Admin Control</h1>
-                    </div>
-                </RouterLink>
-
-                <button
-                    type="button"
-                    class="rounded-2xl border border-slate-200 p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 lg:hidden"
-                    @click="emit('close')"
+        <div class="flex h-20 shrink-0 items-center justify-between gap-2 border-b border-slate-100 px-5 dark:border-slate-800">
+            <RouterLink to="/admin" class="ui-focus flex min-w-0 items-center gap-3 rounded-[10px]" @click="closeOnMobile">
+                <img
+                    v-if="sidebarLogo"
+                    :src="sidebarLogo"
+                    :alt="settings.site_name || 'Nạp Carot'"
+                    class="h-auto w-24 shrink-0 object-contain object-left"
+                />
+                <span v-else class="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-blue-600 text-white"
+                    ><ShieldCheck class="h-5 w-5"
+                /></span>
+                <span v-if="!sidebarLogo" class="min-w-0"
+                    ><span class="block truncate text-sm font-bold text-slate-900 dark:text-white">{{ settings.site_name || 'Nạp Carot' }}</span
+                    ><span class="mt-0.5 block text-xs text-slate-500">Trang quản trị</span></span
                 >
-                    <X class="h-5 w-5" />
-                </button>
-            </div>
-
-            <nav class="flex-1 overflow-y-auto px-4 py-5">
-                <div class="mb-4 px-2">
-                    <p class="text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-500">Điều hướng</p>
-                </div>
-
-                <div class="space-y-2">
-                    <template v-for="group in visibleMenuGroups" :key="group.key">
-                        <RouterLink
-                            v-if="group.href"
-                            :to="group.href"
-                            class="flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-semibold transition"
-                            :class="
-                                isGroupActive(group)
-                                    ? 'bg-blue-600 text-white shadow-[0_12px_24px_rgba(37,99,235,0.2)]'
-                                    : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'
-                            "
-                            @click="closeSidebarOnMobile"
-                        >
-                            <component :is="group.icon" class="h-5 w-5" />
-                            <span class="flex-1">{{ group.label }}</span>
-                        </RouterLink>
-
-                        <div v-else class="rounded-[1.35rem] border border-slate-200 bg-slate-50/80">
-                            <button
-                                type="button"
-                                class="flex w-full items-center gap-3 px-4 py-3 text-left text-sm font-semibold transition"
-                                :class="isGroupActive(group) ? 'text-blue-700' : 'text-slate-600 hover:bg-blue-50 hover:text-blue-700'"
-                                @click="toggleGroup(group.key)"
+            </RouterLink>
+            <button
+                v-if="isMobile"
+                type="button"
+                aria-label="Đóng menu"
+                class="ui-focus flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800"
+                @click="emit('close')"
+            >
+                <X class="h-5 w-5" />
+            </button>
+        </div>
+        <div class="px-4 pb-1 pt-4">
+            <label class="relative block"
+                ><span class="sr-only">Tìm mục quản lý</span><Search class="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" /><input
+                    ref="searchInput"
+                    v-model="query"
+                    type="search"
+                    placeholder="Tìm mục quản lý…"
+                    class="h-10 w-full rounded-[10px] border border-slate-200 bg-slate-50 pl-9 pr-3 text-sm text-slate-800 dark:border-slate-700 dark:bg-slate-800 dark:text-white"
+            /></label>
+        </div>
+        <nav class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-6 pt-3" aria-label="Menu chính">
+            <RouterLink
+                v-if="visibleGroups.some((group) => group.key === 'overview')"
+                to="/admin"
+                class="admin-nav-item mb-5"
+                :class="{ 'admin-nav-active': active?.href === '/admin' }"
+                :aria-current="active?.href === '/admin' ? 'page' : undefined"
+                @click="closeOnMobile"
+            >
+                <component :is="visibleGroups.find((group) => group.key === 'overview')?.icon" class="h-[18px] w-[18px] shrink-0" /><span
+                    >Tổng quan</span
+                >
+            </RouterLink>
+            <div class="grid gap-6">
+                <section v-for="section in sections" :key="section.key">
+                    <h2 class="mb-2 px-3 text-[11px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
+                        {{ section.label }}
+                    </h2>
+                    <div class="grid gap-1">
+                        <template v-for="group in section.groups" :key="group.key">
+                            <RouterLink
+                                v-if="group.href"
+                                :to="group.href"
+                                class="admin-nav-item"
+                                :class="{ 'admin-nav-active': isGroupActive(group) }"
+                                :aria-current="isGroupActive(group) ? 'page' : undefined"
+                                @click="closeOnMobile"
                             >
-                                <component :is="group.icon" class="h-5 w-5" />
-                                <span class="flex-1">{{ group.label }}</span>
-
-                                <ChevronRight
-                                    class="h-4 w-4 transition"
-                                    :class="expandedGroups[group.key] ? 'rotate-90 text-blue-600' : 'text-slate-400'"
-                                />
-                            </button>
-
-                            <Transition
-                                enter-active-class="transition-all duration-200 ease-out"
-                                enter-from-class="max-h-0 opacity-0"
-                                enter-to-class="max-h-96 opacity-100"
-                                leave-active-class="transition-all duration-150 ease-in"
-                                leave-from-class="max-h-96 opacity-100"
-                                leave-to-class="max-h-0 opacity-0"
-                            >
-                                <div v-if="expandedGroups[group.key]" class="overflow-hidden px-3 pb-3">
+                                <component :is="group.icon" class="h-[18px] w-[18px] shrink-0" /><span class="flex-1">{{ group.label }}</span>
+                            </RouterLink>
+                            <div v-else>
+                                <button
+                                    type="button"
+                                    class="admin-nav-item w-full text-left"
+                                    :class="{ 'text-blue-700 dark:text-blue-300': isGroupActive(group) }"
+                                    :aria-expanded="isExpanded(group.key)"
+                                    :aria-controls="'admin-nav-' + group.key"
+                                    @click="expandedGroup = expandedGroup === group.key ? null : group.key"
+                                >
+                                    <component :is="group.icon" class="h-[18px] w-[18px] shrink-0" /><span class="flex-1">{{ group.label }}</span
+                                    ><ChevronDown
+                                        class="h-4 w-4 text-slate-400 transition-transform"
+                                        :class="{ 'rotate-180': isExpanded(group.key) }"
+                                    />
+                                </button>
+                                <div
+                                    v-if="isExpanded(group.key)"
+                                    :id="'admin-nav-' + group.key"
+                                    class="ml-5 mt-1 grid gap-1 border-l border-slate-200 pl-3 dark:border-slate-700"
+                                >
                                     <RouterLink
                                         v-for="child in group.children"
                                         :key="child.href"
                                         :to="child.href"
-                                        class="mt-1 flex items-center gap-3 rounded-2xl px-4 py-2.5 text-sm transition"
-                                        :class="
-                                            isChildActive(child.href)
-                                                ? 'bg-blue-50 font-semibold text-blue-700 ring-1 ring-blue-100'
-                                                : 'text-slate-500 hover:bg-white hover:text-blue-700'
-                                        "
-                                        @click="closeSidebarOnMobile"
+                                        class="admin-nav-item min-h-9 py-2 text-[13px]"
+                                        :class="{ 'admin-nav-active': active?.href === child.href }"
+                                        :aria-current="active?.href === child.href ? 'page' : undefined"
+                                        @click="closeOnMobile"
+                                        >{{ child.label }}</RouterLink
                                     >
-                                        <span class="bg-current/70 h-1.5 w-1.5 rounded-full" />
-                                        <span class="flex-1">{{ child.label }}</span>
-                                    </RouterLink>
                                 </div>
-                            </Transition>
-                        </div>
-                    </template>
-                </div>
-            </nav>
-        </aside>
-    </Transition>
+                            </div>
+                        </template>
+                    </div>
+                </section>
+            </div>
+            <p v-if="!visibleGroups.length" role="status" class="px-3 py-8 text-center text-sm leading-6 text-slate-500">
+                Không tìm thấy mục quản lý.<br />Thử từ khóa khác.
+            </p>
+        </nav>
+        <div class="shrink-0 border-t border-slate-100 p-3 dark:border-slate-800">
+            <a href="/" class="admin-nav-item text-slate-500"><ExternalLink class="h-4 w-4" /><span>Trở về website</span></a>
+        </div>
+    </aside>
 </template>

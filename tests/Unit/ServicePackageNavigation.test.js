@@ -13,19 +13,20 @@ function loadTypeScript(path) {
     return exports;
 }
 
-test('wallet and user management share the users submenu with registered routes and page titles', () => {
+test('wallet management has a dedicated menu without duplicating the users destination', () => {
     const navigation = loadTypeScript('../../resources/js/layouts/admin/sidebar/navigation.ts');
     const router = loadTypeScript('../../resources/js/router/modules/admin/index.ts').default;
-    const group = navigation.adminMenuGroups.find((item) => item.key === 'users');
+    const group = navigation.adminMenuGroups.find((item) => item.key === 'wallet');
     assert.deepEqual(
         group.children.map((child) => child.href),
-        ['/admin/users', '/admin/wallets'],
+        ['/admin/wallets', '/admin/wallets/token-captcha'],
     );
     assert.equal(group.href, undefined);
-    assert.equal(
-        navigation.adminMenuGroups.some((item) => item.key === 'wallets'),
-        false,
-    );
+    assert.equal(navigation.adminMenuGroups.find((item) => item.key === 'users').href, '/admin/users');
+    const destinations = navigation.adminMenuGroups
+        .flatMap((item) => [item.href, ...(item.children || []).map((child) => child.href)])
+        .filter(Boolean);
+    assert.equal(destinations.filter((href) => href === '/admin/wallets').length, 1);
     for (const child of group.children) {
         assert.ok(router.children.some((route) => `/admin/${route.path}` === child.href));
         assert.equal(navigation.resolveAdminPageTitle(child.href), child.label);
@@ -44,7 +45,7 @@ test('service menus are hidden and license management resolves to its registered
     assert.equal(group.href, undefined);
     assert.deepEqual(
         group.children.map((child) => child.href),
-        ['/admin/licenses', '/admin/licenses/products', '/admin/licenses/plans'],
+        ['/admin/licenses', '/admin/licenses/client-game', '/admin/licenses/products', '/admin/licenses/plans'],
     );
     for (const child of group.children) {
         const route = router.children.find((route) => `/admin/${route.path}` === child.href);

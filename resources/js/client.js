@@ -1,4 +1,5 @@
 import { initializeClientAuth } from './client-auth';
+import { initializeCaptchaTool } from './client-captcha';
 import { initializeClientCatalogModals } from './client-catalog-modals';
 import { initializeGameDataPage } from './client-game-data';
 import { initializeLicenseRotation } from './client-license-rotation';
@@ -13,6 +14,7 @@ import { initializeNroNotifications } from './nro-notifications';
 initializeClientTheme();
 void initializeClientNotifications();
 initializeClientAuth();
+initializeCaptchaTool();
 initializePotentialCalculator();
 initializeNroAccess();
 

@@ -2,14 +2,9 @@
 @section('title', 'Tính chỉ số trang bị nâng cấp NRO')
 @section('description', 'Tính chỉ số trang bị Ngọc Rồng Online từ +0 đến +7 theo chỉ số và cấp độ hiện tại.')
 @section('canonical', route('tools.equipment-upgrade'))
+@section('tool_title', 'Tính chỉ số trang bị nâng cấp NRO')
+@section('tool_description', 'Nhập chỉ số trên trang bị và cấp độ hiện tại để xem chỉ số tương ứng từ +0 đến +7.')
 @section('content')
-<section class="client-container py-8 sm:py-12">
-    <div class="mx-auto grid max-w-4xl gap-6">
-        <header>
-            <p class="text-sm font-bold text-emerald-700">Công cụ Ngọc Rồng Online</p>
-            <span class="mt-2 block text-3xl font-extrabold text-slate-900">Tính chỉ số trang bị nâng cấp NRO</span>
-            <p class="mt-3 text-sm leading-6 text-slate-600">Nhập chỉ số trên trang bị và cấp độ hiện tại để xem chỉ số tương ứng từ +0 đến +7.</p>
-        </header>
         @if(!$service['is_enabled'])
             <x-client.service-maintenance :message="$service['maintenance_message']" />
         @else
@@ -68,6 +63,4 @@
                 <p>Kết quả tham khảo, chưa tính các lần nâng cấp thất bại.</p>
             </aside>
         @endif
-    </div>
-</section>
 @endsection

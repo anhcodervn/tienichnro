@@ -6,6 +6,8 @@ use App\Support\SettingStore;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+require base_path('app/Features/Captcha/api.php');
+
 Route::post('/auth/login', [AuthController::class, 'apiLogin'])->middleware('throttle:10,1')->name('api.auth.login');
 
 Route::middleware('auth:sanctum')->group(function (): void {

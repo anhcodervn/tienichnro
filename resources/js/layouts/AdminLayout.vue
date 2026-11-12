@@ -1,56 +1,70 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import Header from './admin/header/index.vue';
 import Sidebar from './admin/sidebar/index.vue';
-import { resolveAdminPageTitle } from './admin/sidebar/navigation';
+import { resolveAdminNavigation, resolveAdminPageTitle } from './admin/sidebar/navigation';
 
 const route = useRoute();
 const isSidebarOpen = ref(false);
+const isMobile = ref(false);
+const currentPageTitle = computed(() => resolveAdminPageTitle(route.path));
+const currentSection = computed(() => resolveAdminNavigation(route.path)?.group.label ?? 'Quản trị');
+let viewport: MediaQueryList | undefined;
+let previousOverflow = '';
 
-const currentPageTitle = computed(() => {
-    return resolveAdminPageTitle(route.path);
-});
-
-const syncSidebarWithViewport = (): void => {
-    isSidebarOpen.value = window.innerWidth >= 1024;
+const syncViewport = (): void => {
+    isMobile.value = !viewport?.matches;
+    isSidebarOpen.value = !!viewport?.matches;
 };
-
-onMounted(() => {
-    syncSidebarWithViewport();
-    window.addEventListener('resize', syncSidebarWithViewport);
+const closeSidebar = (): void => {
+    if (isMobile.value) isSidebarOpen.value = false;
+};
+const closeOnEscape = (event: KeyboardEvent): void => {
+    if (event.key === 'Escape') closeSidebar();
+};
+watch(() => route.fullPath, closeSidebar);
+watch([isSidebarOpen, isMobile], ([open, mobile]) => {
+    document.body.style.overflow = open && mobile ? 'hidden' : previousOverflow;
 });
-
+onMounted(() => {
+    previousOverflow = document.body.style.overflow;
+    document.body.classList.add('admin-ui');
+    viewport = window.matchMedia('(min-width: 1024px)');
+    syncViewport();
+    viewport.addEventListener('change', syncViewport);
+    window.addEventListener('keydown', closeOnEscape);
+});
 onUnmounted(() => {
-    window.removeEventListener('resize', syncSidebarWithViewport);
+    document.body.classList.remove('admin-ui');
+    document.body.style.overflow = previousOverflow;
+    viewport?.removeEventListener('change', syncViewport);
+    window.removeEventListener('keydown', closeOnEscape);
 });
 </script>
 
 <template>
-    <div class="min-h-screen bg-[radial-gradient(circle_at_top_right,_#dff6ff_0%,_#f1f6fd_32%,_#f8fafc_72%)] text-slate-800">
-        <Transition
-            enter-active-class="transition-opacity duration-200"
-            enter-from-class="opacity-0"
-            enter-to-class="opacity-100"
-            leave-active-class="transition-opacity duration-200"
-            leave-from-class="opacity-100"
-            leave-to-class="opacity-0"
-        >
-            <div v-if="isSidebarOpen" class="fixed inset-0 z-40 bg-slate-950/45 backdrop-blur-sm lg:hidden" @click="isSidebarOpen = false" />
-        </Transition>
-
-        <div class="flex min-h-screen">
-            <Sidebar :is-open="isSidebarOpen" @close="isSidebarOpen = false" />
-
-            <div class="min-w-0 flex-1">
-                <Header :page-title="currentPageTitle" @open-sidebar="isSidebarOpen = true" />
-
-                <main class="px-4 pb-8 pt-6 sm:px-6 xl:px-8">
-                    <div class="mx-auto w-full min-w-0 max-w-[1800px]">
+    <div class="admin-shell min-h-screen bg-slate-100 text-slate-800 dark:bg-slate-950 dark:text-slate-200">
+        <a href="#admin-main" class="admin-skip-link">Đến nội dung chính</a>
+        <div v-if="isSidebarOpen && isMobile" class="fixed inset-0 z-40 bg-slate-950/50 lg:hidden" aria-hidden="true" @click="closeSidebar" />
+        <Sidebar :is-open="isSidebarOpen" :is-mobile="isMobile" @close="closeSidebar" />
+        <div class="min-w-0 lg:pl-[264px]">
+            <Header
+                :page-title="currentPageTitle"
+                :section-title="currentSection"
+                :sidebar-open="isSidebarOpen"
+                @open-sidebar="isSidebarOpen = true"
+            />
+            <main id="admin-main" tabindex="-1" class="min-w-0 px-4 py-6 sm:px-6 xl:px-8">
+                <div class="mx-auto w-full min-w-0 max-w-[1800px]">
+                    <div
+                        data-admin-page-surface
+                        class="min-w-0 rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6"
+                    >
                         <router-view />
                     </div>
-                </main>
-            </div>
+                </div>
+            </main>
         </div>
     </div>
 </template>

@@ -2,15 +2,9 @@
 @section('title', 'Tính tiềm năng còn thiếu')
 @section('description', 'Tính tiềm năng cần thêm để nâng HP, KI, sức đánh, giáp và chí mạng đến chỉ số mong muốn.')
 @section('canonical', route('tools.missing-potential'))
+@section('tool_title', 'Tính tiềm năng còn thiếu')
+@section('tool_description', 'Nhập chỉ số gốc hiện tại và chỉ số muốn đạt. Dùng chỉ số chưa cộng trang bị, ngọc hoặc hiệu ứng hỗ trợ.')
 @section('content')
-    <section class="client-container py-8 sm:py-12">
-        <div class="mx-auto max-w-3xl">
-            <div class="mb-6">
-                <p class="text-sm font-bold text-emerald-700">Công cụ Ngọc Rồng Online</p>
-                <span class="mt-2 block text-3xl font-extrabold text-slate-900">Tính tiềm năng còn thiếu</span>
-                <p class="mt-3 text-sm leading-6 text-slate-600">Nhập chỉ số gốc hiện tại và chỉ số muốn đạt. Dùng chỉ số
-                    chưa cộng trang bị, ngọc hoặc hiệu ứng hỗ trợ.</p>
-            </div>
             @if (!$service['is_enabled'])
                 <x-client.service-maintenance :message="$service['maintenance_message']" />
             @else
@@ -100,6 +94,4 @@
                     </section>
                 @endif
             @endif
-        </div>
-    </section>
 @endsection

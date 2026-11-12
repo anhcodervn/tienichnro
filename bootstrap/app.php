@@ -45,6 +45,23 @@ return Application::configure(basePath: dirname(__DIR__))
     })
     ->withExceptions(function (Exceptions $exceptions) {
         $exceptions->render(function (Throwable $throwable, Request $request) {
+            if (! $request->is('api/v1/giai-captcha-nro/solve', 'giai-captcha-nro/solve')) {
+                return null;
+            }
+
+            $status = match (true) {
+                $throwable instanceof ValidationException => 422,
+                $throwable instanceof AuthenticationException => 401,
+                $throwable instanceof AuthorizationException => 403,
+                $throwable instanceof HttpExceptionInterface => $throwable->getStatusCode(),
+                default => 500,
+            };
+
+            return response()->json(['status' => false, 'code' => null, 'time' => 0], $status)
+                ->header('Cache-Control', 'no-store, private');
+        });
+
+        $exceptions->render(function (Throwable $throwable, Request $request) {
             if (! $request->is('api/v1/licenses/*')) {
                 return null;
             }

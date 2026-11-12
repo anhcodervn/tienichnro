@@ -205,8 +205,15 @@
     </nav>
     <main id="main-content" class="client-page-scale min-w-0 focus:outline-none" tabindex="-1" data-page-enter>
         @include('client.partials.flash')
-        @yield('content')
-        <x-client.tool-seo :seo="$toolSeo" />
+        @hasSection('tool_title')
+            <x-client.tool-page :title="trim($__env->yieldContent('tool_title'))"
+                :description="trim($__env->yieldContent('tool_description'))" :seo="$toolSeo">
+                @yield('content')
+            </x-client.tool-page>
+        @else
+            @yield('content')
+            <x-client.tool-seo :seo="$toolSeo" />
+        @endif
     </main>
     <footer class="mt-16 border-t border-slate-200 bg-white">
         <div class="client-container grid gap-8 py-10 sm:grid-cols-2 lg:grid-cols-4">

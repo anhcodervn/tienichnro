@@ -46,6 +46,7 @@ test('tool seo defaults and derived location are returned without creating anoth
 });
 
 test('published tool seo renders below the calculator with its metadata faq and schemas', function (string $path): void {
+    $this->actingAs(User::factory()->create());
     app(ToolAvailabilityService::class)->update('test_potential', ['url' => $path, 'is_enabled' => true, 'maintenance_message' => 'Đang bảo trì.']);
     app(ToolSeoService::class)->update('test_potential', toolSeoPayload([
         'cover_image' => '/storage/tool.webp', 'cover_alt' => 'Ảnh hướng dẫn', 'robots' => 'noindex,follow',
@@ -60,13 +61,23 @@ test('published tool seo renders below the calculator with its metadata faq and 
         ->assertSee('"@type":"BreadcrumbList"', false);
     $html = $response->getContent();
     expect(strpos($html, '<form'))->toBeLessThan(strpos($html, 'id="tool-seo-title"'));
-    expect($html)->toContain('<h1 id="tool-seo-title"')
+    expect($html)->toContain('<h2 id="tool-seo-title"')
         ->and(preg_match_all('/<h1\b/i', $html))->toBe(1);
     $toolHeader = substr($html, strpos($html, '<main'), strpos($html, '<form') - strpos($html, '<main'));
-    expect($toolHeader)->toContain('<span class="mt-2 block text-3xl font-extrabold text-slate-900">')
-        ->toContain('<p class="mt-3 text-sm leading-6 text-slate-600">')
-        ->not->toContain('<h1');
-})->with(['/tinh-tiem-nang', '/tinh-chi-so-trang-bi-nang-cap', '/tinh-tiem-nang-con-thieu']);
+    expect($toolHeader)->toContain('id="tool-page-title"')
+        ->toContain('Hướng dẫn công cụ')
+        ->toContain('Giới thiệu công cụ.')
+        ->and(substr_count($html, 'id="tool-seo-title"'))->toBe(1)
+        ->and(substr_count($html, 'data-tool-page'))->toBe(1)
+        ->and(strpos($html, 'id="tool-page-title"'))->toBeLessThan(strpos($html, 'data-tool-workspace'));
+})->with(['/tinh-tiem-nang', '/tinh-chi-so-trang-bi-nang-cap', '/tinh-tiem-nang-con-thieu', '/giai-captcha-nro']);
+
+test('tool pages without a published article retain one useful heading and no empty guide', function (string $path): void {
+    $html = $this->get($path)->assertOk()->getContent();
+    expect(preg_match_all('/<h1\b/i', $html))->toBe(1)
+        ->and($html)->toContain('data-tool-header', 'data-tool-workspace')
+        ->not->toContain('data-tool-guide');
+})->with(['/tinh-tiem-nang', '/tinh-chi-so-trang-bi-nang-cap', '/tinh-tiem-nang-con-thieu', '/giai-captcha-nro']);
 
 test('tool seo uses the configured path without query fragments or a separate article slug', function (): void {
     app(ToolAvailabilityService::class)->update('test_potential', [

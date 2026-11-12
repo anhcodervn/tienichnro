@@ -15,9 +15,10 @@ test('SEO has one parent menu and retains all destinations and page titles', () 
     assert.equal(seo.length, 1);
     assert.equal(seo[0].label, 'SEO');
     assert.equal(groups.filter((group) => group.href?.startsWith('/admin/seo/')).length, 0);
-    assert.deepEqual(seo[0].children.map((child) => child.href), [
-        '/admin/seo/posts', '/admin/seo/categories', '/admin/seo/home', '/admin/seo/sitemaps',
-    ]);
+    assert.deepEqual(
+        seo[0].children.map((child) => child.href),
+        ['/admin/seo/posts', '/admin/seo/categories', '/admin/seo/home', '/admin/seo/sitemaps'],
+    );
     for (const child of seo[0].children) {
         assert.equal(navigation.resolveAdminPageTitle(child.href), child.label);
         assert.equal(navigation.resolveAdminPageTitle(`${child.href}/1/edit`), child.label);

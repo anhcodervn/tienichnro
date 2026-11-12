@@ -2,6 +2,13 @@ export default {
     path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),
     children: [
+        { path: 'wallets/token-captcha', name: 'admin.captcha.wallet', component: () => import('@/pages/admin/captcha/index.vue') },
+        {
+            path: 'captcha/history',
+            name: 'admin.captcha.history',
+            component: () => import('@/pages/admin/captcha/index.vue'),
+            props: { section: 'solves' },
+        },
         { path: 'licenses/client-game', name: 'admin.licenses.client-game', component: () => import('@/pages/admin/licenses/client-game.vue') },
         { path: 'licenses', name: 'admin.licenses', component: () => import('@/pages/admin/licenses/index.vue') },
         {
@@ -33,7 +40,8 @@ export default {
         },
         {
             path: '',
-            redirect: { name: 'admin.seo.posts' },
+            name: 'admin.overview',
+            component: () => import('@/pages/admin/overview/index.vue'),
         },
         {
             path: 'users',

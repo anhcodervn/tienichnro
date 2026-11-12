@@ -1,0 +1,152 @@
+body.admin-ui {
+    --radius: 10px;
+    --ui-border: #e2e8f0;
+    background: #f1f5f9;
+    font-size: 14px;
+}
+
+.admin-ui [class*='rounded']:not(.animate-spin):not([class*='rounded-none']),
+body.admin-ui :where(input:not([type='checkbox']):not([type='radio']), select, textarea) {
+    border-radius: 10px;
+}
+
+body.admin-ui :where([class*='shadow-lg'], [class*='shadow-xl'], [class*='shadow-['], .ui-panel) {
+    box-shadow: 0 2px 6px rgb(15 23 42 / 4%);
+}
+
+.admin-ui :where(button, a, input, select, textarea):focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 3px;
+}
+
+.admin-ui :where(button:not(:disabled), [role='tab']) {
+    cursor: pointer;
+}
+
+.admin-ui :where(button:disabled) {
+    cursor: not-allowed;
+}
+
+.admin-ui :where(input, select, textarea) {
+    font: inherit;
+}
+
+.admin-ui :where(input:not([type='checkbox']):not([type='radio']):not([type='file']), select) {
+    min-height: 40px;
+}
+
+.admin-ui :where(table) {
+    font-variant-numeric: tabular-nums;
+}
+
+body.admin-ui :where(table th) {
+    font-size: 12px;
+    letter-spacing: 0;
+    text-transform: none;
+}
+
+body.admin-ui :where(table td, table th) {
+    padding-top: 14px;
+    padding-bottom: 14px;
+}
+
+.admin-ui :where(.admin-nav-item) {
+    display: flex;
+    min-height: 42px;
+    align-items: center;
+    gap: 12px;
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 20px;
+    color: #475569;
+    transition:
+        background-color 150ms,
+        color 150ms;
+}
+
+.admin-ui .admin-nav-item:hover {
+    background-color: #f8fafc;
+    color: #0f172a;
+}
+
+.admin-ui .admin-nav-active,
+.admin-ui .admin-nav-active:hover {
+    background-color: #eff6ff;
+    color: #1d4ed8;
+    font-weight: 600;
+}
+
+.admin-secondary-button {
+    display: inline-flex;
+    min-height: 42px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: white;
+    padding: 10px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+}
+
+.admin-secondary-button:hover {
+    border-color: #94a3b8;
+    background: #f8fafc;
+}
+
+.admin-skip-link {
+    position: fixed;
+    top: -80px;
+    left: 16px;
+    z-index: 100;
+    border-radius: 10px;
+    background: #1d4ed8;
+    padding: 12px 16px;
+    color: white;
+}
+
+.admin-skip-link:focus {
+    top: 12px;
+}
+
+.dark .admin-ui .admin-nav-item {
+    color: #94a3b8;
+}
+
+.dark .admin-ui .admin-nav-item:hover {
+    background: #1e293b;
+    color: #f8fafc;
+}
+
+.dark .admin-ui .admin-nav-active,
+.dark .admin-ui .admin-nav-active:hover {
+    background: #172554;
+    color: #93c5fd;
+}
+
+.dark .admin-secondary-button {
+    border-color: #334155;
+    background: #0f172a;
+    color: #e2e8f0;
+}
+
+@media (max-width: 1023px) {
+    body.admin-ui :where(input, select, textarea) {
+        font-size: 16px;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .admin-ui *,
+    .admin-ui *::before,
+    .admin-ui *::after {
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+    }
+}
