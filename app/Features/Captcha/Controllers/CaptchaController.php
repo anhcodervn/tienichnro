@@ -76,11 +76,23 @@ class CaptchaController extends Controller
             'processing' => 202, 'success' => 200, default => 502
         };
 
-        return response()->json([
+        $data = [
             'status' => $solve->status === 'success',
             'code' => $solve->result,
             'time' => ($solve->duration_ms ?? 0) / 1000,
-        ], $status);
+        ];
+        if ($solve->status !== 'success') {
+            $data['message'] = match (true) {
+                $solve->status === 'processing' => 'Captcha đang được xử lý. Vui lòng chờ kết quả.',
+                ($solve->response['error'] ?? null) === 'provider_unavailable' => 'Không thể kết nối bộ giải captcha. Vui lòng thử lại sau. Lượt này không bị trừ token.',
+                ($solve->response['error'] ?? null) === 'invalid_response' => 'Bộ giải captcha trả về dữ liệu không hợp lệ. Vui lòng thử lại sau. Lượt này không bị trừ token.',
+                ($solve->response['error'] ?? null) === 'processing_expired' => 'Lượt giải đã hết thời gian xử lý. Vui lòng thử lại. Lượt này không bị trừ token.',
+                $solve->http_status !== null && ($solve->http_status < 200 || $solve->http_status >= 300) => 'Dịch vụ giải captcha đang gặp lỗi. Vui lòng thử lại sau. Lượt này không bị trừ token.',
+                default => 'Chưa giải được captcha từ ảnh này. Vui lòng thử ảnh khác. Lượt này không bị trừ token.',
+            };
+        }
+
+        return response()->json($data, $status);
     }
 
     public function history(Request $request, CaptchaWalletService $wallets): JsonResponse

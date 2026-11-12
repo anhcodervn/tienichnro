@@ -135,7 +135,7 @@ export function initializeCaptchaTool() {
                 const data = await request(root.dataset.solveUrl, 'POST', { image });
                 root.querySelector('[data-captcha-result]').textContent = data.status
                     ? 'Kết quả: ' + data.code + ' · ' + data.time + ' giây'
-                    : 'Chưa có kết quả giải captcha.';
+                    : data.message || 'Chưa có kết quả giải captcha.';
                 showMessage(data.status ? 'Đã trừ 1 token. Mỗi lần bấm giải sẽ tạo lượt mới.' : 'Chưa trừ token.');
                 await loadHistory();
             });

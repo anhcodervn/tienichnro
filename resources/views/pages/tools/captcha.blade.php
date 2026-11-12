@@ -65,7 +65,13 @@
   "time": 0.842
 }</code></pre>
             <p class="text-sm text-slate-600"><code>time</code> là thời gian gọi bộ giải, tính bằng giây. Lượt thất bại trả status=false, code=null. Gửi lại ảnh sẽ tạo lượt giải mới.</p>
-            <p class="text-sm text-slate-600">200: thành công · 401: khóa sai/đã thu hồi · 422: dữ liệu sai hoặc thiếu token · 429: quá nhiều yêu cầu · 500: lỗi xử lý · 502: bộ giải lỗi, không tính phí · 503: công cụ tắt hoặc bảo trì. Các lỗi trả status=false, code=null và time=0 nếu chưa gọi bộ giải.</p>
+            <p class="text-sm text-slate-600">200: thành công · 401: khóa sai/đã thu hồi · 422: dữ liệu sai hoặc thiếu token · 429: quá nhiều yêu cầu · 500: lỗi xử lý · 502: bộ giải lỗi, không tính phí · 503: công cụ tắt hoặc bảo trì. Các lỗi trả status=false, code=null, message giải thích nguyên nhân và time=0 nếu chưa gọi bộ giải.</p>
+            <pre class="overflow-x-auto rounded-xl bg-slate-900 p-4 text-xs leading-6 text-slate-100"><code>{
+  "status": false,
+  "code": null,
+  "time": 0,
+  "message": "Công cụ giải captcha đang tắt hoặc bảo trì. Vui lòng thử lại sau."
+}</code></pre>
             <div class="flex flex-wrap gap-3 text-sm">
                 @foreach($rates as $rate)
                 <span class="rounded-lg bg-slate-100 px-3 py-2">Từ {{ number_format($rate['min_tokens']) }} token: {{ number_format($rate['unit_price']) }}đ/token</span>

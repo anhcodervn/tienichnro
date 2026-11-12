@@ -1,5 +1,6 @@
 <?php
 
+use App\Features\Captcha\Services\CaptchaFailure;
 use App\Features\License\Services\LicenseFailure;
 use App\Http\Middleware\EnsureAdminUser;
 use App\Http\Middleware\EnsurePlatformAdmin;
@@ -50,6 +51,7 @@ return Application::configure(basePath: dirname(__DIR__))
             }
 
             $status = match (true) {
+                $throwable instanceof CaptchaFailure => $throwable->httpStatus,
                 $throwable instanceof ValidationException => 422,
                 $throwable instanceof AuthenticationException => 401,
                 $throwable instanceof AuthorizationException => 403,
@@ -57,7 +59,23 @@ return Application::configure(basePath: dirname(__DIR__))
                 default => 500,
             };
 
-            return response()->json(['status' => false, 'code' => null, 'time' => 0], $status)
+            $message = match (true) {
+                $throwable instanceof CaptchaFailure => $throwable->getMessage(),
+                $throwable instanceof ValidationException => collect($throwable->errors())->flatten()->first()
+                    ?: 'Dữ liệu không hợp lệ. Vui lòng kiểm tra ảnh captcha.',
+                default => match ($status) {
+                    401 => 'API token không hợp lệ hoặc đã bị thu hồi. Vui lòng tạo lại token và gửi trong header Authorization: Bearer.',
+                    403 => 'Tài khoản không được phép sử dụng công cụ giải captcha.',
+                    404 => 'Không tìm thấy API giải captcha. Vui lòng kiểm tra lại đường dẫn.',
+                    405 => 'Phương thức không hợp lệ. Vui lòng gửi yêu cầu POST.',
+                    419 => 'Phiên đăng nhập đã hết hạn. Vui lòng tải lại trang và thử lại.',
+                    429 => 'Bạn gửi quá nhiều yêu cầu. Vui lòng chờ một phút rồi thử lại.',
+                    503 => 'Công cụ giải captcha đang tạm thời không khả dụng. Vui lòng thử lại sau.',
+                    default => 'Không thể xử lý yêu cầu giải captcha lúc này. Vui lòng thử lại sau.',
+                },
+            };
+
+            return response()->json(['status' => false, 'code' => null, 'time' => 0, 'message' => $message], $status)
                 ->header('Cache-Control', 'no-store, private');
         });
 

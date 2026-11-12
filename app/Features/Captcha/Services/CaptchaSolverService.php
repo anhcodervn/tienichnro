@@ -25,7 +25,9 @@ class CaptchaSolverService
         $tool = $this->tools->all()->first(fn (array $tool): bool => ($tool['route'] ?? null) === 'tools.captcha'
             || rtrim((string) parse_url((string) ($tool['url'] ?? ''), PHP_URL_PATH), '/') === '/giai-captcha-nro'
         ) ?? ['is_enabled' => false, 'maintenance_message' => 'Công cụ chưa được bật trong danh sách công cụ.'];
-        abort_unless($tool['is_enabled'], 503, $tool['maintenance_message']);
+        if (! $tool['is_enabled']) {
+            throw new CaptchaFailure(trim((string) $tool['maintenance_message']) ?: 'Công cụ giải captcha đang tắt hoặc bảo trì. Vui lòng thử lại sau.');
+        }
         $decoded = $this->images->decode($image);
         $solve = DB::transaction(function () use ($user, $requestId, $source, $decoded): CaptchaSolve {
             $wallet = $this->wallets->lock($user);

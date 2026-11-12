@@ -168,10 +168,17 @@ test('failed captcha provider responses release reservation and never charge', f
         'false' => Http::response(['success' => false, 'result' => '12345']),
         default => Http::response('not json', 200),
     }]);
-    $this->actingAs($user)->postJson('/giai-captcha-nro/solve', [
+    $result = $this->actingAs($user)->postJson('/giai-captcha-nro/solve', [
         'image' => captchaTestImage(),
     ])->assertStatus(502)->assertJsonPath('status', false)->assertJsonPath('code', null)
-        ->assertJsonStructure(['status', 'code', 'time'])->assertJsonCount(3);
+        ->assertJsonStructure(['status', 'code', 'time', 'message'])->assertJsonCount(4);
+    $expectedMessage = match ($failure) {
+        'connection' => 'Không thể kết nối bộ giải captcha. Vui lòng thử lại sau. Lượt này không bị trừ token.',
+        'http' => 'Dịch vụ giải captcha đang gặp lỗi. Vui lòng thử lại sau. Lượt này không bị trừ token.',
+        'malformed' => 'Bộ giải captcha trả về dữ liệu không hợp lệ. Vui lòng thử lại sau. Lượt này không bị trừ token.',
+        default => 'Chưa giải được captcha từ ảnh này. Vui lòng thử ảnh khác. Lượt này không bị trừ token.',
+    };
+    $result->assertJsonPath('message', $expectedMessage);
     expect(CaptchaWallet::query()->first()->reserved)->toBe(0)
         ->and(CaptchaWallet::query()->first()->balance)->toBe(10);
     expect(CaptchaSolve::query()->first()->status)->toBe('failed');
@@ -358,7 +365,7 @@ test('disabled captcha returns only the public error fields even when debug is e
     app(SettingStore::class)->putMany(['tool_giai-captcha-nro_enabled' => false]);
     foreach (['/giai-captcha-nro/solve', '/api/v1/giai-captcha-nro/solve'] as $path) {
         $this->postJson($path, ['image' => captchaTestImage()], ['Authorization' => 'Bearer '.$token])
-            ->assertStatus(503)->assertExactJson(['status' => false, 'code' => null, 'time' => 0])
+            ->assertStatus(503)->assertExactJson(['status' => false, 'code' => null, 'time' => 0, 'message' => 'Bảo trì.'])
             ->assertHeader('Cache-Control', 'no-store, private');
     }
     expect(app(CaptchaWalletService::class)->wallet($user)->balance)->toBe(10);
@@ -369,11 +376,13 @@ test('disabled captcha returns only the public error fields even when debug is e
 test('captcha authentication and validation errors never expose debug details', function (): void {
     config()->set('app.debug', true);
     $error = ['status' => false, 'code' => null, 'time' => 0];
-    $this->postJson('/api/v1/giai-captcha-nro/solve', [])->assertUnauthorized()->assertExactJson($error);
+    $this->postJson('/api/v1/giai-captcha-nro/solve', [])->assertUnauthorized()->assertExactJson([
+        ...$error, 'message' => 'API token không hợp lệ hoặc đã bị thu hồi. Vui lòng tạo lại token và gửi trong header Authorization: Bearer.',
+    ]);
     $user = User::factory()->create();
     $token = $this->actingAs($user)->postJson('/giai-captcha-nro/api-token')->json('token');
     $this->postJson('/api/v1/giai-captcha-nro/solve', [], ['Authorization' => 'Bearer '.$token])
-        ->assertUnprocessable()->assertExactJson($error);
+        ->assertUnprocessable()->assertExactJson([...$error, 'message' => 'Vui lòng gửi ảnh captcha base64 trong trường image.']);
     Http::assertNothingSent();
 });
 
@@ -385,5 +394,43 @@ test('unexpected captcha errors and throttling preserve HTTP status without inte
         : new HttpException($httpStatus, 'Internal exception message');
     $this->mock(CaptchaSolverService::class)->shouldReceive('solve')->once()->andThrow($exception);
     $this->actingAs($user)->postJson('/giai-captcha-nro/solve', ['image' => captchaTestImage()])
-        ->assertStatus($httpStatus)->assertExactJson(['status' => false, 'code' => null, 'time' => 0]);
-})->with([500, 429]);
+        ->assertStatus($httpStatus)->assertExactJson([
+            'status' => false, 'code' => null, 'time' => 0,
+            'message' => match ($httpStatus) {
+                429 => 'Bạn gửi quá nhiều yêu cầu. Vui lòng chờ một phút rồi thử lại.',
+                503 => 'Công cụ giải captcha đang tạm thời không khả dụng. Vui lòng thử lại sau.',
+                default => 'Không thể xử lý yêu cầu giải captcha lúc này. Vui lòng thử lại sau.',
+            },
+        ]);
+})->with([500, 429, 503]);
+
+test('processing captcha responses explain that the result is pending', function (): void {
+    $user = User::factory()->create();
+    $solve = CaptchaSolve::factory()->create(['user_id' => $user->id]);
+    $this->mock(CaptchaSolverService::class)->shouldReceive('solve')->once()->andReturn($solve);
+    $this->actingAs($user)->postJson('/giai-captcha-nro/solve', ['image' => captchaTestImage()])
+        ->assertStatus(202)->assertExactJson([
+            'status' => false, 'code' => null, 'time' => 0,
+            'message' => 'Captcha đang được xử lý. Vui lòng chờ kết quả.',
+        ]);
+    Http::assertNothingSent();
+});
+
+test('captcha validation messages distinguish missing invalid images and insufficient tokens', function (string $scenario, string $expectedMessage): void {
+    config()->set('app.debug', true);
+    $user = User::factory()->create();
+    $image = match ($scenario) {
+        'invalid' => 'invalid-base64',
+        'type' => ['invalid'],
+        default => captchaTestImage(),
+    };
+    $this->actingAs($user)->postJson('/giai-captcha-nro/solve', ['image' => $image])
+        ->assertUnprocessable()->assertExactJson([
+            'status' => false, 'code' => null, 'time' => 0, 'message' => $expectedMessage,
+        ]);
+    Http::assertNothingSent();
+})->with([
+    ['invalid', 'Ảnh phải là base64 PNG, JPEG hoặc WebP, tối đa 2MB và 2048 × 2048 pixel.'],
+    ['type', 'Trường image phải là chuỗi ảnh captcha base64.'],
+    ['balance', 'Không đủ token_captcha. Vui lòng mua thêm token.'],
+]);
