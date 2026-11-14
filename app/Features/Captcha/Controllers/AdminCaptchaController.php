@@ -56,7 +56,7 @@ class AdminCaptchaController extends Controller
     public function solves(Request $request): JsonResponse
     {
         return response()->json(CaptchaSolve::query()
-            ->select(['id', 'user_id', 'request_id', 'source', 'status', 'result', 'http_status', 'created_at'])
+            ->select(['id', 'user_id', 'request_id', 'source', 'status', 'result', 'http_status', 'provider_name', 'duration_ms', 'created_at'])
             ->when($request->filled('user_id'), fn ($query) => $query->where('user_id', $request->integer('user_id')))
             ->when($request->filled('status'), fn ($query) => $query->where('status', $request->string('status')->toString()))
             ->latest('id')->paginate(20));
@@ -64,7 +64,7 @@ class AdminCaptchaController extends Controller
 
     public function show(CaptchaSolve $solve): JsonResponse
     {
-        return response()->json(['data' => $solve]);
+        return response()->json(['data' => $solve->load('providerAttempts')])->header('Cache-Control', 'no-store, private');
     }
 
     public function image(CaptchaSolve $solve): BinaryFileResponse

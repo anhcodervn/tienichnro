@@ -6,9 +6,7 @@ use App\Features\Admin\Setting\Services\ToolAvailabilityService;
 use App\Models\CaptchaSolve;
 use App\Models\CaptchaWallet;
 use App\Models\User;
-use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
@@ -18,6 +16,7 @@ class CaptchaSolverService
         private readonly CaptchaWalletService $wallets,
         private readonly CaptchaImageService $images,
         private readonly ToolAvailabilityService $tools,
+        private readonly CaptchaProviderRunnerService $providers,
     ) {}
 
     public function solve(User $user, string $image, string $requestId, string $source): CaptchaSolve
@@ -29,6 +28,10 @@ class CaptchaSolverService
             throw new CaptchaFailure(trim((string) $tool['maintenance_message']) ?: 'Công cụ giải captcha đang tắt hoặc bảo trì. Vui lòng thử lại sau.');
         }
         $decoded = $this->images->decode($image);
+        $provider = $this->providers->primary();
+        if (! $provider) {
+            throw new CaptchaFailure('Chưa chọn nguồn giải captcha chính. Vui lòng liên hệ quản trị viên.');
+        }
         $solve = DB::transaction(function () use ($user, $requestId, $source, $decoded): CaptchaSolve {
             $wallet = $this->wallets->lock($user);
             $this->expireLocked($user, $wallet);
@@ -62,26 +65,14 @@ class CaptchaSolverService
         }
 
         $startedAt = hrtime(true);
-        try {
-            $response = Http::acceptJson()->asJson()->connectTimeout(5)->timeout(30)
-                ->withOptions(['allow_redirects' => false])
-                ->post(config('captcha.endpoint'), ['image' => $decoded['base64']]);
-            $payload = $response->json();
-            if (! is_array($payload)) {
-                $payload = ['success' => false, 'error' => 'invalid_response', 'body' => mb_substr($response->body(), 0, 10000)];
-            }
-            $httpStatus = $response->status();
-            $success = $response->successful() && ($payload['success'] ?? null) === true
-                && is_string($payload['result'] ?? null) && trim($payload['result']) !== '';
-        } catch (ConnectionException) {
-            $payload = ['success' => false, 'error' => 'provider_unavailable'];
-            $httpStatus = null;
-            $success = false;
-        }
+        $outcome = $this->providers->run($solve, $decoded['base64'], $provider);
+        $payload = $outcome['payload'];
+        $httpStatus = $outcome['http_status'];
+        $success = $outcome['success'];
 
         $durationMs = (int) round((hrtime(true) - $startedAt) / 1000000);
 
-        return DB::transaction(function () use ($user, $solve, $payload, $httpStatus, $success, $durationMs): CaptchaSolve {
+        return DB::transaction(function () use ($user, $solve, $payload, $httpStatus, $success, $durationMs, $outcome): CaptchaSolve {
             $wallet = $this->wallets->lock($user);
             $locked = CaptchaSolve::query()->lockForUpdate()->findOrFail($solve->id);
             if ($locked->status !== 'processing') {
@@ -93,7 +84,8 @@ class CaptchaSolverService
             }
             $locked->update([
                 'status' => $success ? 'success' : 'failed', 'response' => $payload,
-                'http_status' => $httpStatus, 'result' => $success ? $payload['result'] : null, 'duration_ms' => $durationMs,
+                'http_status' => $httpStatus, 'result' => $success ? $outcome['result'] : null, 'duration_ms' => $durationMs,
+                'provider_name' => $outcome['provider_name'],
             ]);
 
             return $locked;

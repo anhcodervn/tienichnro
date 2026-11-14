@@ -61,7 +61,10 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         label: 'Giải captcha',
         icon: ScanLine,
         section: 'services',
-        children: [{ label: 'Lịch sử giải', href: '/admin/captcha/history' }],
+        children: [
+            { label: 'Cấu hình nguồn', href: '/admin/captcha/providers' },
+            { label: 'Lịch sử giải', href: '/admin/captcha/history' },
+        ],
     },
     { key: 'nro-servers', label: 'Server NRO', icon: Globe2, section: 'services', href: '/admin/nro/servers' },
     {

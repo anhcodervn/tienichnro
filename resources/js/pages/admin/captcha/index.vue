@@ -25,6 +25,17 @@ type Row = {
     created_at?: string;
     response?: unknown;
     http_status?: number;
+    provider_name?: string;
+    duration_ms?: number;
+    provider_attempts?: {
+        id: number;
+        provider_name: string;
+        driver: string;
+        status: string;
+        http_status: number | null;
+        duration_ms: number;
+        response: unknown;
+    }[];
 };
 const tab = ref('wallets');
 const rows = ref<Row[]>([]);
@@ -249,6 +260,7 @@ onMounted(load);
                             </td>
                             <td class="p-3">
                                 {{ row.source }}
+                                <p>{{ row.provider_name || '—' }} · {{ row.duration_ms ?? 0 }} ms</p>
                                 <p>{{ row.created_at ? new Date(row.created_at).toLocaleString('vi-VN') : '' }}</p>
                             </td>
                             <td class="p-3">
@@ -330,10 +342,20 @@ onMounted(load);
                     <DialogPanel class="grid w-full max-w-3xl gap-4 rounded-xl bg-white p-6 text-slate-900 dark:bg-slate-900 dark:text-white"
                         ><DialogTitle class="text-xl font-bold">Lượt giải #{{ detail?.id }}</DialogTitle>
                         <p>HTTP: {{ detail?.http_status || 'Không có' }} · {{ detail?.status }}</p>
+                        <p>Nguồn: {{ detail?.provider_name || 'Không có' }} · {{ detail?.duration_ms ?? 0 }} ms</p>
                         <img v-if="imageUrl" :src="imageUrl" alt="Ảnh captcha lưu trong lịch sử" class="max-h-64 max-w-full rounded-lg border" />
-                        <pre class="max-h-96 overflow-auto rounded-lg bg-slate-100 p-3 text-xs dark:bg-slate-800">{{
-                            JSON.stringify(detail?.response, null, 2)
-                        }}</pre>
+                        <div v-for="attempt in detail?.provider_attempts || []" :key="attempt.id" class="grid gap-2 rounded-[10px] border p-3">
+                            <p class="font-semibold">{{ attempt.provider_name }} · {{ attempt.status }}</p>
+                            <p class="text-sm">{{ attempt.driver }} · HTTP {{ attempt.http_status || 'Không có' }} · {{ attempt.duration_ms }} ms</p>
+                            <pre class="max-h-72 overflow-auto rounded-[10px] bg-slate-100 p-3 text-xs dark:bg-slate-800">{{
+                                JSON.stringify(attempt.response, null, 2)
+                            }}</pre>
+                        </div>
+                        <pre
+                            v-if="!detail?.provider_attempts?.length"
+                            class="max-h-96 overflow-auto rounded-lg bg-slate-100 p-3 text-xs dark:bg-slate-800"
+                            >{{ JSON.stringify(detail?.response, null, 2) }}</pre
+                        >
                         <button type="button" class="justify-self-start rounded-lg border px-4 py-2" @click="closeDetail">Đóng</button></DialogPanel
                     >
                 </div>

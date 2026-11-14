@@ -2,6 +2,7 @@ export default {
     path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),
     children: [
+        { path: 'captcha/providers', name: 'admin.captcha.providers', component: () => import('@/pages/admin/captcha/providers.vue') },
         { path: 'wallets/token-captcha', name: 'admin.captcha.wallet', component: () => import('@/pages/admin/captcha/index.vue') },
         {
             path: 'captcha/history',

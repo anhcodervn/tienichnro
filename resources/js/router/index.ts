@@ -8,6 +8,7 @@ const routeTitles: Record<string, string> = {
     'admin.overview': 'Tổng quan quản trị',
     'admin.captcha.wallet': 'Ví token captcha',
     'admin.captcha.history': 'Lịch sử giải captcha',
+    'admin.captcha.providers': 'Cấu hình nguồn captcha',
     'admin.licenses.client-game': 'Client Game',
     'admin.licenses': 'License keys',
     'admin.licenses.products': 'Sản phẩm / tool',
