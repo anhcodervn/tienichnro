@@ -1,8 +1,10 @@
 <script setup lang="ts">
+import DataTable from '@/components/shared/DataTable/index.vue';
 import api from '@/config/axios';
 import { Dialog, DialogPanel, DialogTitle } from '@headlessui/vue';
 import { isAxiosError } from 'axios';
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import CaptchaImagePreview from './CaptchaImagePreview.vue';
 
 const props = withDefaults(defineProps<{ section?: 'wallet' | 'solves' }>(), { section: 'wallet' });
 type Rate = { min_tokens: number; unit_price: number };
@@ -42,6 +44,24 @@ const rows = ref<Row[]>([]);
 const rates = ref<Rate[]>([]);
 const page = ref(1);
 const lastPage = ref(1);
+const totalRows = ref(0);
+const range = ref({ from: 0, to: 0 });
+const solveColumns = [
+    { accessorKey: 'id', header: 'Mã lượt' },
+    { accessorKey: 'user_id', header: 'Người dùng' },
+    { accessorKey: 'status', header: 'Trạng thái' },
+    { accessorKey: 'result', header: 'Kết quả' },
+    { accessorKey: 'provider_name', header: 'Nguồn giải' },
+    { accessorKey: 'source', header: 'Kênh' },
+    { accessorKey: 'duration_ms', header: 'Thời gian giải' },
+    { accessorKey: 'created_at', header: 'Thời điểm' },
+    { id: 'actions', header: 'Chi tiết' },
+];
+const solveStatus: Record<string, { label: string; class: string }> = {
+    success: { label: 'Thành công', class: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300' },
+    failed: { label: 'Thất bại', class: 'bg-rose-50 text-rose-700 dark:bg-rose-950 dark:text-rose-300' },
+    processing: { label: 'Đang xử lý', class: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300' },
+};
 const userId = ref('');
 const status = ref('');
 const loading = ref(false);
@@ -50,6 +70,11 @@ const error = ref('');
 const notice = ref('');
 const detail = ref<Row | null>(null);
 const imageUrl = ref('');
+const detailLoading = ref(false);
+const detailError = ref('');
+const imageLoading = ref(false);
+const imageError = ref('');
+let detailRequest = 0;
 const adjusting = ref<Row | null>(null);
 const adjustment = ref({ amount: 1, direction: 'credit', description: '', request_id: '' });
 const endpoint = computed(() => (props.section === 'solves' ? 'solves' : tab.value));
@@ -73,12 +98,19 @@ const load = async () => {
         else {
             rows.value = data.data;
             lastPage.value = data.last_page;
+            totalRows.value = data.total;
+            range.value = { from: data.from || 0, to: data.to || 0 };
         }
     } catch (err) {
         fail(err);
     } finally {
         loading.value = false;
     }
+};
+const goToPage = async (nextPage: number) => {
+    if (loading.value || nextPage < 1 || nextPage > lastPage.value) return;
+    page.value = nextPage;
+    await load();
 };
 const saveRates = async () => {
     if (saving.value) return;
@@ -116,20 +148,40 @@ const adjust = async () => {
     }
 };
 const closeDetail = () => {
+    detailRequest++;
     detail.value = null;
     if (imageUrl.value) URL.revokeObjectURL(imageUrl.value);
     imageUrl.value = '';
+    detailLoading.value = false;
+    imageLoading.value = false;
 };
 const show = async (row: Row) => {
     error.value = '';
     closeDetail();
+    const request = detailRequest;
+    detail.value = row;
+    detailLoading.value = true;
+    detailError.value = '';
+    imageError.value = '';
     try {
         const { data } = await api.get('/api/admin-api/captcha/solves/' + row.id);
+        if (request !== detailRequest) return;
         detail.value = data.data;
+    } catch {
+        if (request === detailRequest) detailError.value = 'Không tải được chi tiết. Đóng và mở lại để thử lại.';
+    } finally {
+        if (request === detailRequest) detailLoading.value = false;
+    }
+    if (request !== detailRequest) return;
+    imageLoading.value = true;
+    try {
         const image = await api.get('/api/admin-api/captcha/solves/' + row.id + '/image', { responseType: 'blob' });
+        if (request !== detailRequest) return;
         imageUrl.value = URL.createObjectURL(image.data);
-    } catch (err) {
-        fail(err);
+    } catch {
+        if (request === detailRequest) imageError.value = 'Không tải được ảnh captcha. Ảnh có thể đã bị xóa hoặc không còn tồn tại.';
+    } finally {
+        if (request === detailRequest) imageLoading.value = false;
     }
 };
 watch([tab, () => props.section], () => {
@@ -137,11 +189,17 @@ watch([tab, () => props.section], () => {
     void load();
 });
 onMounted(load);
+onBeforeUnmount(closeDetail);
 </script>
 
 <template>
     <section class="grid gap-5 text-slate-900 dark:text-slate-100">
-        <h1 class="text-2xl font-bold">{{ section === 'solves' ? 'Lịch sử giải captcha NRO' : 'Ví token_captcha' }}</h1>
+        <header class="rounded-[10px] border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+            <h1 class="text-2xl font-bold">{{ section === 'solves' ? 'Lịch sử giải captcha NRO' : 'Ví token_captcha' }}</h1>
+            <p v-if="section === 'solves'" class="mt-2 text-sm text-slate-500 dark:text-slate-400">
+                Theo dõi kết quả, nguồn giải và thời gian xử lý. Mở chi tiết để xem ảnh và response.
+            </p>
+        </header>
         <p v-if="error" role="alert" class="rounded-lg bg-rose-50 p-3 text-rose-700">{{ error }}</p>
         <p v-if="notice" role="status" class="text-emerald-600">{{ notice }}</p>
         <div v-if="section === 'wallet'" class="flex flex-wrap gap-2" aria-label="Quản lý token captcha">
@@ -163,7 +221,7 @@ onMounted(load);
         </div>
         <form
             v-if="endpoint !== 'rates'"
-            class="flex flex-wrap items-end gap-3"
+            class="flex flex-wrap items-end gap-3 rounded-[10px] border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
             @submit.prevent="
                 page = 1;
                 load();
@@ -182,7 +240,61 @@ onMounted(load);
             >
             <button type="submit" class="rounded-lg bg-emerald-700 px-4 py-2 text-white" :disabled="loading">Lọc / làm mới</button>
         </form>
-        <p v-if="loading">Đang tải…</p>
+        <div v-if="section === 'solves'" class="grid gap-3">
+            <p class="text-sm text-slate-500 dark:text-slate-400" aria-live="polite">
+                Hiển thị {{ range.from }}–{{ range.to }} / {{ totalRows.toLocaleString('vi-VN') }} lượt giải
+            </p>
+            <DataTable
+                :data="rows"
+                :columns="solveColumns"
+                :current-page="page"
+                :total-pages="lastPage"
+                :go-to-page="goToPage"
+                :loading="loading"
+                empty-text="Chưa có lượt giải phù hợp với bộ lọc."
+            >
+                <template #id="{ row }"
+                    ><span class="font-semibold">#{{ row.id }}</span></template
+                >
+                <template #user_id="{ row }"
+                    ><span class="whitespace-nowrap">#{{ row.user_id }}</span></template
+                >
+                <template #status="{ row }"
+                    ><span
+                        class="inline-flex whitespace-nowrap rounded-[10px] px-2.5 py-1 text-xs font-semibold"
+                        :class="solveStatus[row.status]?.class"
+                        >{{ solveStatus[row.status]?.label || row.status }}</span
+                    ></template
+                >
+                <template #result="{ row }"
+                    ><code class="font-mono text-base font-bold tracking-wider">{{ row.result || '—' }}</code></template
+                >
+                <template #provider_name="{ row }"
+                    ><span class="whitespace-nowrap">{{ row.provider_name || '—' }}</span></template
+                >
+                <template #source="{ row }">{{ row.source === 'api' ? 'API' : 'Demo' }}</template>
+                <template #duration_ms="{ row }"
+                    ><span class="whitespace-nowrap tabular-nums">{{
+                        row.duration_ms == null ? '—' : (row.duration_ms / 1000).toFixed(3) + ' s'
+                    }}</span></template
+                >
+                <template #created_at="{ row }"
+                    ><span class="whitespace-nowrap text-xs">{{
+                        row.created_at ? new Date(row.created_at).toLocaleString('vi-VN') : '—'
+                    }}</span></template
+                >
+                <template #actions="{ row }"
+                    ><button
+                        type="button"
+                        class="whitespace-nowrap rounded-[10px] border border-slate-300 px-3 py-2 text-sm font-medium text-emerald-700 hover:bg-emerald-50"
+                        @click="show(row)"
+                    >
+                        Ảnh / response
+                    </button></template
+                >
+            </DataTable>
+        </div>
+        <p v-else-if="loading">Đang tải…</p>
         <form v-else-if="endpoint === 'rates'" class="grid gap-4 rounded-xl border p-5" @submit.prevent="saveRates">
             <p class="text-sm">Bậc đầu tiên phải bắt đầu từ 1 token. Khi đạt ngưỡng, đơn giá áp dụng cho toàn bộ số token mua.</p>
             <div v-for="(rate, index) in rates" :key="index" class="flex flex-wrap items-end gap-3">
@@ -274,7 +386,7 @@ onMounted(load);
                 </tbody>
             </table>
         </div>
-        <div v-if="endpoint !== 'rates'" class="flex items-center gap-3">
+        <div v-if="section === 'wallet' && endpoint !== 'rates'" class="flex items-center gap-3">
             <button
                 type="button"
                 :disabled="page <= 1 || loading"
@@ -339,11 +451,37 @@ onMounted(load);
             ><div class="fixed inset-0 bg-black/50" aria-hidden="true"></div>
             <div class="fixed inset-0 overflow-y-auto p-5">
                 <div class="flex min-h-full items-center justify-center">
-                    <DialogPanel class="grid w-full max-w-3xl gap-4 rounded-xl bg-white p-6 text-slate-900 dark:bg-slate-900 dark:text-white"
+                    <DialogPanel
+                        class="grid w-full max-w-4xl gap-4 rounded-[10px] bg-white p-5 text-slate-900 dark:bg-slate-900 dark:text-white sm:p-6"
                         ><DialogTitle class="text-xl font-bold">Lượt giải #{{ detail?.id }}</DialogTitle>
-                        <p>HTTP: {{ detail?.http_status || 'Không có' }} · {{ detail?.status }}</p>
-                        <p>Nguồn: {{ detail?.provider_name || 'Không có' }} · {{ detail?.duration_ms ?? 0 }} ms</p>
-                        <img v-if="imageUrl" :src="imageUrl" alt="Ảnh captcha lưu trong lịch sử" class="max-h-64 max-w-full rounded-lg border" />
+                        <div class="grid gap-3 rounded-[10px] bg-slate-50 p-4 text-sm dark:bg-slate-800 sm:grid-cols-2">
+                            <p>
+                                Người dùng: <strong>#{{ detail?.user_id }}</strong>
+                            </p>
+                            <p>
+                                Trạng thái: <strong>{{ solveStatus[detail?.status || '']?.label || detail?.status }}</strong> · HTTP
+                                {{ detail?.http_status || '—' }}
+                            </p>
+                            <p>
+                                Nguồn: <strong>{{ detail?.provider_name || '—' }}</strong>
+                            </p>
+                            <p>
+                                Kết quả: <code class="font-bold">{{ detail?.result || '—' }}</code> · {{ detail?.duration_ms ?? 0 }} ms
+                            </p>
+                        </div>
+                        <p v-if="detailLoading" role="status" class="text-sm text-slate-500">Đang tải chi tiết…</p>
+                        <p v-if="detailError" role="alert" class="text-sm text-rose-600">{{ detailError }}</p>
+                        <p v-if="imageLoading" role="status" class="rounded-[10px] border p-5 text-center text-sm text-slate-500">
+                            Đang tải ảnh captcha…
+                        </p>
+                        <p
+                            v-if="imageError"
+                            role="alert"
+                            class="rounded-[10px] bg-amber-50 p-4 text-sm text-amber-800 dark:bg-amber-950 dark:text-amber-200"
+                        >
+                            {{ imageError }}
+                        </p>
+                        <CaptchaImagePreview v-if="imageUrl" :src="imageUrl" :solve-id="detail?.id" />
                         <div v-for="attempt in detail?.provider_attempts || []" :key="attempt.id" class="grid gap-2 rounded-[10px] border p-3">
                             <p class="font-semibold">{{ attempt.provider_name }} · {{ attempt.status }}</p>
                             <p class="text-sm">{{ attempt.driver }} · HTTP {{ attempt.http_status || 'Không có' }} · {{ attempt.duration_ms }} ms</p>
