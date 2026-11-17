@@ -181,8 +181,8 @@ test('text block validation rejects invalid content and styles', function (strin
     expect($account->fresh()->layout)->toBeNull();
 })->with([
     ['id', 'text-11'], ['content', str_repeat('a', 1001)], ['content', ['invalid']],
-    ['font_size', 11], ['font_size', 73], ['font_size', 'bad'], ['color', 'red'], ['color', '#123'],
-    ['bold', 'bad'], ['width', 119], ['width', 1001],
+    ['font_size', 11], ['font_size', 513], ['font_size', 'bad'], ['color', 'red'], ['color', '#123'],
+    ['bold', 'bad'], ['width', 119], ['width', 6001],
 ]);
 
 test('text blocks require unique identifiers and support empty text', function (): void {
@@ -259,6 +259,17 @@ test('autosave persists independent image scales and a custom background size', 
     $layout['document']['height'] = 400;
     $layout['layers']['bag']['scale_x'] = -1;
     $this->patchJson(route('tools.game-image.update', $account), ['layout' => $layout])->assertUnprocessable()->assertJsonValidationErrors('layout.layers.bag.scale_x');
+});
+
+test('large text sizes and widths survive saving and reloading', function (): void {
+    $account = GameImageAccount::factory()->create();
+    $layout = gameImageLayout();
+    $layout['texts'] = [['id' => 'text-1', 'content' => 'Large text', 'font_size' => 512, 'width' => 6000, 'color' => '#123456', 'bold' => true]];
+    $this->actingAs(User::findOrFail($account->user_id))->patchJson(route('tools.game-image.update', $account), ['layout' => $layout])
+        ->assertOk()->assertJsonPath('data.layout.texts.0.font_size', 512)->assertJsonPath('data.layout.texts.0.width', 6000);
+    expect($account->fresh()->layout['texts'][0]['font_size'])->toBe(512);
+    $layout['texts'][0]['font_size'] = 513;
+    $this->patchJson(route('tools.game-image.update', $account), ['layout' => $layout])->assertUnprocessable()->assertJsonValidationErrors('layout.texts.0.font_size');
 });
 
 test('positions across the full background survive saving and reloading', function (): void {

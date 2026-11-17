@@ -184,8 +184,8 @@ const groups = computed<Highlight[]>(() =>
 const textConfigs = computed(() =>
     texts.value.map((text) => ({
         ...text,
-        font_size: Math.max(12, Math.min(72, Math.round(Number(text.font_size) || 24))),
-        width: Math.max(120, Math.min(1000, Math.round(Number(text.width) || 360))),
+        font_size: Math.max(12, Math.min(512, Math.round(Number(text.font_size) || 24))),
+        width: Math.max(120, Math.min(6000, Math.round(Number(text.width) || 360))),
     })),
 );
 const shapeConfigs = computed(() =>
@@ -342,7 +342,8 @@ function addText() {
     if (props.readOnly) return;
     const id = freeId('text', texts.value);
     if (!id) return;
-    texts.value.push({ id, content: 'Nội dung của bạn', font_size: 24, color: '#1e293b', bold: false, width: 360 });
+    const fontSize = Math.max(32, Math.min(160, Math.round(dimensions.value.width / 50)));
+    texts.value.push({ id, content: 'Nội dung của bạn', font_size: fontSize, color: '#1e293b', bold: false, width: Math.max(360, fontSize * 18) });
     added(id);
 }
 function addShape(kind: string) {
@@ -918,9 +919,9 @@ async function importProject(event: Event) {
                 typeof text.content !== 'string' ||
                 text.content.length > 1000 ||
                 text.font_size < 12 ||
-                text.font_size > 72 ||
+                text.font_size > 512 ||
                 text.width < 120 ||
-                text.width > 1000 ||
+                text.width > 6000 ||
                 !/^#[a-f\d]{6}$/i.test(text.color)
             )
                 throw new Error('Khối text không hợp lệ.');
@@ -1426,10 +1427,10 @@ onUnmounted(() => {
                                     v-model.number="activeText.font_size"
                                     type="number"
                                     min="12"
-                                    max="72"
+                                    max="512"
                                     :disabled="active?.locked" /></label
                             ><label
-                                >Độ rộng<input v-model.number="activeText.width" type="number" min="120" max="1000" :disabled="active?.locked"
+                                >Độ rộng<input v-model.number="activeText.width" type="number" min="120" max="6000" :disabled="active?.locked"
                             /></label>
                         </div>
                         <label class="studio-color">Màu chữ<input v-model="activeText.color" type="color" :disabled="active?.locked" /></label

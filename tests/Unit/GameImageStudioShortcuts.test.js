@@ -16,7 +16,7 @@ const require = createRequire(import.meta.url);
 async function studio(readOnly = false, logoUrl = '', accountExtras = {}) {
     const source = readFileSync(new URL('../../resources/js/components/game-image/GameImageEditor.vue', import.meta.url), 'utf8').replace(
         '</script>',
-        'defineExpose({ keydown, releasePan, startPointer, tool, spacePan, selectedIds, texts, positions, zoom, canvas, stageSize, loadAssets, layerList, layerDrag, startLayerDrag, moveLayerDrag, endLayerDrag, cancelLayerDrag, blocks, order, layout, undo, redo, startResize, movePointer, stopPointer, documentSettings, dimensions, fitBackground, setBackgroundSize, layerSettings, save, dirty, savedSnapshot });\n</script>',
+        'defineExpose({ addText, keydown, releasePan, startPointer, tool, spacePan, selectedIds, texts, positions, zoom, canvas, stageSize, loadAssets, layerList, layerDrag, startLayerDrag, moveLayerDrag, endLayerDrag, cancelLayerDrag, blocks, order, layout, undo, redo, startResize, movePointer, stopPointer, documentSettings, dimensions, fitBackground, setBackgroundSize, layerSettings, save, dirty, savedSnapshot });\n</script>',
     );
     const { descriptor } = parse(source);
     const script = compileScript(descriptor, { id: 'studio-shortcut-test', inlineTemplate: true });
@@ -251,4 +251,17 @@ test('saving exports the chosen canvas size and a response cannot mark newer edi
         globalThis.document = originalDocument;
         globalThis.fetch = originalFetch;
     }
+});
+
+test('new text uses a readable size on large compositions and retains larger saved fonts', async () => {
+    const state = await studio();
+    state.setBackgroundSize(6000, 3000);
+    state.addText();
+    assert.equal(state.texts.value[0].font_size, 120);
+    assert.equal(state.texts.value[0].width, 2160);
+    state.texts.value[0].font_size = 256;
+    state.texts.value[0].width = 5000;
+    assert.equal(state.layout.value.texts[0].font_size, 256);
+    assert.equal(state.layout.value.texts[0].width, 5000);
+    assert.equal(model.validateProject(state.layout.value), state.layout.value);
 });

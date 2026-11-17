@@ -1,7 +1,9 @@
 <?php
 
 use App\Features\Client\GameImage\Services\GameImageAssetService;
+use App\Features\NroNotification\Services\NotificationReadCacheService;
 use App\Models\GameImageAccount;
+use App\Models\NroServer;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -21,6 +23,22 @@ function accountCapturePayload(): array
 
 beforeEach(function (): void {
     Storage::fake('local');
+});
+
+test('capture form selects active game server codes from the shared password tool catalog', function (): void {
+    $server = NroServer::query()->create(['server_code' => 731, 'code' => 'sv731', 'name' => 'Shared capture server', 'is_active' => true, 'sort_order' => -10]);
+    NroServer::query()->create(['server_code' => 732, 'code' => 'sv732', 'name' => 'Inactive capture server', 'is_active' => false, 'sort_order' => -20]);
+    $catalog = app(NotificationReadCacheService::class);
+    $catalog->invalidate('catalog');
+    $response = $this->actingAs(User::factory()->create())->get(route('tools.game-image'))->assertOk()
+        ->assertViewHas('servers', fn ($servers): bool => $servers->pluck('id')->all() === $catalog->catalog()['servers']->pluck('id')->all());
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
+    $xpath = new DOMXPath($document);
+    expect($xpath->query('//select[@id="capture-server" and @name="server"]')->length)->toBe(1)
+        ->and($xpath->query('//select[@id="capture-server"]/option[@value="731"]')->item(0)->textContent)->toContain($server->name)
+        ->and($xpath->query('//select[@id="capture-server"]/option[@value="732"]')->length)->toBe(0)
+        ->and($xpath->query('//input[@id="capture-server"]')->length)->toBe(0);
 });
 
 test('account table masks usernames and paginates only the owners accounts with stable row numbers', function (): void {

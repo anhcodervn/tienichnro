@@ -20,7 +20,7 @@ class GameImageAccountIndexRequest extends FormRequest
     {
         return [
             'q' => ['nullable', 'string', 'max:100'],
-            'status' => ['nullable', Rule::in(['pending', 'processing', 'success', 'error'])],
+            'status' => ['nullable', Rule::in(['pending', 'processing', 'success', 'error', 'paused', 'cancelled'])],
             'page' => ['nullable', 'integer', 'min:1'],
         ];
     }

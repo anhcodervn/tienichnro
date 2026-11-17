@@ -14,7 +14,7 @@ async function environment(file, overrides = {}) {
     const calls = [];
     const errors = [];
     const notices = [];
-    const exposed = file === 'configuration' ? 'load, save, price, saving, errorMessage, openSeo, seo, tab' : 'load, rows, q, status, page, total';
+    const exposed = file === 'configuration' ? 'load, save, price, saving, errorMessage, openSeo, seo, tab' : 'load, rows, q, status, page, total, openEdit, closeEdit, draft, editing, saveAccount, removeAccount';
     const source = readFileSync(new URL(`../../resources/js/pages/admin/game-image/${file}.vue`, import.meta.url), 'utf8').replace(
         '</script>',
         `defineExpose({${exposed}});\n</script>`,
@@ -26,6 +26,7 @@ async function environment(file, overrides = {}) {
     }).outputText;
     const exports = {};
     new Function('require', 'exports', code)((name) => {
+        if (name === 'sweetalert2') return { default: { fire: async () => ({ isConfirmed: overrides.confirmDelete ?? false }) } };
         if (name.includes('admin-service-management.service'))
             return {
                 adminServiceManagement: {
@@ -180,4 +181,32 @@ test('admin menu and router expose separate image configuration and capture hist
         assert.ok(navigation.includes('/admin/' + path));
         assert.ok(routes.includes("path: '" + path + "'"));
     }
+});
+
+
+test('admin account edits omit an unchanged password and clear password input after saving', async () => {
+    const updates = [];
+    const env = await environment('history', { update: async (id, data) => updates.push({ id, data }) });
+    const row = { ...env.state.rows.value[0], capture_version: 4 };
+    env.state.openEdit(row);
+    assert.equal(env.state.draft.value.password, '');
+    env.state.draft.value.username = 'updated';
+    await env.state.saveAccount();
+    assert.deepEqual(updates[0], { id: 1, data: { username: 'updated', server: 'Server 1', capture_version: 4 } });
+    assert.equal(env.state.editing.value, null);
+    env.state.openEdit(row);
+    env.state.draft.value.password = 'new-secret';
+    await env.state.saveAccount();
+    assert.equal(updates[1].data.password, 'new-secret');
+    assert.equal(env.state.draft.value.password, '');
+});
+
+test('deleting an account requires confirmation and sends the current capture version', async () => {
+    const removed = [];
+    const cancelled = await environment('history', { remove: async (...args) => removed.push(args) });
+    await cancelled.state.removeAccount({ ...cancelled.state.rows.value[0], capture_version: 3 });
+    assert.equal(removed.length, 0);
+    const confirmed = await environment('history', { confirmDelete: true, remove: async (...args) => removed.push(args) });
+    await confirmed.state.removeAccount({ ...confirmed.state.rows.value[0], capture_version: 3 });
+    assert.deepEqual(removed, [[1, 3]]);
 });

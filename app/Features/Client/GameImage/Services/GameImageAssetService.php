@@ -104,7 +104,7 @@ class GameImageAssetService
                 if ($claimToken !== null) {
                     abort_unless(filled($locked->capture_claim_hash) && hash_equals($locked->capture_claim_hash, hash('sha256', $claimToken)), 409, 'Capture claim is invalid.');
                 }
-                abort_if($locked->status === 'error', 409, 'Lượt ghép ảnh đã lỗi và hoàn tiền, không nhận ảnh đến trễ.');
+                abort_if(in_array($locked->status, ['error', 'paused', 'cancelled'], true), 409, 'Lượt chụp đã dừng hoặc kết thúc, không nhận ảnh đến trễ.');
                 if ($locked->status === 'success' && $locked->capture_directory !== null) {
                     return [null, null, null, false];
                 }

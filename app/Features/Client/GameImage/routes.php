@@ -17,6 +17,8 @@ Route::middleware(['auth', 'cache.headers:no_store;private'])->group(function ()
     Route::get('/ghep-anh-game/trang-thai/stream', [GameImageController::class, 'stream'])->name('tools.game-image.stream');
     Route::post('/ghep-anh-game/{account}/chup-lai', [GameImageController::class, 'recapture'])->whereNumber('account')->name('tools.game-image.recapture');
     Route::post('/ghep-anh-game', [GameImageController::class, 'store'])->name('tools.game-image.store');
+    Route::patch('/ghep-anh-game/{account}/thong-tin', [GameImageController::class, 'details'])->whereNumber('account')->name('tools.game-image.details');
+    Route::post('/ghep-anh-game/{account}/quan-ly', [GameImageController::class, 'control'])->whereNumber('account')->name('tools.game-image.control');
     Route::post('/ghep-anh-game/{account}/du-lieu', [GameImageController::class, 'capture'])->whereNumber('account')->name('tools.game-image.capture');
     Route::get('/ghep-anh-game/{account}/du-lieu.zip', [GameImageController::class, 'downloadData'])->whereNumber('account')->name('tools.game-image.download-data');
     Route::get('/ghep-anh-game/{account}/anh-ghep', [GameImageController::class, 'preview'])->whereNumber('account')->name('tools.game-image.preview');

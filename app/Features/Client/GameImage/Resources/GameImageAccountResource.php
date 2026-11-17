@@ -22,6 +22,7 @@ class GameImageAccountResource extends JsonResource
             'capture_version' => $this->capture_version,
             'error_code' => $this->error_code, 'error_message' => $this->error_message,
             'charged_amount' => $this->charged_amount,
+            'refunded_amount' => $this->refunded_amount ?? ($this->refunded_at ? $this->charged_amount : null),
             'refunded_at' => $this->refunded_at?->toIso8601String(),
             'layout' => $this->layout,
             'capture_urls' => app(GameImageAssetService::class)->sourceUrls($this->resource),

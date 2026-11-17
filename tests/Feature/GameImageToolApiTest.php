@@ -74,6 +74,16 @@ beforeEach(function (): void {
     $this->withToken($this->admin->createToken('capture-tool')->plainTextToken);
 });
 
+test('paused or cancelled capture rejects stale tool status upload and claim without extra refunds', function (string $action): void {
+    $this->postJson(route('api.game-image.claim', $this->account), $this->claim)->assertOk();
+    $controlled = app(GameImageOrderService::class)->control($this->member, $this->account, $action, 1);
+    $this->postJson(route('api.game-image.claim', $this->account), $this->claim)->assertConflict();
+    $this->patchJson(route('api.game-image.status', $this->account), ['status' => 'error', 'error_message' => 'Late callback', ...$this->claim])->assertConflict();
+    $this->postJson(route('api.game-image.upload', $this->account), ['package' => toolCaptureZip(), 'cName' => 'kztiger', ...$this->claim])->assertConflict();
+    $this->getJson(route('api.game-image.pending'))->assertOk()->assertJsonCount(0, 'data');
+    expect($this->account->fresh()->status)->toBe($controlled->status)->and($this->wallet->fresh()->balance)->toBe(900);
+})->with(['pause', 'cancel']);
+
 test('pending API uses bearer auth paginates active owners and never leaks passwords', function (): void {
     GameImageAccount::factory()->count(21)->create(['user_id' => $this->member->id]);
     GameImageAccount::factory()->create(['status' => 'success']);

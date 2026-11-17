@@ -189,8 +189,18 @@ export function fitComposition(blocks, requestedSize = sceneSize(blocks)) {
     const top = Math.min(0, ...bounds.map((block) => block.y));
     const right = Math.max(0, ...bounds.map((block) => block.x + block.width));
     const bottom = Math.max(0, ...bounds.map((block) => block.y + block.height));
+    const headerHeight = compositionTitleSize(size.width) + 24;
     const scale = Math.min(1, size.width / (right - left), size.height / (bottom - top));
-    return { size, scale, x: -left * scale, y: -top * scale };
+    const firstRow = Math.min(...bounds.map((block) => block.y - top));
+    if (firstRow * scale >= headerHeight || bounds.length === 0) {
+        return { size, scale, x: -left * scale, y: -top * scale };
+    }
+    const contentScale = Math.min(scale, Math.max(1, size.height - headerHeight) / Math.max(1, bottom - top - firstRow));
+    return { size, scale: contentScale, x: -left * contentScale, y: headerHeight - (top + firstRow) * contentScale };
+}
+
+export function compositionTitleSize(width) {
+    return Math.max(18, Math.min(96, Math.round(width / 65)));
 }
 
 /** @param {{selected?: string | string[] | null, size?: {width: number, height: number}, cname?: string, background?: string, backgroundSize?: {width: number, height: number}, projection?: {scale: number, x: number, y: number}}} [options] */
@@ -209,8 +219,9 @@ export function drawScene(canvas, images, blocks, options = {}) {
     context.imageSmoothingEnabled = true;
     context.imageSmoothingQuality = 'high';
     context.fillStyle = '#492d16';
-    context.font = 'bold 18px sans-serif';
-    context.fillText(`NRO - ${cname.trim() || 'kztiger'} - tienichnro.com`, 20, 28);
+    const titleSize = compositionTitleSize(frame.size.width);
+    context.font = `bold ${titleSize}px sans-serif`;
+    context.fillText(`NRO - ${cname.trim() || 'kztiger'} - tienichnro.com`, 20, titleSize + 10, Math.max(1, frame.size.width - 40));
     const projected = scale !== 1 || x !== 0 || y !== 0;
     if (projected) {
         context.save();

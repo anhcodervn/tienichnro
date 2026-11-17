@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class GameImageOrderService
 {
+    public const CANCELLATION_FEE = 1000;
+
     public function __construct(private readonly SettingStore $settings, private readonly WalletService $wallets) {}
 
     /** @return array{price: ?int} */
@@ -55,7 +57,7 @@ class GameImageOrderService
             $user = User::query()->lockForUpdate()->findOrFail($account->user_id);
             abort_unless($user->status === 'active', 403);
             $locked = GameImageAccount::query()->lockForUpdate()->findOrFail($account->id);
-            abort_unless($locked->capture_version === $version && in_array($locked->status, ['success', 'error'], true), 409, 'Lượt chụp đã thay đổi hoặc đang xử lý. Vui lòng tải lại trang.');
+            abort_unless($locked->capture_version === $version && in_array($locked->status, ['success', 'error', 'cancelled'], true), 409, 'Lượt chụp đã thay đổi hoặc đang xử lý. Vui lòng tải lại trang.');
             $price = $this->configuration()['price'];
             if ($price === null || $price !== $quotedPrice) {
                 throw ValidationException::withMessages(['price' => 'Phí chụp ảnh đã thay đổi. Vui lòng tải lại trang để xác nhận mức phí mới.']);
@@ -63,7 +65,7 @@ class GameImageOrderService
             $nextVersion = $version + 1;
             $transaction = $this->wallets->apply($user, $price, 'debit', 'game-image:charge:'.$locked->id.':'.$nextVersion, 'Chụp lại ảnh game #'.$locked->id.' lượt '.$nextVersion);
             $locked->forceFill(['capture_version' => $nextVersion, 'status' => 'pending', 'charged_amount' => $price,
-                'charge_transaction_id' => $transaction->id, 'refund_transaction_id' => null, 'refunded_at' => null,
+                'charge_transaction_id' => $transaction->id, 'refund_transaction_id' => null, 'refunded_amount' => null, 'refunded_at' => null,
                 'error_code' => null, 'error_message' => null, 'processing_at' => null, 'completed_at' => null, 'capture_claim_hash' => null, 'capture_public_key' => null])->save();
 
             return $locked;
@@ -86,15 +88,50 @@ class GameImageOrderService
             if ($locked->status === $status) {
                 return $locked;
             }
-            abort_unless(in_array($locked->status, ['pending', 'processing'], true), 409, 'Lượt ghép ảnh đã kết thúc, không thể đổi trạng thái.');
+            abort_unless(in_array($locked->status, $status === 'error' ? ['pending', 'processing', 'paused'] : ['pending', 'processing'], true), 409, 'Lượt ghép ảnh đã kết thúc, không thể đổi trạng thái.');
             if ($status === 'processing') {
                 $locked->forceFill(['status' => 'processing', 'processing_at' => now()])->save();
             } else {
                 $refund = $locked->charge_transaction_id !== null || $locked->charged_amount > 0
                     ? $this->wallets->apply($user, $locked->charged_amount, 'credit', 'game-image:refund:'.$locked->id.($version > 1 ? ':'.$version : ''), 'Hoàn tiền ghép ảnh lỗi #'.$locked->id) : null;
                 $locked->forceFill(['status' => 'error', 'error_code' => $errorCode, 'error_message' => $message, 'completed_at' => now(),
-                    'refund_transaction_id' => $refund?->id, 'refunded_at' => $refund ? now() : null])->save();
+                    'refund_transaction_id' => $refund?->id, 'refunded_amount' => $refund?->amount, 'refunded_at' => $refund ? now() : null])->save();
             }
+
+            return $locked;
+        }, 3);
+    }
+
+    public function control(User $owner, GameImageAccount $account, string $action, int $version): GameImageAccount
+    {
+        abort_unless(in_array($action, ['cancel', 'pause', 'resume'], true), 422);
+
+        return DB::transaction(function () use ($owner, $account, $action, $version): GameImageAccount {
+            $user = User::query()->lockForUpdate()->findOrFail($owner->id);
+            abort_unless($user->status === 'active', 403);
+            $locked = GameImageAccount::query()->lockForUpdate()->findOrFail($account->id);
+            abort_unless($locked->user_id === $user->id, 403);
+            abort_unless($locked->capture_version === $version, 409, 'Lượt chụp đã thay đổi. Vui lòng làm mới danh sách.');
+            if ($action === 'cancel' && $locked->status === 'cancelled') {
+                return $locked;
+            }
+            abort_unless($locked->refunded_at === null, 409, 'Lượt chụp đã được hoàn tiền.');
+            if ($action === 'resume') {
+                abort_unless($locked->status === 'paused', 409, 'Chỉ tiếp tục được đơn đang tạm dừng.');
+                $locked->forceFill(['status' => 'pending', 'capture_version' => $version + 1, 'processing_at' => null, 'capture_claim_hash' => null, 'capture_public_key' => null])->save();
+
+                return $locked;
+            }
+            abort_unless(in_array($locked->status, $action === 'cancel' ? ['pending', 'processing', 'paused'] : ['pending', 'processing'], true), 409, 'Đơn đã kết thúc hoặc không thể thực hiện thao tác này.');
+            if ($action === 'pause') {
+                $locked->forceFill(['status' => 'paused', 'capture_version' => $version + 1, 'processing_at' => null, 'capture_claim_hash' => null, 'capture_public_key' => null])->save();
+
+                return $locked;
+            }
+            $amount = max(0, $locked->charged_amount - self::CANCELLATION_FEE);
+            $refund = $amount > 0 ? $this->wallets->apply($user, $amount, 'credit', 'game-image:cancel:'.$locked->id.':'.$version, 'Hoàn tiền huỷ đơn ghép ảnh #'.$locked->id.' lượt '.$version) : null;
+            $locked->forceFill(['status' => 'cancelled', 'completed_at' => now(), 'capture_claim_hash' => null, 'capture_public_key' => null,
+                'refunded_amount' => $amount, 'refunded_at' => now(), 'refund_transaction_id' => $refund?->id])->save();
 
             return $locked;
         }, 3);

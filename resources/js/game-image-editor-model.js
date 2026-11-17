@@ -176,7 +176,7 @@ export function validateProject(value) {
     }
     for (const group of value.groups ?? []) check(object(group) && Array.isArray(group.item_ids) && typeof group.show_details === 'boolean');
     for (const text of value.texts ?? [])
-        check(object(text) && number(text.font_size, 12, 72) && number(text.width, 120, 1000) && typeof text.bold === 'boolean');
+        check(object(text) && number(text.font_size, 12, 512) && number(text.width, 120, 6000) && typeof text.bold === 'boolean');
     for (const shape of value.shapes ?? []) check(object(shape) && number(shape.stroke_width, 0, 12));
     return value;
 }

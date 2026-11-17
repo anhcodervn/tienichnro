@@ -18,7 +18,7 @@ class GameImageAccountListService
         $log = new GameImageCaptureLog;
 
         return GameImageAccount::query()->where('user_id', $user->id)
-            ->select(['id', 'username', 'cname', 'layout->document->cname as layout_cname', 'server', 'status', 'capture_version', 'error_code', 'error_message', 'charged_amount', 'refunded_at', 'preview_path', 'capture_directory', 'created_at', 'updated_at'])
+            ->select(['id', 'username', 'cname', 'layout->document->cname as layout_cname', 'server', 'status', 'capture_version', 'error_code', 'error_message', 'charged_amount', 'refunded_amount', 'refunded_at', 'preview_path', 'capture_directory', 'created_at', 'updated_at'])
             ->with(['captureLogs' => fn (HasMany $logs) => $logs
                 ->select(['id', 'account_id', 'capture_version', 'message', 'occurred_at', 'created_at'])
                 ->whereExists(GameImageAccount::query()->select('id')

@@ -4,16 +4,20 @@ namespace App\Features\Client\GameImage\Controllers;
 
 use App\Features\Admin\Setting\Services\ToolAvailabilityService;
 use App\Features\Client\GameImage\Requests\GameImageAccountIndexRequest;
+use App\Features\Client\GameImage\Requests\ManageGameImageOrderRequest;
 use App\Features\Client\GameImage\Requests\RecaptureGameImageAccountRequest;
 use App\Features\Client\GameImage\Requests\StoreGameImageAccountRequest;
 use App\Features\Client\GameImage\Requests\StoreGameImageCaptureRequest;
 use App\Features\Client\GameImage\Requests\StreamGameImageAccountsRequest;
+use App\Features\Client\GameImage\Requests\UpdateGameImageAccountDetailsRequest;
 use App\Features\Client\GameImage\Requests\UpdateGameImageLayoutRequest;
 use App\Features\Client\GameImage\Resources\GameImageAccountResource;
+use App\Features\Client\GameImage\Services\GameImageAccountDetailsService;
 use App\Features\Client\GameImage\Services\GameImageAccountFeedService;
 use App\Features\Client\GameImage\Services\GameImageAccountListService;
 use App\Features\Client\GameImage\Services\GameImageAssetService;
 use App\Features\Client\GameImage\Services\GameImageOrderService;
+use App\Features\NroNotification\Services\NotificationReadCacheService;
 use App\Http\Controllers\Controller;
 use App\Models\GameImageAccount;
 use Generator;
@@ -30,7 +34,7 @@ class GameImageController extends Controller
 {
     public function __construct(private readonly ToolAvailabilityService $tools) {}
 
-    public function index(GameImageAccountIndexRequest $request, GameImageOrderService $orders, GameImageAccountListService $lists): View
+    public function index(GameImageAccountIndexRequest $request, GameImageOrderService $orders, GameImageAccountListService $lists, NotificationReadCacheService $readCache): View
     {
         $filters = $request->validated();
         $accounts = $request->user() ? $lists->paginate($request->user(), $filters) : null;
@@ -40,6 +44,7 @@ class GameImageController extends Controller
             'accounts' => $accounts,
             'filters' => $filters,
             'capturePrice' => $orders->configuration()['price'],
+            'servers' => $readCache->catalog()['servers'],
         ]);
     }
 
@@ -83,6 +88,21 @@ class GameImageController extends Controller
         $orders->recapture($account, $request->integer('capture_version'), $request->integer('price'));
 
         return response()->json(['message' => 'Đã trừ phí và đưa tài khoản vào hàng chờ chụp lại.']);
+    }
+
+    public function control(ManageGameImageOrderRequest $request, GameImageAccount $account, GameImageOrderService $orders): JsonResponse
+    {
+        $updated = $orders->control($request->user(), $account, $request->validated('action'), $request->integer('capture_version'));
+
+        return response()->json(['data' => ['id' => $updated->id, 'status' => $updated->status, 'capture_version' => $updated->capture_version, 'refunded_amount' => $updated->refunded_amount]]);
+    }
+
+    public function details(UpdateGameImageAccountDetailsRequest $request, GameImageAccount $account, GameImageAccountDetailsService $details): JsonResponse
+    {
+        $this->ensureEnabled();
+        $updated = $details->update($account, $request->validated());
+
+        return response()->json(['message' => 'Đã cập nhật thông tin tài khoản.', 'data' => ['id' => $updated->id, 'username' => $updated->username, 'server' => $updated->server, 'capture_version' => $updated->capture_version]]);
     }
 
     public function edit(Request $request, GameImageAccount $account): View

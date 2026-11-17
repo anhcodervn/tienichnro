@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class GameImageAccount extends Model
 {
+    public const STATUS_LABELS = ['pending' => 'Chờ ghép', 'processing' => 'Đang chụp ảnh', 'success' => 'Hoàn tất', 'error' => 'Lỗi', 'paused' => 'Tạm dừng', 'cancelled' => 'Đã huỷ'];
+
     /** @use HasFactory<GameImageAccountFactory> */
     use HasFactory;
 
@@ -20,7 +22,7 @@ class GameImageAccount extends Model
     protected function casts(): array
     {
         return ['user_id' => 'integer', 'password' => 'encrypted', 'layout' => 'array', 'shared_layout' => 'array', 'share_expires_at' => 'immutable_datetime', 'capture_files' => 'array',
-            'capture_version' => 'integer', 'charged_amount' => 'integer', 'processing_at' => 'immutable_datetime', 'completed_at' => 'immutable_datetime', 'refunded_at' => 'immutable_datetime'];
+            'capture_version' => 'integer', 'charged_amount' => 'integer', 'refunded_amount' => 'integer', 'processing_at' => 'immutable_datetime', 'completed_at' => 'immutable_datetime', 'refunded_at' => 'immutable_datetime'];
     }
 
     public function captureLogs(): HasMany

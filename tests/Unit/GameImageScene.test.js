@@ -31,6 +31,10 @@ function surface() {
     const draws = [];
     const borders = [];
     const context = {
+        save() {},
+        restore() {},
+        translate() {},
+        scale() {},
         clearRect() {},
         fillRect() {},
         fillText() {},
@@ -337,6 +341,25 @@ test('new captures render on a white background with chest 84 and its item detai
     assert.deepEqual(backgrounds[0].args, [0, 0, output.canvas.width, output.canvas.height]);
     assert.ok(output.draws.some(([image]) => image.file === 'box-84.png'));
     assert.ok(output.draws.some(([image]) => image.file === detailFile(46)));
+});
+
+test('large image branding is readable, reserves space above panels and matches preview with export', () => {
+    const blocks = [{ key: 'bag', x: 20, y: 48, width: 1200, height: 2500, panel: true, pieces: [{ file: 'bag.png', x: 0, y: 0 }] }];
+    const output = surface();
+    const context = output.canvas.getContext();
+    const titles = [];
+    context.fillText = (text, x, y, maxWidth) => titles.push({ text, x, y, maxWidth, font: context.font });
+    const size = { width: 6000, height: 3000 };
+    drawScene(output.canvas, { 'bag.png': {} }, blocks, { size, cname: 'Songoku' });
+    drawScene(output.canvas, { 'bag.png': {} }, blocks, { size: { width: 6240, height: 3240 }, backgroundSize: size, cname: 'Songoku' });
+    assert.deepEqual(titles[0], titles[1]);
+    assert.equal(titles[0].font, 'bold 92px sans-serif');
+    assert.equal(titles[0].text, 'NRO - Songoku - tienichnro.com');
+    assert.equal(titles[0].maxWidth, 5960);
+    const frame = fitComposition(blocks, size);
+    assert.ok(blocks[0].y * frame.scale + frame.y > titles[0].y);
+    assert.ok((blocks[0].y + blocks[0].height) * frame.scale + frame.y <= size.height);
+    assert.equal(blocks[0].y, 48);
 });
 
 test('image title includes the character name and tienichnro.com', () => {
