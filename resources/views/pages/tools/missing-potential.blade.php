@@ -12,7 +12,7 @@
                     class="client-card grid gap-5 p-4 sm:p-6">
                     @csrf
                     @if ($errors->any())
-                        <div role="alert" class="rounded-xl bg-rose-50 p-4 text-sm text-rose-700">
+                        <div role="alert" class="rounded-[10px] bg-rose-50 p-4 text-sm text-rose-700">
                             <ul class="list-inside list-disc">
                                 @foreach ($errors->all() as $error)
                                     <li>{{ $error }}</li>

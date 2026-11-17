@@ -2,8 +2,11 @@
 
 namespace App\Features\Captcha\Controllers;
 
+use App\Features\Captcha\Requests\CaptchaHistoryRequest;
 use App\Features\Captcha\Requests\PurchaseCaptchaRequest;
 use App\Features\Captcha\Requests\SolveCaptchaRequest;
+use App\Features\Captcha\Requests\TryCaptchaRequest;
+use App\Features\Captcha\Services\CaptchaDemoService;
 use App\Features\Captcha\Services\CaptchaSolverService;
 use App\Features\Captcha\Services\CaptchaWalletService;
 use App\Features\Client\Wallet\Services\WalletService;
@@ -20,7 +23,7 @@ use Illuminate\Support\Str;
 
 class CaptchaController extends Controller
 {
-    public function index(Request $request, CaptchaWalletService $wallets, WalletService $mainWallets, CaptchaSolverService $solver): View
+    public function index(Request $request, CaptchaWalletService $wallets, WalletService $mainWallets, CaptchaSolverService $solver, CaptchaDemoService $demo): View
     {
         $user = $request->user();
         if ($user instanceof User) {
@@ -29,10 +32,18 @@ class CaptchaController extends Controller
 
         return view('pages.tools.captcha', [
             'rates' => $wallets->rates(),
+            'turnstileSiteKey' => $demo->siteKey(),
             'wallet' => $user ? $wallets->wallet($user) : null,
             'mainBalance' => $user ? $mainWallets->wallet($user)->balance : 0,
             'apiKey' => $user ? CaptchaApiKey::query()->where('user_id', $user->id)->first() : null,
         ]);
+    }
+
+    public function demo(TryCaptchaRequest $request, CaptchaDemoService $demo): JsonResponse
+    {
+        $data = $demo->solve($request, $request->validated('image'), $request->validated('cf-turnstile-response'));
+
+        return response()->json($data, $data['status'] ? 200 : 502)->header('Cache-Control', 'no-store, private');
     }
 
     public function purchase(PurchaseCaptchaRequest $request, CaptchaWalletService $wallets): JsonResponse
@@ -95,13 +106,23 @@ class CaptchaController extends Controller
         return response()->json($data, $status);
     }
 
-    public function history(Request $request, CaptchaWalletService $wallets): JsonResponse
+    public function history(CaptchaHistoryRequest $request, CaptchaWalletService $wallets): JsonResponse
     {
+        $filters = $request->validated();
+
         return response()->json([
             'balance' => $wallets->wallet($request->user())->balance,
             'solves' => CaptchaSolve::query()->where('user_id', $request->user()->id)
-                ->select(['id', 'request_id', 'source', 'status', 'result', 'duration_ms', 'created_at'])->latest('id')->paginate(10, pageName: 'solves_page'),
-            'transactions' => CaptchaTransaction::query()->where('user_id', $request->user()->id)->latest('id')->paginate(10, pageName: 'transactions_page'),
+                ->when($filters['status'] ?? null, fn ($query, $status) => $query->where('status', $status))
+                ->when($filters['source'] ?? null, fn ($query, $source) => $query->where('source', $source))
+                ->when(isset($filters['solves_search']), fn ($query) => $query->where('result', 'like', '%'.$filters['solves_search'].'%'))
+                ->select(['id', 'request_id', 'source', 'status', 'result', 'duration_ms', 'created_at'])
+                ->latest('id')->paginate(20, pageName: 'solves_page')->withQueryString(),
+            'transactions' => CaptchaTransaction::query()->where('user_id', $request->user()->id)
+                ->when($filters['direction'] ?? null, fn ($query, $direction) => $query->where('direction', $direction))
+                ->when(isset($filters['transactions_search']), fn ($query) => $query->where('description', 'like', '%'.$filters['transactions_search'].'%'))
+                ->select(['id', 'direction', 'amount', 'description', 'balance_after', 'created_at'])
+                ->latest('id')->paginate(20, pageName: 'transactions_page')->withQueryString(),
         ]);
     }
 }

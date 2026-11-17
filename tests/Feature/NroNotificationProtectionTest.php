@@ -5,6 +5,7 @@ use App\Features\NroNotification\Services\NotificationStreamSlotsService;
 use App\Features\NroNotification\Services\NroNotificationFeedService;
 use App\Features\NroNotification\Services\NroNotificationService;
 use App\Models\User;
+use App\Support\EventStreamRuntime;
 use App\Support\SettingStore;
 use Database\Seeders\NroNotificationSeeder;
 use Illuminate\Http\Client\Factory;
@@ -147,6 +148,19 @@ test('stream slots cap concurrent sessions sharing the same IP', function (): vo
         foreach ($held as $locks) {
             $slots->release($locks);
         }
+    }
+});
+
+test('local notification streams close immediately and allow short stream reconnects', function (): void {
+    $this->app->instance(EventStreamRuntime::class, new EventStreamRuntime('cli-server'));
+    $this->actingAs(User::factory()->create(['role' => 'user']));
+    $started = microtime(true);
+    $content = $this->get('/api/nro/notifies/stream')->assertOk()->streamedContent();
+    expect($content)->toContain("retry: 3000\n\n", 'event: notifications')
+        ->and(substr_count($content, 'event: notifications'))->toBe(1)
+        ->and(microtime(true) - $started)->toBeLessThan(2);
+    for ($attempt = 0; $attempt < 11; $attempt++) {
+        $this->get('/api/nro/notifies/stream')->assertOk()->streamedContent();
     }
 });
 

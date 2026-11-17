@@ -49,7 +49,7 @@ function fundCaptchaUser(User $user, int $tokens = 10): void
 }
 
 test('captcha tool can be added manually and its public page includes curl documentation', function (): void {
-    $this->get('/giai-captcha-nro')->assertOk()->assertSee('Tài liệu cURL')->assertDontSee('request_id')->assertSee('Đăng nhập để demo');
+    $this->get('/giai-captcha-nro')->assertOk()->assertSee('Tài liệu cURL')->assertDontSee('request_id')->assertSee('Thử giải captcha')->assertSee('Đăng nhập để dùng API');
     $this->get('/')->assertOk()->assertSee('Giải captcha NRO');
     expect(collect(config('tools.items'))->contains('code', 'giai-captcha-nro'))->toBeFalse();
     $this->postJson('/giai-captcha-nro/purchase', [])->assertUnauthorized();
@@ -340,11 +340,48 @@ test('captcha history renders separate solve and wallet tabs with wallet initial
     @$document->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
     $xpath = new DOMXPath($document);
     expect($xpath->query('//*[@role="tablist"]/*[@role="tab"]')->length)->toBe(2)
+        ->and($xpath->query('//table/tbody[@data-captcha-history or @data-captcha-transactions]')->length)->toBe(2)
+        ->and($xpath->query('//form[@data-captcha-filters]')->length)->toBe(2)
         ->and($xpath->query('//*[@id="captcha-solves-tab"]')->item(0)->getAttribute('aria-selected'))->toBe('true')
         ->and($xpath->query('//*[@id="captcha-transactions-tab"]')->item(0)->getAttribute('aria-selected'))->toBe('false')
         ->and($xpath->query('//*[@id="captcha-solves-panel"]')->item(0)->hasAttribute('hidden'))->toBeFalse()
         ->and($xpath->query('//*[@id="captcha-transactions-panel"]')->item(0)->hasAttribute('hidden'))->toBeTrue();
 });
+
+test('captcha history paginates both tables at twenty rows and keeps filters private', function (): void {
+    $user = User::factory()->create();
+    $other = User::factory()->create();
+    CaptchaSolve::factory()->count(23)->create(['user_id' => $user->id, 'status' => 'success', 'source' => 'api', 'result' => '12345']);
+    CaptchaSolve::factory()->create(['user_id' => $user->id, 'status' => 'failed', 'source' => 'demo', 'result' => 'other']);
+    CaptchaSolve::factory()->create(['user_id' => $other->id, 'status' => 'success', 'source' => 'api', 'result' => '12345']);
+    CaptchaTransaction::factory()->count(22)->create(['user_id' => $user->id, 'direction' => 'credit', 'description' => 'Mua token']);
+    CaptchaTransaction::factory()->create(['user_id' => $user->id, 'direction' => 'debit', 'description' => 'Giải captcha']);
+    CaptchaTransaction::factory()->create(['user_id' => $other->id, 'direction' => 'credit', 'description' => 'Mua token']);
+    $filters = ['status' => 'success', 'source' => 'api', 'solves_search' => '234', 'direction' => 'credit', 'transactions_search' => 'Mua'];
+    $url = '/giai-captcha-nro/history?'.http_build_query($filters);
+    $first = $this->actingAs($user)->getJson($url)->assertOk()
+        ->assertJsonCount(20, 'solves.data')->assertJsonCount(20, 'transactions.data')
+        ->assertJsonPath('solves.total', 23)->assertJsonPath('transactions.total', 22)
+        ->assertJsonPath('solves.per_page', 20)->assertJsonPath('transactions.per_page', 20)
+        ->assertJsonMissingPath('solves.data.0.response');
+    expect($first->json('solves.next_page_url'))->toContain('status=success', 'solves_page=2');
+    $this->getJson($url.'&solves_page=2')->assertOk()->assertJsonCount(3, 'solves.data')->assertJsonCount(20, 'transactions.data');
+    $this->getJson($url.'&transactions_page=2')->assertOk()->assertJsonCount(20, 'solves.data')->assertJsonCount(2, 'transactions.data');
+    $this->getJson('/giai-captcha-nro/history?status=failed&source=demo&direction=debit')->assertOk()
+        ->assertJsonCount(1, 'solves.data')->assertJsonCount(1, 'transactions.data');
+    $this->getJson('/giai-captcha-nro/history?solves_search=missing&transactions_search=missing')->assertOk()
+        ->assertJsonCount(0, 'solves.data')->assertJsonCount(0, 'transactions.data');
+});
+
+test('captcha history validates filters and page numbers', function (string $field, mixed $value): void {
+    $this->actingAs(User::factory()->create())
+        ->getJson('/giai-captcha-nro/history?'.http_build_query([$field => $value]))
+        ->assertUnprocessable()->assertJsonValidationErrors($field);
+})->with([
+    ['status', 'unknown'], ['source', 'unknown'], ['direction', 'unknown'],
+    ['solves_page', 0], ['transactions_page', -1], ['solves_page', 'abc'],
+    ['solves_search', str_repeat('a', 101)], ['transactions_search', ['invalid']],
+]);
 
 test('disabled captcha tool and inactive users cannot spend tokens', function (): void {
     $user = User::factory()->create();

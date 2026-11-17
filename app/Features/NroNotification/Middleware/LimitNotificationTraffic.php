@@ -2,6 +2,7 @@
 
 namespace App\Features\NroNotification\Middleware;
 
+use App\Support\EventStreamRuntime;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\RateLimiter;
@@ -9,10 +10,12 @@ use Symfony\Component\HttpFoundation\Response;
 
 class LimitNotificationTraffic
 {
+    public function __construct(private readonly EventStreamRuntime $runtime) {}
+
     public function handle(Request $request, Closure $next, string $mode = 'read'): Response
     {
         $limits = match ($mode) {
-            'stream' => [10, 30], 'verify' => [5, 20], default => [60, 120]
+            'stream' => $this->runtime->durationSeconds() === 0.0 ? [60, 180] : [10, 30], 'verify' => [5, 20], default => [60, 120]
         };
         $identity = $request->user()?->getAuthIdentifier() ?? ($request->hasSession() ? $request->session()->getId() : $request->ip());
         $keys = ['nro:'.$mode.':identity:'.hash('sha256', (string) $identity), 'nro:'.$mode.':ip:'.hash('sha256', (string) $request->ip())];

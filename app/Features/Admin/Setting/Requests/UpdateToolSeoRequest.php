@@ -16,6 +16,7 @@ class UpdateToolSeoRequest extends UpsertSeoPostRequest
     {
         $rules = Arr::except(parent::rules(), ['type', 'service_id', 'seo_category_id', 'slug', 'canonical_url']);
         $rules['is_published'] = ['required', 'boolean'];
+        $rules['hide_when_authenticated'] = ['sometimes', 'boolean'];
         $rules['expected_version'] = ['required', 'integer', 'min:0'];
         $rules['title'] = [Rule::requiredIf($this->boolean('is_published')), 'nullable', 'string', 'max:255'];
         array_unshift($rules['content'], Rule::requiredIf($this->boolean('is_published')));
@@ -28,7 +29,7 @@ class UpdateToolSeoRequest extends UpsertSeoPostRequest
 
     public function attributes(): array
     {
-        return [...parent::attributes(), 'is_published' => 'trạng thái xuất bản', 'expected_version' => 'phiên bản bài SEO'];
+        return [...parent::attributes(), 'is_published' => 'trạng thái xuất bản', 'hide_when_authenticated' => 'ẩn bài SEO khi đã đăng nhập', 'expected_version' => 'phiên bản bài SEO'];
     }
 
     protected function prepareForValidation(): void

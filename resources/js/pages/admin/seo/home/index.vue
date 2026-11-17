@@ -11,6 +11,10 @@ import { nextTick, onMounted, reactive, ref } from 'vue';
 const loading = ref(true);
 const saving = ref(false);
 const contentEditor = ref<{ flush: () => unknown[] | string } | null>(null);
+const homeUrl = `${window.location.origin}/`;
+const inputClass =
+    'min-h-9 w-full rounded-[5px] border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100';
+const cardClass = 'min-w-0 rounded-[5px] border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900';
 const form = reactive<AdminHomeSeoSettings>({
     meta_title: '',
     meta_description: '',
@@ -56,12 +60,11 @@ const save = async (): Promise<void> => {
 
         form.content = await uploadEditorImages(form.content);
         const response = await adminSeoService.updateHomeSeo({
-            ...form,
             meta_title: form.meta_title.trim(),
             meta_description: form.meta_description.trim(),
             meta_keywords: form.meta_keywords.trim(),
-            h1: form.h1.trim(),
-            article_title: form.article_title.trim(),
+            content: form.content,
+            is_published: form.is_published,
             faqs: form.faqs
                 .map((item) => ({ question: item.question.trim(), answer: item.answer.trim() }))
                 .filter((item) => item.question || item.answer),
@@ -80,151 +83,141 @@ onMounted(loadSettings);
 </script>
 
 <template>
-    <div class="grid gap-5">
-        <Breadcrumb title="SEO trang chủ" description="Quản lý metadata, nội dung hướng dẫn và FAQ riêng cho trang chủ.">
+    <div class="grid gap-4 text-slate-900 dark:text-slate-100">
+        <Breadcrumb title="SEO trang chủ" description="Chỉnh tiêu đề, mô tả, bài viết và FAQ của trang chủ.">
             <template #actions>
                 <a
                     href="/"
                     target="_blank"
                     rel="noreferrer"
-                    class="inline-flex items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:border-violet-300 hover:text-violet-700"
-                >
-                    Xem trang chủ <ExternalLink class="h-4 w-4" />
-                </a>
+                    class="inline-flex items-center gap-2 rounded-[5px] border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:text-violet-700 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300"
+                    >Xem trang chủ <ExternalLink class="h-3.5 w-3.5"
+                /></a>
             </template>
         </Breadcrumb>
-
-        <div v-if="loading" class="rounded-[14px] border border-slate-200 bg-white p-8 text-center text-sm text-slate-500">Đang tải cấu hình...</div>
-
-        <form v-else class="grid items-start gap-5 xl:grid-cols-[minmax(0,1fr)_22rem]" @submit.prevent="save">
-            <section class="grid min-w-0 gap-5">
-                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="border-b border-slate-100 pb-4">
-                        <h2 class="text-lg font-semibold text-slate-950">Thông tin hiển thị và tìm kiếm</h2>
-                        <p class="mt-1 text-sm text-slate-500">Trang chủ dùng URL gốc nên không cần nhập slug.</p>
+        <p v-if="loading" role="status" :class="cardClass">Đang tải cấu hình…</p>
+        <form v-else class="grid min-w-0 items-start gap-4 lg:grid-cols-[minmax(0,2.2fr)_minmax(16rem,1fr)]" @submit.prevent="save">
+            <article :class="[cardClass, 'lg:col-span-2']" data-seo-editor-context>
+                <div class="grid items-center gap-2 sm:grid-cols-2">
+                    <div>
+                        <h2 class="text-sm font-semibold">Cấu hình SEO trang chủ</h2>
+                        <p class="mt-1 text-xs leading-5 text-slate-500">
+                            Nhập tiêu đề và mô tả một lần, dùng chung cho Google và phần đầu trang chủ.
+                        </p>
                     </div>
-                    <div class="mt-5 grid gap-4">
-                        <label class="grid gap-2">
-                            <span class="flex justify-between text-sm font-semibold text-slate-700"
-                                ><span>Meta title</span><small>{{ form.meta_title.length }}/255</small></span
-                            >
-                            <input
-                                v-model="form.meta_title"
-                                maxlength="255"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                                placeholder="Nạp game Teamobi nhanh chóng, giá tốt"
-                            />
-                        </label>
-                        <label class="grid gap-2">
-                            <span class="flex justify-between text-sm font-semibold text-slate-700"
-                                ><span>Meta keywords</span><small>{{ form.meta_keywords.length }}/1000</small></span
-                            >
-                            <textarea
-                                v-model="form.meta_keywords"
-                                rows="3"
-                                maxlength="1000"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                                placeholder="nạp carot, nạp game teamobi, nạp ngọc rồng online"
-                            />
-                            <small class="text-xs leading-5 text-slate-500">Nhập các từ khóa cách nhau bằng dấu phẩy.</small>
-                        </label>
-                        <label class="grid gap-2">
-                            <span class="flex justify-between text-sm font-semibold text-slate-700"
-                                ><span>Meta description</span><small>{{ form.meta_description.length }}/320</small></span
-                            >
-                            <textarea
+                    <div class="text-xs leading-5 text-slate-500">
+                        <a :href="homeUrl" target="_blank" rel="noreferrer" class="break-all font-medium text-violet-600">{{ homeUrl }}</a>
+                        <p>Trang chủ sử dụng URL gốc, không cần nhập slug.</p>
+                    </div>
+                </div>
+            </article>
+            <section class="grid min-w-0 gap-4" aria-label="Soạn bài SEO trang chủ">
+                <article :class="cardClass">
+                    <h2 class="mb-3 text-sm font-bold">Thông tin bài viết</h2>
+                    <div class="grid gap-3">
+                        <label class="grid gap-1.5 text-xs font-semibold"
+                            ><span class="flex justify-between gap-2"
+                                ><span>Tiêu đề trang chủ</span
+                                ><small class="font-normal text-slate-400">{{ form.meta_title.length }}/255</small></span
+                            ><input v-model="form.meta_title" :class="inputClass" maxlength="255" placeholder="Tiêu đề trên Google và đầu trang chủ"
+                        /></label>
+                        <label class="grid gap-1.5 text-xs font-semibold"
+                            ><span class="flex justify-between gap-2"
+                                ><span>Mô tả ngắn</span><small class="font-normal text-slate-400">{{ form.meta_description.length }}/320</small></span
+                            ><textarea
                                 v-model="form.meta_description"
+                                :class="inputClass"
                                 rows="3"
                                 maxlength="320"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                                placeholder="Mô tả ngắn hiển thị trên kết quả tìm kiếm"
-                            />
+                                placeholder="Mô tả trên Google và bên dưới tiêu đề đầu trang"
+                            ></textarea>
                         </label>
-                        <label class="grid gap-2">
-                            <span class="text-sm font-semibold text-slate-700">Tiêu đề H1 đầu trang</span>
-                            <input
-                                v-model="form.h1"
-                                maxlength="255"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                                placeholder="Nạp Carot Game Teamobi Nhanh Chóng, Giá Tốt"
-                            />
-                        </label>
+                        <label class="grid gap-1.5 text-xs font-semibold"
+                            >Từ khóa (không bắt buộc)<input
+                                v-model="form.meta_keywords"
+                                :class="inputClass"
+                                maxlength="1000"
+                                placeholder="Ngọc Rồng Online, tiện ích NRO…"
+                            /><small class="font-normal leading-5 text-slate-400">Phân cách các từ khóa bằng dấu phẩy.</small></label
+                        >
                     </div>
                 </article>
-
-                <article class="min-w-0 rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <label class="grid gap-2 border-b border-slate-100 pb-4">
-                        <span class="text-sm font-semibold text-slate-700">Tiêu đề bài SEO</span>
-                        <input
-                            v-model="form.article_title"
-                            maxlength="255"
-                            class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
-                            placeholder="Hướng dẫn nạp game tại NapCarot"
-                        />
-                    </label>
-                    <div class="min-w-0 pt-5">
-                        <p class="mb-3 text-sm text-slate-500">Soạn nội dung hiển thị trong khối hướng dẫn trên trang chủ. Không chèn thêm H1.</p>
-                        <Editor ref="contentEditor" v-model="form.content" />
-                    </div>
+                <article :class="cardClass">
+                    <h2 class="text-sm font-bold">Nội dung bài viết</h2>
+                    <p class="mb-3 mt-1 text-xs leading-5 text-slate-500">
+                        Bài viết nằm bên dưới các công cụ. Viết nội dung tại đây, dùng H2, H3 để chia mục; không cần thêm H1.
+                    </p>
+                    <Editor ref="contentEditor" v-model="form.content" :height="520" />
                 </article>
-
-                <article class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm">
-                    <div class="flex items-start justify-between gap-3 border-b border-slate-100 pb-4">
+                <article :class="cardClass">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
                         <div>
-                            <h2 class="text-lg font-semibold text-slate-950">FAQ trang chủ</h2>
-                            <p class="mt-1 text-sm text-slate-500">Các câu hỏi này đồng thời tạo schema FAQPage.</p>
+                            <h2 class="text-sm font-bold">Câu hỏi thường gặp (FAQ)</h2>
+                            <p class="mt-1 text-xs text-slate-500">Tối đa 20 câu hỏi; đồng thời tạo schema FAQPage.</p>
                         </div>
                         <button
                             type="button"
-                            class="inline-flex items-center gap-2 rounded-[8px] border border-violet-200 px-3 py-2 text-xs font-semibold text-violet-700 hover:bg-violet-50"
+                            :disabled="form.faqs.length >= 20"
+                            class="inline-flex min-h-9 items-center gap-1 rounded-[5px] border border-violet-200 px-3 text-xs font-semibold text-violet-700 hover:bg-violet-50 disabled:opacity-50"
                             @click="addFaq"
                         >
-                            <Plus class="h-4 w-4" /> Thêm FAQ
+                            <Plus class="h-3.5 w-3.5" />Thêm câu hỏi
                         </button>
                     </div>
-                    <div v-if="form.faqs.length" class="grid gap-4 pt-5">
-                        <div v-for="(faq, index) in form.faqs" :key="index" class="grid gap-3 rounded-[10px] border border-slate-200 p-4">
+                    <div v-if="form.faqs.length" class="mt-3 grid gap-3">
+                        <div
+                            v-for="(faq, index) in form.faqs"
+                            :key="index"
+                            class="grid gap-2 rounded-[5px] border border-slate-200 bg-slate-50/50 p-3 dark:border-slate-700 dark:bg-slate-800/50"
+                        >
                             <div class="flex items-center justify-between">
-                                <strong class="text-sm text-slate-700">FAQ {{ index + 1 }}</strong
-                                ><button type="button" class="text-rose-600" aria-label="Xóa FAQ" @click="removeFaq(index)">
-                                    <Trash2 class="h-4 w-4" />
+                                <strong class="text-xs text-slate-500">FAQ {{ index + 1 }}</strong
+                                ><button
+                                    type="button"
+                                    class="inline-flex min-h-8 items-center gap-1 text-xs text-rose-600"
+                                    aria-label="Xóa FAQ"
+                                    @click="removeFaq(index)"
+                                >
+                                    <Trash2 class="h-3.5 w-3.5" />Xóa
                                 </button>
                             </div>
-                            <input
-                                v-model="faq.question"
-                                maxlength="255"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                placeholder="Câu hỏi"
-                            />
-                            <textarea
-                                v-model="faq.answer"
-                                rows="3"
-                                maxlength="2000"
-                                class="rounded-[10px] border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-violet-400"
-                                placeholder="Câu trả lời"
-                            />
+                            <label class="grid gap-1.5 text-xs">Câu hỏi<input v-model="faq.question" :class="inputClass" maxlength="255" /></label>
+                            <label class="grid gap-1.5 text-xs"
+                                >Câu trả lời<textarea v-model="faq.answer" :class="inputClass" rows="2" maxlength="2000"></textarea>
+                            </label>
                         </div>
                     </div>
-                    <p v-else class="pt-5 text-sm text-slate-500">Chưa có FAQ tùy chỉnh.</p>
+                    <p v-else class="mt-3 text-xs text-slate-400">Chưa có FAQ tùy chỉnh.</p>
                 </article>
             </section>
-
-            <aside class="rounded-[14px] border border-slate-200 bg-white p-5 shadow-sm xl:sticky xl:top-24">
-                <h2 class="text-base font-semibold text-slate-950">Xuất bản</h2>
-                <label class="mt-4 flex items-center justify-between gap-4 rounded-[10px] border border-slate-200 p-3">
-                    <span
-                        ><strong class="block text-sm text-slate-800">Dùng SEO tùy chỉnh</strong
-                        ><small class="text-slate-500">Tắt để dùng nội dung mặc định.</small></span
+            <aside class="grid min-w-0 gap-4" aria-label="Xem trước và xuất bản SEO">
+                <article :class="cardClass">
+                    <h2 class="mb-3 text-sm font-bold">Hiển thị trên Google</h2>
+                    <div class="mb-3 border-b border-slate-100 pb-3 dark:border-slate-700" aria-label="Xem trước kết quả Google">
+                        <p class="break-all text-xs text-slate-400">{{ homeUrl }}</p>
+                        <p class="mt-1 break-words text-base leading-6 text-blue-700 dark:text-blue-400">
+                            {{ form.meta_title || 'Tiêu đề trang chủ' }}
+                        </p>
+                        <p class="mt-1 break-words text-xs leading-5 text-slate-500">
+                            {{ form.meta_description || 'Mô tả trang chủ trên kết quả tìm kiếm.' }}
+                        </p>
+                    </div>
+                    <label class="grid gap-1.5 text-xs font-semibold">Canonical URL<input :value="homeUrl" readonly :class="inputClass" /></label>
+                    <label class="my-3 flex items-start gap-2"
+                        ><input v-model="form.is_published" type="checkbox" class="mt-0.5 rounded border-slate-300 text-violet-600" /><span
+                            class="text-xs leading-5"
+                            ><strong class="block font-semibold">Hiển thị bài viết và FAQ</strong
+                            ><span class="text-slate-500">Tắt để ẩn bài viết và FAQ. Tiêu đề, mô tả vẫn được áp dụng.</span></span
+                        ></label
                     >
-                    <input v-model="form.is_published" type="checkbox" class="h-5 w-5 rounded border-slate-300 text-violet-600" />
-                </label>
-                <button
-                    type="submit"
-                    :disabled="saving"
-                    class="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-violet-600 px-4 text-sm font-bold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                    <Save class="h-4 w-4" /> {{ saving ? 'Đang lưu...' : 'Lưu SEO trang chủ' }}
-                </button>
+                    <button
+                        type="submit"
+                        :disabled="saving"
+                        class="inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-[5px] bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700 disabled:opacity-50"
+                    >
+                        <Save class="h-4 w-4" />{{ saving ? 'Đang lưu…' : 'Lưu SEO trang chủ' }}
+                    </button>
+                </article>
             </aside>
         </form>
     </div>

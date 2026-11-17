@@ -26,7 +26,7 @@
             </div>
             <button
                 type="button"
-                class="grid h-11 w-11 shrink-0 place-items-center rounded-[5px] border border-slate-300 bg-white text-xl text-slate-600 transition hover:border-rose-300 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
+                class="grid h-11 w-11 shrink-0 place-items-center rounded-[10px] border border-slate-300 bg-white text-xl text-slate-600 transition hover:border-rose-300 hover:text-rose-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600"
                 data-game-service-picker-close
                 aria-label="Đóng danh sách game"
             >
@@ -42,7 +42,7 @@
                         class="group flex min-w-0 flex-col items-center gap-2 rounded-[10px] text-center transition hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-4"
                         data-game-service-picker-link
                     >
-                        <span class="grid aspect-square w-full max-w-[7rem] place-items-center overflow-hidden rounded-[12px] border border-slate-200 bg-slate-100 text-xl font-extrabold text-slate-600 shadow-sm transition group-hover:shadow-md">
+                        <span class="grid aspect-square w-full max-w-[7rem] place-items-center overflow-hidden rounded-[10px] border border-slate-200 bg-slate-100 text-xl font-extrabold text-slate-600 shadow-sm transition group-hover:shadow-md">
                             @if (filled($game->image))
                                 <img class="h-full w-full object-cover" src="{{ $game->image }}" alt="Icon {{ $game->name }}" loading="lazy" width="112" height="112" decoding="async">
                             @else
@@ -53,7 +53,7 @@
                         <span class="text-[11px] font-semibold text-slate-500">{{ $game->active_game_services_count }} dịch vụ</span>
                     </a>
                 @empty
-                    <div class="col-span-full rounded-[8px] border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
+                    <div class="col-span-full rounded-[10px] border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center">
                         <i class="bx bx-game mb-2 text-3xl text-slate-400" aria-hidden="true"></i>
                         <p class="text-sm font-semibold text-slate-600">Chưa có game đang mở dịch vụ.</p>
                     </div>

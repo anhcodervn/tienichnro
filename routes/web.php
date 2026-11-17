@@ -112,7 +112,10 @@ Route::get('/admin/{any?}', function (Request $request, SettingStore $settingSto
 require base_path('app/Features/Client/Profile/web.php');
 require base_path('app/Features/Client/Potential/routes.php');
 require base_path('app/Features/Client/EquipmentUpgrade/routes.php');
+require base_path('app/Features/Client/GameImage/routes.php');
 require base_path('app/Features/Captcha/routes.php');
+require base_path('app/Features/Client/GamePassword/routes.php');
+require base_path('app/Features/Client/GameVerification/routes.php');
 
 Route::get('/{categorySlug}/{postSlug}', [PublicSeoPageController::class, 'show'])
     ->where([
@@ -120,3 +123,11 @@ Route::get('/{categorySlug}/{postSlug}', [PublicSeoPageController::class, 'show'
         'postSlug' => '[a-z0-9]+(?:-[a-z0-9]+)*',
     ])
     ->name('seo.show');
+
+if (file_exists(base_path('app/Features/Client/GameVerification/routes.php'))) {
+
+}
+
+if (file_exists(base_path('app/Features/Admin/GameVerification/routes.php'))) {
+
+}

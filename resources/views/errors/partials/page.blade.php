@@ -27,25 +27,25 @@
 <body class="min-h-screen bg-slate-50 text-slate-900 antialiased">
     <main class="flex min-h-screen items-center py-8 sm:py-12" data-error-page="{{ $statusCode }}">
         <div class="client-container w-full">
-            <section class="mx-auto grid max-w-5xl overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-xl shadow-slate-200/60 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <section class="mx-auto grid max-w-5xl overflow-hidden rounded-[10px] border border-slate-200 bg-white shadow-xl shadow-slate-200/60 lg:grid-cols-[minmax(0,1fr)_20rem]">
                 <div class="min-w-0 p-6 sm:p-10 lg:p-12">
-                    <a class="inline-flex max-w-full items-center rounded-[5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ url('/') }}" aria-label="Về trang chủ {{ $siteName }}">
+                    <a class="inline-flex max-w-full items-center rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" href="{{ url('/') }}" aria-label="Về trang chủ {{ $siteName }}">
                         @if ($logo !== '')
                             <img src="{{ $logo }}" alt="{{ $siteName }}" class="h-auto max-h-14 w-auto max-w-48 object-contain object-left">
                         @else
-                            <span class="grid h-11 w-11 place-items-center rounded-[5px] bg-emerald-600 font-extrabold text-white">C</span>
+                            <span class="grid h-11 w-11 place-items-center rounded-[10px] bg-emerald-600 font-extrabold text-white">C</span>
                             <span class="ml-3 truncate font-extrabold text-slate-950">{{ $siteName }}</span>
                         @endif
                     </a>
 
                     <div class="mt-10 flex flex-wrap items-center gap-3">
-                        <span class="rounded-[5px] bg-emerald-50 px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700">{{ $eyebrow }}</span>
+                        <span class="rounded-[10px] bg-emerald-50 px-3 py-1.5 text-xs font-extrabold uppercase tracking-[0.16em] text-emerald-700">{{ $eyebrow }}</span>
                         <span class="text-sm font-bold text-slate-400">Mã lỗi {{ $statusCode }}</span>
                     </div>
                     <h1 class="mt-4 max-w-3xl break-words text-3xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-4xl">{{ $headline }}</h1>
                     <p class="mt-4 max-w-3xl text-base leading-7 text-slate-600">{{ $description }}</p>
 
-                    <div class="mt-7 rounded-[5px] border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                    <div class="mt-7 rounded-[10px] border border-slate-200 bg-slate-50 p-4 sm:p-5">
                         <h2 class="flex items-center gap-2 font-extrabold text-slate-900"><i class="bx bx-info-circle text-xl text-emerald-600" aria-hidden="true"></i>Bạn có thể làm gì?</h2>
                         <ul class="mt-3 grid gap-2.5 text-sm leading-6 text-slate-600">
                             @foreach ($hints as $hint)

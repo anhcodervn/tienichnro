@@ -33,7 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToGroup('web', EnsureSiteIsActive::class);
         $middleware->statefulApi();
         $middleware->trustProxies(at: '*');
-        $middleware->trimStrings(except: ['content.*', '*_content.*', 'custom_css', 'custom_js', 'custom_head_tags', 'custom_script']);
+        $middleware->trimStrings(except: ['old_password', 'new_password', 'accounts_text', 'entries.*.old_password', 'entries.*.new_password', 'content.*', '*_content.*', 'custom_css', 'custom_js', 'custom_head_tags', 'custom_script']);
         $middleware->convertEmptyStringsToNull(except: [
             fn (Request $request): bool => $request->is('api/admin-api/settings/custom-code'),
         ]);
@@ -45,8 +45,9 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
+        $exceptions->dontFlash(['old_password', 'new_password', 'accounts_text', 'entries', 'captcha_api_secret', 'captcha_api_key', 'captcha_proxy']);
         $exceptions->render(function (Throwable $throwable, Request $request) {
-            if (! $request->is('api/v1/giai-captcha-nro/solve', 'giai-captcha-nro/solve')) {
+            if (! $request->is('api/v1/giai-captcha-nro/solve', 'giai-captcha-nro/solve', 'giai-captcha-nro/try')) {
                 return null;
             }
 

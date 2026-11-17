@@ -79,8 +79,10 @@ test('snapshot mapping preserves null false arrays and clears fields missing in 
 test('editor layout orders SEO fields and puts Google preview and save above the cover', async () => {
     const html = await environment().render();
     assert.ok(html.indexOf('Bản SEO cũ') < html.indexOf('Soạn bài SEO'));
-    assert.ok(html.includes('xl:grid-cols-[minmax(0,1fr)_360px]'));
-    const labels = ['Thông tin bài viết', 'SEO title', 'SEO description', 'Keyword', 'Đường dẫn bài viết (slug)', 'Danh mục', 'Ngôn ngữ bài viết', 'Nội dung bài viết'];
+    assert.ok(html.includes('lg:grid-cols-[minmax(0,2.2fr)_minmax(16rem,1fr)]'));
+    const context = html.slice(html.indexOf('data-seo-editor-context'), html.indexOf('Thông tin bài viết'));
+    for (const field of ['Danh mục', 'Ngôn ngữ bài viết', 'Đường dẫn bài viết (slug)']) assert.ok(context.includes(field));
+    const labels = ['Thông tin bài viết', 'SEO title', 'SEO description', 'Keyword', 'Nội dung bài viết'];
     let last = html.indexOf('Thông tin bài viết');
     for (const label of labels.slice(1)) { const next = html.indexOf(label, last); assert.ok(next > last, label); last = next; }
     const google = html.indexOf('Hiển thị trên Google');

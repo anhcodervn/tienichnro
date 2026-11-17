@@ -253,8 +253,34 @@ html[data-client-theme].dark .to-rose-50 {
         @apply mx-auto box-border w-full min-w-0 max-w-6xl px-3 sm:px-6 lg:px-8;
     }
 
+    @supports (zoom: 0.85) {
+        #main-content {
+            --client-main-scale: 0.85;
+            zoom: var(--client-main-scale);
+            width: 100%;
+            max-width: none;
+        }
+
+        #main-content .client-container {
+            max-width: calc(72rem / var(--client-main-scale));
+            padding-inline: calc(0.75rem / var(--client-main-scale));
+        }
+
+        @media (min-width: 640px) {
+            #main-content .client-container {
+                padding-inline: calc(1.5rem / var(--client-main-scale));
+            }
+        }
+
+        @media (min-width: 1024px) {
+            #main-content .client-container {
+                padding-inline: calc(2rem / var(--client-main-scale));
+            }
+        }
+    }
+
     .client-card {
-        @apply min-w-0 max-w-full rounded-[5px] border border-slate-200 bg-white shadow-sm;
+        @apply min-w-0 max-w-full rounded-[10px] border border-slate-200 bg-white shadow-sm;
     }
 
     .client-label {
@@ -262,19 +288,19 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .client-input {
-        @apply mt-2 min-h-12 w-full min-w-0 max-w-full rounded-[5px] border border-slate-300 bg-white px-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100;
+        @apply mt-2 min-h-12 w-full min-w-0 max-w-full rounded-[10px] border border-slate-300 bg-white px-4 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100;
     }
 
     .client-button {
-        @apply inline-flex min-h-12 items-center justify-center rounded-[5px] bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
+        @apply inline-flex min-h-12 items-center justify-center rounded-[10px] bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50;
     }
 
     .client-button-secondary {
-        @apply inline-flex min-h-11 items-center justify-center rounded-[5px] border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2;
+        @apply inline-flex min-h-11 items-center justify-center rounded-[10px] border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-emerald-300 hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2;
     }
 
     .status-pill {
-        @apply inline-flex rounded-[5px] bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700;
+        @apply inline-flex rounded-[10px] bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700;
     }
 
     .article-content {
@@ -311,6 +337,28 @@ html[data-client-theme].dark .to-rose-50 {
     .article-content h5,
     .article-content h6 {
         @apply mt-7 text-lg sm:text-xl;
+    }
+
+    .article-content[data-seo-content] {
+        @apply text-sm leading-7 sm:text-[15px];
+    }
+
+    .article-content[data-seo-content] h1 {
+        @apply text-[26px] sm:text-[32px];
+    }
+
+    .article-content[data-seo-content] h2 {
+        @apply text-[22px] sm:text-[26px];
+    }
+
+    .article-content[data-seo-content] h3 {
+        @apply text-lg sm:text-[22px];
+    }
+
+    .article-content[data-seo-content] h4,
+    .article-content[data-seo-content] h5,
+    .article-content[data-seo-content] h6 {
+        @apply text-base sm:text-lg;
     }
 
     .article-content strong {
@@ -416,7 +464,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .article-content code {
-        @apply rounded bg-sky-50 px-1.5 py-0.5 font-mono text-[0.95em] text-sky-800;
+        @apply rounded-[10px] bg-sky-50 px-1.5 py-0.5 font-mono text-[0.95em] text-sky-800;
     }
 
     .article-content pre {
@@ -471,7 +519,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-notice-banner {
-        @apply mb-4 w-full min-w-0 overflow-hidden rounded-[5px] border border-cyan-200 bg-cyan-50 text-sm text-cyan-950;
+        @apply mb-4 w-full min-w-0 overflow-hidden rounded-[10px] border border-cyan-200 bg-cyan-50 text-sm text-cyan-950;
         font-family: 'Be Vietnam Pro', ui-sans-serif, system-ui, sans-serif;
     }
 
@@ -525,7 +573,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-checkout-card {
-        @apply w-full min-w-0 overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-sm;
+        @apply w-full min-w-0 overflow-hidden rounded-[10px] border border-slate-200 bg-white shadow-sm;
     }
 
     .home-checkout-header {
@@ -546,7 +594,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-checkout-secure {
-        @apply w-fit rounded-[5px] bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700;
+        @apply w-fit rounded-[10px] bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-700;
     }
 
     .home-checkout-layout {
@@ -572,7 +620,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-checkout-card .client-input {
-        @apply mt-0 min-h-11 rounded-[5px] border-slate-300 px-3 py-2 text-sm focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100;
+        @apply mt-0 min-h-11 rounded-[10px] border-slate-300 px-3 py-2 text-sm focus:border-cyan-600 focus:ring-2 focus:ring-cyan-100;
     }
 
     .home-field-help {
@@ -592,7 +640,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-package-option {
-        @apply relative grid min-h-[6.5rem] min-w-0 content-center gap-1.5 rounded-[5px] border border-slate-200 bg-white px-2.5 py-2.5 text-left transition hover:border-cyan-400 hover:bg-cyan-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2;
+        @apply relative grid min-h-[6.5rem] min-w-0 content-center gap-1.5 rounded-[10px] border border-slate-200 bg-white px-2.5 py-2.5 text-left transition hover:border-cyan-400 hover:bg-cyan-50/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2;
     }
 
     .home-package-name {
@@ -600,7 +648,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-package-discount {
-        @apply absolute right-2 top-2 rounded-[5px] bg-rose-50 px-1.5 py-0.5 text-[10px] font-extrabold leading-4 text-rose-700;
+        @apply absolute right-2 top-2 rounded-[10px] bg-rose-50 px-1.5 py-0.5 text-[10px] font-extrabold leading-4 text-rose-700;
     }
 
     .home-package-original-price,
@@ -634,7 +682,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-package-empty {
-        @apply col-span-full rounded-[5px] border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500;
+        @apply col-span-full rounded-[10px] border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-slate-500;
     }
 
     [data-purchase-panel] {
@@ -642,11 +690,11 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-purchase-tabs {
-        @apply grid grid-cols-2 overflow-hidden rounded-[5px] border border-slate-300 bg-slate-100 p-1;
+        @apply grid grid-cols-2 overflow-hidden rounded-[10px] border border-slate-300 bg-slate-100 p-1;
     }
 
     .home-purchase-tabs [role='tab'] {
-        @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-[5px] px-3 py-2 text-sm font-bold text-slate-600 transition hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-1;
+        @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-[10px] px-3 py-2 text-sm font-bold text-slate-600 transition hover:text-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-1;
     }
 
     .home-purchase-tabs [role='tab'][aria-selected='true'] {
@@ -662,7 +710,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-quantity-control {
-        @apply grid min-h-11 w-full grid-cols-[2.75rem_minmax(3rem,1fr)_2.75rem] overflow-hidden rounded-[5px] border border-slate-300 bg-white;
+        @apply grid min-h-11 w-full grid-cols-[2.75rem_minmax(3rem,1fr)_2.75rem] overflow-hidden rounded-[10px] border border-slate-300 bg-white;
     }
 
     .home-quantity-control button {
@@ -686,7 +734,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-bulk-schema {
-        @apply rounded-[5px] border border-cyan-200 bg-cyan-50 px-3 py-2;
+        @apply rounded-[10px] border border-cyan-200 bg-cyan-50 px-3 py-2;
     }
 
     .home-checkout-card .home-bulk-textarea {
@@ -742,7 +790,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-summary-rewards {
-        @apply mt-5 grid gap-1 rounded-[5px] border border-cyan-200 bg-white p-3;
+        @apply mt-5 grid gap-1 rounded-[10px] border border-cyan-200 bg-white p-3;
     }
 
     .home-summary-rewards p {
@@ -762,7 +810,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-payment-option {
-        @apply flex min-h-[4.5rem] min-w-0 items-center justify-center gap-2 rounded-[5px] border border-slate-300 bg-white px-3 py-2 text-left text-xs text-slate-600 transition hover:border-cyan-400 hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70;
+        @apply flex min-h-[4.5rem] min-w-0 items-center justify-center gap-2 rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-left text-xs text-slate-600 transition hover:border-cyan-400 hover:bg-cyan-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 disabled:opacity-70;
     }
 
     .home-payment-option[aria-checked='true'] {
@@ -770,7 +818,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-checkout-submit {
-        @apply mt-4 inline-flex min-h-[3.25rem] w-full items-center justify-center gap-2 rounded-[5px] bg-cyan-700 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600;
+        @apply mt-4 inline-flex min-h-[3.25rem] w-full items-center justify-center gap-2 rounded-[10px] bg-cyan-700 px-5 py-3 text-sm font-extrabold text-white transition hover:bg-cyan-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-700 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600;
     }
 
     .home-checkout-note {
@@ -778,7 +826,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-trust-strip {
-        @apply mt-4 grid grid-cols-3 rounded-[5px] border border-slate-200 bg-white px-2 py-3.5 text-center text-xs text-slate-600 sm:px-4 sm:text-sm;
+        @apply mt-4 grid grid-cols-3 rounded-[10px] border border-slate-200 bg-white px-2 py-3.5 text-center text-xs text-slate-600 sm:px-4 sm:text-sm;
     }
 
     .home-trust-strip > span {
@@ -801,7 +849,7 @@ html[data-client-theme].dark .to-rose-50 {
     .home-pricing-card,
     .home-reward-card,
     .home-seo-article {
-        @apply w-full min-w-0 max-w-full overflow-hidden rounded-[5px] border border-slate-300 bg-white;
+        @apply w-full min-w-0 max-w-full overflow-hidden rounded-[10px] border border-slate-300 bg-white;
     }
 
     .home-reference-header {
@@ -834,7 +882,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-game-tab {
-        @apply min-h-11 shrink-0 rounded-[5px] border border-slate-300 bg-slate-100 px-5 py-2 text-sm font-bold text-slate-700 transition-colors duration-200 hover:border-cyan-600 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2;
+        @apply min-h-11 shrink-0 rounded-[10px] border border-slate-300 bg-slate-100 px-5 py-2 text-sm font-bold text-slate-700 transition-colors duration-200 hover:border-cyan-600 hover:text-cyan-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-cyan-600 focus-visible:ring-offset-2;
     }
 
     .home-game-tab[aria-selected='true'] {
@@ -927,7 +975,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-seo-step {
-        @apply flex gap-4 rounded-[5px] border border-slate-200 p-4;
+        @apply flex gap-4 rounded-[10px] border border-slate-200 p-4;
     }
 
     .home-seo-step > span {
@@ -943,7 +991,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .home-game-link {
-        @apply flex items-center gap-3 rounded-[5px] border border-slate-200 p-3 transition hover:border-emerald-300 hover:bg-emerald-50/50;
+        @apply flex items-center gap-3 rounded-[10px] border border-slate-200 p-3 transition hover:border-emerald-300 hover:bg-emerald-50/50;
     }
 
     [data-menu-icon-open],
@@ -988,7 +1036,7 @@ html[data-client-theme].dark .to-rose-50 {
     }
 
     .client-toast {
-        border-radius: 5px !important;
+        border-radius: 10px !important;
         border: 1px solid rgb(203 213 225) !important;
         padding: 0.75rem 1rem !important;
         font-family: inherit !important;
@@ -1080,22 +1128,6 @@ html[data-client-theme].dark .to-rose-50 {
     }
 }
 
-.client-page-scale {
-    width: 111.111111111%;
-    zoom: 0.9;
-}
-
-@media (min-width: 1024px) {
-    .client-page-scale {
-        width: 117.647058824%;
-        zoom: 0.85;
-    }
-
-    .client-page-scale .client-container {
-        max-width: 84.705882353rem;
-    }
-}
-
 @media (min-width: 992px) {
     .home-checkout-layout {
         grid-template-columns: minmax(0, 65fr) minmax(20rem, 35fr);
@@ -1105,6 +1137,16 @@ html[data-client-theme].dark .to-rose-50 {
         border-left-width: 1px;
         border-top-width: 0;
     }
+}
+
+.seo-article--collapsed [data-seo-viewport] {
+    max-height: 16rem;
+    overflow: hidden;
+}
+
+[data-seo-article],
+[data-seo-content] :is(h2, h3, h4) {
+    scroll-margin-top: 7rem;
 }
 
 @media (prefers-reduced-motion: reduce) {

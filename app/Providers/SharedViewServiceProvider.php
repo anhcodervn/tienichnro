@@ -23,6 +23,10 @@ class SharedViewServiceProvider extends ServiceProvider
      */
     public function boot(SettingStore $settingStore, CustomHeadTags $customHeadTags, ToolAvailabilityService $tools, ServiceCatalogService $services): void
     {
+        ViewFacade::composer('pages.tools.game-image-edit', function (View $view) use ($settingStore): void {
+            $branding = $settingStore->getMany(['dark_logo' => '', 'light_logo' => '']);
+            $view->with('studioLogo', trim((string) $branding['dark_logo']) ?: trim((string) $branding['light_logo']));
+        });
         ViewFacade::composer('client.layouts.app', function (View $view) use ($customHeadTags, $settingStore, $tools, $services): void {
             $view->with('toolSeo', app(ToolSeoService::class)->publicPage(request()));
             $view->with('clientTools', $tools->all());

@@ -60,7 +60,7 @@
         ],
         "dev": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#86efac,#fdba74\" \"php artisan serve\" \"php artisan queue:listen --queue=mails,user-logs,game-data,default --tries=3\" \"php artisan reverb:start --debug\" \"npm run dev\" --names='server,queue,reverb,vite'"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#facc15,#86efac,#fdba74,#67e8f9\" \"php artisan serve\" \"php artisan queue:listen --queue=mails,user-logs,game-data,default --tries=3\" \"php artisan queue:listen game_password --queue=game-password --tries=1 --timeout=300\" \"php artisan queue:listen game_verification --queue=game-verification --tries=1 --timeout=300\" \"php artisan reverb:start --debug\" \"npm run dev\" --names='server,queue,passwords,verification,reverb,vite'"
         ],
         "setup:site": [
             "@php artisan site:setup --no-interaction"

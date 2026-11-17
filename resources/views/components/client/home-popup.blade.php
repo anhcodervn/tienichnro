@@ -31,7 +31,7 @@
 
     <section
         @class([
-            'relative flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-[12px] border border-slate-200 bg-white shadow-2xl outline-none sm:max-h-[calc(100dvh-3rem)]',
+            'relative flex max-h-[calc(100dvh-1.5rem)] w-full flex-col overflow-hidden rounded-[10px] border border-slate-200 bg-white shadow-2xl outline-none sm:max-h-[calc(100dvh-3rem)]',
             'max-w-2xl' => $isModal,
             'pointer-events-auto max-w-md' => ! $isModal,
         ])

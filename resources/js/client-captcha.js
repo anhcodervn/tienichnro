@@ -109,35 +109,32 @@ export function initializeCaptchaTool() {
         });
     }
     const solveForm = root.querySelector('[data-captcha-solve]');
-    let previewUrl;
     if (solveForm) {
-        solveForm.elements.image.addEventListener('change', () => {
-            if (previewUrl) URL.revokeObjectURL(previewUrl);
-            const preview = root.querySelector('[data-captcha-preview]');
-            const file = solveForm.elements.image.files[0];
-            preview.hidden = !file;
-            if (file) {
-                previewUrl = URL.createObjectURL(file);
-                preview.src = previewUrl;
-            }
-        });
+        initializeCaptchaUpload(solveForm, showMessage);
         solveForm.addEventListener('submit', (event) => {
             event.preventDefault();
             void busy(solveForm, async () => {
                 const file = solveForm.elements.image.files[0];
                 if (!file || file.size > 2 * 1024 * 1024) throw new Error('Chọn ảnh tối đa 2MB.');
+                const token = new FormData(solveForm).get('cf-turnstile-response');
+                if (!token) throw new Error('Vui lòng hoàn tất xác minh Cloudflare trước khi giải miễn phí.');
+                root.querySelector('[data-captcha-result]').textContent = '';
                 const image = await new Promise((resolve, reject) => {
                     const reader = new FileReader();
                     reader.onload = () => resolve(reader.result);
                     reader.onerror = () => reject(new Error('Không đọc được ảnh.'));
                     reader.readAsDataURL(file);
                 });
-                const data = await request(root.dataset.solveUrl, 'POST', { image });
-                root.querySelector('[data-captcha-result]').textContent = data.status
-                    ? 'Kết quả: ' + data.code + ' · ' + data.time + ' giây'
-                    : data.message || 'Chưa có kết quả giải captcha.';
-                showMessage(data.status ? 'Đã trừ 1 token. Mỗi lần bấm giải sẽ tạo lượt mới.' : 'Chưa trừ token.');
-                await loadHistory();
+                try {
+                    const data = await request(root.dataset.solveUrl, 'POST', { image, 'cf-turnstile-response': token });
+                    root.querySelector('[data-captcha-result]').textContent = data.status
+                        ? 'Kết quả: ' + data.code + ' · ' + data.time + ' giây'
+                        : data.message || 'Chưa có kết quả giải captcha.';
+                    showMessage('Lượt thử miễn phí, không trừ token_captcha.');
+                    await loadHistory();
+                } finally {
+                    window.turnstile?.reset();
+                }
             });
         });
     }
@@ -163,57 +160,194 @@ export function initializeCaptchaTool() {
             showMessage(error.message);
         }
     });
-    let solvesPage = 1;
-    let transactionsPage = 1;
-    const renderRows = (selector, rows, format) => {
-        const container = root.querySelector(selector);
-        container.replaceChildren();
-        if (!rows.length) container.textContent = 'Chưa có dữ liệu.';
-        rows.forEach((row) => {
-            const item = document.createElement('p');
-            item.className = 'rounded-lg border border-slate-200 p-3';
-            item.textContent = format(row);
-            container.appendChild(item);
+    const loadHistory = initializeCaptchaHistory(root, request, balance, showMessage);
+    void loadHistory();
+}
+
+export function initializeCaptchaUpload(form, showMessage) {
+    const input = form.elements.image;
+    const dropzone = form.querySelector('[data-captcha-dropzone]');
+    const preview = form.querySelector('[data-captcha-preview]');
+    const name = form.querySelector('[data-captcha-file-name]');
+    let previewUrl;
+    let dragDepth = 0;
+    const highlight = (active) => {
+        dropzone.classList.toggle('!border-emerald-500', active);
+        dropzone.classList.toggle('!bg-emerald-50', active);
+    };
+    input.addEventListener('change', () => {
+        if (previewUrl) URL.revokeObjectURL(previewUrl);
+        previewUrl = null;
+        preview.hidden = true;
+        preview.removeAttribute('src');
+        name.textContent = 'Kéo thả ảnh vào đây hoặc bấm để chọn ảnh';
+        const file = input.files[0];
+        if (!file) return;
+        if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type) || file.size > 2 * 1024 * 1024) {
+            input.value = '';
+            showMessage('Chọn ảnh PNG, JPEG hoặc WebP, tối đa 2 MB.');
+            return;
+        }
+        name.textContent = file.name;
+        previewUrl = URL.createObjectURL(file);
+        preview.src = previewUrl;
+        preview.hidden = false;
+        showMessage('');
+    });
+    for (const eventName of ['dragenter', 'dragover', 'dragleave', 'drop']) {
+        dropzone.addEventListener(eventName, (event) => {
+            event.preventDefault();
+            if (eventName === 'dragenter') dragDepth++;
+            if (eventName === 'dragleave') dragDepth = Math.max(0, dragDepth - 1);
+            if (eventName === 'drop') {
+                dragDepth = 0;
+                if (event.dataTransfer.files.length !== 1) {
+                    showMessage('Vui lòng chọn một ảnh mỗi lượt.');
+                } else {
+                    input.files = event.dataTransfer.files;
+                    input.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+            }
+            highlight(dragDepth > 0 || eventName === 'dragover');
         });
+    }
+}
+
+export function initializeCaptchaHistory(root, request, balance, showMessage) {
+    const pages = { solves: 1, transactions: 1 };
+    const filters = { solves: {}, transactions: {} };
+    const pagination = {};
+    let revision = 0;
+    const formatNumber = (value) => Number(value).toLocaleString('vi-VN');
+    const date = (value) => new Date(value).toLocaleString('vi-VN');
+    const statusLabels = { success: 'Thành công', failed: 'Thất bại', processing: 'Đang xử lý' };
+    const statusClasses = {
+        success: 'bg-emerald-50 text-emerald-700 ring-emerald-600/10',
+        failed: 'bg-rose-50 text-rose-700 ring-rose-600/10',
+        processing: 'bg-amber-50 text-amber-700 ring-amber-600/10',
+    };
+    const cell = (row, value, classes = '') => {
+        const td = document.createElement('td');
+        td.className = 'px-3 py-3 text-slate-600 ' + classes;
+        td.textContent = value;
+        row.appendChild(td);
+        return td;
+    };
+    const render = (name, data, emptyMessage = 'Không có dữ liệu phù hợp.') => {
+        const body = root.querySelector(name === 'solves' ? '[data-captcha-history]' : '[data-captcha-transactions]');
+        body.replaceChildren();
+        if (!data.length) {
+            const row = document.createElement('tr');
+            const td = cell(row, emptyMessage, 'text-center !py-10 text-slate-400');
+            td.colSpan = name === 'solves' ? 6 : 5;
+            body.appendChild(row);
+        }
+        data.forEach((item) => {
+            const row = document.createElement('tr');
+            row.className = 'transition-colors hover:bg-slate-50/70';
+            cell(row, '#' + item.id, 'tabular-nums text-slate-400');
+            if (name === 'solves') {
+                cell(row, item.result || '—', 'font-mono font-semibold !text-slate-800');
+                const badge = document.createElement('span');
+                badge.className =
+                    'inline-flex rounded-full px-2 py-1 text-[11px] font-medium ring-1 ring-inset ' +
+                    (statusClasses[item.status] || 'bg-slate-100 text-slate-600');
+                badge.textContent = statusLabels[item.status] || item.status;
+                cell(row, '').appendChild(badge);
+                cell(row, item.source === 'api' ? 'API' : 'Demo');
+                cell(row, item.duration_ms == null ? '—' : formatNumber(item.duration_ms / 1000) + ' s', 'text-right tabular-nums');
+            } else {
+                cell(row, item.description, 'min-w-48 max-w-md break-words');
+                cell(
+                    row,
+                    (item.direction === 'credit' ? '+' : '−') + formatNumber(item.amount),
+                    'text-right whitespace-nowrap font-semibold tabular-nums ' +
+                        (item.direction === 'credit' ? '!text-emerald-700' : '!text-rose-600'),
+                );
+                cell(row, formatNumber(item.balance_after), 'text-right tabular-nums');
+            }
+            cell(row, date(item.created_at), 'whitespace-nowrap tabular-nums text-slate-400');
+            body.appendChild(row);
+        });
+    };
+    const setBusy = (busy) => {
+        root.querySelectorAll('[data-captcha-history-panel]').forEach((panel) => {
+            panel.setAttribute('aria-busy', String(busy));
+            panel.querySelectorAll('button').forEach((button) => {
+                button.disabled = busy;
+            });
+        });
+        const refresh = root.querySelector('[data-captcha-history-load]');
+        if (refresh) refresh.disabled = busy;
+        if (!busy) {
+            for (const name of ['solves', 'transactions']) {
+                const data = pagination[name];
+                root.querySelector('[data-captcha-' + name + '-prev]').disabled = !data || data.current_page <= 1;
+                root.querySelector('[data-captcha-' + name + '-next]').disabled = !data || data.current_page >= data.last_page;
+            }
+        }
     };
     async function loadHistory() {
         if (!root.querySelector('[data-captcha-history]')) return;
+        const current = ++revision;
+        setBusy(true);
+        const params = new URLSearchParams({
+            ...filters.solves,
+            ...filters.transactions,
+            solves_page: pages.solves,
+            transactions_page: pages.transactions,
+        });
         try {
-            const data = await request(root.dataset.historyUrl + '?solves_page=' + solvesPage + '&transactions_page=' + transactionsPage);
+            const data = await request(root.dataset.historyUrl + '?' + params);
+            if (current !== revision) return;
             balance(data);
-            renderRows(
-                '[data-captcha-history]',
-                data.solves.data,
-                (row) => '#' + row.id + ' · ' + row.status + ' · ' + (row.result || '—') + ' · ' + new Date(row.created_at).toLocaleString('vi-VN'),
-            );
-            renderRows(
-                '[data-captcha-transactions]',
-                data.transactions.data,
-                (row) => (row.direction === 'credit' ? '+' : '-') + row.amount + ' token · ' + row.description + ' · Số dư: ' + row.balance_after,
-            );
-            for (const [name, pagination] of [
-                ['solves', data.solves],
-                ['transactions', data.transactions],
-            ]) {
-                root.querySelector('[data-captcha-' + name + '-prev]').disabled = pagination.current_page <= 1;
-                root.querySelector('[data-captcha-' + name + '-next]').disabled = pagination.current_page >= pagination.last_page;
+            for (const name of ['solves', 'transactions']) {
+                pagination[name] = data[name];
+                pages[name] = data[name].current_page;
+                render(name, data[name].data);
+                root.querySelector('[data-captcha-' + name + '-summary]').textContent =
+                    (data[name].from || 0) + '–' + (data[name].to || 0) + ' / ' + formatNumber(data[name].total) + ' bản ghi';
+                root.querySelector('[data-captcha-' + name + '-page]').textContent =
+                    'Trang ' + data[name].current_page + ' / ' + data[name].last_page;
             }
         } catch (error) {
+            if (current !== revision) return;
             showMessage(error.message);
+            for (const name of ['solves', 'transactions']) {
+                pagination[name] = null;
+                render(name, [], 'Không tải được lịch sử. Bấm Làm mới để thử lại.');
+                root.querySelector('[data-captcha-' + name + '-summary]').textContent = '';
+                root.querySelector('[data-captcha-' + name + '-page]').textContent = '';
+            }
+        } finally {
+            if (current === revision) setBusy(false);
         }
     }
     root.querySelector('[data-captcha-history-load]')?.addEventListener('click', () => void loadHistory());
     for (const name of ['solves', 'transactions']) {
+        const form = root.querySelector('[data-captcha-filters="' + name + '"]');
+        form?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            filters[name] = Object.fromEntries([...new FormData(form)].filter(([, value]) => value !== ''));
+            pages[name] = 1;
+            void loadHistory();
+        });
+        form?.addEventListener('reset', () => {
+            filters[name] = {};
+            pages[name] = 1;
+            void loadHistory();
+        });
         for (const [direction, offset] of [
             ['prev', -1],
             ['next', 1],
         ]) {
             root.querySelector('[data-captcha-' + name + '-' + direction + ']')?.addEventListener('click', () => {
-                if (name === 'solves') solvesPage += offset;
-                else transactionsPage += offset;
+                const next = pages[name] + offset;
+                if (!pagination[name] || next < 1 || next > pagination[name].last_page) return;
+                pages[name] = next;
                 void loadHistory();
             });
         }
     }
-    void loadHistory();
+    return loadHistory;
 }

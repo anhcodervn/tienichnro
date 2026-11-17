@@ -26,6 +26,41 @@ test('potential tool uses the admin SQL definition with an absolute URL', functi
     expect(collect(config('tools.items'))->contains('code', 'potential_calculator'))->toBeFalse();
 });
 
+test('potential calculator has separate full width input and inline result cards', function (): void {
+    $html = $this->get(route('tools.potential'))->assertOk()->getContent();
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="UTF-8">'.$html);
+    $xpath = new DOMXPath($document);
+
+    expect($xpath->query('//*[@data-tool-workspace][contains(@class,"w-full")]'))->toHaveCount(1)
+        ->and($xpath->query('//*[@data-potential-workspace][contains(@class,"lg:grid-cols-2")]'))->toHaveCount(1)
+        ->and($xpath->query('//*[@data-potential-workspace]/form[@data-potential-form]'))->toHaveCount(1)
+        ->and($xpath->query('//*[@data-potential-workspace]/section//*[@data-potential-result][@hidden]'))->toHaveCount(1)
+        ->and($xpath->query('//*[@data-potential-result]//*[@data-potential-cost]'))->toHaveCount(5)
+        ->and($xpath->query('//*[@data-potential-form]//*[@data-potential-error][@role="alert"]'))->toHaveCount(1);
+});
+
+test('public tool workspaces share the header container without a narrower nested container', function (string $routeName): void {
+    $html = $this->get(route($routeName))->assertOk()->getContent();
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="UTF-8">'.$html);
+    $xpath = new DOMXPath($document);
+    $page = $xpath->query('//*[@data-tool-page]')->item(0);
+    $workspace = $xpath->query('//*[@data-tool-workspace]')->item(0);
+
+    expect($page)->not->toBeNull()
+        ->and($page->getAttribute('class'))->toContain('client-container')
+        ->and($workspace)->not->toBeNull()
+        ->and($workspace->getAttribute('class'))->toContain('w-full', 'grid-cols-1')
+        ->and($xpath->query('//*[@data-tool-workspace]//*[contains(concat(" ",normalize-space(@class)," ")," client-container ")]'))->toHaveCount(0);
+})->with([
+    'potential' => 'tools.potential',
+    'missing potential' => 'tools.missing-potential',
+    'equipment' => 'tools.equipment-upgrade',
+    'captcha' => 'tools.captcha',
+    'game image' => 'tools.game-image',
+]);
+
 test('removing the SQL tool disables the calculation page', function (): void {
     app(ToolAvailabilityService::class)->delete('admin_potential_tool');
     $this->get(route('tools.potential'))->assertOk()->assertDontSee('data-potential-form', false);

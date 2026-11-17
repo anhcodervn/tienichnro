@@ -1,5 +1,6 @@
 <?php
 
+use App\Features\Admin\Seo\Services\HomeSeoService;
 use App\Models\Setting;
 use App\Models\User;
 
@@ -81,10 +82,61 @@ test('published home seo is rendered safely with matching faq schema', function 
         ->assertSee('<title>Meta trang chủ tùy chỉnh</title>', false)
         ->assertSee('content="Mô tả trang chủ tùy chỉnh cho kết quả tìm kiếm."', false)
         ->assertSee('<meta name="keywords" content="nạp carot tùy chỉnh, nạp game nhanh">', false)
-        ->assertSee('H1 trang chủ tùy chỉnh')
+        ->assertDontSee('H1 trang chủ tùy chỉnh')
+        ->assertSee('sm:text-[26px]">Meta trang chủ tùy chỉnh</h1>', false)
+        ->assertSee('text-slate-600">Mô tả trang chủ tùy chỉnh cho kết quả tìm kiếm.</p>', false)
         ->assertSee('Bài hướng dẫn tùy chỉnh')
         ->assertSee('Nội dung SEO an toàn')
         ->assertSee('Câu hỏi riêng?')
         ->assertSee('FAQPage')
+        ->assertSee('data-seo-article', false)
+        ->assertSee('data-seo-toc-toggle', false)
+        ->assertSee('data-seo-faq', false)
         ->assertDontSee('javascript:alert(1)', false);
+});
+
+test('home seo can be published without duplicate titles while preserving the existing article heading', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+    $settings = app(HomeSeoService::class);
+    $settings->update([
+        'article_title' => 'Hướng dẫn đã lưu',
+        'h1' => 'Tiêu đề cũ',
+    ]);
+
+    $this->actingAs($admin)->patchJson('/api/admin-api/seo/home', [
+        'meta_title' => 'Tiêu đề dùng chung',
+        'meta_description' => 'Mô tả dùng chung.',
+        'content' => [
+            ['type' => 'paragraph', 'children' => [['text' => 'Bài viết trang chủ.']]],
+        ],
+        'faqs' => [['question' => 'Câu hỏi?', 'answer' => 'Câu trả lời.']],
+        'is_published' => true,
+    ])->assertOk()
+        ->assertJsonPath('data.h1', 'Tiêu đề dùng chung')
+        ->assertJsonPath('data.article_title', 'Hướng dẫn đã lưu');
+
+    $this->get(route('home'))->assertOk()
+        ->assertSee('sm:text-[26px]">Tiêu đề dùng chung</h1>', false)
+        ->assertSee('text-slate-600">Mô tả dùng chung.</p>', false)
+        ->assertSee('Hướng dẫn đã lưu')
+        ->assertSee('Bài viết trang chủ.')
+        ->assertSee('Câu hỏi?');
+});
+
+test('hiding the home article and faq keeps the shared title and description visible', function (): void {
+    $admin = User::factory()->create(['role' => 'admin']);
+
+    $this->actingAs($admin)->patchJson('/api/admin-api/seo/home', [
+        'meta_title' => 'Trang chủ vẫn hiển thị',
+        'meta_description' => 'Mô tả vẫn hiển thị.',
+        'content' => [['type' => 'paragraph', 'children' => [['text' => 'Nội dung cần ẩn.']]]],
+        'faqs' => [['question' => 'Câu hỏi cần ẩn?', 'answer' => 'Trả lời cần ẩn.']],
+        'is_published' => false,
+    ])->assertOk();
+
+    $this->get(route('home'))->assertOk()
+        ->assertSee('sm:text-[26px]">Trang chủ vẫn hiển thị</h1>', false)
+        ->assertSee('text-slate-600">Mô tả vẫn hiển thị.</p>', false)
+        ->assertDontSee('Nội dung cần ẩn.')
+        ->assertDontSee('Câu hỏi cần ẩn?');
 });

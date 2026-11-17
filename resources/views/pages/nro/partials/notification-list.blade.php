@@ -5,7 +5,7 @@
         $state = $isBoss ? ($notify->death_time ? 'dead' : ($hasLifecycle ? 'living' : 'global')) : 'notification';
     @endphp
     <article data-notify-id="{{ $notify->id }}" data-notify-state="{{ $state }}" role="listitem" @class([
-        'min-w-0 rounded-xl border border-l-4 px-4 py-4 text-sm leading-6 shadow-sm sm:px-5',
+        'min-w-0 rounded-[10px] border border-l-4 px-4 py-4 text-sm leading-6 shadow-sm sm:px-5',
         'border-emerald-500 bg-emerald-50' => $state === 'living',
         'border-rose-500 bg-rose-50' => $state === 'dead',
         'border-amber-500 bg-amber-50' => $state === 'global',

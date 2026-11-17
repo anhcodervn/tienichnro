@@ -128,7 +128,7 @@
     @if ($metaPixelId !== '')
         <noscript data-site-meta-pixel-noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id={{ urlencode($metaPixelId) }}&amp;ev=PageView&amp;noscript=1" alt=""></noscript>
     @endif
-    <a href="#main-content" class="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[5px] focus:bg-slate-950 focus:px-4 focus:py-3 focus:text-white">Bỏ qua điều hướng</a>
+    <a href="#main-content" class="sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-[10px] focus:bg-slate-950 focus:px-4 focus:py-3 focus:text-white">Bỏ qua điều hướng</a>
     @php
         $clientLinks = [
             ['label' => 'Trang chủ', 'url' => route('home'), 'icon' => 'bx-home-alt-2', 'active' => request()->routeIs('home')],
@@ -141,16 +141,16 @@
     @endphp
     <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur lg:z-40">
         <div class="client-container flex min-h-[4.5rem] items-center justify-between gap-3 sm:min-h-20">
-            <a href="{{ route('home') }}" class="flex min-w-0 items-center gap-3 rounded-[5px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" data-client-home>
+            <a href="{{ route('home') }}" class="flex min-w-0 items-center gap-3 rounded-[10px] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600" data-client-home>
                 @if ($headerLogo !== '')
                     <img src="{{ $headerLogo }}" alt="{{ $siteName }}" class="h-10 w-auto max-w-[5rem] shrink-0 object-contain object-left sm:h-12 sm:max-w-[12rem] lg:h-14 lg:max-w-none">
                 @else
-                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-[5px] bg-emerald-600 font-extrabold text-white">N</span><span class="truncate font-extrabold tracking-tight text-slate-950">{{ $siteName }}</span>
+                    <span class="grid h-10 w-10 shrink-0 place-items-center rounded-[10px] bg-emerald-600 font-extrabold text-white">N</span><span class="truncate font-extrabold tracking-tight text-slate-950">{{ $siteName }}</span>
                 @endif
             </a>
             <nav class="hidden min-w-0 items-center gap-2 text-sm font-semibold text-slate-700 lg:flex xl:gap-4" aria-label="Điều hướng chính">
                 @foreach ($clientLinks as $link)
-                    <a @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[5px] px-2 transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => $link['active']]) href="{{ $link['url'] }}" @if($link['opens_tools'] ?? false) data-client-tools-open role="button" aria-haspopup="dialog" aria-controls="client-tools-modal" @endif @if($link['opens_services'] ?? false) data-client-services-open role="button" aria-haspopup="dialog" aria-controls="client-services-modal" @endif @if($link['active']) aria-current="page" @endif><i class="bx {{ $link['icon'] }} text-lg" aria-hidden="true"></i>{{ $link['label'] }}</a>
+                    <a @class(['inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[10px] px-2 transition hover:text-emerald-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600', 'text-emerald-700' => $link['active']]) href="{{ $link['url'] }}" @if($link['opens_tools'] ?? false) data-client-tools-open role="button" aria-haspopup="dialog" aria-controls="client-tools-modal" @endif @if($link['opens_services'] ?? false) data-client-services-open role="button" aria-haspopup="dialog" aria-controls="client-services-modal" @endif @if($link['active']) aria-current="page" @endif><i class="bx {{ $link['icon'] }} text-lg" aria-hidden="true"></i>{{ $link['label'] }}</a>
                 @endforeach
             </nav>
             <div class="flex shrink-0 items-center gap-2">
@@ -160,17 +160,17 @@
                 @auth
                     @php($headerWalletBalance = number_format($clientAccount['wallet_balance'], 0, ',', '.').' đ')
                     <details class="group relative" data-client-menu>
-                        <summary class="flex min-h-12 cursor-pointer list-none items-center gap-2 rounded-[5px] border border-slate-200 bg-white px-2.5 py-1 text-left shadow-sm transition hover:border-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden" aria-label="Menu tài khoản">
+                        <summary class="flex min-h-12 cursor-pointer list-none items-center gap-2 rounded-[10px] border border-slate-200 bg-white px-2.5 py-1 text-left shadow-sm transition hover:border-emerald-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 [&::-webkit-details-marker]:hidden" aria-label="Menu tài khoản">
                             <span class="flex items-center gap-2">
                             <span class="hidden h-9 w-9 shrink-0 place-items-center overflow-hidden rounded-full bg-emerald-600 text-sm font-extrabold text-white sm:grid" data-header-avatar>@if($clientAccount['avatar'] !== '')<img class="h-full w-full object-cover" src="{{ $clientAccount['avatar'] }}" alt="{{ $clientAccount['name'] }}" referrerpolicy="no-referrer">@else{{ $clientAccount['initial'] }}@endif</span>
                             <span class="hidden min-w-0 max-w-32 gap-1 sm:grid"><span class="truncate text-xs font-bold text-slate-900">{{ $clientAccount['name'] }}</span><span class="truncate text-[11px] font-semibold text-emerald-700 dark:text-emerald-400" data-header-wallet-balance="desktop" title="Số dư ví: {{ $headerWalletBalance }}">{{ $headerWalletBalance }}</span></span>
                             <span class="max-w-28 truncate whitespace-nowrap text-xs font-bold tabular-nums text-emerald-700 dark:text-emerald-400 sm:hidden" data-header-wallet-balance="mobile" title="Số dư ví: {{ $headerWalletBalance }}">{{ $headerWalletBalance }}</span><i class="bx bx-chevron-down text-lg text-slate-400" aria-hidden="true"></i>
                             </span>
                         </summary>
-                        <div class="absolute right-0 top-full z-[60] mt-2 w-64 overflow-hidden rounded-[5px] border border-slate-200 bg-white shadow-xl">
+                        <div class="absolute right-0 top-full z-[60] mt-2 w-64 overflow-hidden rounded-[10px] border border-slate-200 bg-white shadow-xl">
                             <div class="border-b border-slate-100 bg-slate-50 px-4 py-3"><p class="truncate text-sm font-bold">{{ $clientAccount['name'] }}</p><a href="{{ route('account.wallet') }}" class="mt-1 block text-xs font-bold text-emerald-700 dark:text-emerald-400" data-header-wallet-balance="menu">Số dư ví: {{ $headerWalletBalance }}</a><p class="mt-1 truncate text-xs text-slate-500">{{ $clientAccount['email'] }}</p></div>
-                            <nav class="grid gap-1 p-2" aria-label="Menu tài khoản"><a class="rounded-[5px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('account.profile.dashboard') }}">Dashboard</a><a class="rounded-[5px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('account.index') }}">Thông tin tài khoản</a>@if($clientAccount['role'] === 'admin')<a class="rounded-[5px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('admin.spa') }}">Trang quản trị</a>@endif<a class="rounded-[5px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('content.contact') }}">Liên hệ hỗ trợ</a></nav>
-                            <form class="border-t border-slate-100 p-2" method="POST" action="{{ route('logout') }}">@csrf<button class="w-full rounded-[5px] px-3 py-2.5 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50" type="submit">Đăng xuất</button></form>
+                            <nav class="grid gap-1 p-2" aria-label="Menu tài khoản"><a class="rounded-[10px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('account.profile.dashboard') }}">Dashboard</a><a class="rounded-[10px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('account.index') }}">Thông tin tài khoản</a>@if($clientAccount['role'] === 'admin')<a class="rounded-[10px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('admin.spa') }}">Trang quản trị</a>@endif<a class="rounded-[10px] px-3 py-2.5 text-sm font-semibold hover:bg-emerald-50" href="{{ route('content.contact') }}">Liên hệ hỗ trợ</a></nav>
+                            <form class="border-t border-slate-100 p-2" method="POST" action="{{ route('logout') }}">@csrf<button class="w-full rounded-[10px] px-3 py-2.5 text-left text-sm font-semibold text-rose-600 hover:bg-rose-50" type="submit">Đăng xuất</button></form>
                         </div>
                     </details>
                 @else
@@ -178,10 +178,10 @@
                     <a class="client-button hidden gap-2 lg:inline-flex" href="{{ route('auth.register') }}"><i class="bx bx-user-plus text-lg" aria-hidden="true"></i>Đăng ký</a>
                 @endauth
                 <details class="relative lg:hidden" data-client-menu>
-                    <summary class="grid h-11 w-11 cursor-pointer list-none place-items-center rounded-[5px] border border-slate-200 text-2xl text-slate-700 [&::-webkit-details-marker]:hidden" aria-label="Menu điều hướng"><i class="bx bx-menu" aria-hidden="true"></i></summary>
-                    <nav class="absolute right-0 top-full z-[60] mt-2 grid w-64 gap-1 rounded-[5px] border border-slate-200 bg-white p-2 shadow-xl" aria-label="Điều hướng di động">
-                        @foreach($clientLinks as $link)<a class="flex items-center gap-3 rounded-[5px] px-3 py-3 text-sm font-semibold hover:bg-emerald-50" href="{{ $link['url'] }}" @if($link['opens_tools'] ?? false) data-client-tools-open role="button" aria-haspopup="dialog" aria-controls="client-tools-modal" @endif @if($link['opens_services'] ?? false) data-client-services-open role="button" aria-haspopup="dialog" aria-controls="client-services-modal" @endif><i class="bx {{ $link['icon'] }} text-lg" aria-hidden="true"></i>{{ $link['label'] }}</a>@endforeach
-                        <a class="rounded-[5px] px-3 py-3 text-sm font-semibold hover:bg-emerald-50" href="{{ route('content.guide') }}">Hướng dẫn</a><a class="rounded-[5px] px-3 py-3 text-sm font-semibold hover:bg-emerald-50" href="{{ route('content.contact') }}">Liên hệ</a>
+                    <summary class="grid h-11 w-11 cursor-pointer list-none place-items-center rounded-[10px] border border-slate-200 text-2xl text-slate-700 [&::-webkit-details-marker]:hidden" aria-label="Menu điều hướng"><i class="bx bx-menu" aria-hidden="true"></i></summary>
+                    <nav class="absolute right-0 top-full z-[60] mt-2 grid w-64 gap-1 rounded-[10px] border border-slate-200 bg-white p-2 shadow-xl" aria-label="Điều hướng di động">
+                        @foreach($clientLinks as $link)<a class="flex items-center gap-3 rounded-[10px] px-3 py-3 text-sm font-semibold hover:bg-emerald-50" href="{{ $link['url'] }}" @if($link['opens_tools'] ?? false) data-client-tools-open role="button" aria-haspopup="dialog" aria-controls="client-tools-modal" @endif @if($link['opens_services'] ?? false) data-client-services-open role="button" aria-haspopup="dialog" aria-controls="client-services-modal" @endif><i class="bx {{ $link['icon'] }} text-lg" aria-hidden="true"></i>{{ $link['label'] }}</a>@endforeach
+                        <a class="rounded-[10px] px-3 py-3 text-sm font-semibold hover:bg-emerald-50" href="{{ route('content.guide') }}">Hướng dẫn</a><a class="rounded-[10px] px-3 py-3 text-sm font-semibold hover:bg-emerald-50" href="{{ route('content.contact') }}">Liên hệ</a>
                     </nav>
                 </details>
             </div>
@@ -198,21 +198,25 @@
         @endif
     </header>
     <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_18px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden" aria-label="Điều hướng nhanh trên di động" data-mobile-bottom-nav>
-        <div class="mx-auto grid h-16 max-w-lg grid-cols-5">
+        <div class="mx-auto grid h-16 max-w-lg grid-cols-4">
             @foreach($clientLinks as $link)<a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition hover:text-emerald-700', 'text-emerald-700' => $link['active'], 'text-slate-500' => ! $link['active']]) href="{{ $link['url'] }}" @if($link['opens_tools'] ?? false) data-client-tools-open role="button" aria-haspopup="dialog" aria-controls="client-tools-modal" @endif @if($link['opens_services'] ?? false) data-client-services-open role="button" aria-haspopup="dialog" aria-controls="client-services-modal" @endif><i class="bx {{ $link['icon'] }} text-xl" aria-hidden="true"></i><span class="truncate">{{ $link['label'] === 'Thông báo game' ? 'Thông báo' : $link['label'] }}</span></a>@endforeach
             <a class="flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold text-slate-500 hover:text-emerald-700" href="{{ auth()->check() ? route('account.index') : route('auth.login') }}"><i class="bx bx-user-circle text-xl" aria-hidden="true"></i><span>Tài khoản</span></a>
         </div>
     </nav>
-    <main id="main-content" class="client-page-scale min-w-0 focus:outline-none" tabindex="-1" data-page-enter>
+    <main id="main-content" class="min-w-0 focus:outline-none" tabindex="-1" data-page-enter>
         @include('client.partials.flash')
         @hasSection('tool_title')
             <x-client.tool-page :title="trim($__env->yieldContent('tool_title'))"
                 :description="trim($__env->yieldContent('tool_description'))" :seo="$toolSeo">
+                <x-slot:actions>@yield('tool_actions')</x-slot:actions>
                 @yield('content')
             </x-client.tool-page>
         @else
             @yield('content')
             <x-client.tool-seo :seo="$toolSeo" />
+            @if($toolSeo && count($toolSeo['faq']))
+                <div class="client-container pb-8 sm:pb-12"><x-client.seo-faq :items="$toolSeo['faq']" id="tool-seo-faq" /></div>
+            @endif
         @endif
     </main>
     <footer class="mt-16 border-t border-slate-200 bg-white">

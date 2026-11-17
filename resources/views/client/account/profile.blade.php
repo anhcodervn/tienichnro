@@ -33,14 +33,14 @@
                     @foreach ($tabs as $tab)
                         <a
                             @class([
-                                'flex min-h-[4.75rem] w-[12.5rem] snap-start items-center gap-3 rounded-[5px] border p-3 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 md:w-auto',
+                                'flex min-h-[4.75rem] w-[12.5rem] snap-start items-center gap-3 rounded-[10px] border p-3 text-left transition duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 md:w-auto',
                                 'border-slate-950 bg-slate-950 text-white shadow-sm ring-1 ring-slate-950/10' => $activeTab === $tab['key'],
                                 'border-slate-200 bg-white text-slate-700 hover:border-emerald-300 hover:bg-emerald-50/60' => $activeTab !== $tab['key'],
                             ])
                             href="{{ route($tab['route']) }}"
                             @if ($activeTab === $tab['key']) aria-current="page" data-account-tab-active @endif
                         >
-                            <span @class(['grid h-10 w-10 shrink-0 place-items-center rounded-[5px] text-xl', 'bg-white/10 text-white' => $activeTab === $tab['key'], 'bg-slate-100 text-slate-500' => $activeTab !== $tab['key']])>
+                            <span @class(['grid h-10 w-10 shrink-0 place-items-center rounded-[10px] text-xl', 'bg-white/10 text-white' => $activeTab === $tab['key'], 'bg-slate-100 text-slate-500' => $activeTab !== $tab['key']])>
                                 <i class="bx {{ $tab['icon'] }}" aria-hidden="true"></i>
                             </span>
                             <span class="min-w-0">
@@ -58,12 +58,12 @@
                 @include('client.account.licenses')
             @elseif ($activeTab === 'profile')
                 <div class="grid min-w-0 gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
-                    <form class="min-w-0 rounded-[5px] border border-slate-200 bg-white p-4 sm:p-5" method="POST" action="{{ route('account.profile.update') }}">
+                    <form class="min-w-0 rounded-[10px] border border-slate-200 bg-white p-4 sm:p-5" method="POST" action="{{ route('account.profile.update') }}">
                         @csrf
                         @method('PATCH')
 
-                        <div class="flex flex-col gap-4 rounded-[5px] bg-slate-50 p-4 sm:flex-row sm:items-center">
-                            <div class="relative h-20 w-20 shrink-0 overflow-hidden rounded-[5px] border border-slate-200 bg-white">
+                        <div class="flex flex-col gap-4 rounded-[10px] bg-slate-50 p-4 sm:flex-row sm:items-center">
+                            <div class="relative h-20 w-20 shrink-0 overflow-hidden rounded-[10px] border border-slate-200 bg-white">
                                 @if ($avatarUrl)
                                     <img class="h-full w-full object-cover" src="{{ $avatarUrl }}" alt="Ảnh đại diện của {{ $user->name }}">
                                 @else
@@ -107,13 +107,13 @@
                     </form>
 
                     <aside class="grid content-start gap-3">
-                        <section class="rounded-[5px] border border-slate-200 bg-white p-4">
+                        <section class="rounded-[10px] border border-slate-200 bg-white p-4">
                             <h2 class="flex items-center gap-2 font-extrabold text-slate-950"><i class="bx bx-envelope text-lg text-emerald-600" aria-hidden="true"></i>Tổng quan xác thực</h2>
                             <dl class="mt-4 grid gap-2 text-sm">
-                                <div class="flex items-center justify-between gap-3 rounded-[5px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">User ID</dt><dd class="font-extrabold">#{{ $user->id }}</dd></div>
-                                <div class="flex items-center justify-between gap-3 rounded-[5px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Trạng thái</dt><dd class="font-extrabold">{{ $statusLabel }}</dd></div>
-                                <div class="flex items-center justify-between gap-3 rounded-[5px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Ngày tạo</dt><dd class="text-right font-extrabold">{{ $user->created_at?->format('H:i d/m/Y') }}</dd></div>
-                                <div class="flex items-center justify-between gap-3 rounded-[5px] bg-slate-50 p-3">
+                                <div class="flex items-center justify-between gap-3 rounded-[10px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">User ID</dt><dd class="font-extrabold">#{{ $user->id }}</dd></div>
+                                <div class="flex items-center justify-between gap-3 rounded-[10px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Trạng thái</dt><dd class="font-extrabold">{{ $statusLabel }}</dd></div>
+                                <div class="flex items-center justify-between gap-3 rounded-[10px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Ngày tạo</dt><dd class="text-right font-extrabold">{{ $user->created_at?->format('H:i d/m/Y') }}</dd></div>
+                                <div class="flex items-center justify-between gap-3 rounded-[10px] bg-slate-50 p-3">
                                     <dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Email xác thực</dt>
                                     @if ($user->hasVerifiedEmail())
                                         <dd class="font-extrabold text-emerald-700">Đã xác thực</dd>
@@ -121,23 +121,23 @@
                                         <dd><a class="font-extrabold text-amber-700 underline decoration-amber-300 underline-offset-2" href="{{ route('verification.notice') }}">Xác minh ngay</a></dd>
                                     @endif
                                 </div>
-                                <div class="flex items-start justify-between gap-3 rounded-[5px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Phiên gần nhất</dt><dd class="text-right font-extrabold">{{ $user->last_login_at?->format('H:i d/m/Y') ?? 'Chưa có' }}@if ($user->last_login_ip)<br><span class="font-medium text-slate-500">{{ $user->last_login_ip }}</span>@endif</dd></div>
+                                <div class="flex items-start justify-between gap-3 rounded-[10px] bg-slate-50 p-3"><dt class="text-xs font-bold uppercase tracking-wider text-slate-400">Phiên gần nhất</dt><dd class="text-right font-extrabold">{{ $user->last_login_at?->format('H:i d/m/Y') ?? 'Chưa có' }}@if ($user->last_login_ip)<br><span class="font-medium text-slate-500">{{ $user->last_login_ip }}</span>@endif</dd></div>
                             </dl>
                         </section>
 
-                        <section class="rounded-[5px] border border-blue-200 bg-blue-50 p-4">
+                        <section class="rounded-[10px] border border-blue-200 bg-blue-50 p-4">
                             <h2 class="flex items-center gap-2 font-extrabold text-blue-950"><i class="bx bx-shield-quarter text-lg text-blue-600" aria-hidden="true"></i>Khuyến nghị bảo mật</h2>
                             <ul class="mt-3 grid gap-2 text-sm leading-6 text-blue-900">
-                                <li class="rounded-[5px] bg-white/70 p-3">Xác thực email để bảo vệ tài khoản.</li>
-                                <li class="rounded-[5px] bg-white/70 p-3">Dùng mật khẩu riêng, không trùng với tài khoản game.</li>
-                                <li class="rounded-[5px] bg-white/70 p-3">Kiểm tra lịch sử nếu phát hiện hoạt động bất thường.</li>
+                                <li class="rounded-[10px] bg-white/70 p-3">Xác thực email để bảo vệ tài khoản.</li>
+                                <li class="rounded-[10px] bg-white/70 p-3">Dùng mật khẩu riêng, không trùng với tài khoản game.</li>
+                                <li class="rounded-[10px] bg-white/70 p-3">Kiểm tra lịch sử nếu phát hiện hoạt động bất thường.</li>
                             </ul>
                         </section>
                     </aside>
                 </div>
             @elseif ($activeTab === 'password')
                 <div class="grid gap-3 lg:grid-cols-[minmax(0,1fr)_21rem]">
-                    <form class="rounded-[5px] border border-slate-200 bg-white p-4 sm:p-6" method="POST" action="{{ route('account.profile.password.update') }}">
+                    <form class="rounded-[10px] border border-slate-200 bg-white p-4 sm:p-6" method="POST" action="{{ route('account.profile.password.update') }}">
                         @csrf
                         @method('PUT')
                         <h2 class="text-xl font-extrabold text-slate-950">Đổi mật khẩu</h2>
@@ -159,7 +159,7 @@
 
                         <button class="client-button mt-5 min-h-11 w-full justify-center sm:w-auto" type="submit"><i class="bx bx-key text-lg" aria-hidden="true"></i>Cập nhật mật khẩu</button>
                     </form>
-                    <aside class="rounded-[5px] border border-amber-200 bg-amber-50 p-4">
+                    <aside class="rounded-[10px] border border-amber-200 bg-amber-50 p-4">
                         <h2 class="flex items-center gap-2 font-extrabold text-amber-950"><i class="bx bx-lock-alt text-lg" aria-hidden="true"></i>Mật khẩu an toàn</h2>
                         <ul class="mt-3 grid gap-2 text-sm leading-6 text-amber-900">
                             <li>• Ít nhất 8 ký tự.</li>
@@ -169,7 +169,7 @@
                     </aside>
                 </div>
             @elseif ($activeTab === 'logs')
-                <section class="overflow-hidden rounded-[5px] border border-slate-200 bg-white">
+                <section class="overflow-hidden rounded-[10px] border border-slate-200 bg-white">
                     <div class="flex flex-col gap-1 border-b border-slate-200 p-4 sm:p-5">
                         <h2 class="text-xl font-extrabold text-slate-950">Lịch sử người dùng</h2>
                         <p class="text-sm text-slate-500">Theo dõi các lần đăng nhập và thao tác bảo mật gần đây.</p>
@@ -177,7 +177,7 @@
                     <div class="divide-y divide-slate-100">
                         @forelse ($userLogs ?? [] as $log)
                             <article class="grid min-w-0 gap-3 p-4 sm:grid-cols-[2.5rem_minmax(0,1fr)_auto] sm:items-start sm:p-5">
-                                <span class="grid h-10 w-10 place-items-center rounded-[5px] bg-slate-100 text-xl text-slate-500"><i class="bx bx-history" aria-hidden="true"></i></span>
+                                <span class="grid h-10 w-10 place-items-center rounded-[10px] bg-slate-100 text-xl text-slate-500"><i class="bx bx-history" aria-hidden="true"></i></span>
                                 <div class="min-w-0">
                                     <h3 class="font-extrabold text-slate-950">{{ $log->description ?: $log->action }}</h3>
                                     <p class="mt-1 break-words text-xs leading-5 text-slate-500">Hành động: {{ $log->action }}@if ($log->ip) · IP: {{ $log->ip }}@endif</p>

@@ -3,7 +3,7 @@
     $additionalFilters = $selectedType?->additional_filters ?? [];
     $limitOptions = auth()->check() ? collect([10, 25, 50, 100, (int) $limit])->unique()->sort() : collect([10]);
 @endphp
-<form method="GET" action="{{ route('nro.notifies.page') }}" data-nro-filters class="mb-6 rounded-xl border border-slate-300 bg-white p-4 shadow-sm sm:p-5">
+<form method="GET" action="{{ route('nro.notifies.page') }}" data-nro-filters class="mb-6 rounded-[10px] border border-slate-300 bg-white p-4 shadow-sm sm:p-5">
     <div class="grid grid-cols-2 items-end gap-3 sm:gap-4 lg:grid-cols-[1fr_1fr_2fr]">
         <div class="min-w-0 text-sm font-semibold text-slate-700" data-nro-server-select>
             <label id="nro-server-label" for="nro-server-native">Server</label>
@@ -18,13 +18,13 @@
                     <span id="nro-server-status" data-nro-server-status class="sr-only"></span>
                     <svg aria-hidden="true" viewBox="0 0 20 20" fill="none" class="size-4 shrink-0 text-slate-500"><path d="m6 8 4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" /></svg>
                 </button>
-                <div hidden id="nro-server-list" data-nro-server-list role="listbox" aria-labelledby="nro-server-label" class="absolute left-0 top-full z-40 mt-2 max-h-80 w-72 max-w-[calc(100vw-3rem)] overflow-y-auto rounded-xl border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
-                    <button type="button" role="option" tabindex="-1" aria-selected="false" data-nro-server-option data-value="" data-name="Tất cả server" data-status="" class="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 focus:bg-emerald-50 focus:outline-none aria-selected:bg-emerald-50 aria-selected:text-emerald-800">
+                <div hidden id="nro-server-list" data-nro-server-list role="listbox" aria-labelledby="nro-server-label" class="absolute left-0 top-full z-40 mt-2 max-h-80 w-72 max-w-[calc(100vw-3rem)] overflow-y-auto rounded-[10px] border border-slate-200 bg-white p-1.5 shadow-xl shadow-slate-900/10">
+                    <button type="button" role="option" tabindex="-1" aria-selected="false" data-nro-server-option data-value="" data-name="Tất cả server" data-status="" class="flex min-h-11 w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 focus:bg-emerald-50 focus:outline-none aria-selected:bg-emerald-50 aria-selected:text-emerald-800">
                         <span aria-hidden="true" class="size-2 shrink-0 rounded-full bg-slate-400"></span>
                         <span class="min-w-0 flex-1 truncate">Tất cả server</span>
                     </button>
                     @foreach($servers as $server)
-                        <button type="button" role="option" tabindex="-1" aria-selected="false" data-nro-server-option data-value="{{ $server->id }}" data-name="{{ $server->name }}" data-status="{{ $server->connection ? 'online' : 'offline' }}" class="flex min-h-11 w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 focus:bg-emerald-50 focus:outline-none aria-selected:bg-emerald-50 aria-selected:text-emerald-800">
+                        <button type="button" role="option" tabindex="-1" aria-selected="false" data-nro-server-option data-value="{{ $server->id }}" data-name="{{ $server->name }}" data-status="{{ $server->connection ? 'online' : 'offline' }}" class="flex min-h-11 w-full items-center gap-2.5 rounded-[10px] px-3 py-2.5 text-left text-sm font-medium text-slate-700 hover:bg-slate-50 focus:bg-emerald-50 focus:outline-none aria-selected:bg-emerald-50 aria-selected:text-emerald-800">
                             <span aria-hidden="true" @class(['size-2 shrink-0 rounded-full', 'bg-emerald-500' => $server->connection, 'bg-rose-500' => !$server->connection])></span>
                             <span class="min-w-0 flex-1 truncate">{{ $server->name }}</span>
                             <span @class(['shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold', 'bg-emerald-50 text-emerald-700' => $server->connection, 'bg-rose-50 text-rose-700' => !$server->connection])>{{ $server->connection ? 'Hoạt động' : 'Không hoạt động' }}</span>

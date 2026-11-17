@@ -2,6 +2,7 @@
 
 namespace App\Features\NroNotification\Services;
 
+use App\Support\EventStreamRuntime;
 use Generator;
 use Illuminate\Http\StreamedEvent;
 use Illuminate\Support\Arr;
@@ -9,7 +10,7 @@ use Throwable;
 
 class NroNotificationFeedService
 {
-    public function __construct(private readonly NroNotificationService $notifications, private readonly NotificationReadCacheService $readCache) {}
+    public function __construct(private readonly NroNotificationService $notifications, private readonly NotificationReadCacheService $readCache, private readonly EventStreamRuntime $runtime) {}
 
     /**
      * @param  array<string, mixed>  $filters
@@ -34,9 +35,9 @@ class NroNotificationFeedService
      * @param  array<string, mixed>  $filters
      * @return Generator<int, StreamedEvent>
      */
-    public function events(array $filters, float $durationSeconds = 25, int $pollMicroseconds = 2000000): Generator
+    public function events(array $filters, ?float $durationSeconds = null, int $pollMicroseconds = 2000000): Generator
     {
-        $deadline = microtime(true) + $durationSeconds;
+        $deadline = microtime(true) + ($durationSeconds ?? $this->runtime->durationSeconds());
         $signature = null;
 
         try {

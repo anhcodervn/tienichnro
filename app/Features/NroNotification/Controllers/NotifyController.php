@@ -75,6 +75,7 @@ class NotifyController extends Controller
         $locks = $slots->acquire($request);
 
         return response()->eventStream(function () use ($request, $feed, $filters, $slots, $locks): Generator {
+            echo "retry: 3000\n\n";
             try {
                 foreach ($feed->events($filters) as $event) {
                     if (! $this->access->realtime($request)) {

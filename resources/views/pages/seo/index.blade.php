@@ -3,6 +3,9 @@
 @section('description', $pageMetaDescription)
 @section('canonical', $pageMetaCanonical)
 @section('robots', $pageMetaRobots)
+@push('head')
+    <script type="application/ld+json">{!! json_encode($breadcrumbSchema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) !!}</script>
+@endpush
 @section('content')
 @php
     $displayPosts = collect([$featuredPost])->filter()->concat($latestPosts);
@@ -42,7 +45,7 @@
         <label class="sr-only" for="seo-post-search">Tìm bài viết</label>
         <div class="relative min-w-0 flex-1">
             <i class="bx bx-search pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xl text-slate-400" aria-hidden="true"></i>
-            <input id="seo-post-search" class="min-h-12 w-full min-w-0 rounded-[5px] border border-slate-300 bg-white pl-11 pr-4 text-base outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" name="q" value="{{ $search }}" placeholder="Tìm hướng dẫn, mẹo nạp game...">
+            <input id="seo-post-search" class="min-h-12 w-full min-w-0 rounded-[10px] border border-slate-300 bg-white pl-11 pr-4 text-base outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100" name="q" value="{{ $search }}" placeholder="Tìm hướng dẫn, mẹo nạp game...">
         </div>
         <button class="client-button w-full gap-2 sm:w-auto" type="submit"><i class="bx bx-search text-lg" aria-hidden="true"></i>Tìm kiếm</button>
     </form>
@@ -97,7 +100,7 @@
                 <h2 class="flex items-center gap-2 font-extrabold text-slate-950"><i class="bx bx-category text-xl text-emerald-600" aria-hidden="true"></i>Danh mục</h2>
                 <div class="mt-4 grid gap-1">
                     @foreach ($categories as $category)
-                        <a @class(['flex items-center justify-between gap-3 rounded-[5px] px-3 py-2.5 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-800' => $activeCategorySlug === $category->slug, 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => $activeCategorySlug !== $category->slug]) href="{{ route('seo.category', $category->slug) }}"><span class="min-w-0 truncate">{{ $category->name }}</span><span class="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{{ $category->posts_count }}</span></a>
+                        <a @class(['flex items-center justify-between gap-3 rounded-[10px] px-3 py-2.5 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-800' => $activeCategorySlug === $category->slug, 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => $activeCategorySlug !== $category->slug]) href="{{ route('seo.category', $category->slug) }}"><span class="min-w-0 truncate">{{ $category->name }}</span><span class="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{{ $category->posts_count }}</span></a>
                     @endforeach
                 </div>
             </section>

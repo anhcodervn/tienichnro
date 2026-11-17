@@ -68,7 +68,10 @@
 <section class="client-container py-8 sm:py-10">
     <div class="grid min-w-0 gap-7 lg:grid-cols-[minmax(0,1fr)_18rem]">
         <main class="min-w-0">
-            <div class="article-content client-card min-w-0 max-w-full break-words p-5 sm:p-8 lg:p-10" lang="{{ $post->language }}" data-client-image-viewer>{!! $contentHtml !!}</div>
+            <div id="blog-article" class="client-card relative min-w-0 max-w-full break-words p-5 pb-20 sm:p-8 sm:pb-20 lg:p-10 lg:pb-20" lang="{{ $post->language }}" data-seo-article>
+                <div id="blog-article-content" class="article-content" data-seo-content data-client-image-viewer>{!! $contentHtml !!}</div>
+                <x-client.seo-toc id="blog-article" />
+            </div>
 
             @if ($faq->isNotEmpty())
                 <section class="client-card mt-5 p-5 sm:p-8" aria-labelledby="seo-faq-title">
@@ -87,7 +90,7 @@
                 </section>
             @endif
 
-            <footer class="mt-5 flex flex-col gap-4 rounded-[5px] border border-emerald-200 bg-emerald-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <footer class="mt-5 flex flex-col gap-4 rounded-[10px] border border-emerald-200 bg-emerald-50 p-5 sm:flex-row sm:items-center sm:justify-between">
                 <div class="min-w-0">
                     <p class="text-xs font-bold uppercase tracking-wide text-emerald-700">Bạn đang đọc</p>
                     <p class="mt-1 break-words font-extrabold text-emerald-950">{{ $post->title }}</p>
@@ -97,22 +100,11 @@
         </main>
 
         <aside class="min-w-0 space-y-5 lg:sticky lg:top-24 lg:self-start">
-            @if ($headingIndex !== [])
-                <nav class="client-card p-5" aria-label="Mục lục bài viết">
-                    <h2 class="flex items-center gap-2 font-extrabold text-slate-950"><i class="bx bx-list-ol text-xl text-emerald-600" aria-hidden="true"></i>Mục lục</h2>
-                    <ol class="mt-4 grid gap-1.5 border-l-2 border-slate-100 pl-3">
-                        @foreach ($headingIndex as $heading)
-                            <li @class(['pl-3' => $heading['level'] > 2])><a class="block rounded-[5px] px-2 py-1.5 text-sm leading-5 text-slate-600 transition hover:bg-emerald-50 hover:text-emerald-700" href="#{{ $heading['id'] }}">{{ $heading['text'] }}</a></li>
-                        @endforeach
-                    </ol>
-                </nav>
-            @endif
-
             <section class="client-card p-5">
                 <h2 class="flex items-center gap-2 font-extrabold text-slate-950"><i class="bx bx-category text-xl text-emerald-600" aria-hidden="true"></i>Danh mục bài viết</h2>
                 <div class="mt-4 grid gap-1">
                     @foreach ($sidebarCategories as $category)
-                        <a @class(['flex items-center justify-between gap-3 rounded-[5px] px-3 py-2.5 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-800' => $post->category?->id === $category->id, 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => $post->category?->id !== $category->id]) href="{{ route('seo.category', $category->slug) }}"><span class="min-w-0 truncate">{{ $category->name }}</span><span class="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{{ $category->posts_count }}</span></a>
+                        <a @class(['flex items-center justify-between gap-3 rounded-[10px] px-3 py-2.5 text-sm font-semibold transition', 'bg-emerald-50 text-emerald-800' => $post->category?->id === $category->id, 'text-slate-600 hover:bg-slate-50 hover:text-emerald-700' => $post->category?->id !== $category->id]) href="{{ route('seo.category', $category->slug) }}"><span class="min-w-0 truncate">{{ $category->name }}</span><span class="rounded-full bg-white px-2 py-0.5 text-xs text-slate-500">{{ $category->posts_count }}</span></a>
                     @endforeach
                 </div>
             </section>

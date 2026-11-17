@@ -10,7 +10,14 @@ export default defineConfig(({ mode }) => {
     return {
         plugins: [
             laravel({
-                input: ['resources/css/app.css', 'resources/js/app.ts', 'resources/css/client.css', 'resources/js/client.js'],
+                input: [
+                    'resources/css/app.css',
+                    'resources/js/app.ts',
+                    'resources/css/client.css',
+                    'resources/js/client.js',
+                    'resources/css/game-image-editor.css',
+                    'resources/js/game-image-editor.ts',
+                ],
                 refresh: true,
             }),
             vue(),

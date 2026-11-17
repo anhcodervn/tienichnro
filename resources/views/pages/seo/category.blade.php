@@ -28,8 +28,8 @@
                 <h1 class="mt-2 break-words text-3xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-4xl lg:text-5xl">{{ $pageTitle }}</h1>
                 <p class="mt-4 break-words text-base leading-7 text-slate-600 sm:text-lg">{{ $pageDescription }}</p>
             </div>
-            <div class="flex shrink-0 items-center gap-3 rounded-[5px] border border-emerald-200 bg-white px-4 py-3 shadow-sm">
-                <span class="grid h-10 w-10 place-items-center rounded-[5px] bg-emerald-50 text-2xl text-emerald-700"><i class="bx bx-news" aria-hidden="true"></i></span>
+            <div class="flex shrink-0 items-center gap-3 rounded-[10px] border border-emerald-200 bg-white px-4 py-3 shadow-sm">
+                <span class="grid h-10 w-10 place-items-center rounded-[10px] bg-emerald-50 text-2xl text-emerald-700"><i class="bx bx-news" aria-hidden="true"></i></span>
                 <span>
                     <strong class="block text-lg font-extrabold tabular-nums text-slate-950">{{ number_format($posts->total(), 0, ',', '.') }}</strong>
                     <small class="text-xs font-medium text-slate-500">bài viết đã xuất bản</small>
@@ -38,11 +38,11 @@
         </div>
 
         <nav class="mt-7 flex gap-2 overflow-x-auto pb-2" aria-label="Danh mục bài viết">
-            <a class="shrink-0 rounded-[5px] border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700" href="{{ route('seo.index') }}">Tất cả</a>
+            <a class="shrink-0 rounded-[10px] border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-emerald-300 hover:text-emerald-700" href="{{ route('seo.index') }}">Tất cả</a>
             @foreach ($categories as $categoryItem)
                 <a
                     @class([
-                        'shrink-0 rounded-[5px] border px-4 py-2 text-sm font-bold transition',
+                        'shrink-0 rounded-[10px] border px-4 py-2 text-sm font-bold transition',
                         'border-emerald-600 bg-emerald-600 text-white' => $categoryItem->id === $category->id,
                         'border-slate-200 bg-white text-slate-600 hover:border-emerald-300 hover:text-emerald-700' => $categoryItem->id !== $category->id,
                     ])
@@ -61,7 +61,7 @@
             <i class="bx bx-search pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-xl text-slate-400" aria-hidden="true"></i>
             <input
                 id="category-post-search"
-                class="min-h-12 w-full min-w-0 rounded-[5px] border border-slate-300 bg-white pl-11 pr-4 text-base outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
+                class="min-h-12 w-full min-w-0 rounded-[10px] border border-slate-300 bg-white pl-11 pr-4 text-base outline-none transition placeholder:text-slate-400 focus:border-emerald-600 focus:ring-4 focus:ring-emerald-100"
                 name="q"
                 value="{{ $search }}"
                 maxlength="100"
@@ -91,7 +91,7 @@
                     </a>
                     <div class="flex min-w-0 flex-1 flex-col p-5">
                         <div class="flex flex-wrap items-center gap-2 text-xs font-semibold text-slate-500">
-                            <span class="rounded-[5px] bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700">{{ $category->name }}</span>
+                            <span class="rounded-[10px] bg-emerald-50 px-2.5 py-1 font-bold text-emerald-700">{{ $category->name }}</span>
                             <span>{{ $post['published_label'] }}</span>
                         </div>
                         <h2 class="mt-3 break-words text-xl font-extrabold leading-snug text-slate-950">
@@ -114,7 +114,7 @@
         @endif
     @else
         <div class="client-card mt-7 grid place-items-center gap-3 p-10 text-center">
-            <span class="grid h-16 w-16 place-items-center rounded-[5px] bg-slate-100 text-4xl text-slate-300"><i class="bx bx-file-find" aria-hidden="true"></i></span>
+            <span class="grid h-16 w-16 place-items-center rounded-[10px] bg-slate-100 text-4xl text-slate-300"><i class="bx bx-file-find" aria-hidden="true"></i></span>
             <div>
                 <h2 class="font-extrabold text-slate-950">Chưa tìm thấy bài viết phù hợp</h2>
                 <p class="mt-1 text-sm leading-6 text-slate-500">Thử từ khóa khác hoặc xem toàn bộ bài viết trong danh mục này.</p>

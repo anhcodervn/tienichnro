@@ -32,6 +32,22 @@ test('home is a Blade tool hub and news has a separate searchable page', functio
     $this->get('/tin-tuc?q=khong-tim-thay')->assertOk()->assertDontSee($post->title)->assertSee('noindex,follow');
 });
 
+test('mobile bottom navigation balances its four items in four equal columns', function (bool $signedIn): void {
+    if ($signedIn) {
+        $this->actingAs(User::factory()->create());
+    }
+
+    $html = $this->get(route('home'))->assertOk()->getContent();
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="UTF-8">'.$html);
+    $xpath = new DOMXPath($document);
+    $grid = $xpath->query('//nav[@data-mobile-bottom-nav]/div')->item(0);
+
+    expect($grid)->not->toBeNull()
+        ->and($grid->getAttribute('class'))->toContain('grid-cols-4')->not->toContain('grid-cols-5')
+        ->and($xpath->query('./a', $grid))->toHaveCount(4);
+})->with(['guest' => false, 'member' => true]);
+
 test('all published articles are reachable with pagination and page canonicals', function (): void {
     foreach (range(1, 13) as $number) {
         articleWebsitePost(['slug' => 'bai-viet-'.$number]);
@@ -45,6 +61,54 @@ test('article pages retain canonical redirects and Article schema', function ():
     $url = route('seo.show', ['categorySlug' => $post->category->slug, 'postSlug' => $post->slug]);
     $this->get($url)->assertOk()->assertSee('"@type":"Article"', false)->assertSee('rel="canonical" href="'.$url.'"', false);
     $this->get('/bai-viet/'.$post->slug)->assertRedirect($url)->assertStatus(301);
+});
+
+test('blog articles place the shared absolute TOC inside the full article instead of the sidebar', function (): void {
+    $post = articleWebsitePost(['content' => [
+        ['type' => 'heading', 'level' => 2, 'children' => [['text' => 'Các bước thực hiện']]],
+        ['type' => 'paragraph', 'children' => [['text' => 'Nội dung hướng dẫn chi tiết.']]],
+    ]]);
+    $html = $this->get(route('seo.show', ['categorySlug' => $post->category->slug, 'postSlug' => $post->slug]))
+        ->assertOk()->getContent();
+    $document = new DOMDocument;
+    @$document->loadHTML('<?xml encoding="UTF-8">'.$html);
+    $xpath = new DOMXPath($document);
+
+    expect($xpath->query('//*[@id="blog-article"][@data-seo-article]'))->toHaveCount(1)
+        ->and($xpath->query('//*[@id="blog-article"]//*[@data-seo-toc-toggle][contains(@class,"absolute")]'))->toHaveCount(1)
+        ->and($xpath->query('//*[@id="blog-article"]//*[@data-seo-toc][@hidden]'))->toHaveCount(1)
+        ->and($xpath->query('//*[@id="blog-article"]//*[@data-seo-content]//h2'))->toHaveCount(1)
+        ->and($xpath->query('//*[@id="blog-article"]//*[@data-seo-expand]'))->toHaveCount(0)
+        ->and($xpath->query('//aside//nav[@aria-label="Mục lục bài viết"]'))->toHaveCount(0);
+});
+
+test('article and category breadcrumbs emit one valid ordered JSON LD trail', function (): void {
+    $post = articleWebsitePost();
+    $postUrl = route('seo.show', ['categorySlug' => $post->category->slug, 'postSlug' => $post->slug]);
+    $categoryUrl = route('seo.category', $post->category->slug);
+    foreach ([$postUrl => 4, $categoryUrl => 3, route('seo.index') => 2] as $url => $length) {
+        $html = $this->get($url)->assertOk()->getContent();
+        $document = new DOMDocument;
+        @$document->loadHTML('<?xml encoding="UTF-8">'.$html);
+        $xpath = new DOMXPath($document);
+        $trails = [];
+        foreach ($xpath->query('//script[@type="application/ld+json"]') as $script) {
+            $schema = json_decode($script->textContent, true, 512, JSON_THROW_ON_ERROR);
+            if (($schema['@type'] ?? '') === 'BreadcrumbList') {
+                $trails[] = $schema['itemListElement'];
+            }
+        }
+        expect($trails)->toHaveCount(1)
+            ->and($trails[0])->toHaveCount($length)
+            ->and(array_column($trails[0], 'position'))->toBe(range(1, $length))
+            ->and($trails[0][0]['item'])->toBe(route('home'))
+            ->and($trails[0][$length - 1]['item'])->toBe($url);
+        foreach ($trails[0] as $item) {
+            expect($item['@type'])->toBe('ListItem')
+                ->and($item['name'])->not->toBeEmpty()
+                ->and(filter_var($item['item'], FILTER_VALIDATE_URL))->not->toBeFalse();
+        }
+    }
 });
 
 test('legacy commercial endpoints are not available', function (string $method, string $uri): void {
@@ -131,7 +195,7 @@ test('home promotes tools before a limited news preview with the original mobile
     }
     $response = $this->get('/')->assertOk()->assertViewHas('latestPosts', fn ($posts): bool => $posts->count() === 3)
         ->assertSee('data-home-compact-header', false)->assertSee('data-mobile-bottom-nav', false)
-        ->assertSee('client-page-scale', false)->assertSee(route('seo.index'))
+        ->assertDontSee('client-page-scale', false)->assertSee(route('seo.index'))
         ->assertDontSee('aria-label="Chủ đề tin tức"', false);
     expect(strpos($response->getContent(), 'data-home-tool-grid'))->toBeLessThan(strpos($response->getContent(), 'data-home-latest-news'));
     $this->get('/tin-tuc')->assertOk()->assertViewIs('pages.seo.index')->assertViewHas('posts', fn ($posts): bool => $posts->total() === 5);
@@ -160,7 +224,7 @@ test('a new tool can be registered without changing homepage or navigation templ
 test('home lists NRO tools without the retired topup link', function (): void {
     $response = $this->get('/')->assertOk()
         ->assertViewHas('tools', fn ($tools): bool => $tools->pluck('name')->all() === [
-            'Thông báo game', 'Đổi mật khẩu game', 'Xác minh tài khoản', 'Tải mod',
+            'Ghép ảnh game', 'Thông báo game', 'Đổi mật khẩu game', 'Xác minh tài khoản', 'Tải mod',
         ]);
 
     $document = new DOMDocument;
@@ -170,11 +234,12 @@ test('home lists NRO tools without the retired topup link', function (): void {
     $links = $xpath->query('.//a', $toolGrid);
     $buttons = $xpath->query('.//button', $toolGrid);
 
-    expect($links->length)->toBe(1)
-        ->and($links->item(0)->getAttribute('href'))->toBe(route('nro.notifies.page'))
-        ->and(trim($links->item(0)->textContent))->toBe('Thông báo game')
-        ->and($buttons->length)->toBe(3)
-        ->and($buttons->item(2)->textContent)->toContain('Tải mod');
+    expect($links->length)->toBe(3)
+        ->and($links->item(0)->getAttribute('href'))->toBe(route('tools.game-image'))
+        ->and($links->item(1)->getAttribute('href'))->toBe(route('nro.notifies.page'))
+        ->and($links->item(2)->getAttribute('href'))->toBe(route('tools.game-password'))
+        ->and($buttons->length)->toBe(2)
+        ->and($buttons->item(1)->textContent)->toContain('Tải mod');
 
     foreach ($buttons as $button) {
         $icon = $xpath->query('./span', $button)->item(0);
@@ -215,9 +280,10 @@ test('tools navigation exposes the shared modal on public pages', function (stri
             ->and(trim($badge->textContent))->toBe('Sắp ra mắt')
             ->and($badge->getAttribute('class'))->toContain('absolute', 'bottom-2');
     }
-    expect($links->length)->toBe(1)
-        ->and($links->item(0)->getAttribute('href'))->toBe(route('nro.notifies.page'))
-        ->and($xpath->query('.//*[@data-client-tools-list]//button[@disabled]', $modal)->length)->toBe(3)
-        ->and($xpath->query('.//*[@data-client-tools-list]//button[@disabled]', $modal)->item(2)->textContent)->toContain('Tải mod', 'Sắp ra mắt')
+    expect($links->length)->toBe(3)
+        ->and($links->item(0)->getAttribute('href'))->toBe(route('tools.game-image'))
+        ->and($links->item(2)->getAttribute('href'))->toBe(route('tools.game-password'))
+        ->and($xpath->query('.//*[@data-client-tools-list]//button[@disabled]', $modal)->length)->toBe(2)
+        ->and($xpath->query('.//*[@data-client-tools-list]//button[@disabled]', $modal)->item(1)->textContent)->toContain('Tải mod', 'Sắp ra mắt')
         ->and($xpath->query('.//button[@data-client-tools-close]', $modal)->length)->toBe(1);
 })->with(['/', '/tin-tuc', '/thong-bao-game']);

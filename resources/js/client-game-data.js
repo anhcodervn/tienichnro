@@ -84,12 +84,12 @@ function initializeGameDataPreviews(root) {
     if (root.documentElement.dataset.gameDataLightbox) return;
     root.documentElement.dataset.gameDataLightbox = 'true';
     const viewer = root.createElement('dialog');
-    viewer.className = 'm-auto max-h-[95dvh] max-w-[95vw] overflow-auto rounded-xl bg-slate-950 p-4 text-white backdrop:bg-slate-950/80';
+    viewer.className = 'm-auto max-h-[95dvh] max-w-[95vw] overflow-auto rounded-[10px] bg-slate-950 p-4 text-white backdrop:bg-slate-950/80';
     viewer.setAttribute('aria-label', 'Xem ảnh lớn');
     const close = root.createElement('button');
     close.type = 'button';
     close.textContent = 'Đóng (Esc)';
-    close.className = 'sticky top-0 mb-3 block min-h-11 rounded-lg bg-white px-4 font-bold text-slate-900';
+    close.className = 'sticky top-0 mb-3 block min-h-11 rounded-[10px] bg-white px-4 font-bold text-slate-900';
     const image = root.createElement('img');
     image.className = 'max-w-none [image-rendering:pixelated]';
     const controls = root.createElement('div');
@@ -110,7 +110,7 @@ function initializeGameDataPreviews(root) {
         button.type = 'button';
         button.textContent = label;
         button.setAttribute('aria-label', change > 0 ? 'Phóng to' : 'Thu nhỏ');
-        button.className = 'min-h-11 min-w-11 rounded-lg bg-white px-4 font-bold text-slate-900';
+        button.className = 'min-h-11 min-w-11 rounded-[10px] bg-white px-4 font-bold text-slate-900';
         button.addEventListener('click', () => zoom(scale + change));
         controls.appendChild(button);
     }

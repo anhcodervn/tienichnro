@@ -30,8 +30,8 @@ class UpdateHomeSeoRequest extends FormRequest
             'meta_title' => [Rule::requiredIf($isPublished), 'nullable', 'string', 'max:255'],
             'meta_description' => [Rule::requiredIf($isPublished), 'nullable', 'string', 'max:320'],
             'meta_keywords' => ['nullable', 'string', 'max:1000'],
-            'h1' => [Rule::requiredIf($isPublished), 'nullable', 'string', 'max:255'],
-            'article_title' => [Rule::requiredIf($isPublished), 'nullable', 'string', 'max:255'],
+            'h1' => ['nullable', 'string', 'max:255'],
+            'article_title' => ['nullable', 'string', 'max:255'],
             'content' => [Rule::requiredIf($isPublished), 'nullable', 'array', new ValidSeoPostContent],
             'faqs' => ['nullable', 'array', 'max:20'],
             'faqs.*.question' => ['required', 'string', 'max:255'],
@@ -50,8 +50,8 @@ class UpdateHomeSeoRequest extends FormRequest
     public function attributes(): array
     {
         return [
-            'meta_title' => 'meta title trang chủ',
-            'meta_description' => 'meta description trang chủ',
+            'meta_title' => 'tiêu đề trang chủ',
+            'meta_description' => 'mô tả ngắn',
             'meta_keywords' => 'từ khóa SEO trang chủ',
             'h1' => 'tiêu đề H1 trang chủ',
             'article_title' => 'tiêu đề bài hướng dẫn',

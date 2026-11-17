@@ -29,6 +29,13 @@ return [
     */
 
     'disks' => [
+        'game-image-uploads' => [
+            'driver' => 'local',
+            'root' => public_path('uploads/ghep-anh'),
+            'url' => env('APP_URL').'/uploads/ghep-anh',
+            'visibility' => 'public',
+            'throw' => true,
+        ],
 
         'local' => [
             'driver' => 'local',

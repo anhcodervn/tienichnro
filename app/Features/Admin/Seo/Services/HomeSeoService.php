@@ -44,12 +44,14 @@ class HomeSeoService
      */
     public function update(array $payload): array
     {
+        $current = $this->settings();
+
         $this->settingStore->putMany([
             'home_seo_meta_title' => $payload['meta_title'] ?? '',
             'home_seo_meta_description' => $payload['meta_description'] ?? '',
             'home_seo_meta_keywords' => $payload['meta_keywords'] ?? '',
-            'home_seo_h1' => $payload['h1'] ?? '',
-            'home_seo_article_title' => $payload['article_title'] ?? '',
+            'home_seo_h1' => $payload['h1'] ?? $payload['meta_title'] ?? '',
+            'home_seo_article_title' => $payload['article_title'] ?? $current['article_title'],
             'home_seo_content' => $payload['content'] ?? [],
             'home_seo_faqs' => $payload['faqs'] ?? [],
             'home_seo_is_published' => (bool) ($payload['is_published'] ?? false),

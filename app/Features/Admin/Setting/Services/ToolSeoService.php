@@ -52,6 +52,7 @@ class ToolSeoService
             abort_if($version !== (int) $payload['expected_version'], 409, 'Bài SEO đã được thay đổi. Hãy tải lại trước khi lưu.');
             $this->settings->putArray($key, [
                 ...Arr::only($payload, array_keys($this->defaults())),
+                'hide_when_authenticated' => (bool) ($payload['hide_when_authenticated'] ?? $current['hide_when_authenticated']),
                 'lock_version' => $version + 1,
                 'updated_at' => now()->toAtomString(),
             ]);
@@ -73,9 +74,14 @@ class ToolSeoService
             if (! $seo['is_published']) {
                 continue;
             }
-            $seo['content_html'] = $this->renderer->renderNodes($seo['content']);
+            $seo['show_article'] = ! ($seo['hide_when_authenticated'] && $request->user() !== null);
+            $seo['content_html'] = $seo['show_article'] ? $this->renderer->renderNodes($seo['content']) : '';
+            $seo['tool_name'] = $tool['name'];
             $seo['faq'] = collect($seo['faq'] ?? [])->filter(fn (mixed $item): bool => is_array($item)
                 && filled($item['question'] ?? null) && filled($item['answer'] ?? null))->values()->all();
+            if (! $seo['show_article']) {
+                $seo['faq'] = [];
+            }
             $seo['schemas'] = $this->schemas($seo, $tool);
 
             return $seo;
@@ -110,6 +116,7 @@ class ToolSeoService
             'seo_title' => null, 'seo_description' => null, 'meta_keywords' => null, 'focus_keyword' => null,
             'cover_image' => null, 'cover_alt' => null, 'robots' => 'index,follow',
             'article_schema' => true, 'breadcrumb_schema' => true, 'is_published' => false, 'lock_version' => 0, 'updated_at' => null,
+            'hide_when_authenticated' => false,
         ];
     }
 
@@ -121,7 +128,7 @@ class ToolSeoService
     private function schemas(array $seo, array $tool): array
     {
         $schemas = [];
-        if ($seo['article_schema']) {
+        if ($seo['article_schema'] && $seo['show_article']) {
             $schemas[] = array_filter([
                 '@context' => 'https://schema.org', '@type' => 'Article', 'headline' => $seo['title'],
                 'inLanguage' => $seo['language'], 'description' => $seo['seo_description'] ?: $seo['excerpt'],

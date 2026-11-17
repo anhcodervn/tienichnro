@@ -43,6 +43,9 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
     ];
 
     protected $hidden = [
+        'game_password_captcha_key',
+        'game_password_captcha_secret',
+        'game_password_captcha_profile',
         'password',
         'game_service_secondary_password',
         'remember_token',
@@ -55,6 +58,9 @@ class User extends Authenticatable implements CanResetPassword, JWTSubject, Must
     protected function casts(): array
     {
         return [
+            'game_password_captcha_key' => 'encrypted',
+            'game_password_captcha_secret' => 'encrypted',
+            'game_password_captcha_profile' => 'array',
             'email_verified_at' => 'datetime',
             'last_login_at' => 'datetime',
             'password' => 'hashed',

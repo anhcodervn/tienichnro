@@ -11,11 +11,11 @@
                 <h2 class="text-xl font-bold text-slate-900">{{ $service['name'] }}</h2>
                 <p class="mt-2 whitespace-pre-line text-sm text-slate-600">{{ $service['description'] }}</p>
                 @if(!$service['is_enabled'])
-                    <p class="mt-4 rounded-lg bg-amber-50 p-3 text-sm text-amber-800">{{ $service['maintenance_message'] }}</p>
+                    <p class="mt-4 rounded-[10px] bg-amber-50 p-3 text-sm text-amber-800">{{ $service['maintenance_message'] }}</p>
                 @else
                     <div class="mt-4 grid gap-3">
                         @foreach($packages->get($service['code'], collect()) as $package)
-                            <div class="min-w-0 rounded-lg border border-slate-200 bg-slate-50 p-4" data-package-id="{{ $package->id }}">
+                            <div class="min-w-0 rounded-[10px] border border-slate-200 bg-slate-50 p-4" data-package-id="{{ $package->id }}">
                                 <h3 class="break-words font-bold text-slate-900">{{ $package->name }}</h3>
                                 <p class="mt-1 font-bold text-emerald-700">{{ number_format($package->price, 0, ',', '.') }} đ</p>
                                 <p class="mt-1 text-sm text-slate-600">{{ match($package->billing_type) { 'usage' => number_format($package->usage_limit, 0, ',', '.').' lượt', 'time' => $package->duration_days.' ngày', default => 'Vĩnh viễn' } }}</p>

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 require base_path('app/Features/Captcha/api.php');
+require base_path('app/Features/Client/GameImage/api.php');
 
 Route::post('/auth/login', [AuthController::class, 'apiLogin'])->middleware('throttle:10,1')->name('api.auth.login');
 
@@ -64,3 +65,11 @@ if (file_exists(base_path('app/Features/License/routes.php'))) {
 if (file_exists(base_path('app/Features/Admin/License/routes.php'))) {
     require base_path('app/Features/Admin/License/routes.php');
 }
+
+if (file_exists(base_path('app/Features/Admin/GameImage/routes.php'))) {
+    require base_path('app/Features/Admin/GameImage/routes.php');
+}
+
+require base_path('app/Features/Admin/GamePassword/routes.php');
+
+require base_path('app/Features/Admin/GameVerification/routes.php');

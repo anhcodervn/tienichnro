@@ -217,6 +217,16 @@ class PublicSeoPageController extends Controller
                 : $pageTitle.' | '.($systemSettings['site_name'] ?: config('app.name', 'Tiện ích NRO')),
             'pageMetaDescription' => $pageDescription,
             'pageMetaUrl' => $pageUrl,
+            'breadcrumbSchema' => [
+                '@context' => 'https://schema.org', '@type' => 'BreadcrumbList',
+                'itemListElement' => collect([
+                    ['name' => 'Trang chủ', 'url' => route('home')],
+                    ['name' => 'Tin tức', 'url' => route('seo.index')],
+                    $activeCategory ? ['name' => $activeCategory->name, 'url' => $pageUrl] : null,
+                ])->filter()->values()->map(fn (array $item, int $index): array => [
+                    '@type' => 'ListItem', 'position' => $index + 1, 'name' => $item['name'], 'item' => $item['url'],
+                ])->all(),
+            ],
             'pageMetaCanonical' => $posts->currentPage() > 1 && $search === '' ? $pageUrl.'?page='.$posts->currentPage() : $pageUrl,
             'pageMetaRobots' => $search !== '' ? 'noindex,follow' : ($activeCategory?->robots ?: 'index,follow'),
             'featuredPost' => $featuredPost ? $this->transformPost($featuredPost) : null,

@@ -2,6 +2,31 @@ export default {
     path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),
     children: [
+        { path: 'game-verification', redirect: { name: 'admin.game-verification.configuration' } },
+        {
+            path: 'game-verification/configuration',
+            name: 'admin.game-verification.configuration',
+            component: () => import('@/pages/admin/game-verification/configuration.vue'),
+        },
+        {
+            path: 'game-verification/history',
+            name: 'admin.game-verification.history',
+            component: () => import('@/pages/admin/game-verification/history.vue'),
+        },
+        { path: 'game-password', redirect: { name: 'admin.game-password.configuration' } },
+        {
+            path: 'game-password/configuration',
+            name: 'admin.game-password.configuration',
+            component: () => import('@/pages/admin/game-password/configuration.vue'),
+        },
+        { path: 'game-password/history', name: 'admin.game-password.history', component: () => import('@/pages/admin/game-password/history.vue') },
+        { path: 'game-image', redirect: { name: 'admin.game-image.configuration' } },
+        {
+            path: 'game-image/configuration',
+            name: 'admin.game-image.configuration',
+            component: () => import('@/pages/admin/game-image/configuration.vue'),
+        },
+        { path: 'game-image/history', name: 'admin.game-image.history', component: () => import('@/pages/admin/game-image/history.vue') },
         { path: 'captcha/providers', name: 'admin.captcha.providers', component: () => import('@/pages/admin/captcha/providers.vue') },
         { path: 'wallets/token-captcha', name: 'admin.captcha.wallet', component: () => import('@/pages/admin/captcha/index.vue') },
         {

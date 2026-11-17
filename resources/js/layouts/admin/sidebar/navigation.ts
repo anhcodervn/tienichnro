@@ -1,5 +1,6 @@
 import {
     Globe2,
+    Images,
     KeyRound,
     Layers3,
     LayoutDashboard,
@@ -31,6 +32,16 @@ export type AdminMenuGroup = {
 };
 
 export const adminMenuGroups: AdminMenuGroup[] = [
+    {
+        key: 'game-verification',
+        label: 'Xác minh tài khoản game',
+        icon: ScanLine,
+        section: 'services',
+        children: [
+            { label: 'Cấu hình', href: '/admin/game-verification/configuration' },
+            { label: 'Lịch sử lấy cú pháp', href: '/admin/game-verification/history' },
+        ],
+    },
     { key: 'overview', label: 'Tổng quan', icon: LayoutDashboard, href: '/admin' },
     { key: 'users', label: 'Người dùng', icon: Users, section: 'customers', href: '/admin/users' },
     {
@@ -56,6 +67,26 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         ],
     },
     { key: 'tools', label: 'Cấu hình công cụ', icon: Layers3, section: 'services', href: '/admin/tools' },
+    {
+        key: 'game-password',
+        label: 'Đổi mật khẩu game',
+        icon: KeyRound,
+        section: 'services',
+        children: [
+            { label: 'Cấu hình', href: '/admin/game-password/configuration' },
+            { label: 'Lịch sử đổi mật khẩu', href: '/admin/game-password/history' },
+        ],
+    },
+    {
+        key: 'game-image',
+        label: 'Ghép ảnh',
+        icon: Images,
+        section: 'services',
+        children: [
+            { label: 'Cấu hình', href: '/admin/game-image/configuration' },
+            { label: 'Lịch sử ghép ảnh', href: '/admin/game-image/history' },
+        ],
+    },
     {
         key: 'captcha',
         label: 'Giải captcha',

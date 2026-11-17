@@ -4,6 +4,7 @@ use App\Features\Captcha\Controllers\CaptchaController;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/giai-captcha-nro', [CaptchaController::class, 'index'])->name('tools.captcha');
+Route::post('/giai-captcha-nro/try', [CaptchaController::class, 'demo'])->middleware('throttle:5,1')->name('tools.captcha.demo');
 Route::middleware(['auth', 'throttle:60,1'])->prefix('giai-captcha-nro')->name('tools.captcha.')->group(function (): void {
     Route::post('/solve', [CaptchaController::class, 'solve'])->name('solve');
     Route::post('/purchase', [CaptchaController::class, 'purchase'])->name('purchase');

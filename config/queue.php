@@ -29,6 +29,14 @@ return [
     */
 
     'connections' => [
+        'game_verification' => [
+            'driver' => 'database', 'connection' => null, 'table' => 'jobs',
+            'queue' => 'game-verification', 'retry_after' => 360, 'after_commit' => false,
+        ],
+        'game_password' => [
+            'driver' => 'database', 'connection' => null, 'table' => 'jobs',
+            'queue' => 'game-password', 'retry_after' => 360, 'after_commit' => false,
+        ],
 
         'sync' => [
             'driver' => 'sync',

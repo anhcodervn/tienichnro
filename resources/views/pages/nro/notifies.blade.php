@@ -3,19 +3,20 @@
 @section('description', 'Theo dõi Boss Ngọc Rồng Online theo server: vị trí xuất hiện, người tiêu diệt và thời gian hồi sinh.')
 @section('canonical', route('nro.notifies.page'))
 @section('robots', request()->query() ? 'noindex,follow' : 'index,follow')
+@section('tool_title', 'Thông báo game')
+@section('tool_description', 'Theo dõi vòng đời Boss và các thông báo trong game. Giờ hiển thị: Việt Nam (UTC+7).')
+@section('tool_actions')
+    @if($service['is_enabled'])<a data-nro-refresh class="client-button-secondary" href="{{ route('nro.notifies.page', $filters) }}">Làm mới</a>@endif
+@endsection
 @section('content')
 <div class="nro-feed-page bg-slate-50">
-<section class="client-container py-8 sm:py-10" @if($service['is_enabled']) data-nro-clock="{{ $snapshot['server_time'] }}" data-nro-realtime="{{ $realtime ? 'true' : 'false' }}" @guest data-nro-guest-expires="{{ $guestExpiresAt * 1000 }}" data-nro-login-url="{{ route('auth.login') }}" @endguest @if($realtime) data-nro-stream="{{ route('nro.notifies.stream', $filters) }}" @endif data-nro-signature="{{ $snapshot['signature'] }}" @endif>
-    <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div><p class="text-sm font-bold text-emerald-700">Tiện ích Ngọc Rồng Online</p><h1 class="mt-2 text-3xl font-extrabold text-slate-900">Thông báo game</h1><p class="mt-2 text-slate-600">Theo dõi vòng đời Boss và các thông báo trong game. Giờ hiển thị: Việt Nam (UTC+7).</p></div>
-        @if($service['is_enabled'])<a data-nro-refresh class="inline-flex min-h-11 items-center justify-center rounded-[10px] border border-slate-300 bg-white px-4 py-2 text-sm font-semibold hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-600 focus-visible:ring-offset-2" href="{{ route('nro.notifies.page', $filters) }}">Làm mới</a>@endif
-    </div>
+<section class="min-w-0" @if($service['is_enabled']) data-nro-clock="{{ $snapshot['server_time'] }}" data-nro-realtime="{{ $realtime ? 'true' : 'false' }}" @guest data-nro-guest-expires="{{ $guestExpiresAt * 1000 }}" data-nro-login-url="{{ route('auth.login') }}" @endguest @if($realtime) data-nro-stream="{{ route('nro.notifies.stream', $filters) }}" @endif data-nro-signature="{{ $snapshot['signature'] }}" @endif>
     <a class="client-button mb-6 w-full text-center" href="https://zalo.me/g/k0dn4sno8cwi9qjqhgan">Nhận thông báo SKH qua zalo</a>
     @if(!$service['is_enabled'])
         <x-client.service-maintenance :message="$service['maintenance_message']" />
     @else
     @guest
-        <div class="mb-5 grid gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+        <div class="mb-5 grid gap-3 rounded-[10px] border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
             <p>Bạn có thể xem tối đa 30 thông báo mới nhất trong một giờ gần nhất. Cứ 5 phút sẽ có lời nhắc đăng nhập; sau lần nhắc thứ 3, cập nhật trực tiếp sẽ dừng.</p>
             <p>Vui lòng đăng nhập để gỡ bỏ hạn chế.</p>
             <a class="w-fit font-bold underline" href="{{ route('auth.login') }}">Đăng nhập để tiếp tục sử dụng</a>

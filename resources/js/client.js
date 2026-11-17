@@ -2,9 +2,14 @@ import { initializeClientAuth } from './client-auth';
 import { initializeCaptchaTool } from './client-captcha';
 import { initializeClientCatalogModals } from './client-catalog-modals';
 import { initializeGameDataPage } from './client-game-data';
+import { initializeGameImageAccounts } from './client-game-image-accounts';
+import { initializeGameImageRealtime } from './client-game-image-realtime';
+import { initializeGamePassword } from './client-game-password';
+import { initializeGameVerification } from './client-game-verification';
 import { initializeLicenseRotation } from './client-license-rotation';
 import { initializeClientNotifications } from './client-notifications';
 import { initializePotentialCalculator } from './client-potential';
+import { initializeSeoArticles } from './client-seo-article';
 import { initializeNotificationSubscriptions } from './client-subscriptions';
 import { initializeClientTheme } from './client-theme';
 import { initializeGameEffects } from './game-effect-renderer';
@@ -21,8 +26,13 @@ initializeNroAccess();
 initializeClientCatalogModals();
 initializeNotificationSubscriptions();
 initializeGameDataPage();
+initializeGameImageAccounts();
+initializeGamePassword();
+initializeGameVerification();
+initializeGameImageRealtime();
 initializeGameEffects();
 initializeLicenseRotation();
+initializeSeoArticles();
 
 document.querySelectorAll('[data-license-toggle]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -53,7 +63,7 @@ document.querySelectorAll('[data-license-copy]').forEach((button) => {
 });
 
 const imageViewerContainers = Array.from(document.querySelectorAll('[data-client-image-viewer]')).filter(
-    (container) => container instanceof HTMLElement && container.querySelector('img[src]'),
+    (container) => container instanceof HTMLElement,
 );
 
 if (imageViewerContainers.length > 0) {
@@ -135,19 +145,16 @@ if (imageViewerContainers.length > 0) {
             image.tabIndex = 0;
             image.setAttribute('role', 'button');
             image.setAttribute('aria-label', image.alt ? `Xem ảnh lớn: ${image.alt}` : 'Xem ảnh lớn');
-
-            image.addEventListener('click', (event) => {
-                event.preventDefault();
-                openViewer(image, images);
-            });
-
-            image.addEventListener('keydown', (event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                    event.preventDefault();
-                    openViewer(image, images);
-                }
-            });
         });
+        const showImage = (event) => {
+            if (event.type === 'keydown' && !['Enter', ' '].includes(event.key)) return;
+            const image = event.target instanceof Element ? event.target.closest('img[src]') : null;
+            if (!image || !container.contains(image)) return;
+            event.preventDefault();
+            openViewer(image, Array.from(container.querySelectorAll('img[src]')));
+        };
+        container.addEventListener('click', showImage);
+        container.addEventListener('keydown', showImage);
     });
 
     viewer.addEventListener('click', (event) => {

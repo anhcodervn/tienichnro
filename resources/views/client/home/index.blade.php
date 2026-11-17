@@ -12,8 +12,8 @@
 <div class="client-container grid gap-4 py-4 sm:gap-5 sm:py-6">
     <header class="rounded-[10px] border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 px-4 py-4 shadow-sm sm:px-6 sm:py-5" data-home-compact-header>
         <p class="text-xs font-extrabold uppercase tracking-[0.14em] text-emerald-700">Tiện ích NRO · Công cụ hỗ trợ game</p>
-        <h1 class="mt-1.5 max-w-4xl text-2xl font-extrabold leading-tight tracking-tight text-slate-950 sm:text-3xl">{{ $homeSeo['h1'] }}</h1>
-        <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600">Chọn công cụ bạn cần để theo dõi Boss, thông báo và hỗ trợ chơi Ngọc Rồng Online. Tin tức và hướng dẫn được cập nhật trong mục riêng.</p>
+        <h1 class="mt-1.5 max-w-4xl text-[22px] font-extrabold leading-tight tracking-tight text-slate-950 sm:text-[26px]">{{ $homeSeo['meta_title'] }}</h1>
+        <p class="mt-2 max-w-4xl text-sm leading-6 text-slate-600">{{ $homeSeo['meta_description'] }}</p>
     </header>
     <section id="cong-cu" class="scroll-mt-24 rounded-[10px] border border-slate-200 bg-white p-3 shadow-sm sm:p-5" aria-labelledby="home-tools-title" data-home-tool-picker>
         <div class="flex items-end justify-between gap-3 px-1 pb-4"><div><p class="text-xs font-bold uppercase tracking-[0.12em] text-emerald-700">Chọn nhanh</p><h2 id="home-tools-title" class="mt-0.5 text-lg font-extrabold text-slate-950 sm:text-xl">Công cụ hỗ trợ Ngọc Rồng Online</h2></div><span class="hidden text-xs font-semibold text-slate-500 sm:inline">Chọn công cụ để sử dụng</span></div>
@@ -32,15 +32,15 @@
                     <div class="p-4"><p class="text-xs text-slate-500">{{ $post->published_at->format('d/m/Y') }}</p><h3 class="mt-2 font-bold leading-6 text-slate-900"><a class="hover:text-emerald-700" href="{{ $post->category ? route('seo.show', ['categorySlug' => $post->category->slug, 'postSlug' => $post->slug]) : route('seo.legacy.show', $post->slug) }}">{{ $post->title }}</a></h3>@if($post->excerpt)<p class="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">{{ $post->excerpt }}</p>@endif</div>
                 </article>
             @empty
-                <p class="col-span-full rounded-[8px] bg-slate-50 p-5 text-sm text-slate-500">Tin tức và hướng dẫn đang được cập nhật.</p>
+                <p class="col-span-full rounded-[10px] bg-slate-50 p-5 text-sm text-slate-500">Tin tức và hướng dẫn đang được cập nhật.</p>
             @endforelse
         </div>
     </section>
     @if($homeContentHtml !== '')
-        <section class="rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5"><h2 class="text-xl font-extrabold text-slate-950">{{ $homeSeo['article_title'] }}</h2><div class="article-content mt-4" data-client-image-viewer>{!! $homeContentHtml !!}</div></section>
+        <div class="mb-6"><x-client.seo-article :title="$homeSeo['article_title']" id="home-seo"><div data-client-image-viewer>{!! $homeContentHtml !!}</div></x-client.seo-article></div>
     @endif
     @if($homeFaq->isNotEmpty())
-        <section class="rounded-[10px] border border-slate-200 bg-white p-4 shadow-sm sm:p-5"><h2 class="text-xl font-extrabold text-slate-950">Câu hỏi thường gặp</h2><div class="mt-4 grid gap-3 lg:grid-cols-2">@foreach($homeFaq as $faq)<details class="group rounded-[8px] border border-slate-200 bg-slate-50 p-4 open:border-emerald-200 open:bg-emerald-50/40"><summary class="cursor-pointer font-bold text-slate-950">{{ $faq['question'] }}</summary><p class="mt-3 text-sm leading-6 text-slate-600">{{ $faq['answer'] }}</p></details>@endforeach</div></section>
+        <x-client.seo-faq :items="$homeFaq" id="home-seo-faq" />
     @endif
 </div>
 @endsection

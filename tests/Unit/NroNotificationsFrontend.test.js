@@ -40,7 +40,6 @@ function ajaxFixture(dataset = {}, alerts = { fire: async () => ({ isConfirmed: 
                     '[data-nro-filters]': form,
                     '[data-nro-loading]': loading,
                     '[data-nro-error]': error,
-                    '[data-nro-refresh]': refresh,
                 }[selector] || null
             );
         }
@@ -55,7 +54,7 @@ function ajaxFixture(dataset = {}, alerts = { fire: async () => ({ isConfirmed: 
     Object.assign(root.dataset, dataset);
     DOMPurify.sanitize = (html) => html;
     globalThis.HTMLElement = Element;
-    globalThis.document = { querySelector: () => root };
+    globalThis.document = { querySelector: (selector) => (selector === '[data-nro-refresh]' ? refresh : root) };
     globalThis.window = {
         location: { href: form.action, origin: 'https://example.test', reload: () => ++reloads.count },
         history: { pushState: (_, __, url) => (window.location.href = url) },
@@ -322,7 +321,7 @@ test('relative labels update on initial load and SSE heartbeats using server tim
     }
     try {
         globalThis.HTMLElement = Element;
-        globalThis.document = { querySelector: () => new Element() };
+        globalThis.document = { querySelector: (selector) => (selector === '[data-nro-clock]' ? new Element() : null) };
         globalThis.window = { setInterval: () => 1, addEventListener: () => {}, EventSource: true };
         globalThis.EventSource = class {
             addEventListener(name, listener) {
@@ -374,7 +373,7 @@ test('SSE snapshots replace page rows pagination and totals without adding timer
     try {
         DOMPurify.sanitize = (html) => html;
         globalThis.HTMLElement = Element;
-        globalThis.document = { querySelector: () => new Element() };
+        globalThis.document = { querySelector: (selector) => (selector === '[data-nro-clock]' ? new Element() : null) };
         globalThis.window = { setInterval: () => ++timerCount, addEventListener: () => {}, EventSource: true };
         globalThis.EventSource = class {
             constructor(url) {

@@ -16,8 +16,8 @@
     @endauth
     <div class="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         @foreach($packages as $package)
-        <article class="min-w-0 rounded-lg border border-slate-200 bg-white p-4" data-package-card="{{ $package->id }}" data-package-id="{{ $package->id }}">
-            <div class="flex items-start justify-between gap-2"><h3 class="min-w-0 break-words text-sm font-extrabold text-slate-950">{{ $package->name }}</h3><span class="shrink-0 rounded bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">{{ $package->notification_mode === 'personal' ? 'Cá nhân' : ($package->notification_mode === 'webhook' ? 'Webhook' : 'Dịch vụ') }}</span></div>
+        <article class="min-w-0 rounded-[10px] border border-slate-200 bg-white p-4" data-package-card="{{ $package->id }}" data-package-id="{{ $package->id }}">
+            <div class="flex items-start justify-between gap-2"><h3 class="min-w-0 break-words text-sm font-extrabold text-slate-950">{{ $package->name }}</h3><span class="shrink-0 rounded-[10px] bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">{{ $package->notification_mode === 'personal' ? 'Cá nhân' : ($package->notification_mode === 'webhook' ? 'Webhook' : 'Dịch vụ') }}</span></div>
             <p class="mt-3 text-lg font-extrabold text-emerald-700">{{ number_format($package->price, 0, ',', '.') }} đ</p>
             <p class="mt-1 text-xs font-semibold text-slate-600">{{ $package->billing_type === 'lifetime' ? 'Vĩnh viễn' : ($package->billing_type === 'usage' ? number_format($package->usage_limit, 0, ',', '.').' lượt' : $package->duration_days.' ngày') }}</p>
             @if($package->description)<p class="mt-2 whitespace-pre-line break-words text-xs leading-relaxed text-slate-500">{{ $package->description }}</p>@endif
@@ -42,13 +42,13 @@
             <label class="grid min-w-0 gap-2 text-xs font-semibold {{ $field['type'] === 'textarea' ? 'sm:col-span-2' : '' }}">
                 <span>{{ $field['label'] }} @if($field['required'])<span class="text-rose-700">*</span>@endif</span>
                 @if($field['type'] === 'select')
-                <select data-service-field="{{ $field['name'] }}" data-required="{{ $field['required'] ? 'true' : 'false' }}" disabled class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 text-sm"><option value="">Chọn {{ $field['label'] }}</option>@foreach($field['options'] ?? [] as $option)<option value="{{ $option['value'] }}">{{ $option['label'] }}</option>@endforeach</select>
+                <select data-service-field="{{ $field['name'] }}" data-required="{{ $field['required'] ? 'true' : 'false' }}" disabled class="min-h-11 w-full rounded-[10px] border border-slate-300 bg-white px-3 text-sm"><option value="">Chọn {{ $field['label'] }}</option>@foreach($field['options'] ?? [] as $option)<option value="{{ $option['value'] }}">{{ $option['label'] }}</option>@endforeach</select>
                 @elseif($field['type'] === 'textarea')
-                <textarea data-service-field="{{ $field['name'] }}" data-required="{{ $field['required'] ? 'true' : 'false' }}" disabled maxlength="2000" placeholder="{{ $field['placeholder'] ?? '' }}" class="min-h-24 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm"></textarea>
+                <textarea data-service-field="{{ $field['name'] }}" data-required="{{ $field['required'] ? 'true' : 'false' }}" disabled maxlength="2000" placeholder="{{ $field['placeholder'] ?? '' }}" class="min-h-24 w-full rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm"></textarea>
                 @elseif($field['type'] === 'boolean')
                 <span class="flex min-h-11 items-center gap-2"><input type="checkbox" data-service-field="{{ $field['name'] }}" data-required="{{ $field['required'] ? 'true' : 'false' }}" disabled class="h-4 w-4 accent-emerald-700">Bật</span>
                 @else
-                <input type="{{ in_array($field['type'], ['email', 'number', 'password'], true) ? $field['type'] : 'text' }}" data-service-field="{{ $field['name'] }}" data-required="{{ $field['required'] ? 'true' : 'false' }}" disabled @if($field['type'] === 'number') step="any" min="-1000000000000000" max="1000000000000000" @else maxlength="{{ $field['type'] === 'email' ? 254 : 2000 }}" @endif autocomplete="{{ $field['type'] === 'password' ? 'new-password' : 'off' }}" placeholder="{{ $field['placeholder'] ?? '' }}" class="min-h-11 w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm">
+                <input type="{{ in_array($field['type'], ['email', 'number', 'password'], true) ? $field['type'] : 'text' }}" data-service-field="{{ $field['name'] }}" data-required="{{ $field['required'] ? 'true' : 'false' }}" disabled @if($field['type'] === 'number') step="any" min="-1000000000000000" max="1000000000000000" @else maxlength="{{ $field['type'] === 'email' ? 254 : 2000 }}" @endif autocomplete="{{ $field['type'] === 'password' ? 'new-password' : 'off' }}" placeholder="{{ $field['placeholder'] ?? '' }}" class="min-h-11 w-full rounded-[10px] border border-slate-300 bg-white px-3 py-2 text-sm">
                 @endif
             </label>
             @endforeach
@@ -63,15 +63,15 @@
     <p data-payment-locked class="text-xs text-slate-500">Hoàn tất thông tin ở bước 2 để thanh toán.</p>
     @if($packages->isNotEmpty() && auth()->check())
     <div data-checkout-payment class="grid gap-4">
-        <dl class="grid gap-2 rounded-lg bg-slate-50 p-4 text-xs sm:grid-cols-2"><div><dt class="text-slate-500">Gói đã chọn</dt><dd data-review-name class="mt-1 font-bold"></dd></div><div><dt class="text-slate-500">Quyền sử dụng</dt><dd data-review-entitlement class="mt-1 font-bold"></dd></div></dl>
+        <dl class="grid gap-2 rounded-[10px] bg-slate-50 p-4 text-xs sm:grid-cols-2"><div><dt class="text-slate-500">Gói đã chọn</dt><dd data-review-name class="mt-1 font-bold"></dd></div><div><dt class="text-slate-500">Quyền sử dụng</dt><dd data-review-entitlement class="mt-1 font-bold"></dd></div></dl>
         <div>
             <p class="mb-2 flex items-center gap-2 text-xs font-semibold"><i class="bx bx-credit-card" aria-hidden="true"></i> Phương thức thanh toán</p>
             <div class="grid grid-cols-2 gap-2">
-                <div data-wallet-method class="flex min-h-[64px] items-center justify-center gap-2 rounded border-2 border-cyan-700 bg-cyan-50 p-3 text-cyan-900 dark:border-cyan-500 dark:bg-cyan-950 dark:text-cyan-100"><i class="bx bx-wallet text-xl" aria-hidden="true"></i><div><p class="text-xs font-bold">Số dư tài khoản</p><p class="mt-1 text-[10px]">{{ number_format($wallet->balance, 0, ',', '.') }} đ</p></div></div>
-                <button type="button" disabled class="flex min-h-[64px] items-center justify-center gap-2 rounded border border-slate-200 bg-slate-50 p-3 text-slate-400 disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-800"><i class="bx bx-qr text-xl" aria-hidden="true"></i><span><span class="block text-xs font-bold">QR thanh toán</span><span class="mt-1 block text-[10px]">Chưa hỗ trợ chuyển khoản tự động</span></span></button>
+                <div data-wallet-method class="flex min-h-[64px] items-center justify-center gap-2 rounded-[10px] border-2 border-cyan-700 bg-cyan-50 p-3 text-cyan-900 dark:border-cyan-500 dark:bg-cyan-950 dark:text-cyan-100"><i class="bx bx-wallet text-xl" aria-hidden="true"></i><div><p class="text-xs font-bold">Số dư tài khoản</p><p class="mt-1 text-[10px]">{{ number_format($wallet->balance, 0, ',', '.') }} đ</p></div></div>
+                <button type="button" disabled class="flex min-h-[64px] items-center justify-center gap-2 rounded-[10px] border border-slate-200 bg-slate-50 p-3 text-slate-400 disabled:cursor-not-allowed dark:border-slate-700 dark:bg-slate-800"><i class="bx bx-qr text-xl" aria-hidden="true"></i><span><span class="block text-xs font-bold">QR thanh toán</span><span class="mt-1 block text-[10px]">Chưa hỗ trợ chuyển khoản tự động</span></span></button>
             </div>
         </div>
-        <div data-payment-summary hidden class="grid gap-3 rounded-xl border border-emerald-200 bg-emerald-50 p-4 sm:p-5 dark:border-emerald-800 dark:bg-emerald-950">
+        <div data-payment-summary hidden class="grid gap-3 rounded-[10px] border border-emerald-200 bg-emerald-50 p-4 sm:p-5 dark:border-emerald-800 dark:bg-emerald-950">
             <div class="flex flex-wrap items-center justify-between gap-2 text-sm"><span class="text-slate-600">Giá gói dịch vụ</span><span data-review-unit-price class="font-semibold text-slate-950"></span></div>
             <div class="flex items-center justify-between gap-2 text-sm"><span class="text-slate-600">Số lượng</span><span class="font-semibold text-slate-950">1 gói</span></div>
             <div class="flex flex-wrap items-center justify-between gap-3 border-t border-emerald-200 pt-3 dark:border-emerald-800"><span class="text-sm font-extrabold text-slate-950">Tổng tiền thanh toán</span><strong data-review-price aria-live="polite" class="text-2xl font-extrabold text-emerald-700 dark:text-emerald-400 sm:text-3xl"></strong></div>
@@ -79,7 +79,7 @@
         </div>
         <p data-wallet-insufficient hidden class="text-xs text-rose-700">Số dư ví chưa đủ. <a class="font-bold underline" href="{{ route('account.wallet') }}">Mở ví để nạp thêm tiền</a>.</p>
         <p class="text-xs leading-relaxed text-slate-500">Giá được trừ từ ví khi đăng ký thành công. Thời hạn bắt đầu ngay khi kích hoạt.</p>
-        <button type="submit" disabled data-payment-submit class="flex min-h-[44px] w-full items-center justify-center gap-2 rounded bg-cyan-700 px-4 py-3 text-xs font-extrabold uppercase text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"><i class="bx bx-bolt-circle text-lg" aria-hidden="true"></i><span data-payment-submit-label>Chọn gói dịch vụ</span></button>
+        <button type="submit" disabled data-payment-submit class="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[10px] bg-cyan-700 px-4 py-3 text-xs font-extrabold uppercase text-white transition hover:bg-cyan-800 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-600 dark:disabled:bg-slate-700 dark:disabled:text-slate-400"><i class="bx bx-bolt-circle text-lg" aria-hidden="true"></i><span data-payment-submit-label>Chọn gói dịch vụ</span></button>
         <button type="button" data-edit-payload class="justify-self-start text-xs font-bold text-emerald-700">← Sửa thông tin bước 2</button>
     </div>
     @endif

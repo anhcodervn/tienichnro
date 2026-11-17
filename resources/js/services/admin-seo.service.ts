@@ -18,7 +18,7 @@ export const adminSeoService = {
         return response.data.data as AdminHomeSeoSettings;
     },
 
-    async updateHomeSeo(payload: AdminHomeSeoSettings) {
+    async updateHomeSeo(payload: Omit<AdminHomeSeoSettings, 'h1' | 'article_title'>) {
         return api.patch('/api/admin-api/seo/home', payload);
     },
 

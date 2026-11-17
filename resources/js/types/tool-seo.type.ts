@@ -16,6 +16,7 @@ export interface ToolSeoPayload {
     article_schema: boolean;
     breadcrumb_schema: boolean;
     is_published: boolean;
+    hide_when_authenticated: boolean;
     expected_version: number;
 }
 
