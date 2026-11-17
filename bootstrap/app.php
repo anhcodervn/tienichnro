@@ -45,7 +45,7 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
-        $exceptions->dontFlash(['old_password', 'new_password', 'accounts_text', 'entries', 'captcha_api_secret', 'captcha_api_key', 'captcha_proxy']);
+        $exceptions->dontFlash(['old_password', 'new_password', 'accounts_text', 'entries', 'captcha_api_secret', 'captcha_api_key', 'captcha_proxy', 'api_key', 'api_secret', 'cron_key']);
         $exceptions->render(function (Throwable $throwable, Request $request) {
             if (! $request->is('api/v1/giai-captcha-nro/solve', 'giai-captcha-nro/solve', 'giai-captcha-nro/try')) {
                 return null;

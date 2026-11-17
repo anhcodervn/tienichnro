@@ -41,7 +41,7 @@ test('wallet history is private to its owner and cannot be credited by a member'
     $service->apply($mine, 10000, 'credit', 'mine', 'My transaction');
     $service->apply($other, 10000, 'credit', 'other', 'Private transaction');
     $this->get('/tai-khoan/vi')->assertRedirect(route('login'));
-    $this->actingAs($mine)->get('/tai-khoan/vi')->assertOk()->assertSee('My transaction')->assertDontSee('Private transaction');
+    $this->actingAs($mine)->get('/tai-khoan/vi?tab=transactions')->assertOk()->assertSee('My transaction')->assertDontSee('Private transaction');
     $this->postJson('/api/admin-api/wallets/'.$mine->id.'/adjust', [])->assertForbidden();
 });
 

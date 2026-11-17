@@ -7,6 +7,7 @@ Route::middleware(['auth:sanctum', 'admin'])->prefix('admin-api/wallets')
     ->name('admin.wallets.')
     ->group(function (): void {
         Route::get('/', [WalletController::class, 'index'])->name('index');
+        Route::get('/history', [WalletController::class, 'history'])->name('history');
         Route::get('/{user}/transactions', [WalletController::class, 'transactions'])->whereNumber('user')->name('transactions');
         Route::post('/{user}/adjust', [WalletController::class, 'adjust'])->whereNumber('user')->name('adjust');
     });

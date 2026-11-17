@@ -2,6 +2,20 @@ export default {
     path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),
     children: [
+        { path: 'wallets/history', name: 'admin.wallets.history', component: () => import('@/pages/admin/wallets/history.vue') },
+        {
+            path: 'wallets/token-history',
+            name: 'admin.wallets.token-history',
+            component: () => import('@/pages/admin/wallets/history.vue'),
+            props: { kind: 'token' },
+        },
+        { path: 'recharge/configuration', name: 'admin.recharge.configuration', component: () => import('@/pages/admin/recharge/index.vue') },
+        {
+            path: 'recharge/history',
+            name: 'admin.recharge.history',
+            component: () => import('@/pages/admin/recharge/index.vue'),
+            props: { section: 'history' },
+        },
         { path: 'game-verification', redirect: { name: 'admin.game-verification.configuration' } },
         {
             path: 'game-verification/configuration',

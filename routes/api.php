@@ -73,3 +73,6 @@ if (file_exists(base_path('app/Features/Admin/GameImage/routes.php'))) {
 require base_path('app/Features/Admin/GamePassword/routes.php');
 
 require base_path('app/Features/Admin/GameVerification/routes.php');
+
+require base_path('app/Features/Admin/Recharge/routes.php');
+require base_path('app/Features/Recharge/api.php');

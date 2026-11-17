@@ -51,7 +51,11 @@ export const adminMenuGroups: AdminMenuGroup[] = [
         section: 'customers',
         children: [
             { label: 'Ví chính', href: '/admin/wallets' },
+            { label: 'Cấu hình bank', href: '/admin/recharge/configuration' },
+            { label: 'Lịch sử dòng tiền', href: '/admin/wallets/history' },
             { label: 'Token captcha', href: '/admin/wallets/token-captcha' },
+            { label: 'Lịch sử token', href: '/admin/wallets/token-history' },
+            { label: 'Lịch sử nạp', href: '/admin/recharge/history' },
         ],
     },
     {

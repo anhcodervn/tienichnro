@@ -137,6 +137,7 @@
                 ['label' => 'Dịch vụ', 'url' => route('services.index'), 'icon' => 'bx-store', 'active' => request()->routeIs('services.*'), 'opens_services' => true],
             ] : []),
             ['label' => 'Tin tức', 'url' => route('seo.index'), 'icon' => 'bx-news', 'active' => request()->routeIs('seo.*')],
+            ['label' => 'Nạp tiền', 'url' => route('account.wallet').'#nap-tien', 'icon' => 'bx-wallet', 'active' => request()->routeIs('account.wallet', 'account.recharge.*')],
         ];
     @endphp
     <header class="sticky top-0 z-50 border-b border-slate-200 bg-white/95 backdrop-blur lg:z-40">
@@ -198,7 +199,7 @@
         @endif
     </header>
     <nav class="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 pb-[env(safe-area-inset-bottom)] shadow-[0_-4px_18px_rgba(15,23,42,0.08)] backdrop-blur lg:hidden" aria-label="Điều hướng nhanh trên di động" data-mobile-bottom-nav>
-        <div class="mx-auto grid h-16 max-w-lg grid-cols-4">
+        <div @class(['mx-auto grid h-16 w-full max-w-lg', 'grid-cols-5' => count($clientLinks) === 4, 'grid-cols-6' => count($clientLinks) === 5])>
             @foreach($clientLinks as $link)<a @class(['flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold transition hover:text-emerald-700', 'text-emerald-700' => $link['active'], 'text-slate-500' => ! $link['active']]) href="{{ $link['url'] }}" @if($link['opens_tools'] ?? false) data-client-tools-open role="button" aria-haspopup="dialog" aria-controls="client-tools-modal" @endif @if($link['opens_services'] ?? false) data-client-services-open role="button" aria-haspopup="dialog" aria-controls="client-services-modal" @endif><i class="bx {{ $link['icon'] }} text-xl" aria-hidden="true"></i><span class="truncate">{{ $link['label'] === 'Thông báo game' ? 'Thông báo' : $link['label'] }}</span></a>@endforeach
             <a class="flex min-w-0 flex-col items-center justify-center gap-1 px-1 text-[11px] font-bold text-slate-500 hover:text-emerald-700" href="{{ auth()->check() ? route('account.index') : route('auth.login') }}"><i class="bx bx-user-circle text-xl" aria-hidden="true"></i><span>Tài khoản</span></a>
         </div>
