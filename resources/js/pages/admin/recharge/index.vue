@@ -19,6 +19,7 @@ const bankId = ref<number | null>(null);
 const apiKey = ref('');
 const apiSecret = ref('');
 const cronKey = ref('');
+const webhookSecret = ref('');
 const saving = ref(false);
 const loadingBanks = ref(false);
 const checking = ref(false);
@@ -70,10 +71,12 @@ async function save() {
             bank_id: bankId.value,
             ...(apiKey.value || apiSecret.value ? { api_key: apiKey.value, api_secret: apiSecret.value } : {}),
             ...(cronKey.value ? { cron_key: cronKey.value } : {}),
+            ...(webhookSecret.value ? { webhook_secret: webhookSecret.value } : {}),
         });
         apiKey.value = '';
         apiSecret.value = '';
         cronKey.value = '';
+        webhookSecret.value = '';
         handleSuccessResponse({ data: { status: true, message: 'Đã lưu cấu hình nạp tiền.' } });
     } catch (error) {
         handleErrorResponse(error);
@@ -208,9 +211,31 @@ onMounted(async () => {
                     class="rounded-[5px] border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-600"
             /></label>
             <p class="text-xs leading-5 text-slate-500">
-                Key, secret và khoá cron được lưu mã hoá. Tắt tạo lệnh mới vẫn cho cron đối soát những lệnh đã tạo. Mỗi lệnh nạp từ 10.000đ đến
-                50.000.000đ.
+                Key, secret và khoá cron/webhook được lưu mã hoá. Tắt tạo lệnh mới vẫn cho cron/webhook đối soát những lệnh đã tạo. Mỗi lệnh nạp từ
+                10.000đ đến 50.000.000đ.
             </p>
+            <label class="grid gap-2 text-sm"
+                >Webhook secret APIBankVN
+                <input
+                    v-model="webhookSecret"
+                    type="password"
+                    autocomplete="new-password"
+                    minlength="32"
+                    maxlength="200"
+                    :placeholder="
+                        configuration.webhook_secret_saved
+                            ? '•••••• Đã lưu — để trống để giữ nguyên'
+                            : 'Nhập secret giống cấu hình webhook bên APIBankVN'
+                    "
+                    class="rounded-[5px] border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-600"
+                />
+            </label>
+            <div class="grid gap-2 rounded-[5px] bg-slate-50 p-3 text-xs leading-6 text-slate-600 dark:bg-slate-800 dark:text-slate-300">
+                <p class="font-semibold">Webhook nhận giao dịch</p>
+                <code class="break-all">POST {{ configuration.webhook_url }}</code>
+                <p>Event keyword: <strong>tnr</strong> · Header: <code>X-Webhook-Secret</code> · Chữ ký: <code>md5(secret + bank_id)</code>.</p>
+                <p>Webhook xác minh lại lệnh qua APIBankVN trước khi cộng tiền. Cron tiếp tục kiểm tra dự phòng.</p>
+            </div>
             <div>
                 <button
                     type="submit"

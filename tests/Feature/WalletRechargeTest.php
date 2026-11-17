@@ -30,6 +30,18 @@ function rechargeRequest(): array
     return ['amount' => 10000, 'request_id' => (string) Str::uuid()];
 }
 
+function rechargeWebhook(WalletRechargeOrder $order, array $overrides = []): array
+{
+    return array_replace_recursive([
+        'event_keyword' => 'tnr', 'webhook_id' => 60, 'bank_id' => $order->bank_id, 'bank_account_id' => $order->bank_id,
+        'sign' => md5(str_repeat('w', 40).$order->bank_id),
+        'payload' => ['source' => 'cron.bank-sync', 'bank_account_id' => $order->bank_id, 'transaction' => [
+            'id' => 991, 'transaction_id' => 'FT123456789', 'amount' => $order->amount.'.00',
+            'description' => 'Thanh toan '.$order->transfer_content, 'type' => 'credit', 'raw_data' => [],
+        ]],
+    ], $overrides);
+}
+
 beforeEach(function (): void {
     Http::preventStrayRequests();
     Http::fake(['https://apibankvn.com/api/v1/list-bank-accounts' => Http::response(['status' => true, 'data' => ['bank_accounts' => [rechargeBank()]]]),
@@ -43,6 +55,77 @@ beforeEach(function (): void {
     $this->config = app(RechargeConfigurationService::class);
     $this->config->save(['enabled' => true, 'bank_id' => 25, 'api_key' => 'ak_private', 'api_secret' => 'sk_private', 'cron_key' => str_repeat('z', 40)]);
     $this->orders = app(RechargeOrderService::class);
+});
+
+test('webhook secret is encrypted masked and retained when omitted from later saves', function (): void {
+    $secret = str_repeat('w', 40);
+    $this->actingAs($this->admin)->putJson('/api/admin-api/recharge/configuration', ['enabled' => false, 'webhook_secret' => $secret])
+        ->assertOk()->assertJsonPath('data.webhook_secret_saved', true)->assertDontSee($secret);
+    expect($this->config->webhookSecret())->toBe($secret);
+    expect(Setting::query()->where('key', 'recharge.webhook_secret')->value('value'))->not->toContain($secret);
+    $this->config->save(['enabled' => false]);
+    expect($this->config->webhookSecret())->toBe($secret);
+});
+
+test('webhook and cron safely process the same bank transaction once', function (bool $cronFirst): void {
+    $this->config->save(['enabled' => false, 'webhook_secret' => str_repeat('w', 40)]);
+    $order = WalletRechargeOrder::factory()->create(['user_id' => $this->user->id, 'code' => 'TNRABC1234', 'transfer_content' => 'TNRABC1234']);
+    Http::fake(['https://apibankvn.com/api/v1/recharge-orders/*' => Http::response(['status' => true, 'data' => ['order' => rechargeRemote($order)]])]);
+    if ($cronFirst) {
+        app(RechargePollService::class)->run();
+    }
+    $this->withHeader('X-Webhook-Secret', str_repeat('w', 40))->postJson(route('recharge.callback.apibankvn'), rechargeWebhook($order))
+        ->assertOk()->assertJsonPath('data.status', $cronFirst ? 'already_processed' : 'paid');
+    $this->postJson(route('recharge.callback.apibankvn'), rechargeWebhook($order))->assertOk()->assertJsonPath('data.status', 'already_processed');
+    app(RechargePollService::class)->run();
+    expect($this->wallet->fresh()->balance)->toBe(11000);
+    $this->assertDatabaseCount('wallet_transactions', 1);
+})->with([false, true]);
+
+test('webhook rejects missing wrong secret invalid signatures and inconsistent bank identifiers', function (): void {
+    $order = $this->orders->create($this->user, 10000, (string) Str::uuid());
+    $payload = rechargeWebhook($order);
+    $url = route('recharge.callback.apibankvn');
+    $this->postJson($url, $payload)->assertForbidden();
+    $this->config->save(['enabled' => false, 'webhook_secret' => str_repeat('w', 40)]);
+    $this->withHeader('X-Webhook-Secret', 'wrong')->postJson($url, $payload)->assertForbidden();
+    $this->withHeader('X-Webhook-Secret', str_repeat('w', 40))->postJson($url, [...$payload, 'sign' => str_repeat('0', 32)])->assertUnauthorized();
+    $this->postJson($url, [...$payload, 'bank_account_id' => 999])->assertUnprocessable();
+    $this->postJson($url, rechargeWebhook($order, ['payload' => ['transaction' => ['amount' => '10000.01']]]))->assertUnprocessable();
+    Http::assertNotSent(fn (HttpRequest $request): bool => str_contains($request->url(), '/recharge-orders/'));
+    $this->assertDatabaseCount('wallet_transactions', 0);
+});
+
+test('webhook ignores unrelated debit ambiguous and mismatched transactions', function (array $overrides): void {
+    $order = $this->orders->create($this->user, 10000, (string) Str::uuid());
+    $this->config->save(['enabled' => false, 'webhook_secret' => str_repeat('w', 40)]);
+    $this->withHeader('X-Webhook-Secret', str_repeat('w', 40))->postJson(route('recharge.callback.apibankvn'), rechargeWebhook($order, $overrides))
+        ->assertOk()->assertJsonPath('data.status', 'ignored');
+    $this->assertDatabaseCount('wallet_transactions', 0);
+})->with(array_map(fn (array $override): array => [$override], [
+    ['event_keyword' => 'other'], ['payload' => ['transaction' => ['type' => 'debit']]],
+    ['payload' => ['transaction' => ['description' => 'NAP123 thanh toan don hang']]],
+    ['payload' => ['transaction' => ['description' => 'TNRABC1234 TNRXYZ5678']]],
+    ['payload' => ['transaction' => ['amount' => '20000.00']]],
+    ['bank_id' => 26, 'bank_account_id' => 26, 'sign' => md5(str_repeat('w', 40).'26'), 'payload' => ['bank_account_id' => 26]],
+]));
+
+test('webhook never credits unconfirmed or different bank transactions and retries provider failures', function (): void {
+    $order = $this->orders->create($this->user, 10000, (string) Str::uuid());
+    $this->config->save(['enabled' => false, 'webhook_secret' => str_repeat('w', 40)]);
+    $url = route('recharge.callback.apibankvn');
+    $this->withHeader('X-Webhook-Secret', str_repeat('w', 40));
+    Http::fake(['https://apibankvn.com/api/v1/recharge-orders/*' => Http::sequence()
+        ->push(['private' => 'must not leak'], 500)
+        ->push(['status' => true, 'data' => ['order' => rechargeRemote($order, 'paid', ['matched_bank_transaction_id' => 555])]])
+        ->push(['status' => true, 'data' => ['order' => rechargeRemote($order, 'pending')]])
+        ->push(['status' => true, 'data' => ['order' => rechargeRemote($order)]])]);
+    $this->postJson($url, rechargeWebhook($order))->assertStatus(503)->assertDontSee('must not leak');
+    $this->postJson($url, rechargeWebhook($order))->assertStatus(503);
+    $this->postJson($url, rechargeWebhook($order))->assertOk()->assertJsonPath('data.status', 'pending');
+    $this->assertDatabaseCount('wallet_transactions', 0);
+    $this->postJson($url, rechargeWebhook($order))->assertOk()->assertJsonPath('data.status', 'paid');
+    $this->assertDatabaseCount('wallet_transactions', 1);
 });
 
 test('client recharge navigation and quick amount form render with balanced mobile columns', function (bool $services): void {

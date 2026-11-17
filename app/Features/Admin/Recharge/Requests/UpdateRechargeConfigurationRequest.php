@@ -22,7 +22,8 @@ class UpdateRechargeConfigurationRequest extends FormRequest
         return ['enabled' => [$this->routeIs('admin.recharge.configure') ? 'required' : 'sometimes', 'boolean'],
             'api_key' => ['nullable', 'string', 'max:500', 'required_with:api_secret'],
             'api_secret' => ['nullable', 'string', 'max:500', 'required_with:api_key'],
-            'bank_id' => ['nullable', 'integer', 'min:1'], 'cron_key' => ['nullable', 'string', 'min:32', 'max:200']];
+            'bank_id' => ['nullable', 'integer', 'min:1'], 'cron_key' => ['nullable', 'string', 'min:32', 'max:200'],
+            'webhook_secret' => ['nullable', 'string', 'min:32', 'max:200']];
     }
 
     public function messages(): array

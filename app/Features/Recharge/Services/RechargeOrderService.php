@@ -64,7 +64,7 @@ class RechargeOrderService
         return $order;
     }
 
-    public function check(WalletRechargeOrder $order): WalletRechargeOrder
+    public function check(WalletRechargeOrder $order, ?string $expectedTransactionId = null): WalletRechargeOrder
     {
         if (! in_array($order->status, ['pending', 'processing'], true)) {
             return $order;
@@ -77,6 +77,9 @@ class RechargeOrderService
         }
         if ($status === 'paid' && (! preg_match('/\A[1-9][0-9]{0,19}\z/', (string) ($remote['matched_bank_transaction_id'] ?? '')) || empty($remote['paid_at']))) {
             throw new RuntimeException('PROVIDER_PAYMENT');
+        }
+        if ($status === 'paid' && $expectedTransactionId !== null && (string) $remote['matched_bank_transaction_id'] !== $expectedTransactionId) {
+            throw new RuntimeException('PROVIDER_MISMATCH');
         }
 
         return DB::transaction(function () use ($order, $remote, $status): WalletRechargeOrder {

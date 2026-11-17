@@ -8,6 +8,8 @@ export type RechargeConfiguration = {
     bank: Partial<RechargeBank>;
     credentials_saved: boolean;
     cron_key_saved: boolean;
+    webhook_secret_saved: boolean;
+    webhook_url: string;
     cron_url: string;
     last_check: RechargeCheck | null;
 };
@@ -44,6 +46,7 @@ export const adminRechargeService = {
         api_key?: string;
         api_secret?: string;
         cron_key?: string;
+        webhook_secret?: string;
     }): Promise<RechargeConfiguration> {
         return (await api.put('/api/admin-api/recharge/configuration', data)).data.data;
     },

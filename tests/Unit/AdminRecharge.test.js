@@ -18,6 +18,8 @@ async function page(section = 'configuration', overrides = {}) {
         bank,
         credentials_saved: true,
         cron_key_saved: true,
+        webhook_secret_saved: true,
+        webhook_url: 'https://example.test/api/recharge/callbacks/apibankvn',
         cron_url: 'https://example.test/api/recharge/cron/check',
         last_check: null,
     };
@@ -56,7 +58,7 @@ async function page(section = 'configuration', overrides = {}) {
     };
     const source = readFileSync(new URL('../../resources/js/pages/admin/recharge/index.vue', import.meta.url), 'utf8').replace(
         '</script>',
-        'defineExpose({ loadConfiguration, load, loadBanks, save, check, apiKey, apiSecret, cronKey, bankId, enabled, configuration, saving });\n</script>',
+        'defineExpose({ loadConfiguration, load, loadBanks, save, check, apiKey, apiSecret, cronKey, webhookSecret, bankId, enabled, configuration, saving });\n</script>',
     );
     const { descriptor } = parse(source);
     const script = compileScript(descriptor, { id: 'admin-recharge-test', inlineTemplate: true });
@@ -120,10 +122,13 @@ test('draft credentials verify banks without saving and are cleared after a succ
     result.state.apiKey.value = 'new-key';
     result.state.apiSecret.value = 'new-secret';
     result.state.cronKey.value = 'z'.repeat(40);
+    result.state.webhookSecret.value = 'w'.repeat(40);
     await result.state.loadBanks();
     assert.deepEqual(result.calls[0], { banks: { api_key: 'new-key', api_secret: 'new-secret' } });
     await result.state.save();
     assert.equal(result.calls[1].save.cron_key, 'z'.repeat(40));
+    assert.equal(result.calls[1].save.webhook_secret, 'w'.repeat(40));
+    assert.equal(result.state.webhookSecret.value, '');
     assert.equal(result.state.apiSecret.value, '');
     assert.equal(result.state.cronKey.value, '');
 });

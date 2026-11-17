@@ -2,10 +2,12 @@
 
 namespace App\Features\Recharge\Controllers;
 
+use App\Features\Recharge\Requests\ApiBankVnCallbackRequest;
 use App\Features\Recharge\Requests\StoreRechargeOrderRequest;
 use App\Features\Recharge\Services\RechargeConfigurationService;
 use App\Features\Recharge\Services\RechargeOrderService;
 use App\Features\Recharge\Services\RechargePollService;
+use App\Features\Recharge\Services\RechargeWebhookService;
 use App\Http\Controllers\Controller;
 use App\Models\WalletRechargeOrder;
 use Illuminate\Contracts\View\View;
@@ -15,6 +17,11 @@ use Illuminate\Http\Request;
 
 class RechargeController extends Controller
 {
+    public function callback(ApiBankVnCallbackRequest $request, RechargeWebhookService $webhook): JsonResponse
+    {
+        return response()->json(['status' => true, 'data' => $webhook->receive($request->validated())]);
+    }
+
     public function store(StoreRechargeOrderRequest $request, RechargeOrderService $orders): RedirectResponse
     {
         $order = $orders->create($request->user(), $request->integer('amount'), $request->validated('request_id'));

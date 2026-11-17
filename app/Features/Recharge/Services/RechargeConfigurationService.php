@@ -22,12 +22,18 @@ class RechargeConfigurationService
         $credentials = $this->credentials();
 
         return ['enabled' => (bool) $this->settings->get('recharge.enabled', false), 'bank_id' => (int) $this->settings->get('recharge.bank_id', 0), 'bank' => $this->settings->getArray('recharge.bank'),
-            'credentials_saved' => filled($credentials['key']) && filled($credentials['secret']), 'cron_key_saved' => filled($this->cronKey()), 'cron_url' => route('recharge.cron'), 'last_check' => Cache::get('recharge:last_check')];
+            'credentials_saved' => filled($credentials['key']) && filled($credentials['secret']), 'cron_key_saved' => filled($this->cronKey()), 'cron_url' => route('recharge.cron'),
+            'webhook_secret_saved' => filled($this->webhookSecret()), 'webhook_url' => route('recharge.callback.apibankvn'), 'last_check' => Cache::get('recharge:last_check')];
     }
 
     public function cronKey(): string
     {
         return $this->settings->getString('recharge.cron_key');
+    }
+
+    public function webhookSecret(): string
+    {
+        return $this->settings->getString('recharge.webhook_secret');
     }
 
     public function banks(array $draft): array
@@ -64,6 +70,9 @@ class RechargeConfigurationService
             }
             if (filled($data['cron_key'] ?? null)) {
                 $this->settings->putEncryptedString('recharge.cron_key', $data['cron_key']);
+            }
+            if (filled($data['webhook_secret'] ?? null)) {
+                $this->settings->putEncryptedString('recharge.webhook_secret', $data['webhook_secret']);
             }
         });
 
