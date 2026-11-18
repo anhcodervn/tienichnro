@@ -1,9 +1,8 @@
 <?php
 
 use App\Features\Client\GameImage\Services\GameImageAssetService;
-use App\Features\NroNotification\Services\NotificationReadCacheService;
 use App\Models\GameImageAccount;
-use App\Models\NroServer;
+use App\Models\ManagedServer;
 use App\Models\User;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -25,13 +24,13 @@ beforeEach(function (): void {
     Storage::fake('local');
 });
 
-test('capture form selects active game server codes from the shared password tool catalog', function (): void {
-    $server = NroServer::query()->create(['server_code' => 731, 'code' => 'sv731', 'name' => 'Shared capture server', 'is_active' => true, 'sort_order' => -10]);
-    NroServer::query()->create(['server_code' => 732, 'code' => 'sv732', 'name' => 'Inactive capture server', 'is_active' => false, 'sort_order' => -20]);
-    $catalog = app(NotificationReadCacheService::class);
-    $catalog->invalidate('catalog');
+test('capture form and admin options use only active game servers and reject other server types', function (): void {
+    $server = ManagedServer::query()->create(['type' => 'game', 'server_id' => '731', 'name' => 'Shared capture server', 'is_active' => true, 'sort_order' => 0]);
+    ManagedServer::query()->create(['type' => 'game', 'server_id' => '732', 'name' => 'Inactive capture server', 'is_active' => false, 'sort_order' => 0]);
+    ManagedServer::factory()->create(['type' => 'website', 'server_id' => '733', 'name' => 'Website only server']);
+    ManagedServer::factory()->create(['type' => 'carot', 'server_id' => '734', 'name' => 'Carot only server']);
     $response = $this->actingAs(User::factory()->create())->get(route('tools.game-image'))->assertOk()
-        ->assertViewHas('servers', fn ($servers): bool => $servers->pluck('id')->all() === $catalog->catalog()['servers']->pluck('id')->all());
+        ->assertViewHas('servers', fn ($servers): bool => $servers->pluck('id')->all() === ManagedServer::activeOptions('game')->pluck('id')->all());
     $document = new DOMDocument;
     @$document->loadHTML('<?xml encoding="UTF-8">'.$response->getContent());
     $xpath = new DOMXPath($document);
@@ -39,6 +38,12 @@ test('capture form selects active game server codes from the shared password too
         ->and($xpath->query('//select[@id="capture-server"]/option[@value="731"]')->item(0)->textContent)->toContain($server->name)
         ->and($xpath->query('//select[@id="capture-server"]/option[@value="732"]')->length)->toBe(0)
         ->and($xpath->query('//input[@id="capture-server"]')->length)->toBe(0);
+    $this->postJson(route('tools.game-image.store'), ['username' => 'new-user', 'password' => 'secret', 'server' => '733'])->assertUnprocessable();
+    $this->postJson(route('tools.game-image.store'), ['username' => 'new-user', 'password' => 'secret', 'server' => '734'])->assertUnprocessable();
+    $this->postJson(route('tools.game-image.store'), ['username' => 'new-user', 'password' => 'secret', 'server' => '732'])->assertUnprocessable();
+    $this->assertDatabaseCount('game_image_accounts', 0);
+    $this->actingAs(User::factory()->create(['role' => 'admin']))->getJson(route('admin.game-image.history'))->assertOk()
+        ->assertJsonPath('servers.0.code', '731')->assertJsonCount(1, 'servers');
 });
 
 test('account table masks usernames and paginates only the owners accounts with stable row numbers', function (): void {

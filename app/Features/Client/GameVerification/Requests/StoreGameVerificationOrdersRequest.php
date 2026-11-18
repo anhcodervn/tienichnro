@@ -3,7 +3,7 @@
 namespace App\Features\Client\GameVerification\Requests;
 
 use App\Features\Client\GamePassword\Services\GamePasswordCaptchaProfileService;
-use App\Models\NroServer;
+use App\Models\ManagedServer;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
@@ -58,7 +58,7 @@ class StoreGameVerificationOrdersRequest extends FormRequest
             'bulk' => ['sometimes', 'boolean'], 'entries' => ['required', 'array', 'list', 'min:1', 'max:100'],
             'entries.*.username' => ['required', 'string', 'max:100', 'regex:/^[^\s|]+$/u'],
             'entries.*.old_password' => ['required', 'string', 'max:200', 'regex:/^[^\r\n|]+$/'],
-            'entries.*.server_code' => ['required', 'integer', Rule::in(NroServer::query()->where('is_active', true)->pluck('server_code')->all())]];
+            'entries.*.server_code' => ['required', 'integer', Rule::exists(ManagedServer::class, 'server_id')->where('type', 'website')->where('is_active', true)]];
     }
 
     public function after(): array

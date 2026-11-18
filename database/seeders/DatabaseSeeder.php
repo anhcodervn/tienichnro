@@ -11,6 +11,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        $this->call([ArticleWebsiteSeeder::class, NroNotificationSeeder::class]);
+        $this->call([ArticleWebsiteSeeder::class, NroNotificationSeeder::class, ManagedServerSeeder::class]);
     }
 }

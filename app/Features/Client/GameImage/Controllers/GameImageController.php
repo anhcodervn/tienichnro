@@ -17,9 +17,9 @@ use App\Features\Client\GameImage\Services\GameImageAccountFeedService;
 use App\Features\Client\GameImage\Services\GameImageAccountListService;
 use App\Features\Client\GameImage\Services\GameImageAssetService;
 use App\Features\Client\GameImage\Services\GameImageOrderService;
-use App\Features\NroNotification\Services\NotificationReadCacheService;
 use App\Http\Controllers\Controller;
 use App\Models\GameImageAccount;
+use App\Models\ManagedServer;
 use Generator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
@@ -34,7 +34,7 @@ class GameImageController extends Controller
 {
     public function __construct(private readonly ToolAvailabilityService $tools) {}
 
-    public function index(GameImageAccountIndexRequest $request, GameImageOrderService $orders, GameImageAccountListService $lists, NotificationReadCacheService $readCache): View
+    public function index(GameImageAccountIndexRequest $request, GameImageOrderService $orders, GameImageAccountListService $lists): View
     {
         $filters = $request->validated();
         $accounts = $request->user() ? $lists->paginate($request->user(), $filters) : null;
@@ -44,7 +44,7 @@ class GameImageController extends Controller
             'accounts' => $accounts,
             'filters' => $filters,
             'capturePrice' => $orders->configuration()['price'],
-            'servers' => $readCache->catalog()['servers'],
+            'servers' => ManagedServer::activeOptions('game'),
         ]);
     }
 

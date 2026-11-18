@@ -8,13 +8,14 @@ use App\Models\Setting;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use Database\Seeders\ManagedServerSeeder;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
 
 function workflowAccountData(): array
 {
-    return ['username' => 'workflow-account', 'password' => 'private-game-password', 'server' => 'Vũ trụ 1'];
+    return ['username' => 'workflow-account', 'password' => 'private-game-password', 'server' => '1'];
 }
 
 function workflowCapturedFiles(): array
@@ -26,6 +27,7 @@ function workflowCapturedFiles(): array
 }
 
 beforeEach(function (): void {
+    $this->seed(ManagedServerSeeder::class);
     Storage::fake('local');
     app(GameImageOrderService::class)->configure(100);
     $this->member = User::factory()->create();

@@ -4,10 +4,9 @@ use App\Features\Client\GamePassword\Exceptions\GamePasswordFailure;
 use App\Features\Client\GamePassword\Services\GamePasswordConfigurationService;
 use App\Features\Client\GamePassword\Services\GamePasswordGatewayService;
 use App\Features\Client\GamePassword\Services\GamePasswordOrderService;
-use App\Features\NroNotification\Services\NotificationReadCacheService;
 use App\Jobs\ChangeGamePassword;
 use App\Models\GamePasswordOrder;
-use App\Models\NroServer;
+use App\Models\ManagedServer;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\Wallet;
@@ -33,23 +32,25 @@ beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->admin = User::factory()->create(['role' => 'admin']);
     $this->wallet = Wallet::factory()->create(['user_id' => $this->user->id, 'balance' => 1000]);
-    NroServer::query()->firstOrCreate(['server_code' => 3], ['code' => 'sv3', 'name' => 'Server 3', 'is_active' => true, 'sort_order' => 3])->update(['is_active' => true]);
+    ManagedServer::query()->firstOrCreate(['type' => 'website', 'server_id' => '3'], ['name' => 'Server 3', 'is_active' => true, 'sort_order' => 3])->update(['is_active' => true]);
     app(GamePasswordConfigurationService::class)->configure(['price' => 100, 'captcha_api_key' => 'private-solver-key']);
 });
 
-test('password tool shares notification server catalog but submits the game server code rather than database id', function (): void {
-    $server = NroServer::query()->create(['server_code' => 731, 'code' => 'sv731', 'name' => 'Shared notification server', 'is_active' => true, 'sort_order' => -10]);
-    NroServer::query()->create(['server_code' => 732, 'code' => 'sv732', 'name' => 'Disabled notification server', 'is_active' => false, 'sort_order' => -20]);
-    $catalog = app(NotificationReadCacheService::class);
-    $catalog->invalidate('catalog');
-    $expected = $catalog->catalog()['servers'];
+test('password tool uses active website servers and submits their configured ID', function (): void {
+    $server = ManagedServer::query()->create(['type' => 'website', 'server_id' => '731', 'name' => 'Shared notification server', 'is_active' => true, 'sort_order' => 0]);
+    ManagedServer::query()->create(['type' => 'website', 'server_id' => '732', 'name' => 'Disabled notification server', 'is_active' => false, 'sort_order' => 0]);
+    $expected = ManagedServer::activeOptions('website');
+    ManagedServer::factory()->create(['type' => 'game', 'server_id' => '733', 'name' => 'Game only server']);
+    ManagedServer::factory()->create(['type' => 'carot', 'server_id' => '734', 'name' => 'Carot only server']);
     $this->actingAs($this->user)->get(route('tools.game-password'))->assertOk()
         ->assertViewHas('servers', fn ($servers): bool => $servers->modelKeys() === $expected->modelKeys())
         ->assertSee('<option value="731"', false)->assertSee('Shared notification server')->assertDontSee('Disabled notification server');
-    expect($server->id)->not->toBe($server->server_code);
+    expect($server->id)->not->toBe((int) $server->server_id);
     $this->post(route('tools.game-password.store'), [...passwordRequest(), 'server_code' => 731])->assertRedirect(route('tools.game-password'));
     expect(GamePasswordOrder::latest('id')->first()->server_code)->toBe(731);
     $this->postJson(route('tools.game-password.store'), [...passwordRequest(), 'server_code' => 732])->assertUnprocessable();
+    $this->postJson(route('tools.game-password.store'), [...passwordRequest(), 'server_code' => 733])->assertUnprocessable();
+    $this->postJson(route('tools.game-password.store'), [...passwordRequest(), 'server_code' => 734])->assertUnprocessable();
     expect(GamePasswordOrder::count())->toBe(1)->and($this->wallet->fresh()->balance)->toBe(900);
 });
 

@@ -2,6 +2,13 @@ export default {
     path: '/admin',
     component: () => import('@/layouts/AdminLayout.vue'),
     children: [
+        { path: 'managed-servers', redirect: { name: 'admin.managed-servers.carot' } },
+        ...(['carot', 'website', 'game'] as const).map((type) => ({
+            path: `managed-servers/${type}`,
+            name: `admin.managed-servers.${type}`,
+            component: () => import('@/pages/admin/managed-servers/index.vue'),
+            props: { type },
+        })),
         { path: 'wallets/history', name: 'admin.wallets.history', component: () => import('@/pages/admin/wallets/history.vue') },
         {
             path: 'wallets/token-history',

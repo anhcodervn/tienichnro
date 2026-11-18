@@ -76,3 +76,7 @@ require base_path('app/Features/Admin/GameVerification/routes.php');
 
 require base_path('app/Features/Admin/Recharge/routes.php');
 require base_path('app/Features/Recharge/api.php');
+
+if (file_exists(base_path('app/Features/Admin/ManagedServer/routes.php'))) {
+    require base_path('app/Features/Admin/ManagedServer/routes.php');
+}

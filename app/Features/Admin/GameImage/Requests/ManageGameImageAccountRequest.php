@@ -3,6 +3,7 @@
 namespace App\Features\Admin\GameImage\Requests;
 
 use App\Exceptions\ApiException;
+use App\Models\ManagedServer;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Foundation\Http\FormRequest;
@@ -28,7 +29,7 @@ class ManageGameImageAccountRequest extends FormRequest
 
         return [...$rules,
             'username' => ['required', 'string', 'max:100', Rule::unique('game_image_accounts')->ignore($account->id)->where(fn ($query) => $query->where('user_id', $account->user_id)->where('server', $this->input('server')))],
-            'server' => ['required', 'string', 'max:100'],
+            'server' => ['required', 'string', 'max:100', Rule::exists(ManagedServer::class, 'server_id')->where('type', 'game')->where('is_active', true)],
             'password' => ['nullable', 'string', 'max:200'],
         ];
     }

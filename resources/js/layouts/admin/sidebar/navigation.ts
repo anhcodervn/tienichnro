@@ -33,6 +33,17 @@ export type AdminMenuGroup = {
 
 export const adminMenuGroups: AdminMenuGroup[] = [
     {
+        key: 'managed-servers',
+        label: 'Quản lý máy chủ',
+        icon: Globe2,
+        section: 'services',
+        children: [
+            { label: 'Server nạp Carot', href: '/admin/managed-servers/carot' },
+            { label: 'Server login website', href: '/admin/managed-servers/website' },
+            { label: 'Server login game', href: '/admin/managed-servers/game' },
+        ],
+    },
+    {
         key: 'game-verification',
         label: 'Xác minh tài khoản game',
         icon: ScanLine,

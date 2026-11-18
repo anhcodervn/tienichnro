@@ -12,9 +12,9 @@ use App\Features\Client\GamePassword\Services\GamePasswordCaptchaProfileService;
 use App\Features\Client\GamePassword\Services\GamePasswordConfigurationService;
 use App\Features\Client\GamePassword\Services\GamePasswordFeedService;
 use App\Features\Client\GamePassword\Services\GamePasswordOrderService;
-use App\Features\NroNotification\Services\NotificationReadCacheService;
 use App\Http\Controllers\Controller;
 use App\Models\GamePasswordOrder;
+use App\Models\ManagedServer;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -23,12 +23,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class GamePasswordController extends Controller
 {
-    public function index(GamePasswordHistoryRequest $request, GamePasswordOrderService $orders, GamePasswordConfigurationService $configuration, ToolAvailabilityService $tools, NotificationReadCacheService $readCache, GamePasswordCaptchaProfileService $profiles): View
+    public function index(GamePasswordHistoryRequest $request, GamePasswordOrderService $orders, GamePasswordConfigurationService $configuration, ToolAvailabilityService $tools, GamePasswordCaptchaProfileService $profiles): View
     {
         return view('pages.tools.game-password', [...$this->historyData($request, $orders),
             'configuration' => $configuration->configuration(), 'service' => $tools->find('game_password'),
             'captchaProfile' => $profiles->snapshot($request->user()),
-            'servers' => $readCache->catalog()['servers']]);
+            'servers' => ManagedServer::activeOptions('website')]);
     }
 
     public function store(StoreGamePasswordOrdersRequest $request, GamePasswordOrderService $orders, GamePasswordCaptchaProfileService $profiles): RedirectResponse

@@ -2,7 +2,7 @@
 
 use App\Features\Client\GamePassword\Services\GamePasswordConfigurationService;
 use App\Models\GamePasswordOrder;
-use App\Models\NroServer;
+use App\Models\ManagedServer;
 use App\Models\User;
 use App\Models\Wallet;
 use Illuminate\Http\Client\ConnectionException;
@@ -47,7 +47,7 @@ test('saving verifies personal keys stores encrypted fields and returns only a s
 test('saved credentials are owner scoped and new orders snapshot them without requesting them again', function (): void {
     app(GamePasswordConfigurationService::class)->configure(['price' => 100]);
     Wallet::factory()->create(['user_id' => $this->owner->id, 'balance' => 1000]);
-    NroServer::query()->firstOrCreate(['server_code' => 3], ['code' => 'sv3', 'name' => 'Server 3', 'is_active' => true, 'sort_order' => 3])->update(['is_active' => true]);
+    ManagedServer::query()->firstOrCreate(['type' => 'website', 'server_id' => '3'], ['name' => 'Server 3', 'is_active' => true, 'sort_order' => 3])->update(['is_active' => true]);
     $other = User::factory()->create();
     $this->actingAs($this->owner)->postJson($this->url, [...$this->keys, 'user_id' => $other->id])->assertOk();
     $this->actingAs($this->owner->fresh());

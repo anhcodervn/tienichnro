@@ -10,9 +10,9 @@ use App\Features\Admin\GameImage\Resources\GameImageHistoryResource;
 use App\Features\Admin\GameImage\Services\GameImageAccountManagementService;
 use App\Features\Client\GameImage\Resources\GameImageAccountResource;
 use App\Features\Client\GameImage\Services\GameImageOrderService;
-use App\Features\NroNotification\Services\NotificationReadCacheService;
 use App\Http\Controllers\Controller;
 use App\Models\GameImageAccount;
+use App\Models\ManagedServer;
 use Illuminate\Http\JsonResponse;
 
 class GameImageController extends Controller
@@ -27,7 +27,7 @@ class GameImageController extends Controller
         return response()->json(['data' => $orders->configure($request->integer('price')), 'message' => 'Đã lưu cấu hình ghép ảnh.']);
     }
 
-    public function history(GameImageHistoryRequest $request, NotificationReadCacheService $readCache): JsonResponse
+    public function history(GameImageHistoryRequest $request): JsonResponse
     {
         $filters = $request->validated();
         $accounts = GameImageAccount::query()->with('user:id,username')
@@ -38,7 +38,7 @@ class GameImageController extends Controller
                     ->orWhereHas('user', fn ($users) => $users->where('username', 'like', '%'.$filters['q'].'%'));
             }))->latest('id')->paginate(20)->withQueryString();
 
-        return GameImageHistoryResource::collection($accounts)->additional(['servers' => $readCache->catalog()['servers']->map(fn ($server): array => ['code' => (string) $server->server_code, 'name' => $server->name])])->response();
+        return GameImageHistoryResource::collection($accounts)->additional(['servers' => ManagedServer::activeOptions('game')->map(fn ($server): array => ['code' => (string) $server->server_code, 'name' => $server->name])])->response();
     }
 
     public function update(ManageGameImageAccountRequest $request, GameImageAccount $account, GameImageAccountManagementService $management): JsonResponse

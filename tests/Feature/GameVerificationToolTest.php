@@ -5,7 +5,7 @@ use App\Features\Client\GameVerification\Services\GameVerificationGatewayService
 use App\Features\Client\GameVerification\Services\GameVerificationOrderService;
 use App\Jobs\VerifyGameAccount;
 use App\Models\GameVerificationOrder;
-use App\Models\NroServer;
+use App\Models\ManagedServer;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
@@ -21,10 +21,26 @@ beforeEach(function (): void {
     $this->owner->forceFill(['game_password_captcha_key' => 'ak_owner', 'game_password_captcha_secret' => 'sk_owner',
         'game_password_captcha_profile' => ['username' => 'captcha-owner', 'balance' => '1500', 'checked_at' => now()->toISOString()]])->save();
     $this->wallet = Wallet::factory()->create(['user_id' => $this->owner->id, 'balance' => 1000]);
-    NroServer::query()->firstOrCreate(['server_code' => 3], ['code' => 'sv3', 'name' => 'Server 3', 'is_active' => true, 'sort_order' => 3])->update(['is_active' => true]);
+    ManagedServer::query()->firstOrCreate(['type' => 'website', 'server_id' => '3'], ['name' => 'Server 3', 'is_active' => true, 'sort_order' => 3])->update(['is_active' => true]);
     app(GameVerificationConfigurationService::class)->configure(100);
     $this->orders = app(GameVerificationOrderService::class);
     $this->payload = ['username' => 'game-user', 'old_password' => 'private-password', 'server_code' => 3, 'price' => 100, 'request_id' => (string) Str::uuid()];
+});
+
+test('verification uses active website servers and rejects game carot and disabled IDs in single and bulk requests', function (): void {
+    ManagedServer::factory()->create(['type' => 'website', 'server_id' => '731', 'name' => 'Website verification server']);
+    ManagedServer::factory()->create(['type' => 'website', 'server_id' => '732', 'is_active' => false]);
+    ManagedServer::factory()->create(['type' => 'game', 'server_id' => '733', 'name' => 'Game only server']);
+    ManagedServer::factory()->create(['type' => 'carot', 'server_id' => '734', 'name' => 'Carot only server']);
+    $this->actingAs($this->owner)->get(route('tools.game-verification'))->assertOk()->assertSee('Website verification server')
+        ->assertDontSee('Game only server')->assertDontSee('Carot only server');
+    foreach ([732, 733, 734] as $server) {
+        $this->postJson(route('tools.game-verification.store'), [...$this->payload, 'server_code' => $server])->assertUnprocessable();
+        $this->postJson(route('tools.game-verification.store'), [...$this->payload, 'bulk' => true, 'accounts_text' => 'bulk-user|old-pass|'.$server])->assertUnprocessable();
+    }
+    expect($this->wallet->fresh()->balance)->toBe(1000)->and(GameVerificationOrder::count())->toBe(0);
+    $this->postJson(route('tools.game-verification.store'), [...$this->payload, 'server_code' => 731])->assertRedirect();
+    expect(GameVerificationOrder::query()->sole()->server_code)->toBe(731);
 });
 
 test('verification page is public with one heading and login required for creating tasks', function (): void {

@@ -5,10 +5,12 @@ use App\Features\Client\GameImage\Services\GameImageToolService;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use Database\Seeders\ManagedServerSeeder;
 use Illuminate\Support\Str;
 use Symfony\Component\HttpKernel\Exception\HttpException;
 
 beforeEach(function (): void {
+    $this->seed(ManagedServerSeeder::class);
     $this->owner = User::factory()->create();
     $this->wallet = Wallet::factory()->create(['user_id' => $this->owner->id, 'balance' => 20000]);
     $this->orders = app(GameImageOrderService::class);
@@ -47,7 +49,7 @@ test('pause holds the paid capture lets its owner replace credentials and resume
     expect($paused->charged_amount)->toBe(10000)->and($paused->capture_claim_hash)->toBeNull()->and($paused->capture_public_key)->toBeNull()->and($paused->refunded_at)->toBeNull();
     expect(fn () => app(GameImageToolService::class)->assertClaim($paused, 1, $token))->toThrow(HttpException::class);
     $this->postJson($route, ['action' => 'resume', 'capture_version' => 1])->assertConflict();
-    $this->patchJson(route('tools.game-image.details', $this->account), ['username' => 'replacement', 'password' => 'replacement-secret', 'server' => '4', 'capture_version' => 2])->assertOk();
+    $this->patchJson(route('tools.game-image.details', $this->account), ['username' => 'replacement', 'password' => 'replacement-secret', 'server' => '6', 'capture_version' => 2])->assertOk();
     $this->postJson($route, ['action' => 'resume', 'capture_version' => 2])->assertOk()->assertJsonPath('data.status', 'pending')->assertJsonPath('data.capture_version', 3);
     expect($this->account->fresh()->username)->toBe('replacement')->and($this->account->fresh()->password)->toBe('replacement-secret')
         ->and($this->wallet->fresh()->balance)->toBe(10000)->and(WalletTransaction::query()->count())->toBe(1);

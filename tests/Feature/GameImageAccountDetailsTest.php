@@ -3,6 +3,11 @@
 use App\Models\GameImageAccount;
 use App\Models\User;
 use App\Models\WalletTransaction;
+use Database\Seeders\ManagedServerSeeder;
+
+beforeEach(function (): void {
+    $this->seed(ManagedServerSeeder::class);
+});
 
 test('owners can correct capture credentials without charges and passwords never appear in the response', function (): void {
     $user = User::factory()->create();
@@ -14,7 +19,7 @@ test('owners can correct capture credentials without charges and passwords never
     expect($account->password)->toBe('correct-secret')->and($account->getRawOriginal('password'))->not->toBe('correct-secret')
         ->and($account->status)->toBe('pending')->and($account->user_id)->toBe($user->id)->and($account->layout)->toBe($layout)
         ->and(WalletTransaction::query()->count())->toBe(0);
-    $this->patchJson(route('tools.game-image.details', $account), ['capture_version' => 2, 'username' => 'corrected', 'server' => '4', 'password' => ''])->assertOk();
+    $this->patchJson(route('tools.game-image.details', $account), ['capture_version' => 2, 'username' => 'corrected', 'server' => '6', 'password' => ''])->assertOk();
     expect($account->fresh()->password)->toBe('correct-secret');
     $html = $this->get(route('tools.game-image'))->assertOk()->getContent();
     expect($html)->toContain('data-game-image-edit-details', 'data-game-image-details-modal')->not->toContain('correct-secret');

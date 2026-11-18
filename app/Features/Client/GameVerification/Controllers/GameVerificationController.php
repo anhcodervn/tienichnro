@@ -12,9 +12,9 @@ use App\Features\Client\GameVerification\Resources\GameVerificationOrderResource
 use App\Features\Client\GameVerification\Services\GameVerificationConfigurationService;
 use App\Features\Client\GameVerification\Services\GameVerificationFeedService;
 use App\Features\Client\GameVerification\Services\GameVerificationOrderService;
-use App\Features\NroNotification\Services\NotificationReadCacheService;
 use App\Http\Controllers\Controller;
 use App\Models\GameVerificationOrder;
+use App\Models\ManagedServer;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -23,12 +23,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class GameVerificationController extends Controller
 {
-    public function index(GameVerificationHistoryRequest $request, GameVerificationOrderService $orders, GameVerificationConfigurationService $configuration, ToolAvailabilityService $tools, NotificationReadCacheService $readCache, GamePasswordCaptchaProfileService $profiles): View
+    public function index(GameVerificationHistoryRequest $request, GameVerificationOrderService $orders, GameVerificationConfigurationService $configuration, ToolAvailabilityService $tools, GamePasswordCaptchaProfileService $profiles): View
     {
         return view('pages.tools.game-verification', [...$this->historyData($request, $orders),
             'configuration' => $configuration->configuration(), 'service' => $tools->find('account_verification'),
             'captchaProfile' => $profiles->snapshot($request->user()),
-            'servers' => $readCache->catalog()['servers']]);
+            'servers' => ManagedServer::activeOptions('website')]);
     }
 
     public function store(StoreGameVerificationOrdersRequest $request, GameVerificationOrderService $orders, GamePasswordCaptchaProfileService $profiles): RedirectResponse

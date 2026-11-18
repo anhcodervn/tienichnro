@@ -5,10 +5,12 @@ use App\Models\GameImageAccount;
 use App\Models\User;
 use App\Models\Wallet;
 use App\Models\WalletTransaction;
+use Database\Seeders\ManagedServerSeeder;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
 
 beforeEach(function (): void {
+    $this->seed(ManagedServerSeeder::class);
     $this->admin = User::factory()->create(['role' => 'admin']);
     $this->owner = User::factory()->create();
     $this->wallet = Wallet::factory()->create(['user_id' => $this->owner->id, 'balance' => 1000]);
@@ -39,7 +41,7 @@ test('admin edits encrypted credentials without changing owner layout fees or re
 
 test('edits reject duplicate accounts processing captures and stale versions', function (): void {
     $account = GameImageAccount::factory()->create(['user_id' => $this->owner->id]);
-    $duplicate = GameImageAccount::factory()->create(['user_id' => $this->owner->id]);
+    $duplicate = GameImageAccount::factory()->create(['user_id' => $this->owner->id, 'server' => '3']);
     $data = ['capture_version' => 1, 'username' => $duplicate->username, 'server' => $duplicate->server];
     $this->actingAs($this->admin)->patchJson(route('admin.game-image.update', $account), $data)->assertUnprocessable();
     $data['username'] = 'edited';
