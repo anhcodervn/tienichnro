@@ -32,16 +32,16 @@ beforeEach(function (): void {
     $this->user = User::factory()->create();
     $this->admin = User::factory()->create(['role' => 'admin']);
     $this->wallet = Wallet::factory()->create(['user_id' => $this->user->id, 'balance' => 1000]);
-    ManagedServer::query()->firstOrCreate(['type' => 'website', 'server_id' => '3'], ['name' => 'Server 3', 'is_active' => true, 'sort_order' => 3])->update(['is_active' => true]);
+    ManagedServer::query()->firstOrCreate(['type' => 'web', 'server_code' => 3], ['name' => 'Server 3', 'is_active' => true, 'sort_order' => 3])->update(['is_active' => true]);
     app(GamePasswordConfigurationService::class)->configure(['price' => 100, 'captcha_api_key' => 'private-solver-key']);
 });
 
 test('password tool uses active website servers and submits their configured ID', function (): void {
-    $server = ManagedServer::query()->create(['type' => 'website', 'server_id' => '731', 'name' => 'Shared notification server', 'is_active' => true, 'sort_order' => 0]);
-    ManagedServer::query()->create(['type' => 'website', 'server_id' => '732', 'name' => 'Disabled notification server', 'is_active' => false, 'sort_order' => 0]);
-    $expected = ManagedServer::activeOptions('website');
+    $server = ManagedServer::query()->create(['type' => 'web', 'server_id' => '731', 'name' => 'Shared notification server', 'is_active' => true, 'sort_order' => 0]);
+    ManagedServer::query()->create(['type' => 'web', 'server_id' => '732', 'name' => 'Disabled notification server', 'is_active' => false, 'sort_order' => 0]);
+    $expected = ManagedServer::activeOptions('web');
     ManagedServer::factory()->create(['type' => 'game', 'server_id' => '733', 'name' => 'Game only server']);
-    ManagedServer::factory()->create(['type' => 'carot', 'server_id' => '734', 'name' => 'Carot only server']);
+    ManagedServer::factory()->create(['type' => 'napcarot', 'server_id' => '734', 'name' => 'Carot only server']);
     $this->actingAs($this->user)->get(route('tools.game-password'))->assertOk()
         ->assertViewHas('servers', fn ($servers): bool => $servers->modelKeys() === $expected->modelKeys())
         ->assertSee('<option value="731"', false)->assertSee('Shared notification server')->assertDontSee('Disabled notification server');

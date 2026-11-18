@@ -1,9 +1,13 @@
 import api from '@/config/axios';
 
-export type ServerType = 'carot' | 'website' | 'game';
+export type ServerType = 'napcarot' | 'web' | 'game';
 export type ManagedServer = { id: number; type: ServerType; server_id: string; name: string; is_active: boolean; sort_order: number };
 export type ServerDraft = Pick<ManagedServer, 'server_id' | 'name' | 'is_active' | 'sort_order'>;
-export const serverTitles: Record<ServerType, string> = { carot: 'Server nạp Carot', website: 'Server login website', game: 'Server login game' };
+export const serverTitles: Record<ServerType, string> = {
+    napcarot: 'Server NRO — Nạp Carot',
+    web: 'Server NRO — Login website',
+    game: 'Server NRO — Login game',
+};
 export const managedServerService = {
     async list(
         type: ServerType,
@@ -20,14 +24,5 @@ export const managedServerService = {
     },
     async remove(type: ServerType, id: number): Promise<void> {
         await api.delete(`/api/admin-api/managed-servers/${type}/${id}`);
-    },
-    async configuration(): Promise<{ credentials_saved: boolean; endpoint: string }> {
-        return (await api.get('/api/admin-api/managed-servers/napcarot/configuration')).data.data;
-    },
-    async configure(data: { api_key?: string; api_secret?: string }): Promise<{ credentials_saved: boolean; endpoint: string }> {
-        return (await api.put('/api/admin-api/managed-servers/napcarot/configuration', data)).data.data;
-    },
-    async sync(): Promise<{ count: number }> {
-        return (await api.post('/api/admin-api/managed-servers/napcarot/sync')).data.data;
     },
 };

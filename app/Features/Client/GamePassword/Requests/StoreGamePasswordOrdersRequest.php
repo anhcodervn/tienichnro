@@ -59,7 +59,7 @@ class StoreGamePasswordOrdersRequest extends FormRequest
             'entries.*.username' => ['required', 'string', 'max:100', 'regex:/^[^\s|]+$/u'],
             'entries.*.old_password' => ['required', 'string', 'max:200'],
             'entries.*.new_password' => ['required', 'string', 'min:6', 'max:200'],
-            'entries.*.server_code' => ['required', 'integer', Rule::exists(ManagedServer::class, 'server_id')->where('type', 'website')->where('is_active', true)]];
+            'entries.*.server_code' => ['required', 'integer', Rule::exists(ManagedServer::class, 'server_code')->where('type', 'web')->where('is_active', true)]];
     }
 
     public function after(): array

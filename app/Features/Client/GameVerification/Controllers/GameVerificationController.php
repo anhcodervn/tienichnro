@@ -28,7 +28,7 @@ class GameVerificationController extends Controller
         return view('pages.tools.game-verification', [...$this->historyData($request, $orders),
             'configuration' => $configuration->configuration(), 'service' => $tools->find('account_verification'),
             'captchaProfile' => $profiles->snapshot($request->user()),
-            'servers' => ManagedServer::activeOptions('website')]);
+            'servers' => ManagedServer::activeOptions('web')]);
     }
 
     public function store(StoreGameVerificationOrdersRequest $request, GameVerificationOrderService $orders, GamePasswordCaptchaProfileService $profiles): RedirectResponse

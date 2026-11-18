@@ -5,6 +5,7 @@ namespace App\Providers;
 use App\Features\NroNotification\Observers\NotificationReadCacheObserver;
 use App\Models\Boss;
 use App\Models\CodeNotify;
+use App\Models\ManagedServer;
 use App\Models\Notify;
 use App\Models\NroServer;
 use App\Models\QueueLog;
@@ -32,7 +33,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
-        foreach ([Notify::class, Boss::class, CodeNotify::class, NroServer::class, Setting::class] as $model) {
+        foreach ([Notify::class, Boss::class, CodeNotify::class, NroServer::class, ManagedServer::class, Setting::class] as $model) {
             $model::observe(NotificationReadCacheObserver::class);
         }
         foreach ([

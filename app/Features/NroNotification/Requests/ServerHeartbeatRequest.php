@@ -22,7 +22,7 @@ class ServerHeartbeatRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'server_code' => ['required', 'integer', 'between:0,4294967295', Rule::exists(NroServer::class, 'server_code')->where('is_active', true)],
+            'server_code' => ['required', 'integer', 'between:0,4294967295', Rule::exists(NroServer::class, 'server_code')->where('type', 'game')->where('is_active', true)],
         ];
     }
 }

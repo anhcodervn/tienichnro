@@ -34,13 +34,13 @@ export type AdminMenuGroup = {
 export const adminMenuGroups: AdminMenuGroup[] = [
     {
         key: 'managed-servers',
-        label: 'Quản lý máy chủ',
+        label: 'Server NRO',
         icon: Globe2,
         section: 'services',
         children: [
-            { label: 'Server nạp Carot', href: '/admin/managed-servers/carot' },
+            { label: 'Nạp Carot', href: '/admin/managed-servers/carot' },
             { label: 'Server login website', href: '/admin/managed-servers/website' },
-            { label: 'Server login game', href: '/admin/managed-servers/game' },
+            { label: 'Server login game', href: '/admin/nro/servers' },
         ],
     },
     {
@@ -112,7 +112,6 @@ export const adminMenuGroups: AdminMenuGroup[] = [
             { label: 'Lịch sử giải', href: '/admin/captcha/history' },
         ],
     },
-    { key: 'nro-servers', label: 'Server NRO', icon: Globe2, section: 'services', href: '/admin/nro/servers' },
     {
         key: 'nro-notifications',
         label: 'Thông báo game',

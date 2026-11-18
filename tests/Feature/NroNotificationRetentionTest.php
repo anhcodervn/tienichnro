@@ -5,6 +5,7 @@ use App\Features\NroNotification\Services\NroNotificationService;
 use App\Models\CodeNotify;
 use App\Models\Notify;
 use App\Models\NroEventReceipt;
+use App\Models\NroServer;
 use Carbon\CarbonImmutable;
 use Database\Seeders\NroNotificationSeeder;
 use Illuminate\Support\Facades\Cache;
@@ -17,7 +18,7 @@ beforeEach(function (): void {
 
 function retentionNotify(string $code, CarbonImmutable $time, array $extra = []): Notify
 {
-    return Notify::query()->create(['server_id' => 1, 'code_id' => CodeNotify::withTrashed()->where('system_key', $code)->value('id'),
+    return Notify::query()->create(['server_id' => NroServer::query()->where('server_code', 1)->sole()->id, 'code_id' => CodeNotify::withTrashed()->where('system_key', $code)->value('id'),
         'time_start' => $time, 'content' => 'Retention fixture', ...$extra]);
 }
 
@@ -49,7 +50,7 @@ test('cron uses stable system keys after types are renamed or soft deleted and p
     $type->delete();
     $old = retentionNotify('OTHER', CarbonImmutable::now()->subMonthsNoOverflow(2));
     $custom = CodeNotify::query()->create(['type_id' => $type->type_id, 'code' => 'CUSTOM', 'name' => 'Custom']);
-    $keep = Notify::query()->create(['server_id' => 1, 'code_id' => $custom->id, 'content' => 'Custom content', 'time_start' => now()->subYears(3)]);
+    $keep = Notify::query()->create(['server_id' => NroServer::query()->where('server_code', 1)->sole()->id, 'code_id' => $custom->id, 'content' => 'Custom content', 'time_start' => now()->subYears(3)]);
     $this->withToken('private-cron-key')->postJson(route('nro.notifies.prune'))->assertOk()
         ->assertJsonPath('data.deleted.OTHER', 1);
     $this->assertDatabaseMissing('notifies', ['id' => $old->id]);
@@ -82,7 +83,7 @@ test('cron prunes receipts older than 24 hours by creation time in batches witho
     $rows = [];
     for ($index = 0; $index < 1001; $index++) {
         $rows[] = [
-            'server_id' => 1, 'event_key' => hash('sha256', 'expired-'.$index),
+            'server_id' => NroServer::query()->where('server_code', 1)->sole()->id, 'event_key' => hash('sha256', 'expired-'.$index),
             'payload_hash' => hash('sha256', 'payload-'.$index), 'notify_id' => $notify->id,
             'status' => 'created', 'content' => 'Expired receipt',
             'occurred_at' => now(), 'created_at' => $boundary->subSecond(), 'updated_at' => now(),
@@ -93,7 +94,7 @@ test('cron prunes receipts older than 24 hours by creation time in batches witho
     }
     foreach ([$boundary, $boundary->addSecond(), CarbonImmutable::now()] as $index => $createdAt) {
         NroEventReceipt::query()->create([
-            'server_id' => 1, 'event_key' => hash('sha256', 'fresh-'.$index),
+            'server_id' => NroServer::query()->where('server_code', 1)->sole()->id, 'event_key' => hash('sha256', 'fresh-'.$index),
             'payload_hash' => hash('sha256', 'fresh-payload-'.$index), 'notify_id' => $notify->id,
             'status' => 'created', 'content' => 'Delayed event',
             'occurred_at' => now()->subDays(3), 'created_at' => $createdAt,

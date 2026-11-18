@@ -23,9 +23,9 @@ class UpsertServerRequest extends FormRequest
         $presence = $server instanceof NroServer ? 'sometimes' : 'required';
 
         return [
-            'code' => ['sometimes', 'nullable', 'string', 'max:50', 'regex:/^[a-zA-Z0-9_-]+$/', Rule::unique('servers', 'code')->ignore($server instanceof NroServer ? $server : null)],
+            'code' => ['sometimes', 'nullable', 'string', 'max:50', 'regex:/^[a-zA-Z0-9_-]+$/', Rule::unique('servers', 'code')->where('type', 'game')->ignore($server instanceof NroServer ? $server : null)],
             'sort_order' => ['sometimes', 'required', 'integer', 'between:0,4294967295'],
-            'server_code' => [$presence, 'required', 'integer', 'between:0,4294967295', Rule::unique('servers', 'server_code')->ignore($server instanceof NroServer ? $server : null)],
+            'server_code' => [$presence, 'required', 'integer', 'between:0,4294967295', Rule::unique('servers', 'server_code')->where('type', 'game')->ignore($server instanceof NroServer ? $server : null)],
             'name' => [$presence, 'required', 'string', 'max:100'],
             'is_active' => [$presence, 'required', 'boolean'],
         ];

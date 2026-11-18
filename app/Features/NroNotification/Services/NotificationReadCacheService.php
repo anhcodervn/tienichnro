@@ -32,7 +32,7 @@ class NotificationReadCacheService
         $store = $this->store();
         ksort($filters);
         $generation = $store->get('nro:read:'.$scope.':generation', 'initial');
-        $key = 'nro:read:v2:'.$scope.':'.$generation.':'.hash('sha256', json_encode($filters, JSON_THROW_ON_ERROR));
+        $key = 'nro:read:v3:'.$scope.':'.$generation.':'.hash('sha256', json_encode($filters, JSON_THROW_ON_ERROR));
         $cached = $store->get($key);
         if ($cached !== null) {
             return $cached;

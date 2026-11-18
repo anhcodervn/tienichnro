@@ -14,18 +14,14 @@ const lastPage = ref(1);
 const total = ref(0);
 const loading = ref(false);
 const saving = ref(false);
-const syncing = ref(false);
 const q = ref('');
 const active = ref('');
 const editingId = ref<number | null>(null);
 const form = ref<HTMLFormElement | null>(null);
 const emptyDraft = (): ServerDraft => ({ server_id: '', name: '', is_active: true, sort_order: 0 });
 const draft = reactive<ServerDraft>(emptyDraft());
-const apiKey = ref('');
-const apiSecret = ref('');
-const configuration = ref<{ credentials_saved: boolean; endpoint: string } | null>(null);
 let requestId = 0;
-const busy = computed(() => saving.value || syncing.value);
+const busy = computed(() => saving.value);
 const columns = [
     { accessorKey: 'id', header: '#' },
     { accessorKey: 'server_id', header: 'ID máy chủ' },
@@ -101,59 +97,19 @@ async function remove(row: ManagedServer) {
         saving.value = false;
     }
 }
-async function loadConfiguration() {
-    if (props.type !== 'carot') return;
-    try {
-        configuration.value = await managedServerService.configuration();
-    } catch (error) {
-        handleErrorResponse(error);
-    }
-}
-async function saveCredentials() {
-    if (busy.value) return;
-    saving.value = true;
-    try {
-        configuration.value = await managedServerService.configure(
-            apiKey.value || apiSecret.value ? { api_key: apiKey.value, api_secret: apiSecret.value } : {},
-        );
-        apiKey.value = apiSecret.value = '';
-        handleSuccessResponse({ data: { status: true, message: 'Đã lưu API Nạp Carot.' } });
-    } catch (error) {
-        handleErrorResponse(error);
-    } finally {
-        saving.value = false;
-    }
-}
-async function sync() {
-    if (busy.value || !configuration.value?.credentials_saved) return;
-    syncing.value = true;
-    try {
-        const data = await managedServerService.sync();
-        if (props.type === 'carot') {
-            await load();
-            handleSuccessResponse({ data: { status: true, message: `Đã đồng bộ ${data.count} máy chủ Ngọc Rồng.` } });
-        }
-    } catch (error) {
-        handleErrorResponse(error);
-    } finally {
-        syncing.value = false;
-    }
-}
 watch(
     () => props.type,
     () => {
         reset();
-        q.value = active.value = apiKey.value = apiSecret.value = '';
+        q.value = active.value = '';
         rows.value = [];
         total.value = 0;
         page.value = lastPage.value = 1;
         void load();
-        void loadConfiguration();
     },
 );
 onMounted(() => {
     void load();
-    void loadConfiguration();
 });
 onBeforeUnmount(() => {
     requestId++;
@@ -163,53 +119,6 @@ onBeforeUnmount(() => {
 <template>
     <div class="space-y-4">
         <Breadcrumb :title="title" description="Quản lý ID, tên, trạng thái và thứ tự máy chủ theo từng nhóm." />
-        <section
-            v-if="type === 'carot'"
-            class="grid gap-4 rounded-[5px] border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
-        >
-            <div>
-                <h2 class="text-sm font-bold">Kết nối Nạp Carot</h2>
-                <p class="mt-1 text-xs leading-5 text-slate-500">
-                    Đồng bộ server Ngọc Rồng qua API catalog. Trạng thái và thứ tự đã chỉnh tại đây được giữ nguyên.
-                </p>
-            </div>
-            <form class="grid items-end gap-3 md:grid-cols-[1fr_1fr_auto]" @submit.prevent="saveCredentials">
-                <label class="grid min-w-0 gap-2 text-sm"
-                    >API key<input
-                        v-model="apiKey"
-                        type="password"
-                        autocomplete="new-password"
-                        maxlength="500"
-                        :required="!configuration?.credentials_saved || !!apiSecret"
-                        :placeholder="configuration?.credentials_saved ? '•••••• Đã lưu — để trống để giữ nguyên' : 'API key có quyền catalog:read'"
-                        class="rounded-[5px] border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-600"
-                /></label>
-                <label class="grid min-w-0 gap-2 text-sm"
-                    >API secret<input
-                        v-model="apiSecret"
-                        type="password"
-                        autocomplete="new-password"
-                        maxlength="500"
-                        :required="!configuration?.credentials_saved || !!apiKey"
-                        :placeholder="configuration?.credentials_saved ? '•••••• Đã lưu — để trống để giữ nguyên' : 'Nhập API secret Nạp Carot'"
-                        class="rounded-[5px] border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-600"
-                /></label>
-                <button :disabled="busy" class="rounded-[5px] border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-slate-600">
-                    Lưu API
-                </button>
-            </form>
-            <div class="flex flex-wrap items-center justify-between gap-3">
-                <code class="break-all text-xs text-slate-500">{{ configuration?.endpoint ?? 'https://napcarot.com/api/v1/catalog' }}</code
-                ><button
-                    type="button"
-                    :disabled="busy || !configuration?.credentials_saved"
-                    class="rounded-[5px] bg-cyan-700 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
-                    @click="sync"
-                >
-                    {{ syncing ? 'Đang đồng bộ…' : 'Đồng bộ từ Nạp Carot' }}
-                </button>
-            </div>
-        </section>
         <form
             ref="form"
             class="grid gap-4 rounded-[5px] border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-900"
@@ -222,7 +131,8 @@ onBeforeUnmount(() => {
                         v-model="draft.server_id"
                         required
                         maxlength="50"
-                        pattern="[A-Za-z0-9_-]+"
+                        pattern="[0-9]+"
+                        inputmode="numeric"
                         placeholder="Ví dụ: 1"
                         class="rounded-[5px] border border-slate-300 bg-transparent px-3 py-2 dark:border-slate-600"
                 /></label>

@@ -7,7 +7,7 @@ export default {
             path: `managed-servers/${type}`,
             name: `admin.managed-servers.${type}`,
             component: () => import('@/pages/admin/managed-servers/index.vue'),
-            props: { type },
+            props: { type: type === 'carot' ? 'napcarot' : type === 'website' ? 'web' : type },
         })),
         { path: 'wallets/history', name: 'admin.wallets.history', component: () => import('@/pages/admin/wallets/history.vue') },
         {

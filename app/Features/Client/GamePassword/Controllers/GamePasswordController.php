@@ -28,7 +28,7 @@ class GamePasswordController extends Controller
         return view('pages.tools.game-password', [...$this->historyData($request, $orders),
             'configuration' => $configuration->configuration(), 'service' => $tools->find('game_password'),
             'captchaProfile' => $profiles->snapshot($request->user()),
-            'servers' => ManagedServer::activeOptions('website')]);
+            'servers' => ManagedServer::activeOptions('web')]);
     }
 
     public function store(StoreGamePasswordOrdersRequest $request, GamePasswordOrderService $orders, GamePasswordCaptchaProfileService $profiles): RedirectResponse

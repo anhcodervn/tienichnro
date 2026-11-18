@@ -31,8 +31,8 @@ class IngestNotifyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'server_id' => ['required_without:server_code', 'nullable', 'integer', Rule::exists('servers', 'id')->where('is_active', true)],
-            'server_code' => ['required_without:server_id', 'nullable', 'integer', Rule::exists('servers', 'server_code')->where('is_active', true)],
+            'server_id' => ['required_without:server_code', 'nullable', 'integer', Rule::exists('servers', 'id')->where('type', 'game')->where('is_active', true)],
+            'server_code' => ['required_without:server_id', 'nullable', 'integer', Rule::exists('servers', 'server_code')->where('type', 'game')->where('is_active', true)],
             'content' => ['required', 'string', 'max:10000'],
             'occurred_at' => ['required', 'date'],
             'event_id' => ['nullable', 'string', 'max:128'],

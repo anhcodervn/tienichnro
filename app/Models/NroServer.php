@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -14,7 +15,12 @@ class NroServer extends Model
 
     protected $fillable = ['server_code', 'code', 'name', 'is_active', 'sort_order'];
 
-    protected $attributes = ['connection' => false];
+    protected $attributes = ['connection' => false, 'type' => 'game'];
+
+    protected static function booted(): void
+    {
+        static::addGlobalScope('game', fn (Builder $query) => $query->where($query->qualifyColumn('type'), 'game'));
+    }
 
     protected function casts(): array
     {

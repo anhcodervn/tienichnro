@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\NroEventReceipt;
+use App\Models\NroServer;
 use App\Models\User;
 use Database\Seeders\NroNotificationSeeder;
 
@@ -12,7 +13,7 @@ beforeEach(function (): void {
 
 test('pruning receipts after 24 hours preserves notifications but permits old events to be replayed', function (): void {
     $payload = [
-        'server_id' => 1,
+        'server_id' => NroServer::query()->where('server_code', 1)->sole()->id,
         'event_id' => 'receipt-retention-replay',
         'content' => 'Receipt retention audit message',
         'occurred_at' => now()->toIso8601String(),
@@ -33,7 +34,7 @@ test('pruning receipts after 24 hours preserves notifications but permits old ev
 
 test('delayed events are accepted and need retention measured from receipt creation', function (): void {
     $this->postJson('/api/admin-api/nro/notifies', [
-        'server_id' => 1,
+        'server_id' => NroServer::query()->where('server_code', 1)->sole()->id,
         'event_id' => 'receipt-retention-delayed',
         'content' => 'Delayed receipt retention audit message',
         'occurred_at' => now()->subDays(2)->toIso8601String(),

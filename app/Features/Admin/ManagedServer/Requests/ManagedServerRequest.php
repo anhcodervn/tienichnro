@@ -22,7 +22,7 @@ class ManagedServerRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'server_id' => ['required', 'string', 'max:50', 'regex:/\A[A-Za-z0-9_-]+\z/', Rule::unique('managed_servers', 'server_id')
+            'server_id' => ['required', 'integer', 'between:0,4294967295', Rule::unique('servers', 'server_code')
                 ->where('type', $this->route('type'))->ignore($this->route('server') instanceof ManagedServer ? $this->route('server')->id : null)],
             'name' => ['required', 'string', 'max:100'],
             'is_active' => ['required', 'boolean'],

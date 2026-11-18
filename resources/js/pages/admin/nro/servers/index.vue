@@ -110,10 +110,10 @@ onMounted(() => load());
 
 <template>
     <div class="mx-auto min-w-0 max-w-7xl space-y-6">
-        <Breadcrumb :items="[{ label: 'Server NRO' }]" />
+        <Breadcrumb :items="[{ label: 'Server NRO' }, { label: 'Game', active: true }]" title="Server NRO — Game" />
         <div class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
-                <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Quản lý server NRO</h1>
+                <h1 class="text-2xl font-bold text-slate-900 dark:text-white">Server NRO — Game</h1>
                 <p class="mt-1 text-sm text-slate-500 dark:text-slate-400">Thêm server, cập nhật mã và quản lý việc nhận thông báo game.</p>
             </div>
             <RouterLink

@@ -6,15 +6,15 @@ use Database\Seeders\NroNotificationSeeder;
 
 test('server catalog matches the supplied twenty two rows and next primary key', function (): void {
     $names = ['Vũ trụ 1', 'Vũ trụ 2', 'Vũ trụ 3', 'Vũ trụ 4', 'Vũ trụ 5', 'Vũ trụ 6', 'Vũ trụ 7', 'Vũ trụ 8', 'Vũ trụ 9', 'Vũ trụ 10', 'Vũ trụ 11', 'Vũ trụ 12', 'Võ đài liên vũ trụ', 'Universe 1', 'Naga', 'Super 1', 'Super 2', 'Vũ trụ 13', 'VIP 2', 'Vũ trụ 14', 'Vũ trụ 15', 'Super 3'];
-    $this->assertDatabaseCount('servers', 22);
+    expect(NroServer::query()->count())->toBe(22);
     foreach ($names as $index => $name) {
         $this->assertDatabaseHas('servers', ['id' => $index + 1, 'server_code' => $index + 1, 'code' => 'sv'.($index + 1), 'name' => $name, 'is_active' => true, 'sort_order' => $index + 1]);
     }
-    expect(NroServer::factory()->create()->id)->toBe(23);
+    expect(NroServer::factory()->create()->id)->toBe(67);
 });
 
 test('catalog sync preserves existing primary keys notification references and custom servers', function (): void {
-    NroServer::query()->delete();
+    NroServer::withoutGlobalScopes()->delete();
     $server = NroServer::factory()->create(['id' => 100, 'server_code' => 1, 'name' => 'Old name', 'is_active' => false]);
     $custom = NroServer::factory()->create(['id' => 200, 'server_code' => 900, 'code' => 'custom']);
     $server->update(['is_active' => true]);

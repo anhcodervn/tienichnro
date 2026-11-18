@@ -18,13 +18,18 @@ beforeEach(function (): void {
     $this->actingAs(User::factory()->create(['role' => 'admin']));
     $this->travelTo(now()->setDate(2026, 10, 6)->setTime(9, 30));
 });
+function nroTestServerId(int $code): int
+{
+    return NroServer::query()->where('server_code', $code)->sole()->id;
+}
+
 function nroSpawn(array $extra = []): array
 {
-    return ['server_id' => 1, 'content' => 'Broly 3 vừa xuất hiện tại Rừng Bamboo khu 5', 'occurred_at' => '2026-10-06T09:10:00+07:00', ...$extra];
+    return ['server_id' => nroTestServerId(1), 'content' => 'Broly 3 vừa xuất hiện tại Rừng Bamboo khu 5', 'occurred_at' => '2026-10-06T09:10:00+07:00', ...$extra];
 }
 function nroDeath(array $extra = []): array
 {
-    return ['server_id' => 1, 'content' => 'Broly 3 vừa bị tiêu diệt bởi TunMeNRO', 'occurred_at' => '2026-10-06T09:18:00+07:00', ...$extra];
+    return ['server_id' => nroTestServerId(1), 'content' => 'Broly 3 vừa bị tiêu diệt bởi TunMeNRO', 'occurred_at' => '2026-10-06T09:18:00+07:00', ...$extra];
 }
 function nroSend(array $payload): TestResponse
 {
@@ -59,7 +64,7 @@ test('notification page shows a full width Zalo button beneath the page heading'
 
 test('ingestion compensates upload delay once across midnight and preserves audit timestamps', function (string $timeField): void {
     $payload = [
-        'server_id' => 1, 'code' => 'OTHER', 'content' => 'Delay compensation',
+        'server_id' => nroTestServerId(1), 'code' => 'OTHER', 'content' => 'Delay compensation',
         $timeField => '2026-10-06T00:00:05.123456+07:00', 'event_id' => 'delay-compensation',
         'expires_at' => '2026-10-06T01:00:00+07:00',
     ];
@@ -104,10 +109,10 @@ test('the live page and SSE use vertical rows with spawn and death details', fun
 
 test('death closes only the matching boss on the matching server', function (): void {
     $first = nroSend(nroSpawn())->assertCreated()->json('data.id');
-    $third = nroSend(nroSpawn(['server_id' => 3]))->assertCreated()->json('data.id');
+    $third = nroSend(nroSpawn(['server_id' => nroTestServerId(3)]))->assertCreated()->json('data.id');
     Boss::factory()->create(['name' => 'Super Broly']);
-    $other = nroSend(nroSpawn(['server_id' => 3, 'content' => 'Super Broly vừa xuất hiện tại Rừng Bamboo khu 5']))->assertCreated()->json('data.id');
-    nroSend(nroDeath(['server_id' => 3]))->assertOk()->assertJsonPath('data.id', $third);
+    $other = nroSend(nroSpawn(['server_id' => nroTestServerId(3), 'content' => 'Super Broly vừa xuất hiện tại Rừng Bamboo khu 5']))->assertCreated()->json('data.id');
+    nroSend(nroDeath(['server_id' => nroTestServerId(3)]))->assertOk()->assertJsonPath('data.id', $third);
     expect(Notify::findOrFail($first)->death_time)->toBeNull()->and(Notify::findOrFail($other)->death_time)->toBeNull();
 });
 
@@ -148,7 +153,7 @@ test('duplicate spawns are idempotent and event ids are unique per server', func
     $payload = nroSpawn(['event_id' => 'spawn-1']);
     nroSend($payload)->assertCreated();
     nroSend($payload)->assertOk()->assertJsonPath('duplicate', true);
-    nroSend([...$payload, 'server_id' => 3])->assertCreated();
+    nroSend([...$payload, 'server_id' => nroTestServerId(3)])->assertCreated();
     nroSend([...$payload, 'content' => 'Broly 3 vừa xuất hiện tại Rừng Bamboo khu 6'])->assertUnprocessable()->assertJsonValidationErrors('event_id');
     $this->assertDatabaseCount('notifies', 2);
 });
@@ -170,7 +175,7 @@ test('legacy boss input codes map to one BOSS code', function (): void {
 });
 
 test('general notifications retain their fields without boss lifecycle fields', function (string $code): void {
-    nroSend(['server_id' => 1, 'code' => $code, 'content' => 'Thông báo game nguyên bản', 'occurred_at' => '2026-10-06T09:20:00+07:00', 'char_name' => 'Player', 'metadata' => ['level' => 5], 'expires_at' => '2026-10-06T10:20:00+07:00'])
+    nroSend(['server_id' => nroTestServerId(1), 'code' => $code, 'content' => 'Thông báo game nguyên bản', 'occurred_at' => '2026-10-06T09:20:00+07:00', 'char_name' => 'Player', 'metadata' => ['level' => 5], 'expires_at' => '2026-10-06T10:20:00+07:00'])
         ->assertCreated()->assertJsonPath('data.code', $code)->assertJsonPath('data.char_name', 'Player')->assertJsonPath('data.metadata.level', 5);
     $notify = Notify::firstOrFail();
     foreach (['boss_id', 'death_content', 'death_time', 'killed_by', 'respawn_at'] as $field) {
@@ -181,11 +186,11 @@ test('general notifications retain their fields without boss lifecycle fields', 
 test('API and Blade filter living respawning history and server with pagination', function (): void {
     nroSend(nroSpawn())->assertCreated();
     nroSend(nroDeath())->assertOk();
-    nroSend(nroSpawn(['server_id' => 3]))->assertCreated();
-    $this->getJson('/api/nro/notifies?state=living')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.server_id', 3);
-    $this->getJson('/api/nro/notifies?state=respawning')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.server_id', 1);
+    nroSend(nroSpawn(['server_id' => nroTestServerId(3)]))->assertCreated();
+    $this->getJson('/api/nro/notifies?state=living')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.server_id', nroTestServerId(3));
+    $this->getJson('/api/nro/notifies?state=respawning')->assertOk()->assertJsonCount(1, 'data')->assertJsonPath('data.0.server_id', nroTestServerId(1));
     $this->getJson('/api/nro/notifies?state=history&per_page=1')->assertOk()->assertJsonPath('meta.total', 2)->assertJsonCount(1, 'data');
-    $this->getJson('/api/nro/notifies?server_id=1&state=living')->assertOk()->assertJsonCount(0, 'data');
+    $this->getJson('/api/nro/notifies?server_id='.nroTestServerId(1).'&state=living')->assertOk()->assertJsonCount(0, 'data');
     $this->get('/thong-bao-game?state=respawning')->assertOk()->assertSee('TunMeNRO')->assertSee('data-nro-respawn', false);
     $this->travelTo(now()->setTime(10, 0));
     $this->getJson('/api/nro/notifies?state=respawning')->assertOk()->assertJsonCount(0, 'data');
@@ -218,7 +223,7 @@ test('raw whitespace is preserved and Blade escapes notification content', funct
     $raw = '  Broly 3 vừa xuất hiện tại Rừng Bamboo khu 5  ';
     nroSend(nroSpawn(['content' => $raw]))->assertCreated();
     expect(Notify::firstOrFail()->content)->toBe($raw);
-    nroSend(['server_id' => 1, 'content' => '<script>alert("x")</script>', 'occurred_at' => '2026-10-06T09:20:00+07:00'])->assertCreated();
+    nroSend(['server_id' => nroTestServerId(1), 'content' => '<script>alert("x")</script>', 'occurred_at' => '2026-10-06T09:20:00+07:00'])->assertCreated();
     $this->get('/thong-bao-game')->assertOk()->assertDontSee('<script>alert("x")</script>', false)->assertSee('&lt;script&gt;', false);
 });
 
@@ -231,10 +236,10 @@ test('changing respawn configuration preserves existing death history', function
 });
 
 test('default seeding is repeatable and keeps existing server configuration', function (): void {
-    NroServer::findOrFail(1)->update(['name' => 'Custom server', 'is_active' => false]);
+    NroServer::findOrFail(nroTestServerId(1))->update(['name' => 'Custom server', 'is_active' => false]);
     $this->seed(NroNotificationSeeder::class);
-    $this->assertDatabaseCount('servers', 22);
-    expect(NroServer::findOrFail(1)->name)->toBe('Custom server')->and(NroServer::findOrFail(22)->name)->toBe('Super 3');
+    expect(NroServer::query()->count())->toBe(22);
+    expect(NroServer::findOrFail(nroTestServerId(1))->name)->toBe('Custom server')->and(NroServer::findOrFail(nroTestServerId(22))->name)->toBe('Super 3');
     $this->assertDatabaseCount('code_notifies', 8);
 });
 
@@ -276,9 +281,9 @@ test('collector logs in for a real bearer token and persists spawn and death thr
 
 test('SQL field names time_start and code_id are supported with consistent replay detection', function (): void {
     $code = CodeNotify::query()->where('code', 'MAINTENANCE')->firstOrFail();
-    $payload = ['server_id' => '1', 'code_id' => $code->id, 'content' => 'Thông báo bảo trì nguyên bản', 'time_start' => '2026-10-06T10:00:00+07:00', 'event_id' => 'sql-message'];
+    $payload = ['server_id' => (string) nroTestServerId(1), 'code_id' => $code->id, 'content' => 'Thông báo bảo trì nguyên bản', 'time_start' => '2026-10-06T10:00:00+07:00', 'event_id' => 'sql-message'];
     $id = nroSend($payload)->assertCreated()->assertJsonPath('data.code_id', $code->id)->json('data.id');
-    nroSend(['server_id' => 1, 'code' => 'MAINTENANCE', 'content' => $payload['content'], 'occurred_at' => $payload['time_start'], 'event_id' => 'sql-message'])
+    nroSend(['server_id' => nroTestServerId(1), 'code' => 'MAINTENANCE', 'content' => $payload['content'], 'occurred_at' => $payload['time_start'], 'event_id' => 'sql-message'])
         ->assertOk()->assertJsonPath('duplicate', true)->assertJsonPath('data.id', $id);
     nroSend([...$payload, 'code' => 'OTHER'])->assertUnprocessable()->assertJsonValidationErrors('code_id');
     nroSend([...$payload, 'code_id' => 999999])->assertUnprocessable()->assertJsonValidationErrors('code_id');
@@ -338,7 +343,7 @@ test('server seeding preserves an existing managed catalog without assigning pri
     $this->seed(NroNotificationSeeder::class);
     $this->seed(NroNotificationSeeder::class);
 
-    $this->assertDatabaseCount('servers', 1);
+    expect(NroServer::query()->count())->toBe(1);
     expect($server->fresh()->name)->toBe('Custom server')->and($server->fresh()->is_active)->toBeFalse();
     expect($server->fresh()->id)->toBe(100);
 });
@@ -350,6 +355,12 @@ test('server codes are unique and required in the database', function (): void {
 
 test('server code migrations backfill existing ids without changing notification references', function (): void {
     $id = nroSend(nroSpawn(['event_id' => 'before-server-migration']))->assertCreated()->json('data.id');
+    $typedCopies = require database_path('migrations/2026_11_18_103114_duplicate_nro_server_catalog_by_type.php');
+    $typedSchema = require database_path('migrations/2026_11_18_103114_add_type_to_nro_servers_table.php');
+    DB::table('notifies')->update(['server_id' => 1]);
+    DB::table('nro_event_receipts')->update(['server_id' => 1]);
+    $typedCopies->down();
+    $typedSchema->down();
     $migrationPaths = [
         '2026_10_08_091639_add_server_code_to_servers_table.php',
         '2026_10_08_091659_backfill_server_codes.php',
@@ -363,17 +374,22 @@ test('server code migrations backfill existing ids without changing notification
         $migration->up();
     }
 
-    expect(DB::table('servers')->whereColumn('server_code', '!=', 'id')->count())->toBe(0)
+    $typedSchema->up();
+    $typedCopies->up();
+
+    expect(DB::table('servers')->where('type', 'napcarot')->whereColumn('server_code', '!=', 'id')->count())->toBe(0)
         ->and(NroServer::query()->count())->toBe(22)
         ->and(Notify::findOrFail($id)->server_id)->toBe(1)
         ->and(NroEventReceipt::firstOrFail()->server_id)->toBe(1);
+    $history = require database_path('migrations/2026_11_18_104301_move_nro_notification_history_to_game_servers.php');
+    $history->up();
     nroSend(nroSpawn(['server_code' => 1, 'event_id' => 'before-server-migration']))
         ->assertOk()->assertJsonPath('duplicate', true)->assertJsonPath('data.id', $id);
 });
 
 test('the live page initially loads the latest 10 notifications and respects a custom limit', function (): void {
     for ($index = 0; $index < 105; $index++) {
-        nroSend(['server_id' => 1, 'content' => 'Notification '.$index,
+        nroSend(['server_id' => nroTestServerId(1), 'content' => 'Notification '.$index,
             'occurred_at' => now()->subSeconds(105 - $index)->toISOString()])->assertCreated();
     }
     $this->get('/thong-bao-game')->assertOk()
@@ -390,7 +406,7 @@ test('live snapshots respect filters update deaths and recover the current state
     $feed = app(NroNotificationFeedService::class);
     $stream = $feed->events(['server_code' => 1, 'state' => 'living', 'limit' => 1], 60, 0);
     expect($stream->current()->event)->toBe('notifications')->and($stream->current()->data['count'])->toBe(0);
-    nroSend(nroSpawn(['server_id' => 3]))->assertCreated();
+    nroSend(nroSpawn(['server_id' => nroTestServerId(3)]))->assertCreated();
     $stream->next();
     expect($stream->current()->event)->toBe('heartbeat');
     nroSend(nroSpawn())->assertCreated();
@@ -402,13 +418,13 @@ test('live snapshots respect filters update deaths and recover the current state
     nroSend(nroDeath())->assertOk();
     $stream->next();
     expect($stream->current()->event)->toBe('notifications')->and($stream->current()->data['count'])->toBe(0);
-    $reconnected = iterator_to_array($feed->events(['server_id' => 1], 0));
+    $reconnected = iterator_to_array($feed->events(['server_id' => nroTestServerId(1)], 0));
     expect($reconnected)->toHaveCount(1)->and($reconnected[0]->data['html'])->toContain('TunMeNRO')
         ->and($reconnected[0]->data['html'])->toContain('data-nro-respawn');
 });
 
 test('SSE sends escaped snapshots with streaming headers and validates limits before streaming', function (): void {
-    nroSend(['server_id' => 1, 'content' => '<script>alert("x")</script>', 'occurred_at' => now()->toISOString()])->assertCreated();
+    nroSend(['server_id' => nroTestServerId(1), 'content' => '<script>alert("x")</script>', 'occurred_at' => now()->toISOString()])->assertCreated();
     $feed = app(NroNotificationFeedService::class);
     $this->mock(NroNotificationFeedService::class)->shouldReceive('events')->once()->with(['limit' => 2])
         ->andReturnUsing(fn (array $filters) => $feed->events($filters, 0));

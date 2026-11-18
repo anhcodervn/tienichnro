@@ -58,7 +58,7 @@ class StoreGameVerificationOrdersRequest extends FormRequest
             'bulk' => ['sometimes', 'boolean'], 'entries' => ['required', 'array', 'list', 'min:1', 'max:100'],
             'entries.*.username' => ['required', 'string', 'max:100', 'regex:/^[^\s|]+$/u'],
             'entries.*.old_password' => ['required', 'string', 'max:200', 'regex:/^[^\r\n|]+$/'],
-            'entries.*.server_code' => ['required', 'integer', Rule::exists(ManagedServer::class, 'server_id')->where('type', 'website')->where('is_active', true)]];
+            'entries.*.server_code' => ['required', 'integer', Rule::exists(ManagedServer::class, 'server_code')->where('type', 'web')->where('is_active', true)]];
     }
 
     public function after(): array

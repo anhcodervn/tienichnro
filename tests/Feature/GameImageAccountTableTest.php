@@ -27,8 +27,8 @@ beforeEach(function (): void {
 test('capture form and admin options use only active game servers and reject other server types', function (): void {
     $server = ManagedServer::query()->create(['type' => 'game', 'server_id' => '731', 'name' => 'Shared capture server', 'is_active' => true, 'sort_order' => 0]);
     ManagedServer::query()->create(['type' => 'game', 'server_id' => '732', 'name' => 'Inactive capture server', 'is_active' => false, 'sort_order' => 0]);
-    ManagedServer::factory()->create(['type' => 'website', 'server_id' => '733', 'name' => 'Website only server']);
-    ManagedServer::factory()->create(['type' => 'carot', 'server_id' => '734', 'name' => 'Carot only server']);
+    ManagedServer::factory()->create(['type' => 'web', 'server_id' => '733', 'name' => 'Website only server']);
+    ManagedServer::factory()->create(['type' => 'napcarot', 'server_id' => '734', 'name' => 'Carot only server']);
     $response = $this->actingAs(User::factory()->create())->get(route('tools.game-image'))->assertOk()
         ->assertViewHas('servers', fn ($servers): bool => $servers->pluck('id')->all() === ManagedServer::activeOptions('game')->pluck('id')->all());
     $document = new DOMDocument;
@@ -43,7 +43,7 @@ test('capture form and admin options use only active game servers and reject oth
     $this->postJson(route('tools.game-image.store'), ['username' => 'new-user', 'password' => 'secret', 'server' => '732'])->assertUnprocessable();
     $this->assertDatabaseCount('game_image_accounts', 0);
     $this->actingAs(User::factory()->create(['role' => 'admin']))->getJson(route('admin.game-image.history'))->assertOk()
-        ->assertJsonPath('servers.0.code', '731')->assertJsonCount(1, 'servers');
+        ->assertJsonPath('servers.0.code', '731')->assertJsonCount(ManagedServer::activeOptions('game')->count(), 'servers');
 });
 
 test('account table masks usernames and paginates only the owners accounts with stable row numbers', function (): void {

@@ -76,7 +76,7 @@ test('switching a server off blocks new events and preserves history across rena
     $this->assertDatabaseCount('notifies', 1);
     $this->assertDatabaseCount('nro_event_receipts', 1);
     $this->seed(NroNotificationSeeder::class);
-    $this->assertDatabaseCount('servers', 22);
-    $this->assertDatabaseMissing('servers', ['server_code' => 1]);
+    expect(NroServer::query()->count())->toBe(22);
+    $this->assertDatabaseMissing('servers', ['type' => 'game', 'server_code' => 1]);
     $this->assertDatabaseHas('servers', ['id' => $server->id, 'server_code' => 4000, 'name' => 'Renamed server']);
 });

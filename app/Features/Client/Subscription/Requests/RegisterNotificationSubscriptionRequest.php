@@ -43,7 +43,7 @@ class RegisterNotificationSubscriptionRequest extends FormRequest
             'characters' => [$personal ? 'required' : 'prohibited', 'array', 'min:1', 'max:10'],
             'characters.*' => ['array:char_name,char_server'],
             'characters.*.char_name' => ['required', 'string', 'max:100'],
-            'characters.*.char_server' => ['required', 'integer', Rule::exists('servers', 'server_code')->where('is_active', true)],
+            'characters.*.char_server' => ['required', 'integer', Rule::exists('servers', 'server_code')->where('type', 'game')->where('is_active', true)],
             'notification_types' => [$personal ? 'required' : 'prohibited', 'array', 'min:1', 'max:100'],
             'notification_types.*' => ['required', 'string', 'distinct', Rule::exists('code_notifies', 'code')->whereNull('deleted_at')],
             'webhook_url' => [$mode === 'webhook' ? 'required' : 'prohibited', 'string', 'max:2000', new PublicWebhookUrl],

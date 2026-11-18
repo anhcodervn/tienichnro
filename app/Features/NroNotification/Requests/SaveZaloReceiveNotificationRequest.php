@@ -42,7 +42,7 @@ class SaveZaloReceiveNotificationRequest extends FormRequest
             'box_zalo_id' => ['nullable', 'string', 'max:128'],
             'zalo_id' => ['required', 'string', 'max:128'],
             'char_name' => ['required', 'string', 'max:100'],
-            'char_server' => ['required', 'integer', 'between:0,4294967295', Rule::exists(NroServer::class, 'server_code')],
+            'char_server' => ['required', 'integer', 'between:0,4294967295', Rule::exists(NroServer::class, 'server_code')->where('type', 'game')],
             'type_receive' => ['bail', 'required', 'string', 'max:1000', function (string $attribute, mixed $value, Closure $fail): void {
                 $codes = explode(',', $value);
                 $knownCodes = CodeNotify::query()->whereIn('code', $codes)->pluck('code')->all();

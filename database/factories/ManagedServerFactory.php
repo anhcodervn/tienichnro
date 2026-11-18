@@ -18,7 +18,7 @@ class ManagedServerFactory extends Factory
     public function definition(): array
     {
         return [
-            'type' => 'website', 'server_id' => fake()->unique()->bothify('SV-########'),
+            'type' => 'web', 'server_id' => (string) fake()->unique()->numberBetween(1000, 999999),
             'name' => 'Server '.fake()->word(), 'is_active' => true, 'sort_order' => 0,
         ];
     }
