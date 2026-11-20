@@ -117,18 +117,27 @@ test('selected PlusDino receives form image and query token and charges only one
     app(CaptchaProviderConfigurationService::class)->save(['is_enabled' => true], $provider);
     Http::fake([
         'nro.giaicaptcha.vn/*' => Http::response(['success' => false], 503),
-        'captcha.plusdino.com/*' => Http::response(['captcha' => 'Ab123', 'token' => 'private-token/+?', 'nested' => ['url' => 'token=private-token%2F%2B%3F']]),
+        'captcha.plusdino.com/*' => Http::response([
+            'message' => 'success',
+            'predictions' => ['captcha' => '59999', 'confidence' => '0.9123848990268727'],
+            'OriginCaptcha' => ['hint_1' => 'x-x', 'hint_2' => 'x-x', 'hint_3' => 'x-x', 'hint_4' => 'x-x', 'hint_5' => 'x-x', 'main' => 'xxxxx'],
+            'time' => 0.222, 'success' => true,
+            'token' => 'private-token/+?', 'nested' => ['url' => 'token=private-token%2F%2B%3F'],
+        ]),
     ]);
     $user = providerUser();
     $response = $this->actingAs($user)->postJson('/giai-captcha-nro/solve', ['image' => providerImage()])
-        ->assertOk()->assertJsonPath('status', true)->assertJsonPath('code', 'Ab123')->assertJsonCount(3);
+        ->assertOk()->assertJsonPath('status', true)->assertJsonPath('code', '59999')->assertJsonCount(3);
     expect(array_keys($response->json()))->toBe(['status', 'code', 'time']);
     Http::assertSentCount(1);
-    Http::assertSent(fn (Request $request): bool => $request->url() === $provider->endpoint.'?token=private-token%2F%2B%3F'
+    Http::assertSent(fn (Request $request): bool => $request->method() === 'POST'
+        && $request->url() === $provider->endpoint.'?token=private-token%2F%2B%3F'
         && $request->hasHeader('Content-Type', 'application/x-www-form-urlencoded')
         && $request->data() === ['image' => providerImage()]);
     $solve = CaptchaSolve::query()->firstOrFail();
     expect($solve->provider_name)->toBe('PlusDino 2')->and($solve->providerAttempts->pluck('status')->all())->toBe(['success'])
+        ->and($solve->response['predictions']['captcha'])->toBe('59999')
+        ->and($solve->response['predictions']['confidence'])->toBe('0.9123848990268727')
         ->and($solve->response['token'])->toBe('[REDACTED]')->and($solve->response['nested']['url'])->toBe('token=[REDACTED]');
     expect(app(CaptchaWalletService::class)->wallet($user)->balance)->toBe(9)
         ->and(app(CaptchaWalletService::class)->wallet($user)->reserved)->toBe(0);
@@ -157,9 +166,15 @@ test('failure of the selected source never calls another provider and releases r
     Http::fake([
         'nro.giaicaptcha.vn/*' => Http::failedConnection(),
         'captcha.plusdino.com/*' => match ($failure) {
-            'short' => Http::response(['captcha' => '123']),
-            'false' => Http::response(['captcha' => '12345', 'status' => false]),
-            'http' => Http::response(['captcha' => '12345'], 500),
+            'short' => Http::response(['success' => true, 'predictions' => ['captcha' => '123']]),
+            'false' => Http::response(['success' => false, 'predictions' => ['captcha' => '12345']]),
+            'missing success' => Http::response(['predictions' => ['captcha' => '12345']]),
+            'string success' => Http::response(['success' => 'true', 'predictions' => ['captcha' => '12345']]),
+            'missing predictions' => Http::response(['success' => true]),
+            'invalid predictions' => Http::response(['success' => true, 'predictions' => '12345']),
+            'empty captcha' => Http::response(['success' => true, 'predictions' => ['captcha' => ' ']]),
+            'numeric captcha' => Http::response(['success' => true, 'predictions' => ['captcha' => 12345]]),
+            'http' => Http::response(['success' => true, 'predictions' => ['captcha' => '12345']], 500),
             'malformed' => Http::response('private-token/+? not json'),
         },
     ]);
@@ -172,7 +187,7 @@ test('failure of the selected source never calls another provider and releases r
         ->and(CaptchaProviderAttempt::query()->pluck('status')->all())->toBe(['failed'])
         ->and(CaptchaProviderAttempt::query()->latest('id')->first()->toJson())->not->toContain('private-token');
     $this->assertDatabaseCount('captcha_transactions', 0);
-})->with(['short', 'false', 'http', 'malformed']);
+})->with(['short', 'false', 'missing success', 'string success', 'missing predictions', 'invalid predictions', 'empty captcha', 'numeric captcha', 'http', 'malformed']);
 
 test('no enabled sources returns a clear error without reserving tokens or calling providers', function (): void {
     CaptchaProvider::query()->update(['is_enabled' => false]);

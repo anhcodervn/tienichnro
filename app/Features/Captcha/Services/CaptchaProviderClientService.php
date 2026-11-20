@@ -36,13 +36,17 @@ class CaptchaProviderClientService
             if (! is_array($payload)) {
                 $payload = ['success' => false, 'error' => 'invalid_response', 'body' => mb_substr($response->body(), 0, 10000)];
             }
-            $result = in_array($provider->driver, ['plusdino', 'phamgiang'], true) ? ($payload['captcha'] ?? null) : ($payload['result'] ?? null);
+            $result = match ($provider->driver) {
+                'plusdino' => data_get($payload, 'predictions.captcha'),
+                'phamgiang' => $payload['captcha'] ?? null,
+                default => $payload['result'] ?? null,
+            };
             $success = $response->successful() && is_string($result) && trim($result) !== '';
             if ($provider->driver === 'phamgiang') {
                 $success = $success && ($payload['status'] ?? null) === 0;
             } elseif ($provider->driver === 'plusdino') {
                 $success = $success && preg_match('/\A[a-zA-Z0-9]{4,7}\z/', trim((string) $result)) === 1
-                    && ($payload['success'] ?? true) !== false && ($payload['status'] ?? true) !== false;
+                    && ($payload['success'] ?? null) === true;
             } else {
                 $success = $success && ($payload['success'] ?? null) === true;
             }
